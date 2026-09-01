@@ -33,11 +33,8 @@
 import { buildArtifactFromSnapshot } from '@/engine/evolution/adapters';
 import { relationshipYears } from '@/engine/species/shared/relationshipYear';
 import { buildTreeSpeciesBlueprint } from '@/engine/species/tree';
-import {
-  COUPLE_TIME_ZONE,
-  ENGINE_VERSION,
-  type PortalSources,
-} from '@/features/world/portalSources';
+import { COUPLE_TIME_ZONE, ENGINE_VERSION } from '@/features/world/coupleEngine';
+import type { PortalSources } from '@/features/world/portalSources';
 
 /** Скільки наповненості має рік, якого не торкнувся жоден модуль. */
 export const EMPTY_YEAR_FILL = 0.3;

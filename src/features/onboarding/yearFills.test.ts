@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { EvolutionSourceSnapshot } from '@/engine/evolution/adapters';
+import type { EvolutionSourceSnapshot, PlanSource, WishlistSource } from '@/engine/evolution/adapters';
 import type { PortalSources } from '@/features/world/portalSources';
 import { EMPTY_YEAR_FILL, relationshipYearFills } from './yearFills';
 
@@ -132,5 +132,93 @@ describe('роки давньої пари', () => {
 
     expect(summary.years).toEqual([]);
     expect(summary.averageFill).toBe(0);
+  });
+});
+
+// ============================================================
+// Скільки насправді вартий прохід по роках.
+// ------------------------------------------------------------
+// Екран колись писав парі «вже N із СЕМИ, після яких рік перестає бути
+// порожнім». Сімку ніхто не міряв — її придумав я. Вимір показав інше, і
+// саме тому ці два числа тепер стоять у тесті: щоб наступна редакція
+// копірайту сперлась на рушій, а не на відчуття.
+// ============================================================
+
+const MID_2017 = '2017-12-09';
+
+function donePlan(id: number, category: string): PlanSource {
+  return {
+    id,
+    category,
+    status: 'done',
+    startDate: MID_2017,
+    endDate: null,
+    completedAt: `${MID_2017}T12:00:00.000Z`,
+    createdAt: MID_2017,
+  };
+}
+
+function grantedWish(id: number): WishlistSource {
+  return {
+    id,
+    fulfilled: true,
+    fulfilledAt: `${MID_2017}T12:00:00.000Z`,
+    giftDate: MID_2017,
+    isShared: true,
+    priority: null,
+    ownerId: 1,
+    fulfilledById: 2,
+  };
+}
+
+const fillOf2017 = (sources: PortalSources): number => (
+  fills(sources).years.find((year) => year.label === 2017)!.fill
+);
+
+describe('віхи року: перша важить більше за наступні шість', () => {
+  it('одна віха вже виводить рік із порожнечі', () => {
+    /*
+     * 0.3 → 0.392. Наповненість зважена в бік ШИРОТИ (`yearActivity`:
+     * 0.6 за модулі, 0.4 за обсяг), тож перший же виконаний план
+     * відкриває рокові цілий модуль із шести.
+     */
+    expect(fillOf2017(sourcesWith({}))).toBeCloseTo(EMPTY_YEAR_FILL, 3);
+    expect(fillOf2017(sourcesWith({ plans: [donePlan(1, 'trip')] }))).toBeCloseTo(0.392, 3);
+  });
+
+  it('сім віх дають менше, ніж удвічі більше за одну', () => {
+    /*
+     * 0.473 проти 0.392 — шість додаткових дотиків додають 0.081, тобто
+     * менше за перший. Усі вони пишуть в ОДИН модуль, а глибина в
+     * межах модуля насичується (`YEAR_DEPTH_HALF_SATURATION`).
+     *
+     * Звідси й правило екрана: обіцяти можна вихід із порожнечі, а не
+     * «сім, після яких рік нарешті рахується».
+     */
+    const seven = [1, 2, 3, 4, 5, 6, 7].map((id) => donePlan(id, 'trip'));
+    const many = fillOf2017(sourcesWith({ plans: seven }));
+
+    expect(many).toBeCloseTo(0.473, 3);
+    expect(many).toBeLessThan(0.392 * 2);
+  });
+
+  it('другий модуль важить більше за шість зайвих віх у першому', () => {
+    /*
+     * План + подарунок (0.48) переважує СІМ планів (0.473). Це вимір, а
+     * не смак, і з нього випливає наступний крок плану: прохід по роках
+     * упреться не в кількість фішок, а в те, що лише `plans` уміє
+     * зберегти спогад, у якого пара пам'ятає рік, а не день
+     * (`date_precision`). Поки другий такий модуль не з'явиться, фішки
+     * лишаються в одному.
+     */
+    const two = fillOf2017(sourcesWith({
+      plans: [donePlan(1, 'trip')],
+      wishlistItems: [grantedWish(1)],
+    }));
+    const seven = fillOf2017(sourcesWith({
+      plans: [1, 2, 3, 4, 5, 6, 7].map((id) => donePlan(id, 'trip')),
+    }));
+
+    expect(two).toBeGreaterThan(seven);
   });
 });

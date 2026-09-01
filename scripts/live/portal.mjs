@@ -203,6 +203,29 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
       '--ignore-gpu-blocklist',
       '--enable-unsafe-swiftshader',
       '--use-angle=swiftshader-webgl',
+      /*
+       * Власний трафік браузера, який у пісочниці нікуди не доходить.
+       *
+       * Chromium на старті стукає у свої служби — variations, safe
+       * browsing, component update. До порталу це не має стосунку, але
+       * тут кожен такий виклик іде через проксі й ОБРИВАЄТЬСЯ: виміряно
+       * 26 мертвих тунелів за прогін до `www.google.com`,
+       * `accounts.google.com` і `android.clients.google.com`, кожен по
+       * шість секунд.
+       *
+       * ЧЕСНО ПРО МЕЖУ ЦІЄЇ ПРАВКИ: я спершу вирішив, що саме вони й
+       * підвішують харнес, і помилився — перевірка зависала через
+       * відсутній `.env.live`, тобто через облікові дані, а не мережу.
+       * Прапорці лишаються, бо 26 обірваних з'єднань на кожен знімок —
+       * це шум, який ховає справжні збої мережі в логах. Але лікують
+       * вони шум, а не зависання.
+       */
+      '--disable-background-networking',
+      '--disable-component-update',
+      '--disable-sync',
+      '--no-first-run',
+      '--no-default-browser-check',
+      '--metrics-recording-only',
     ],
   });
 

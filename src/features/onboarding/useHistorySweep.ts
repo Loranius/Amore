@@ -16,14 +16,28 @@ import {
   fetchPortalSources,
   type PortalSources,
 } from '@/features/world/portalSources';
-import { sweepStepOf, type SweepStep } from './sweepModel';
-import { relationshipYearFills, type HistoryFillSummary } from './yearFills';
+import {
+  middleOfYear,
+  sweepStepOf,
+  type Milestone,
+  type SweepStep,
+} from './sweepModel';
+import {
+  relationshipYearFills,
+  type HistoryFillSummary,
+  type RelationshipYearFill,
+} from './yearFills';
 
 export type { SweepStep };
 
 export interface AnniversaryDraft {
   title: string;
   date: string;
+}
+
+export interface MilestoneDraft {
+  milestone: Milestone;
+  year: RelationshipYearFill;
 }
 
 const SOURCES_KEY = ['onboarding', 'portal-sources'] as const;
@@ -48,6 +62,9 @@ export interface HistorySweep {
   summary: HistoryFillSummary;
   setStartDate: (date: string) => Promise<void>;
   addAnniversary: (draft: AnniversaryDraft) => Promise<void>;
+  addMilestone: (draft: MilestoneDraft) => Promise<void>;
+  /** Скільки віх уже лежить у кожному році стосунків, за номером року. */
+  milestonesByYear: Map<number, number>;
   isSaving: boolean;
 }
 
@@ -68,6 +85,7 @@ export function useHistorySweep(): HistorySweep {
       client.invalidateQueries({ queryKey: SOURCES_KEY }),
       client.invalidateQueries({ queryKey: qk.events() }),
       client.invalidateQueries({ queryKey: qk.settings() }),
+      client.invalidateQueries({ queryKey: qk.plans() }),
     ]);
   }, [client]);
 
@@ -114,6 +132,38 @@ export function useHistorySweep(): HistorySweep {
     onSuccess: refresh,
   });
 
+  const addMilestone = useMutation({
+    mutationFn: async ({ milestone, year }: MilestoneDraft) => {
+      /*
+       * Віха — це ВИКОНАНИЙ план, і це не обхідний шлях.
+       *
+       * Спогад був би природнішим словом, але таблиця спогадів вимагає
+       * фотографію (`memories.photo_url NOT NULL`), а власник вирішив, що
+       * фото йде окремим кроком пізніше. План же вимагає лише назву, і
+       * «ми це зробили» — рівно те, що означає `status: 'done'` з датою в
+       * минулому.
+       *
+       * Категорія вирішує КАНАЛ росту (`adapters/rules.ts`): подорож —
+       * exploration, переїзд — stability, весілля — culture. Тобто
+       * фішка не лише додає подію, а й вибирає, яким вийде рік.
+       */
+      const day = middleOfYear(year.startsAt, year.endsAt);
+      const row: InsertRow<'plans'> = {
+        title: milestone.label,
+        category: milestone.category,
+        status: 'done',
+        start_date: day,
+        completed_at: `${day}T12:00:00.000Z`,
+        // Пара пам'ятає рік, а не день: портал так і покаже.
+        date_precision: 'year',
+        created_by: user.id,
+      };
+      const { error } = await supabase.from('plans').insert(row);
+      if (error) throw error;
+    },
+    onSuccess: refresh,
+  });
+
   const data: PortalSources | undefined = sources.data;
   const relationshipStartedAt = data?.relationshipStartedAt.trim() ?? '';
 
@@ -130,6 +180,20 @@ export function useHistorySweep(): HistorySweep {
     return relationshipYearFills(data, asOf, `couple:${data.userIds.join('-')}`);
   }, [data, relationshipStartedAt, asOf]);
 
+  const milestonesByYear = useMemo(() => {
+    const counts = new Map<number, number>();
+    if (!data) return counts;
+    const done = data.snapshot.plans.filter((plan) => plan.status === 'done');
+    for (const year of summary.years) {
+      const within = done.filter((plan) => {
+        const at = plan.completedAt ?? plan.endDate ?? plan.startDate;
+        return typeof at === 'string' && at >= year.startsAt && at < year.endsAt;
+      });
+      counts.set(year.index, within.length);
+    }
+    return counts;
+  }, [data, summary.years]);
+
   const step = sweepStepOf({
     relationshipStartedAt,
     yearlyAnniversaryCount: yearlyAnniversaries.length,
@@ -145,6 +209,8 @@ export function useHistorySweep(): HistorySweep {
     summary,
     setStartDate: async (date) => { await setStartDate.mutateAsync(date); },
     addAnniversary: async (draft) => { await addAnniversary.mutateAsync(draft); },
-    isSaving: setStartDate.isPending || addAnniversary.isPending,
+    addMilestone: async (draft) => { await addMilestone.mutateAsync(draft); },
+    milestonesByYear,
+    isSaving: setStartDate.isPending || addAnniversary.isPending || addMilestone.isPending,
   };
 }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { sweepStepOf, yearsBehind } from './sweepModel';
+import { PLAN_CATEGORY_ORDER } from '@/features/plans/planConstants';
+import { PLAN_PRESSURES } from '@/engine/evolution/adapters/rules';
+import { YEAR_MILESTONES, middleOfYear, quietestYearIndex, sweepStepOf, yearsBehind } from './sweepModel';
 import type { RelationshipYearFill } from './yearFills';
 
 function year(index: number, complete: boolean): RelationshipYearFill {
@@ -24,7 +26,7 @@ describe('крок заповнення історії виводиться з �
       .toBe('anniversaries');
   });
 
-  it('річниця, додана ПОЗА онбордингом, закриває крок', () => {
+  it('річниця, додана ПОЗА онбордингом, відкриває прохід по роках', () => {
     /*
      * Заради цього крок і виводиться, а не зберігається. Збережений крок
      * не знав би про подію, створену в календарі, і питав би те, що вже
@@ -32,7 +34,58 @@ describe('крок заповнення історії виводиться з �
      * не однієї вади.
      */
     expect(sweepStepOf({ relationshipStartedAt: '2015-06-10', yearlyAnniversaryCount: 1 }))
-      .toBe('done');
+      .toBe('years');
+  });
+
+  it('стану «готово» немає навмисно', () => {
+    /*
+     * Прохід по роках не завершується сам: пара має право лишити рік
+     * порожнім, і жодне число не скаже, що історія «заповнена». Тому
+     * останній крок — це `years`, а вийти з нього можна будь-коли
+     * кнопкою, а не досягнувши умови.
+     */
+    const steps = new Set([
+      sweepStepOf({ relationshipStartedAt: '', yearlyAnniversaryCount: 0 }),
+      sweepStepOf({ relationshipStartedAt: '2015-06-10', yearlyAnniversaryCount: 0 }),
+      sweepStepOf({ relationshipStartedAt: '2015-06-10', yearlyAnniversaryCount: 9 }),
+    ]);
+
+    expect([...steps].sort()).toEqual(['anniversaries', 'date', 'years']);
+  });
+});
+
+describe('віха сідає в середину року, а не на його межу', () => {
+  it('середина — це середина', () => {
+    // 365 днів, половина — 182.5, тобто 9 грудня о полудні. Очікування
+    // «10 грудня» тут спершу й стояло: моя арифметика, не помилка коду.
+    expect(middleOfYear('2017-06-10', '2018-06-10')).toBe('2017-12-09');
+  });
+
+  it('перевернутий або зіпсований проміжок віддає початок, а не NaN', () => {
+    expect(middleOfYear('2018-06-10', '2017-06-10')).toBe('2018-06-10');
+    expect(middleOfYear('нонсенс', '2018-06-10')).toBe('нонсенс');
+  });
+});
+
+describe('прохід починається з найтихішого року', () => {
+  it('береться найменш наповнений ЗАВЕРШЕНИЙ рік', () => {
+    /*
+     * Не перший: прохід кидають на середині, і кинути треба там, де вже
+     * все одно порожньо.
+     */
+    const years = [
+      { ...year(1, true), fill: 0.62 },
+      { ...year(2, true), fill: 0.30 },
+      { ...year(3, true), fill: 0.48 },
+      { ...year(4, false), fill: 0.10 },
+    ];
+
+    expect(quietestYearIndex(years)).toBe(1);
+  });
+
+  it('коли завершених років ще немає — перший', () => {
+    expect(quietestYearIndex([year(1, false)])).toBe(0);
+    expect(quietestYearIndex([])).toBe(0);
   });
 });
 
@@ -52,5 +105,37 @@ describe('смуга рахує роки позаду, а не стовпчик�
 
   it('порожня історія — нуль років позаду, а не помилка', () => {
     expect(yearsBehind([])).toBe(0);
+  });
+});
+
+describe('фішки року обіцяють рівно те, що зробить рушій', () => {
+  it('кожна категорія відома і порталу, і рушію', () => {
+    /*
+     * Дві перевірки, бо в цієї помилки два тихих кінці. Портал намалює
+     * невідому категорію без значка; рушій же НЕ відкине її, а підмінить
+     * на `other` (`adapters/plans.ts`) — і «Подорож» ростиме сталістю,
+     * тобто рік вийде не тим, чим його назвали.
+     */
+    for (const milestone of YEAR_MILESTONES) {
+      expect(PLAN_CATEGORY_ORDER, milestone.label).toContain(milestone.category);
+      expect(Object.keys(PLAN_PRESSURES), milestone.label).toContain(milestone.category);
+    }
+  });
+
+  it('фішки не обіцяють каналів, яких у них немає', () => {
+    /*
+     * Підказка екрана називає три канали поіменно: подорож —
+     * дослідження, переїзд — сталість, весілля — значущість. Якщо
+     * PLAN_PRESSURES колись переїде, впаде саме ця перевірка, а не
+     * довіра пари до екрана.
+     */
+    const channelOf = (label: string) => {
+      const milestone = YEAR_MILESTONES.find((entry) => entry.label.startsWith(label))!;
+      return PLAN_PRESSURES[milestone.category]!;
+    };
+
+    expect(channelOf('Подорож').exploration).toBeGreaterThan(0.5);
+    expect(channelOf('Переїзд').stability).toBeGreaterThan(0.5);
+    expect(channelOf('Весілля').significance).toBeGreaterThan(0.2);
   });
 });

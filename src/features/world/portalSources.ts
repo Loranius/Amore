@@ -24,8 +24,7 @@ import {
   evolutionWishlistFromPairArchive,
 } from '@/features/home/crystal3d/evolution/sourceSnapshot';
 
-export const ENGINE_VERSION = '1.0.0';
-export const COUPLE_TIME_ZONE = 'Europe/Kyiv';
+export { COUPLE_TIME_ZONE, ENGINE_VERSION } from './coupleEngine';
 
 export interface PortalSources {
   relationshipStartedAt: string;

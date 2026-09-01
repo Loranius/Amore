@@ -149,7 +149,24 @@
   gap: 6px;
   min-width: 0;
   height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
 }
+
+/* Смуга під час проходу — навігація, тож стовпчик має бути натисним. */
+button.sweep-strip-year { cursor: pointer; }
+
+/* Рік, який зараз заповнюють. Кільце, а не заливка: сама заливка вже
+   зайнята наповненістю, і другий її голос тут читався б як «більше». */
+.sweep-strip-year--on .sweep-strip-track {
+  outline: 2px solid color-mix(in srgb, var(--accent) 52%, transparent);
+  outline-offset: 2px;
+}
+
+.sweep-strip-year--on .sweep-strip-label { color: var(--text); }
 
 .sweep-strip-track {
   position: relative;
@@ -189,6 +206,50 @@
   color: var(--muted);
   text-align: center;
   font-variant-numeric: tabular-nums;
+}
+
+/* ── Перемикач років ─────────────────────────────────────── */
+
+.sweep-year-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.sweep-year-arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sweep-year-arrow:disabled { opacity: 0.4; cursor: default; }
+
+.sweep-year-name {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.sweep-year-name small {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
 }
 
 .sweep-actions {

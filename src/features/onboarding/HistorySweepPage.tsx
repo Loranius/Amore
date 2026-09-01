@@ -18,6 +18,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { CheckIcon } from '@/components/icons/UiIcon';
 import { formatSinceDate } from '@/features/home/homeUtils';
 import { ANNIVERSARY_SUGGESTIONS, useHistorySweep } from './useHistorySweep';
+import { YEAR_MILESTONES, quietestYearIndex } from './sweepModel';
 import { YearStrip } from './YearStrip';
 import './historySweep.css';
 
@@ -33,9 +34,19 @@ export function HistorySweepPage() {
   const [startDraft, setStartDraft] = useState('');
   const [title, setTitle] = useState(ANNIVERSARY_SUGGESTIONS[0]!);
   const [date, setDate] = useState('');
+  /*
+   * `null` — «ще не обрано вручну». Тоді відкривається найтихіший рік:
+   * прохід кидають на середині, і кидати треба там, де вже все одно
+   * порожньо.
+   */
+  const [picked, setPicked] = useState<number | null>(null);
 
   const today = useMemo(todayInput, []);
   const canAdd = title.trim() !== '' && date !== '' && !sweep.isSaving;
+
+  const years = sweep.summary.years;
+  const activeIndex = picked ?? quietestYearIndex(years);
+  const active = years[activeIndex];
 
   return (
     <div className="page sweep-page">
@@ -141,9 +152,92 @@ export function HistorySweepPage() {
         </section>
       )}
 
-      <YearStrip years={sweep.summary.years} emptyCount={sweep.summary.emptyCount} />
+      {sweep.step === 'years' && active && (
+        <section className="sweep-step">
+          <div className="sweep-year-nav">
+            <button
+              type="button"
+              className="sweep-year-arrow"
+              disabled={activeIndex === 0}
+              onClick={() => setPicked(Math.max(0, activeIndex - 1))}
+              aria-label="Попередній рік"
+            >
+              ‹
+            </button>
+            <span className="sweep-year-name">
+              {active.label} — {active.label + 1}
+              <small>{active.index}-й рік{active.complete ? '' : ' · триває'}</small>
+            </span>
+            <button
+              type="button"
+              className="sweep-year-arrow"
+              disabled={activeIndex >= years.length - 1}
+              onClick={() => setPicked(Math.min(years.length - 1, activeIndex + 1))}
+              aria-label="Наступний рік"
+            >
+              ›
+            </button>
+          </div>
 
-      {sweep.step === 'done' && (
+          <h2 className="sweep-question">Що було того року?</h2>
+          <p className="sweep-hint">
+            {/*
+              * Названо прямо, бо це не дрібниця: фішка вибирає не лише
+              * подію, а й КАНАЛ росту. Пара має розуміти, що рік
+              * подорожей і рік переїздів дадуть різні артефакти.
+              */}
+            Кожен дотик — це виконана справа того року. Подорож росте
+            дослідженням, переїзд — сталістю, весілля — значущістю: рік
+            складеться з того, чим він насправді був.
+          </p>
+
+          <div className="sweep-chips">
+            {YEAR_MILESTONES.map((milestone) => (
+              <button
+                type="button"
+                key={milestone.label}
+                className="sweep-chip"
+                disabled={sweep.isSaving}
+                onClick={() => void sweep.addMilestone({ milestone, year: active })}
+              >
+                {milestone.label}
+              </button>
+            ))}
+          </div>
+
+          {/*
+            * ЧОМУ ТУТ НЕМАЄ ЦІЛІ. Перша редакція писала «вже N із семи,
+            * після яких рік перестає бути порожнім» — і сімка була
+            * вигадана. Виміряно на рушії: порожній рік це 0.3, ОДНА віха
+            * дає 0.392, а сім разом — 0.473. Тобто рік виходить із
+            * порожнечі з першого дотику, а решта шість додають разом
+            * менше, ніж перший, бо всі вони пишуть в ОДИН модуль
+            * (`plans`), а наповненість зважена в бік широти.
+            *
+            * Лічильник із цілі перетворений на стан: він каже, що вже є,
+            * і не обіцяє числа, якого рушій не дасть.
+            */}
+          <p className="sweep-hint">
+            {(sweep.milestonesByYear.get(active.index) ?? 0) === 0
+              ? 'Поки що цей рік порожній — такий самий, як усі роки, яких портал не бачив.'
+              : `Уже ${sweep.milestonesByYear.get(active.index) ?? 0} — і цей рік більше не порожній.
+                 Далі кожен дотик радше вирішує, ЧИМ рік був, ніж наскільки він повний.`}
+          </p>
+        </section>
+      )}
+
+      {sweep.step === 'years' ? (
+        <YearStrip
+          years={years}
+          emptyCount={sweep.summary.emptyCount}
+          activeIndex={activeIndex}
+          onPick={setPicked}
+        />
+      ) : (
+        <YearStrip years={years} emptyCount={sweep.summary.emptyCount} />
+      )}
+
+      {sweep.step === 'years' && (
         <div className="sweep-actions">
           <button type="button" className="btn" onClick={() => void navigate('/')}>
             До артефакта

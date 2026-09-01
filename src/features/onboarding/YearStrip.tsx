@@ -17,6 +17,10 @@ import type { RelationshipYearFill } from './yearFills';
 interface YearStripProps {
   years: RelationshipYearFill[];
   emptyCount: number;
+  /** Рік, який зараз заповнюють; -1 — жодного. */
+  activeIndex?: number;
+  /** Смуга стає й навігацією: рік обирається дотиком по стовпчику. */
+  onPick?: (index: number) => void;
 }
 
 /** Скільки років ще вміщується з підписом на кожному стовпчику. */
@@ -36,7 +40,7 @@ function emptyWord(count: number): string {
   return count % 10 === 1 && count % 100 !== 11 ? 'порожній' : 'порожні';
 }
 
-export function YearStrip({ years, emptyCount }: YearStripProps) {
+export function YearStrip({ years, emptyCount, activeIndex = -1, onPick }: YearStripProps) {
   if (years.length === 0) return null;
   const step = years.length <= LABEL_EVERY_YEAR ? 1 : 2;
   const completed = yearsBehind(years);
@@ -60,19 +64,42 @@ export function YearStrip({ years, emptyCount }: YearStripProps) {
       <div className="sweep-strip-bars" role="img" aria-label={
         `Роки стосунків: ${years.length}, з них порожніх ${emptyCount}`
       }>
-        {years.map((year, position) => (
-          <div className="sweep-strip-year" key={year.index}>
-            <div className="sweep-strip-track">
-              <div
-                className={`sweep-strip-fill${year.complete ? '' : ' sweep-strip-fill--current'}`}
-                style={{ height: `${Math.round(year.fill * 100)}%` }}
-              />
-            </div>
-            <span className="sweep-strip-label">
-              {position % step === 0 || position === years.length - 1 ? year.label : ''}
-            </span>
-          </div>
-        ))}
+        {years.map((year, position) => {
+          const body = (
+            <>
+              <div className="sweep-strip-track">
+                <div
+                  className={`sweep-strip-fill${year.complete ? '' : ' sweep-strip-fill--current'}`}
+                  style={{ height: `${Math.round(year.fill * 100)}%` }}
+                />
+              </div>
+              <span className="sweep-strip-label">
+                {position % step === 0 || position === years.length - 1 ? year.label : ''}
+              </span>
+            </>
+          );
+          const className = `sweep-strip-year${position === activeIndex ? ' sweep-strip-year--on' : ''}`;
+
+          /*
+           * Кнопка ЛИШЕ коли по ній справді можна тицьнути. Див була б
+           * простішою, але смуга під час проходу — це навігація, і
+           * навігація мусить діставатись із клавіатури.
+           */
+          return onPick
+            ? (
+              <button
+                type="button"
+                className={className}
+                key={year.index}
+                onClick={() => onPick(position)}
+                aria-label={`${year.label} — ${year.label + 1}, ${year.index}-й рік`}
+                aria-pressed={position === activeIndex}
+              >
+                {body}
+              </button>
+            )
+            : <div className={className} key={year.index}>{body}</div>;
+        })}
       </div>
     </div>
   );

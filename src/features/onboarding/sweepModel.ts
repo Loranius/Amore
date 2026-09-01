@@ -4,9 +4,45 @@
 // Обидві живуть окремо від React навмисно: у них уже була по помилці, і
 // жодну з них не було видно ані з типів, ані з екрана — лише з числа.
 // ============================================================
+import type { PlanCategory } from '@/types';
 import type { RelationshipYearFill } from './yearFills';
 
-export type SweepStep = 'date' | 'anniversaries' | 'done';
+
+export type SweepStep = 'date' | 'anniversaries' | 'years';
+
+/**
+ * Віха року — те, що пара додає одним дотиком.
+ *
+ * `category` тут не оздоба: рушій бере з неї КАНАЛ, яким росте артефакт
+ * (`adapters/rules.ts`). Подорож — це exploration, переїзд — stability,
+ * весілля — culture зі значущістю, навчання — achievement. Тобто вісім
+ * фішок нижче не просто рахують події: вони вирішують, ЯКИМ вийде
+ * артефакт року.
+ */
+export interface Milestone {
+  label: string;
+  /**
+   * `PlanCategory`, а не власний перелік. Категорія тут читається ДВІЧІ:
+   * порталом — щоб намалювати картку плану, і рушієм — щоб узяти канал
+   * росту. Власний перелік розійшовся б із першим мовчки, а з другим —
+   * ще тихіше: невідому категорію `adapters/plans.ts` не відкидає, а
+   * підміняє на `other`. Тобто фішка «Подорож» і далі рахувалась би,
+   * але росла б сталістю замість дослідження, і екран обіцяв би те,
+   * чого не робить.
+   */
+  category: PlanCategory;
+}
+
+export const YEAR_MILESTONES: readonly Milestone[] = [
+  { label: 'Подорож', category: 'trip' },
+  { label: 'Переїзд', category: 'home' },
+  { label: 'Весілля', category: 'event' },
+  { label: 'Навчання', category: 'learning' },
+  { label: 'Побачення, яке пам\'ятаємо', category: 'date' },
+  { label: 'Відпочинок', category: 'rest' },
+  { label: 'Концерт', category: 'event' },
+  { label: 'Щось своє', category: 'other' },
+];
 
 export interface SweepState {
   relationshipStartedAt: string;
@@ -28,7 +64,41 @@ export interface SweepState {
  */
 export function sweepStepOf(state: SweepState): SweepStep {
   if (state.relationshipStartedAt.trim() === '') return 'date';
-  return state.yearlyAnniversaryCount === 0 ? 'anniversaries' : 'done';
+  return state.yearlyAnniversaryCount === 0 ? 'anniversaries' : 'years';
+}
+
+/**
+ * Середина року стосунків — дата, яку отримує віха.
+ *
+ * Пара пам'ятає РІК, а не день: «ми переїхали у сімнадцятому». Ставити
+ * перше число року означало б збити всі віхи в одну купу на межі,
+ * ставити сьогоднішній день — покласти минуле в теперішнє. Середина
+ * чесніша за обидва, і поруч із нею йде `date_precision: 'year'`, тобто
+ * портал показує рік, а не вигаданий день.
+ */
+export function middleOfYear(startsAt: string, endsAt: string): string {
+  const from = Date.parse(`${startsAt}T00:00:00.000Z`);
+  const to = Date.parse(`${endsAt}T00:00:00.000Z`);
+  if (!Number.isFinite(from) || !Number.isFinite(to) || to <= from) return startsAt;
+  return new Date(from + (to - from) / 2).toISOString().slice(0, 10);
+}
+
+/**
+ * З якого року починати прохід — із найтихішого.
+ *
+ * Не з першого: пара кине на середині, і кинути треба там, де вже все
+ * одно порожньо. Береться найменш наповнений ЗАВЕРШЕНИЙ рік; якщо
+ * завершених немає — перший-ліпший.
+ */
+export function quietestYearIndex(years: readonly RelationshipYearFill[]): number {
+  let best = -1;
+  let lowest = Number.POSITIVE_INFINITY;
+  for (let index = 0; index < years.length; index += 1) {
+    const year = years[index]!;
+    if (!year.complete) continue;
+    if (year.fill < lowest) { lowest = year.fill; best = index; }
+  }
+  return best === -1 ? 0 : best;
 }
 
 /**
