@@ -3,8 +3,8 @@ import { supabase } from '@/lib/supabase';
 import { compress } from '@/lib/images';
 import { qk } from '@/lib/queryKeys';
 import { useToast } from '@/providers/ToastProvider';
-import { nearestPin } from './momentPlace';
 import type { PlaceCandidate } from './momentPlace';
+import { ensurePlacePin } from './placePins';
 import type { InsertRow, MapPinRow, MemoryMomentRow, MemoryRow } from '@/types';
 
 // ============================================================
@@ -378,44 +378,25 @@ export function useMomentMutations() {
 /**
  * Місце спогаду → `map_pins.id`.
  *
- * Спершу пошук серед наявних міток, і лише потім вставка нової. Без цього
- * кроку та сама тераса з'являлась би на карті пари щоразу, коли її обирають
- * у спогаді, — з різними назвами й на відстані десятка метрів одна від
- * одної. Допуск і те, чому він саме такий, описані в `momentPlace.ts`.
+ * Пошук серед наявних міток, дедуплікація й дата візиту живуть у
+ * `placePins.ts`: ту саму дію робить і заповнення історії, а дві копії
+ * розійшлись би тихо — одна дедуплікує, друга ні, і в пари з'являється
+ * друга тераса за десять метрів від першої.
  *
- * Категорія нової мітки — `visited`: спогад за визначенням про те, де пара
- * вже була. «Улюблене» чи «ресторан» пара ставить сама на карті.
+ * `visitedAt` — дата самого спогаду, і саме її бракувало. Мітка без
+ * `visited_at` невидима рушієві (`adapters/map.ts`), а цей шлях —
+ * ЄДИНИЙ живий спосіб створити мітку в порталі: другий, у
+ * `useMapPinMutations`, не має жодного споживача. Тобто карта, один із
+ * шести модулів року, не зароблялась жодним дотиком пари.
  */
 export function useEnsurePlacePin() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (v: { place: PlaceCandidate; userId: number }): Promise<number> => {
-      const { data: pins, error: readErr } = await supabase
-        .from('map_pins').select('id,title,city,country,lat,lng');
-      if (readErr) throw readErr;
-
-      const existing = nearestPin(
-        ((pins ?? []) as MapPinRow[]).map((p) => ({
-          id: p.id, title: p.title, city: p.city, country: p.country,
-          lat: Number(p.lat), lng: Number(p.lng),
-        })),
-        v.place,
-      );
-      if (existing) return existing.id;
-
-      const row: InsertRow<'map_pins'> = {
-        title: v.place.title,
-        category: 'visited',
-        lat: v.place.lat,
-        lng: v.place.lng,
-        city: v.place.city,
-        country: v.place.country,
-        created_by: v.userId,
-      };
-      const { data, error } = await supabase.from('map_pins').insert(row).select('id').single();
-      if (error) throw error;
-      return (data as { id: number }).id;
-    },
+    mutationFn: async (
+      v: { place: PlaceCandidate; userId: number; visitedAt: string },
+    ): Promise<number> => (
+      (await ensurePlacePin(v.place, v.userId, v.visitedAt)).id
+    ),
     onSuccess: () => {
       // Нова мітка мусить з'явитись і на карті — інакше пара побачила б її
       // лише після перезавантаження застосунку.

@@ -140,3 +140,47 @@ export function placeFromFeature(feature: GeoFeature): PlaceCandidate | null {
     lng,
   };
 }
+
+/** Мітка з датою візиту — рівно те, що потрібно рішенню нижче. */
+export interface DatedPin extends PinLike {
+  visited_at: string | null;
+}
+
+/** Рішення, яке приймається до першого запису. Винесено заради тесту. */
+export type PlacePinDecision =
+  | { kind: 'insert' }
+  | { kind: 'date'; id: number }
+  | { kind: 'keep'; id: number; visitedAt: string };
+
+/**
+ * Чи є вже мітка для цього місця, і що з нею робити.
+ *
+ * Уся розвилка тут чиста навмисно: у порталі немає жодного підробленого
+ * клієнта Supabase, і заводити його заради трьох гілок означало б
+ * перевіряти мок, а не правило. Правило ж просте й коштує дорого, якщо
+ * помилитись: мітку не дублювати, дату не переписувати, а датувати —
+ * лише порожню.
+ */
+export function decidePlacePin(
+  rows: readonly DatedPin[],
+  place: PlaceCandidate,
+): PlacePinDecision {
+  const existing = nearestPin(
+    rows.map((pin) => ({
+      id: pin.id,
+      title: pin.title,
+      city: pin.city,
+      country: pin.country,
+      lat: Number(pin.lat),
+      lng: Number(pin.lng),
+    })),
+    place,
+  );
+  if (!existing) return { kind: 'insert' };
+
+  const found = rows.find((pin) => pin.id === existing.id);
+  return found?.visited_at
+    ? { kind: 'keep', id: existing.id, visitedAt: found.visited_at }
+    : { kind: 'date', id: existing.id };
+}
+

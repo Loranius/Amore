@@ -19,6 +19,7 @@ import { CheckIcon } from '@/components/icons/UiIcon';
 import { formatSinceDate } from '@/features/home/homeUtils';
 import { ANNIVERSARY_SUGGESTIONS, useHistorySweep } from './useHistorySweep';
 import { YEAR_MILESTONES, quietestYearIndex } from './sweepModel';
+import { SweepPlaces } from './SweepPlaces';
 import { YearStrip } from './YearStrip';
 import './historySweep.css';
 
@@ -224,6 +225,15 @@ export function HistorySweepPage() {
                  Далі кожен дотик радше вирішує, ЧИМ рік був, ніж наскільки він повний.`}
           </p>
         </section>
+      )}
+
+      {sweep.step === 'years' && active && (
+        <SweepPlaces
+          year={active}
+          count={sweep.placesByYear.get(active.index) ?? 0}
+          isSaving={sweep.isSaving}
+          onAdd={(place) => sweep.addPlace({ place, year: active })}
+        />
       )}
 
       {sweep.step === 'years' ? (

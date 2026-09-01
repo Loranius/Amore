@@ -260,3 +260,87 @@ button.sweep-strip-year { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .sweep-strip-fill { transition: none; }
 }
+
+/* ── Пошук місця ─────────────────────────────────────────────
+   Той самий пошук, що в нотатнику спогадів, але без аркуша: тут він не
+   перекриває екран, бо смуга років під ним і є відповіддю на «навіщо». */
+
+.sweep-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+/* Поле всередині рамки: власної рамки в нього бути не повинно, інакше
+   на екрані дві межі одна в одній. */
+.sweep-search-input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 10px 0;
+}
+
+.sweep-search-input:focus { outline: none; }
+
+.sweep-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 52%, transparent);
+  color: var(--text);
+}
+
+.sweep-found {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sweep-found-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background 140ms ease, border-color 140ms ease;
+}
+
+.sweep-found-item:disabled { opacity: 0.5; cursor: default; }
+
+.sweep-found-item:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--accent) 46%, transparent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+}
+
+.sweep-found-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Відповідь на дотик. Не тост: третій її варіант — відмова, і вона має
+   лишитись на екрані, поки пара не спробує інше місце. */
+.sweep-said {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface-2));
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}

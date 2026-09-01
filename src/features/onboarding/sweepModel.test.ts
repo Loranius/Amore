@@ -1,7 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { PLAN_CATEGORY_ORDER } from '@/features/plans/planConstants';
 import { PLAN_PRESSURES } from '@/engine/evolution/adapters/rules';
-import { YEAR_MILESTONES, middleOfYear, quietestYearIndex, sweepStepOf, yearsBehind } from './sweepModel';
+import {
+  YEAR_MILESTONES,
+  middleOfYear,
+  quietestYearIndex,
+  sweepStepOf,
+  yearContaining,
+  yearsBehind,
+} from './sweepModel';
 import type { RelationshipYearFill } from './yearFills';
 
 function year(index: number, complete: boolean): RelationshipYearFill {
@@ -137,5 +144,35 @@ describe('фішки року обіцяють рівно те, що зроби�
     expect(channelOf('Подорож').exploration).toBeGreaterThan(0.5);
     expect(channelOf('Переїзд').stability).toBeGreaterThan(0.5);
     expect(channelOf('Весілля').significance).toBeGreaterThan(0.2);
+  });
+});
+
+describe('день знаходить свій рік стосунків', () => {
+  const years = [year(1, true), year(2, true), year(3, false)];
+
+  it('день усередині року', () => {
+    // Рік 1 тут іде з 10.06.2015 по 10.06.2016 — не календарний.
+    expect(yearContaining(years, '2015-07-01')!.index).toBe(1);
+    expect(yearContaining(years, '2016-12-31')!.index).toBe(2);
+  });
+
+  it('день річниці належить рокові, який ПОЧИНАЄТЬСЯ', () => {
+    /*
+     * Межа тут не дрібниця: рік стосунків іде від річниці до річниці, і
+     * якби обидва кінці були включними, 10 червня належало б двом рокам
+     * одразу — а місце, додане того дня, підняло б не той рік.
+     */
+    expect(yearContaining(years, '2016-06-10')!.index).toBe(2);
+    expect(yearContaining(years, '2015-06-10')!.index).toBe(1);
+  });
+
+  it('день поза історією не вигадує року', () => {
+    expect(yearContaining(years, '2009-01-01')).toBeNull();
+    expect(yearContaining(years, '')).toBeNull();
+  });
+
+  it('позначку часу приймає так само, як день', () => {
+    // З бази дата приходить і як `YYYY-MM-DD`, і як позначка часу.
+    expect(yearContaining(years, '2015-07-01T12:00:00.000Z')!.index).toBe(1);
   });
 });

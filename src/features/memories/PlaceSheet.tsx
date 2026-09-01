@@ -14,10 +14,10 @@
 // повноекранна карта спогадів, і дублювати її всередині нотатника не варто.
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
-import { geocodePlaces } from '@/lib/geo';
 import { MapPinIcon } from '@/components/icons/MapIcon';
 import { CloseIcon, SearchIcon } from '@/components/icons/UiIcon';
-import { placeFromFeature, placeLabel } from './momentPlace';
+import { placeLabel } from './momentPlace';
+import { usePlaceSearch } from './usePlaceSearch';
 import type { PlaceCandidate } from './momentPlace';
 import type { MomentPlace } from './useMoments';
 
@@ -33,32 +33,11 @@ interface PlaceSheetProps {
 
 export function PlaceSheet({ known, fromPhoto, onPick, onClear, onClose }: PlaceSheetProps) {
   const [query, setQuery] = useState('');
-  const [found, setFound] = useState<PlaceCandidate[]>([]);
-  const [searching, setSearching] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+  // Пауза, поріг і перегони живуть у самому гаку — його ділять два екрани.
+  const { found, searching } = usePlaceSearch(query);
 
   useEffect(() => { inputRef.current?.focus(); }, []);
-
-  /*
-   * Запит іде через паузу в 350 мс. Без неї кожна натиснута літера — це
-   * окреме звернення до геокодера: «Хмельницький» коштував би дванадцять
-   * запитів замість одного, і відповіді приходили б не в тому порядку, у
-   * якому їх просили.
-   */
-  useEffect(() => {
-    const text = query.trim();
-    if (text.length < 3) { setFound([]); setSearching(false); return; }
-    setSearching(true);
-    let alive = true;
-    const timer = setTimeout(() => {
-      void geocodePlaces(text).then((features) => {
-        if (!alive) return;
-        setFound(features.map(placeFromFeature).filter((p): p is PlaceCandidate => p !== null));
-        setSearching(false);
-      });
-    }, 350);
-    return () => { alive = false; clearTimeout(timer); };
-  }, [query]);
 
   const matchingKnown = known
     .filter((pin) => {

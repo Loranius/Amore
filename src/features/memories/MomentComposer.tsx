@@ -195,7 +195,14 @@ export function MomentComposer({
     try {
       let placePinId = place?.pinId ?? null;
       if (place && placePinId === null) {
-        placePinId = await ensurePin.mutateAsync({ place: place.value, userId });
+        /*
+         * Дата спогаду їде разом із місцем. Без неї мітка лягала в базу
+         * без `visited_at`, а `adapters/map.ts` такі мітки пропускає —
+         * тобто справжня подорож пари не рахувалась роком узагалі.
+         */
+        placePinId = await ensurePin.mutateAsync({
+          place: place.value, userId, visitedAt: memoryDate,
+        });
       }
       const draft = {
         title: title.trim(),

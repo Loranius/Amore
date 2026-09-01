@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { EvolutionSourceSnapshot, PlanSource, WishlistSource } from '@/engine/evolution/adapters';
+import type {
+  EvolutionSourceSnapshot,
+  MapPlaceSource,
+  PlanSource,
+  WishlistSource,
+} from '@/engine/evolution/adapters';
 import type { PortalSources } from '@/features/world/portalSources';
 import { EMPTY_YEAR_FILL, relationshipYearFills } from './yearFills';
 
@@ -220,5 +225,66 @@ describe('віхи року: перша важить більше за наст�
     }));
 
     expect(two).toBeGreaterThan(seven);
+  });
+});
+
+// ============================================================
+// Карта: модуль, який не рахувався зовсім.
+// ------------------------------------------------------------
+// `adapters/map.ts` починається з `if (!row.visitedAt) continue`, а
+// єдиний живий шлях створення мітки в порталі (`useEnsurePlacePin`) цього
+// поля не ставив; другий, у `useMapPinMutations`, не має жодного
+// споживача. Тобто один із ШЕСТИ модулів року не заробляли жодним
+// дотиком, і побачити це можна було тільки числом.
+// ============================================================
+
+function visitedPlace(id: number, visitedAt: string | null): MapPlaceSource {
+  return {
+    id,
+    category: 'visited',
+    visitedAt,
+    createdAt: MID_2017,
+    rating: null,
+    city: 'Львів',
+    country: 'Україна',
+  };
+}
+
+describe('мітка без дати невидима рушієві', () => {
+  it('три справжні місця без дати лишають рік РІВНО порожнім', () => {
+    /*
+     * Не «менше, ніж могло б» — рівно 0.3, стеля порожнечі. Пара, яка
+     * тричі кудись їздила й позначила це на своїй карті, отримувала за
+     * той рік стільки ж, скільки за рік, у якому не сталось нічого.
+     */
+    const places = { mapPlaces: [1, 2, 3].map((id) => visitedPlace(id, null)) };
+
+    expect(fillOf2017(sourcesWith(places))).toBeCloseTo(EMPTY_YEAR_FILL, 3);
+    expect(fills(sourcesWith(places)).emptyCount).toBe(10);
+  });
+
+  it('одна датована мітка важить стільки ж, скільки весь важіль річниць', () => {
+    /*
+     * 0.480 → 0.566, тобто +0.086. Для порівняння: щорічна річниця
+     * піднімає рік на 0.092. Одне датоване місце вартує майже того
+     * самого — і саме тому крок «де ви були того року?» стоїть у проході
+     * поруч із віхами, а не замість них.
+     */
+    const withoutPlace = fillOf2017(sourcesWith({
+      calendarEvents: [{
+        id: 1, date: START, type: 'anniversary', yearly: true, isMilestone: true,
+      }],
+      plans: [donePlan(1, 'trip')],
+    }));
+    const withPlace = fillOf2017(sourcesWith({
+      calendarEvents: [{
+        id: 1, date: START, type: 'anniversary', yearly: true, isMilestone: true,
+      }],
+      plans: [donePlan(1, 'trip')],
+      mapPlaces: [visitedPlace(1, MID_2017)],
+    }));
+
+    expect(withoutPlace).toBeCloseTo(0.480, 3);
+    expect(withPlace).toBeCloseTo(0.566, 3);
   });
 });

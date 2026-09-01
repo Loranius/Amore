@@ -16,9 +16,12 @@ import {
   fetchPortalSources,
   type PortalSources,
 } from '@/features/world/portalSources';
+import { ensurePlacePin, type PlacePinOutcome } from '@/features/memories/placePins';
+import type { PlaceCandidate } from '@/features/memories/momentPlace';
 import {
   middleOfYear,
   sweepStepOf,
+  yearContaining,
   type Milestone,
   type SweepStep,
 } from './sweepModel';
@@ -39,6 +42,24 @@ export interface MilestoneDraft {
   milestone: Milestone;
   year: RelationshipYearFill;
 }
+
+export interface PlaceDraft {
+  place: PlaceCandidate;
+  year: RelationshipYearFill;
+}
+
+/**
+ * Що екран скаже парі після дотику по знайденому місцю.
+ *
+ * Три відповіді, а не «готово», бо третя — це відмова, і мовчазна
+ * відмова тут була б найгіршим виходом: пара натиснула, нічого не
+ * змінилось, і вона не знає чому.
+ */
+export type PlaceResult =
+  | { kind: 'created' }
+  | { kind: 'dated' }
+  /** Мітка вже датована іншим роком; `label` — той рік, або `null`. */
+  | { kind: 'taken'; label: number | null };
 
 const SOURCES_KEY = ['onboarding', 'portal-sources'] as const;
 
@@ -63,8 +84,11 @@ export interface HistorySweep {
   setStartDate: (date: string) => Promise<void>;
   addAnniversary: (draft: AnniversaryDraft) => Promise<void>;
   addMilestone: (draft: MilestoneDraft) => Promise<void>;
+  addPlace: (draft: PlaceDraft) => Promise<PlaceResult>;
   /** Скільки віх уже лежить у кожному році стосунків, за номером року. */
   milestonesByYear: Map<number, number>;
+  /** Скільки ДАТОВАНИХ міток карти лежить у кожному році. */
+  placesByYear: Map<number, number>;
   isSaving: boolean;
 }
 
@@ -164,6 +188,27 @@ export function useHistorySweep(): HistorySweep {
     onSuccess: refresh,
   });
 
+  const addPlace = useMutation({
+    mutationFn: async ({ place, year }: PlaceDraft): Promise<PlacePinOutcome> => {
+      /*
+       * Мітка карти — другий модуль, і саме тому цей крок узагалі є.
+       * Виміряно: сім віх в одному модулі дають 0.473, а план плюс одне
+       * ДАТОВАНЕ місце — 0.566. Ширина важить більше за обсяг.
+       *
+       * Дата — середина року стосунків, як і у віх. Показувати її нікому:
+       * `visited_at` у порталі не малюється ніде, він керує лише тим, у
+       * який день архіву стане ФОТО мітки, а в мітки з проходу фото
+       * немає. Тобто вигаданого дня пара тут не побачить — на відміну від
+       * подарунка, чий архів друкує дату (ADR-0078).
+       */
+      return ensurePlacePin(place, user.id, middleOfYear(year.startsAt, year.endsAt));
+    },
+    onSuccess: async () => {
+      await refresh();
+      await client.invalidateQueries({ queryKey: qk.mapPins() });
+    },
+  });
+
   const data: PortalSources | undefined = sources.data;
   const relationshipStartedAt = data?.relationshipStartedAt.trim() ?? '';
 
@@ -194,6 +239,20 @@ export function useHistorySweep(): HistorySweep {
     return counts;
   }, [data, summary.years]);
 
+  const placesByYear = useMemo(() => {
+    const counts = new Map<number, number>();
+    if (!data) return counts;
+    for (const year of summary.years) {
+      const within = data.snapshot.mapPlaces.filter((place) => (
+        typeof place.visitedAt === 'string'
+        && place.visitedAt.slice(0, 10) >= year.startsAt
+        && place.visitedAt.slice(0, 10) < year.endsAt
+      ));
+      counts.set(year.index, within.length);
+    }
+    return counts;
+  }, [data, summary.years]);
+
   const step = sweepStepOf({
     relationshipStartedAt,
     yearlyAnniversaryCount: yearlyAnniversaries.length,
@@ -210,7 +269,17 @@ export function useHistorySweep(): HistorySweep {
     setStartDate: async (date) => { await setStartDate.mutateAsync(date); },
     addAnniversary: async (draft) => { await addAnniversary.mutateAsync(draft); },
     addMilestone: async (draft) => { await addMilestone.mutateAsync(draft); },
+    addPlace: async (draft) => {
+      const outcome = await addPlace.mutateAsync(draft);
+      if (outcome.kind !== 'taken') return { kind: outcome.kind };
+      const year = yearContaining(summary.years, outcome.visitedAt);
+      return { kind: 'taken', label: year?.label ?? null };
+    },
     milestonesByYear,
-    isSaving: setStartDate.isPending || addAnniversary.isPending || addMilestone.isPending,
+    placesByYear,
+    isSaving: setStartDate.isPending
+      || addAnniversary.isPending
+      || addMilestone.isPending
+      || addPlace.isPending,
   };
 }

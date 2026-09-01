@@ -112,3 +112,25 @@ export function quietestYearIndex(years: readonly RelationshipYearFill[]): numbe
 export function yearsBehind(years: readonly RelationshipYearFill[]): number {
   return years.filter((year) => year.complete).length;
 }
+
+/**
+ * Якому року стосунків належить день.
+ *
+ * Потрібне, щоб сказати парі правду про місце, яке вже є на карті: мітка
+ * тримає рівно одну дату, і якщо вона вже датована, екран має назвати
+ * той рік, а не мовчки нічого не зробити.
+ *
+ * Порівняння рядкове й напівінтервалом `[startsAt, endsAt)`: межа року —
+ * це річниця, і день річниці належить рокові, який ПОЧИНАЄТЬСЯ, а не
+ * тому, що закінчився. Дати тут завжди `YYYY-MM-DD`, тож лексикографічне
+ * порівняння збігається з хронологічним і не заводить часових поясів
+ * туди, де їх немає.
+ */
+export function yearContaining(
+  years: readonly RelationshipYearFill[],
+  day: string,
+): RelationshipYearFill | null {
+  const at = day.slice(0, 10);
+  if (at === '') return null;
+  return years.find((year) => at >= year.startsAt && at < year.endsAt) ?? null;
+}
