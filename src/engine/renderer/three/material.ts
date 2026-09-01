@@ -66,6 +66,17 @@ attribute float evolutionAxial;
 varying float vEvolutionAxial;
 attribute vec3 evolutionBodyCoord;
 varying vec3 vEvolutionBodyCoord;
+/**
+ * Тон грані — множник ПІДСУМКОВОГО кольору, а не базового.
+ *
+ * Виміряно, чому саме підсумкового (ADR-0086): вершинний колір у Three
+ * множить лише дифузну складову, а яскравість кристала складається
+ * переважно з адитивних термів — ядра, неба, скла, обідка, вуалі. Тому
+ * фарба через vColor множила те, чого на екрані майже немає: удвічі
+ * ширші тони (кроки 50-71%) не зрушили розділення граней узагалі.
+ */
+attribute float evolutionFacetTone;
+varying float vEvolutionFacetTone;
 `;
 
 const VERTEX_BODY = /* glsl */ `
@@ -74,9 +85,12 @@ const VERTEX_BODY = /* glsl */ `
   vEvolutionEdge = evolutionEdge;
   vEvolutionAxial = evolutionAxial;
   vEvolutionBodyCoord = evolutionBodyCoord;
+  vEvolutionFacetTone = evolutionFacetTone;
 `;
 
 const FRAGMENT_PARS = /* glsl */ `
+varying float vEvolutionFacetTone;
+uniform float uEvolutionFacetPaintStrength;
 uniform float uEvolutionRimStrength;
 uniform float uEvolutionSkyStrength;
 uniform vec3 uEvolutionSkyColor;
@@ -482,6 +496,20 @@ const FRAGMENT_BODY = /* glsl */ `
       // rather than in it.
       * evolutionInner;
   }
+
+  /*
+   * ФАРБА ГРАНІ — останнім рядком, по всьому, що набралось.
+   *
+   * Стоїть у кінці навмисно: усе вище — адитивні терми, і саме вони
+   * складають яскравість кристала. Множник, прикладений до базового
+   * кольору (як робить vColor), їх не торкається взагалі, і тому три
+   * ключі поспіль та вдвічі ширші тони не дали нічого (ADR-0086).
+   *
+   * Тон рахує facetTones за РАНГОМ грані в колі: сусідні за напрямком
+   * грані дістають сусідні тони, скільки б не було фасок і в якому б
+   * порядку геометрія їх не пронумерувала.
+   */
+  outgoingLight *= mix( 1.0, vEvolutionFacetTone, uEvolutionFacetPaintStrength );
 `;
 
 function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: CrystalBodyMaterial['shader']): void {
@@ -518,6 +546,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionAuroraDepth'] = { value: recipe.auroraDepth };
     shader.uniforms['uEvolutionPhase'] = { value: 0 };
     shader.uniforms['uEvolutionFacetEdgeStrength'] = { value: recipe.facetEdgeStrength };
+    shader.uniforms['uEvolutionFacetPaintStrength'] = { value: 1 };
     shader.uniforms['uEvolutionFacetEdgeWidth'] = { value: recipe.facetEdgeWidth };
     shader.uniforms['uEvolutionAxialTintStrength'] = { value: recipe.axialTintStrength };
     shader.uniforms['uEvolutionFootColor'] = { value: toColor(recipe.footColor) };
@@ -579,7 +608,13 @@ export function createThreeCrystalMaterial(source: CrystalBodyMaterial): THREE.M
     // into this colour, so the body still renders as the colour the couple
     // earned — and, because it is geometry rather than material, bodies with
     // the same optical signature still share one draw call.
-    vertexColors: true,
+    /*
+     * Вершинного кольору більше немає: тон грані їде атрибутом
+     * `evolutionFacetTone` і множить ПІДСУМКОВИЙ колір, а не базовий
+     * (ADR-0086). Лишити `vertexColors` означало б застосувати тон двічі
+     * — до дифузу й до підсумку.
+     */
+    vertexColors: false,
     envMapIntensity: source.envMapIntensity,
   });
   material.iridescence = source.iridescence;

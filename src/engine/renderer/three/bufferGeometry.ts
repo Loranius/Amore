@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import type { CrystalMeshData } from '../../geometry';
 import type { CrystalBodyMaterial } from '../../material';
-import { facetTintFor } from '../../material/facets';
+import { facetTintForRank } from '../../material/facets';
 
 /**
  * Per-face colour attribute.
@@ -17,45 +17,97 @@ import { facetTintFor } from '../../material/facets';
  * geometry, not in the material, so bodies sharing an optical signature stay in
  * one batch.
  */
-function facetColors(
+/**
+ * Тон кожної вершини — ОДНЕ число, а не колір.
+ *
+ * Раніше тут писався `color`, який Three множить на базовий колір. Це й
+ * було головною вадою: яскравість кристала складається переважно з
+ * адитивних термів (ядро, небо, скло, обідок, вуаль), і множник базового
+ * кольору їх не торкається. Виміряно — удвічі ширші тони, кроки 50-71%,
+ * не зрушили розділення граней узагалі (ADR-0086).
+ *
+ * Тепер тон їде окремим атрибутом і множить ПІДСУМКОВИЙ колір у самому
+ * кінці шейдера.
+ */
+function facetTones(
   mesh: CrystalMeshData,
   material: CrystalBodyMaterial,
   artifactSeed: number,
 ): Float32Array {
   const vertexCount = mesh.positions.length / 3;
-  const colors = new Float32Array(vertexCount * 3);
-  // Keyed on the *face*, not on the triangle. A face is several coplanar
-  // triangles that must read as one plane; tinting them separately draws seams
-  // across every face — the same mosaic the geometry pass was undoing.
-  //
-  // The geometry publishes which face each triangle belongs to, and it has to:
-  // the arithmetic that used to stand here — `floor(triangle / 2)` modulo the
-  // ring length — encoded the lathe's two-triangles-per-facet layout, and
-  // ADR-0006 replaced the lathe with a polytope whose faces are fanned into a
-  // different number of triangles each. It went on returning an index, so
-  // nothing failed; the tints simply stopped landing on faces, neighbouring
-  // facets averaged to within a few percent of one another, and the crystal
-  // read as a smooth shape. Falls back for persisted meshes with no identifiers.
-  const faceIds = mesh.faceIds;
-  const facesPerRing = Math.max(1, mesh.profile.ring?.length ?? mesh.profile.segments);
+  const tones = new Float32Array(vertexCount);
+  tones.fill(1);
+
+  /*
+   * КЛЮЧ — РАНГ ЗА АЗИМУТОМ, і це третій ключ поспіль; два попередні
+   * виміряні як зламані (ADR-0086):
+   *
+   *  1. зважений жереб по `faceId` — 33% сусідніх пар діставали ОДИН тон,
+   *     тож вимкнення тонування цілком ПІДНІМАЛО розділення 15% -> 17%;
+   *  2. черга `faceId % 4` — номери граней не йдуть по колу: грань 0
+   *     дивиться на 0°, грань 1 — на -135°, сусідніх по колу 14 пар із 22;
+   *  3. кошик за азимутом шириною 360/ring.length — пояс має 23 грані
+   *     разом із фасками, тож сусідні ГОЛОВНІ грані падали через кілька
+   *     кошиків: проба дикими тонами дала три сусідні грані одним
+   *     кольором (0.1685 / 0.1675 / 0.1628).
+   *
+   * Ранг вільний від усіх трьох: грані сортуються за напрямком, і тон
+   * береться порядковим номером у цьому колі.
+   */
+  const facing = new Map<number, { azimuth: number; belt: number }>();
+  const faceOfTriangle: number[] = [];
   for (let offset = 0; offset < mesh.indices.length; offset += 3) {
-    const triangle = offset / 3;
-    const tint = facetTintFor(
+    const first = (mesh.indices[offset] ?? 0) * 3;
+    const nx = mesh.normals[first] ?? 0;
+    const ny = mesh.normals[first + 1] ?? 0;
+    const nz = mesh.normals[first + 2] ?? 0;
+    const azimuth = Math.atan2(nz, nx);
+    // Без `faceIds` ключем стає сам напрямок, огрублений до градуса:
+    // копланарні трикутники однієї грані мають однакову нормаль.
+    const face = mesh.faceIds?.[offset / 3] ?? Math.round((azimuth * 180) / Math.PI);
+    faceOfTriangle.push(face);
+    // Пояс — нахил грані, огрублений до чверті. Бічні грані призми, вінець
+    // і дно потрапляють у різні пояси.
+    if (!facing.has(face)) facing.set(face, { azimuth, belt: Math.round(ny * 2) });
+  }
+
+  /*
+   * РАНГ РАХУЄТЬСЯ ВСЕРЕДИНІ ПОЯСУ, а не серед усіх граней тіла.
+   *
+   * Перша редакція ранжувала всі 23 грані одним списком за азимутом — і
+   * монарх став рівним: 0.3783 / 0.3813 / 0.3981, різниця 2-4%. Причина в
+   * тому, що бічні грані перемежовані коронними та донними, у яких схожий
+   * азимут; дві сусідні БІЧНІ грані розходились у ранзі на три-чотири, а
+   * `% 4` повертало їх у той самий тон.
+   *
+   * Пояс це розводить: сусідні за напрямком грані одного нахилу дістають
+   * сусідні ранги, і вінець більше не заважає стінці.
+   */
+  const rankOf = new Map<number, number>();
+  const belts = new Map<number, { face: number; azimuth: number }[]>();
+  for (const [face, where] of facing) {
+    const list = belts.get(where.belt) ?? [];
+    list.push({ face, azimuth: where.azimuth });
+    belts.set(where.belt, list);
+  }
+  for (const [, list] of belts) {
+    list
+      .sort((left, right) => left.azimuth - right.azimuth)
+      .forEach((entry, rank) => rankOf.set(entry.face, rank));
+  }
+
+  for (let offset = 0; offset < mesh.indices.length; offset += 3) {
+    const tint = facetTintForRank(
       material.facets,
       artifactSeed,
       mesh.bodyId,
-      faceIds === undefined
-        ? Math.floor(triangle / 2) % facesPerRing
-        : faceIds[triangle] ?? 0,
+      rankOf.get(faceOfTriangle[offset / 3] ?? 0) ?? 0,
     );
     for (let slot = 0; slot < 3; slot += 1) {
-      const vertex = (mesh.indices[offset + slot] ?? 0) * 3;
-      colors[vertex] = tint.r;
-      colors[vertex + 1] = tint.g;
-      colors[vertex + 2] = tint.b;
+      tones[mesh.indices[offset + slot] ?? 0] = tint.r;
     }
   }
-  return colors;
+  return tones;
 }
 
 /**
@@ -117,8 +169,8 @@ export function createThreeCrystalGeometry(
   }
   if (material) {
     geometry.setAttribute(
-      'color',
-      new THREE.BufferAttribute(facetColors(mesh, material, artifactSeed), 3),
+      'evolutionFacetTone',
+      new THREE.BufferAttribute(facetTones(mesh, material, artifactSeed), 1),
     );
   }
   const edges = facetEdgeWeights(mesh);

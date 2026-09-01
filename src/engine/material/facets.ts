@@ -87,6 +87,32 @@ export const SUBSTRATE_FACET_TINTING: CrystalFacetTinting = {
  * decision, and adapters do not make those. The renderer calls it once per
  * triangle while filling the colour attribute.
  */
+/**
+ * Тон грані за її РАНГОМ у колі — котра вона по порядку, якщо обійти тіло.
+ *
+ * Ранг рахує викликач (`facetColors`), бо лише він має нормалі. Сусідні за
+ * напрямком грані мають сусідні ранги, тож не можуть дістати однаковий
+ * тон — а саме це було зламане в усіх трьох попередніх ключах (ADR-0086):
+ * зважений жереб по номеру давав 33% збігів, черга по номеру не знала, що
+ * номери не йдуть по колу, а кошик фіксованої ширини за азимутом ділив
+ * пояс із 23 гранями так, що сусідні ГОЛОВНІ грані падали в один тон.
+ */
+export function facetTintForRank(
+  tinting: CrystalFacetTinting,
+  artifactSeed: number,
+  bodyId: string,
+  rank: number,
+): CrystalRgb {
+  const tints = tinting.tints;
+  if (tints.length === 0) return { r: 1, g: 1, b: 1 };
+  if (tints.length === 1) return tints[0]!;
+
+  const safe = Number.isFinite(rank) ? Math.abs(Math.trunc(rank)) : 0;
+  // Зсув із насіння: малюнок лишається власним і незмінним (ADR-0004).
+  const shift = Math.floor(seededUnit(artifactSeed, `facet-shift:${bodyId}`) * tints.length);
+  return tints[(safe + shift) % tints.length]!;
+}
+
 export function facetTintFor(
   tinting: CrystalFacetTinting,
   artifactSeed: number,
