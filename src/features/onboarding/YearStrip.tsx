@@ -13,6 +13,7 @@
 // ============================================================
 import { yearsBehind } from './sweepModel';
 import type { RelationshipYearFill } from './yearFills';
+import { plural } from '@/lib/plural';
 
 interface YearStripProps {
   years: RelationshipYearFill[];
@@ -26,19 +27,8 @@ interface YearStripProps {
 /** Скільки років ще вміщується з підписом на кожному стовпчику. */
 const LABEL_EVERY_YEAR = 8;
 
-function yearsWord(count: number): string {
-  const tens = count % 100;
-  if (tens >= 11 && tens <= 14) return 'років';
-  switch (count % 10) {
-    case 1: return 'рік';
-    case 2: case 3: case 4: return 'роки';
-    default: return 'років';
-  }
-}
-
-function emptyWord(count: number): string {
-  return count % 10 === 1 && count % 100 !== 11 ? 'порожній' : 'порожні';
-}
+const yearsWord = (count: number) => plural(count, 'рік', 'роки', 'років');
+const emptyWord = (count: number) => plural(count, 'порожній', 'порожні', 'порожні');
 
 export function YearStrip({ years, emptyCount, activeIndex = -1, onPick }: YearStripProps) {
   if (years.length === 0) return null;

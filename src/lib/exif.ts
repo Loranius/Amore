@@ -1,11 +1,18 @@
 // ============================================================
-// Час зйомки з метаданих JPEG. Чиста функція над ArrayBuffer.
+// Час зйомки з метаданих JPEG і HEIC. Чиста функція над ArrayBuffer.
 // ------------------------------------------------------------
 // Живе в lib, а не в модулі: дату зйомки читають і «Спогади» (масовий
 // імпорт), і карта (підказка «коли були» для фото місця), а це просто
 // розбір формату файлу, без жодного знання про той чи інший модуль.
 // Без бібліотеки: тягнути залежність заради одного тега — зайве, а сам
 // розбір це прохід по ланцюжку APP1 → TIFF → IFD0 → Exif-IFD.
+//
+// HEIC ДОДАНО НЕ ЗАРАДИ ПОВНОТИ. Виміряно на робочій базі: з 61 світлини
+// пари час зйомки мають 11 — 18%. Айфон пише HEIC, а цей розбір знав
+// лише JPEG і мовчки віддавав `null`, тож гуртовий імпорт минулих років
+// пропустив би більшість плівки. Дорога до TIFF у HEIC інша
+// (ftyp → meta → iinf/iloc → Exif-item), але сам TIFF той самий, тож
+// нижче з'явився лише другий ВХІД, а не другий розбір.
 //
 // КОНВЕНЦІЯ ЧАСУ, і вона тут головна. EXIF зберігає НАСТІННИЙ час камери
 // без зони: «06:12» означає, що на годиннику було 06:12 там, де знімали.
@@ -117,7 +124,8 @@ function scanIfd(
  */
 function openTiff(buffer: ArrayBuffer): { reader: Reader; ifd0: number } | null {
   const view = new DataView(buffer);
-  if (view.byteLength < 4 || view.getUint16(0) !== SOI) return null;
+  if (view.byteLength < 4) return null;
+  if (view.getUint16(0) !== SOI) return openHeicTiff(view);
 
   // Шукаємо сегмент APP1 серед маркерів JPEG.
   let offset = 2;
@@ -138,15 +146,188 @@ function openTiff(buffer: ArrayBuffer): { reader: Reader; ifd0: number } | null 
   if (app1 < 0 || app1 + 6 > view.byteLength) return null;
 
   if (ascii({ view, little: true, base: 0 }, app1, 4) !== 'Exif') return null;
-  const tiff = app1 + 6;
-  if (tiff + 8 > view.byteLength) return null;
+  return tiffAt(view, app1 + 6);
+}
 
+/** TIFF-заголовок за зміщенням: спільний хвіст обох входів. */
+function tiffAt(view: DataView, tiff: number): { reader: Reader; ifd0: number } | null {
+  if (tiff < 0 || tiff + 8 > view.byteLength) return null;
   const byteOrder = view.getUint16(tiff);
   if (byteOrder !== 0x4949 && byteOrder !== 0x4d4d) return null;
   const little = byteOrder === 0x4949;
   if (view.getUint16(tiff + 2, little) !== 0x002a) return null;
-
   return { reader: { view, little, base: tiff }, ifd0: view.getUint32(tiff + 4, little) };
+}
+
+// ── HEIC: ftyp → meta → iinf/iloc → Exif-item → TIFF ────────
+//
+// ISO/IEC 23008-12 тримає EXIF не сегментом у потоці, а ЕЛЕМЕНТОМ:
+// `iinf` каже, який номер елемента має тип 'Exif', `iloc` — де він
+// лежить. Це два різні місця, і жодне з них не можна пропустити.
+
+/** Ім'я боксу чотирма літерами, або порожній рядок за межами буфера. */
+function boxType(view: DataView, at: number): string {
+  if (at + 8 > view.byteLength) return '';
+  let out = '';
+  for (let i = 4; i < 8; i += 1) out += String.fromCharCode(view.getUint8(at + i));
+  return out;
+}
+
+/**
+ * Знайти дочірній бокс на одному рівні.
+ *
+ * `limit` — скільки боксів дивитись найбільше. Не оптимізація: у
+ * пошкодженому файлі розмір боксу легко читається нулем або сміттям, і
+ * без стелі цикл крутився б, поки браузер не вб'є вкладку.
+ */
+function findBox(
+  view: DataView, start: number, end: number, name: string, limit = 64,
+): { start: number; end: number } | null {
+  let at = start;
+  for (let i = 0; i < limit && at + 8 <= end; i += 1) {
+    let size = view.getUint32(at);
+    let header = 8;
+    if (size === 1) {
+      // 64-бітний розмір. Старше слово має бути нулем: файл на 4 ГБ+
+      // усередині браузера все одно не прочитається.
+      if (at + 16 > end || view.getUint32(at + 8) !== 0) return null;
+      size = view.getUint32(at + 12);
+      header = 16;
+    } else if (size === 0) {
+      size = end - at;
+    }
+    if (size < header || at + size > end) return null;
+    if (boxType(view, at) === name) return { start: at + header, end: at + size };
+    at += size;
+  }
+  return null;
+}
+
+/** Ціле big-endian завширшки 0, 4 або 8 байтів; інші ширини — `null`. */
+function beInt(view: DataView, at: number, bytes: number): number | null {
+  if (bytes === 0) return 0;
+  if (at + bytes > view.byteLength) return null;
+  if (bytes === 4) return view.getUint32(at);
+  if (bytes === 8) {
+    if (view.getUint32(at) !== 0) return null;
+    return view.getUint32(at + 4);
+  }
+  return null;
+}
+
+/** Номер елемента, оголошеного типом 'Exif' у `iinf`. */
+function exifItemId(view: DataView, meta: { start: number; end: number }): number | null {
+  const iinf = findBox(view, meta.start, meta.end, 'iinf');
+  if (!iinf) return null;
+  const version = view.getUint8(iinf.start);
+  let at = iinf.start + 4;
+  let count: number;
+  if (version === 0) {
+    if (at + 2 > iinf.end) return null;
+    count = view.getUint16(at);
+    at += 2;
+  } else {
+    if (at + 4 > iinf.end) return null;
+    count = view.getUint32(at);
+    at += 4;
+  }
+
+  for (let i = 0; i < Math.min(count, 256) && at + 8 <= iinf.end; i += 1) {
+    const size = view.getUint32(at);
+    if (size < 8 || at + size > iinf.end) return null;
+    if (boxType(view, at) === 'infe') {
+      const infeVersion = view.getUint8(at + 8);
+      const body = at + 12;
+      // v2 тримає номер у двох байтах, v3 — у чотирьох; тип іде одразу
+      // за індексом захисту. Версії 0–1 давніші за HEIC і сюди не
+      // потрапляють — у них взагалі немає поля типу.
+      if (infeVersion === 2 || infeVersion === 3) {
+        const idBytes = infeVersion === 2 ? 2 : 4;
+        const typeAt = body + idBytes + 2;
+        if (typeAt + 4 <= iinf.end && boxType(view, typeAt - 4) === 'Exif') {
+          return infeVersion === 2 ? view.getUint16(body) : view.getUint32(body);
+        }
+      }
+    }
+    at += size;
+  }
+  return null;
+}
+
+/** Де лежить елемент із цим номером, за `iloc`. */
+function itemOffset(
+  view: DataView, meta: { start: number; end: number }, wantedId: number,
+): number | null {
+  const iloc = findBox(view, meta.start, meta.end, 'iloc');
+  if (!iloc || iloc.start + 8 > iloc.end) return null;
+
+  const version = view.getUint8(iloc.start);
+  let at = iloc.start + 4;
+  const sizes = view.getUint8(at);
+  const offsetSize = sizes >> 4;
+  const lengthSize = sizes & 0xf;
+  const baseAndIndex = view.getUint8(at + 1);
+  const baseOffsetSize = baseAndIndex >> 4;
+  const indexSize = version === 1 || version === 2 ? (baseAndIndex & 0xf) : 0;
+  at += 2;
+
+  let count: number;
+  if (version < 2) {
+    count = view.getUint16(at);
+    at += 2;
+  } else {
+    count = view.getUint32(at);
+    at += 4;
+  }
+
+  for (let i = 0; i < Math.min(count, 256); i += 1) {
+    if (at + 2 > iloc.end) return null;
+    const id = version < 2 ? view.getUint16(at) : view.getUint32(at);
+    at += version < 2 ? 2 : 4;
+    if (version === 1 || version === 2) at += 2; // construction_method
+    at += 2; // data_reference_index
+    const base = beInt(view, at, baseOffsetSize);
+    if (base === null) return null;
+    at += baseOffsetSize;
+    if (at + 2 > iloc.end) return null;
+    const extents = view.getUint16(at);
+    at += 2;
+
+    for (let e = 0; e < Math.min(extents, 64); e += 1) {
+      at += indexSize;
+      const offset = beInt(view, at, offsetSize);
+      if (offset === null) return null;
+      at += offsetSize + lengthSize;
+      // Перший екстент і є початком елемента; розбитий на кілька частин
+      // EXIF у знімках камери не трапляється, і склеювати їх наосліп
+      // означало б читати сміття як дату.
+      if (id === wantedId && e === 0) return base + offset;
+    }
+  }
+  return null;
+}
+
+/**
+ * Дійти до TIFF-заголовка всередині HEIC.
+ *
+ * Корисне навантаження Exif-елемента починається з чотирибайтового
+ * зміщення до самого TIFF (перед ним зазвичай лежить 'Exif\0\0'), тож
+ * заголовок шукається не з початку елемента.
+ */
+function openHeicTiff(view: DataView): { reader: Reader; ifd0: number } | null {
+  if (boxType(view, 0) !== 'ftyp') return null;
+  const meta = findBox(view, 0, view.byteLength, 'meta');
+  if (!meta) return null;
+  // `meta` — FullBox: версія й прапорці перед дочірніми боксами.
+  const inside = { start: meta.start + 4, end: meta.end };
+
+  const id = exifItemId(view, inside);
+  if (id === null) return null;
+  const item = itemOffset(view, inside, id);
+  if (item === null || item + 4 > view.byteLength) return null;
+
+  const skip = view.getUint32(item);
+  return tiffAt(view, item + 4 + skip);
 }
 
 export function readExifTakenAt(buffer: ArrayBuffer): string | null {

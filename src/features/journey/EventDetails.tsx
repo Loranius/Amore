@@ -3,6 +3,7 @@ import { CloseIcon, PencilIcon } from '@/components/icons/UiIcon';
 import type { EventRow } from '@/types';
 import { levelOf, type ConstellationLevel } from './constellationRules';
 import { starColour } from './starPalette';
+import { plural } from '@/lib/plural';
 
 // ============================================================
 // Деталі розкритої події.
@@ -63,17 +64,6 @@ export function sinceLabel(iso: string, today: Date): string | null {
   return `${years} ${plural(years, 'рік', 'роки', 'років')} тому`;
 }
 
-function plural(count: number, one: string, few: string, many: string): string {
-  const tail = count % 100;
-  if (tail >= 11 && tail <= 14) return many;
-  switch (count % 10) {
-    case 1: return one;
-    case 2:
-    case 3:
-    case 4: return few;
-    default: return many;
-  }
-}
 
 export function EventDetails({
   event,

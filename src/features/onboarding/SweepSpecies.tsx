@@ -20,6 +20,7 @@
 import { HomeArtifactSwitcher } from '@/features/home/HomeArtifactSwitcher';
 import { HOME_ARTIFACT_LABELS, type HomeArtifact } from '@/features/home/homeArtifact';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
+import { plural } from '@/lib/plural';
 
 /**
  * Чим види РІЗНЯТЬСЯ, одним рядком кожен.
@@ -82,15 +83,5 @@ export function SweepSpecies({ yearCount }: SweepSpeciesProps) {
   );
 }
 
-/** «частина / частини / частин» — без цього рядок читається як машинний. */
-export function partWord(count: number): string {
-  const tens = count % 100;
-  if (tens >= 11 && tens <= 14) return 'частин';
-  switch (count % 10) {
-    case 1: return 'частина';
-    case 2:
-    case 3:
-    case 4: return 'частини';
-    default: return 'частин';
-  }
-}
+/** «частина / частини / частин» — правило спільне, слова свої. */
+export const partWord = (count: number) => plural(count, 'частина', 'частини', 'частин');

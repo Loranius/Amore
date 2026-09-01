@@ -360,3 +360,7 @@ button.sweep-strip-year { cursor: pointer; }
   color: var(--muted);
   font-weight: 400;
 }
+
+/* Дії всередині кроку тримаються лівого краю: праворуч стоїть лише
+   «До артефакта», і два різні вирівнювання читались би як два рівні. */
+.sweep-actions--start { justify-content: flex-start; }

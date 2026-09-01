@@ -16,6 +16,7 @@
 // його підписати й коли мовчати. Саме вони мусять бути під тестом, бо
 // помилка тут не падає, а тихо бреше парі про її ж історію.
 // ============================================================
+import { plural } from '@/lib/plural';
 
 /** Подія рушія, звужена до того, що потрібно для «виросло». */
 export interface GrowthEvent {
@@ -94,12 +95,7 @@ export function summariseGrowth(
  * коштує тому теплу, заради якого підпис і додається.
  */
 export function momentPhrase(count: number): string {
-  const abs = Math.abs(count) % 100;
-  const last = abs % 10;
-  if (abs >= 11 && abs <= 14) return 'нових митей';
-  if (last === 1) return 'нова мить';
-  if (last >= 2 && last <= 4) return 'нові миті';
-  return 'нових митей';
+  return plural(count, 'нова мить', 'нові миті', 'нових митей');
 }
 
 /**

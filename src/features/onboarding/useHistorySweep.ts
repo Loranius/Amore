@@ -17,6 +17,8 @@ import {
   type PortalSources,
 } from '@/features/world/portalSources';
 import { ensurePlacePin, type PlacePinOutcome } from '@/features/memories/placePins';
+import { useMomentMutations } from '@/features/memories/useMoments';
+import type { PhotoImportPlan } from './photoImport';
 import type { PlaceCandidate } from '@/features/memories/momentPlace';
 import {
   middleOfYear,
@@ -52,6 +54,27 @@ export interface WatchedDraft {
   item: TmdbSearchResult;
   type: MediaType;
   year: RelationshipYearFill;
+}
+
+/** Скільки вже зроблено — щоб смужка показувала правду, а не спінер. */
+export interface ImportProgress {
+  days: number;
+  totalDays: number;
+  photos: number;
+  totalPhotos: number;
+}
+
+export interface PhotoImportResult {
+  createdDays: number;
+  createdPhotos: number;
+  /**
+   * День, на якому спинилось, або `null`.
+   *
+   * Уже створені спогади НЕ відкочуються: вони справжні, і викидати
+   * двадцять успішних днів через двадцять перший означало б покарати
+   * пару за чужу мережу.
+   */
+  failedAt: string | null;
 }
 
 /**
@@ -92,6 +115,10 @@ export interface HistorySweep {
   addMilestone: (draft: MilestoneDraft) => Promise<void>;
   addPlace: (draft: PlaceDraft) => Promise<PlaceResult>;
   addWatched: (draft: WatchedDraft) => Promise<void>;
+  importPhotos: (
+    plan: PhotoImportPlan<File>,
+    onProgress?: (progress: ImportProgress) => void,
+  ) => Promise<PhotoImportResult>;
   /** Скільки віх уже лежить у кожному році стосунків, за номером року. */
   milestonesByYear: Map<number, number>;
   /** Скільки ДАТОВАНИХ міток карти лежить у кожному році. */
@@ -104,6 +131,7 @@ export interface HistorySweep {
 export function useHistorySweep(): HistorySweep {
   const user = useCurrentUser();
   const client = useQueryClient();
+  const moments = useMomentMutations();
   const [asOf] = useState(() => `${coupleDay(new Date(), COUPLE_TIME_ZONE)}T00:00:00.000Z`);
 
   const sources = useQuery({
@@ -247,6 +275,55 @@ export function useHistorySweep(): HistorySweep {
     },
   });
 
+  /**
+   * Створити по спогаду на кожен день зі знімків.
+   *
+   * Через `useMomentMutations.create`, а не власним записом: він уже
+   * вміє вантажити фото, ставити обкладинку й відкочувати момент, у
+   * якого не завантажилось жодне фото. Другий такий шлях розійшовся б
+   * із першим тихо — і саме в тому місці, де в пари зникають світлини.
+   */
+  const importPhotos = useCallback(async (
+    plan: PhotoImportPlan<File>,
+    onProgress?: (progress: ImportProgress) => void,
+  ): Promise<PhotoImportResult> => {
+    const totalPhotos = plan.photoCount;
+    let createdDays = 0;
+    let createdPhotos = 0;
+
+    for (const day of plan.days) {
+      try {
+        await moments.create.mutateAsync({
+          // Назви немає навмисно: картка показує дату, коли назва
+          // порожня, а вигадана назва була б текстом, якого пара не
+          // писала, у її власному архіві.
+          draft: { title: '', note: null, memoryDate: day.day, placePinId: null },
+          photos: day.photos.map((photo) => ({ file: photo.file, takenAt: photo.takenAt })),
+          userId: user.id,
+          onProgress: (done) => onProgress?.({
+            days: createdDays,
+            totalDays: plan.days.length,
+            photos: createdPhotos + done,
+            totalPhotos,
+          }),
+        });
+      } catch {
+        // Помилку вже показала мутація. Спиняємось на першому дні, який
+        // не поїхав: далі, найімовірніше, те саме, а двадцять однакових
+        // тостів — це не звіт.
+        return { createdDays, createdPhotos, failedAt: day.day };
+      }
+      createdDays += 1;
+      createdPhotos += day.photos.length;
+      onProgress?.({
+        days: createdDays, totalDays: plan.days.length, photos: createdPhotos, totalPhotos,
+      });
+    }
+
+    await refresh();
+    return { createdDays, createdPhotos, failedAt: null };
+  }, [moments.create, refresh, user.id]);
+
   const data: PortalSources | undefined = sources.data;
   const relationshipStartedAt = data?.relationshipStartedAt.trim() ?? '';
 
@@ -329,6 +406,7 @@ export function useHistorySweep(): HistorySweep {
       return { kind: 'taken', label: year?.label ?? null };
     },
     addWatched: async (draft) => { await addWatched.mutateAsync(draft); },
+    importPhotos,
     milestonesByYear,
     placesByYear,
     watchedByYear,

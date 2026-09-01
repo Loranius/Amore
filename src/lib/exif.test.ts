@@ -123,6 +123,89 @@ function jpeg(opts: {
 
 const dto = (v: string): Entry => ({ tag: 0x9003, type: 2, count: v.length + 1, value: v });
 
+// ── HEIC ────────────────────────────────────────────────────
+//
+// Айфон пише саме його, а розбір знав лише JPEG і мовчки віддавав
+// `null`: з 61 світлини пари час зйомки мали 11. Дорога до TIFF тут
+// інша — ftyp → meta → iinf (який номер має елемент 'Exif') → iloc (де
+// він лежить), — а сам TIFF той самий, тож будується він тим самим
+// кодом, що й для JPEG.
+
+/** Голий TIFF із `jpeg()`: [SOI 2][APP1 marker 2][len 2]['Exif\0\0' 6] … [EOI 2]. */
+function tiffOf(opts: Parameters<typeof jpeg>[0]): number[] {
+  const bytes = [...new Uint8Array(jpeg(opts))];
+  return bytes.slice(12, bytes.length - 2);
+}
+
+const be32 = (v: number) => [(v >> 24) & 0xff, (v >> 16) & 0xff, (v >> 8) & 0xff, v & 0xff];
+const be16 = (v: number) => [(v >> 8) & 0xff, v & 0xff];
+const fourcc = (v: string) => [...v].map((c) => c.charCodeAt(0));
+
+/**
+ * Мінімальний HEIC з одним елементом EXIF.
+ *
+ * `itemId` навмисно параметром: `iinf` і `iloc` — ДВА різні місця, і
+ * якщо розбір візьме перший-ліпший елемент замість оголошеного типом
+ * 'Exif', розбіжність між ними цього не покаже.
+ */
+function heic(opts: {
+  tiff?: number[];
+  itemId?: number;
+  /** Тип, оголошений у `infe`. Не 'Exif' — елемент не наш. */
+  itemType?: string;
+  omitMeta?: boolean;
+  /** Скільки байтів між полем зміщення й самим TIFF. */
+  skip?: number;
+}): ArrayBuffer {
+  const id = opts.itemId ?? 3;
+  const type = opts.itemType ?? 'Exif';
+  const tiff = opts.tiff ?? tiffOf({ sub: [dto('2021:05:04 07:08:09')] });
+  const skip = opts.skip ?? 6;
+  // Перед TIFF стоїть 'Exif\0\0' рівно тоді, коли зміщення каже 6.
+  const prefix = skip === 6 ? [...fourcc('Exif'), 0, 0] : new Array(skip).fill(0);
+  const payload = [...be32(skip), ...prefix, ...tiff];
+
+  const ftyp = [...be32(16), ...fourcc('ftyp'), ...fourcc('heic'), ...be32(0)];
+
+  const infeBody = [
+    2, 0, 0, 0,                    // version 2 + flags
+    ...be16(id),
+    ...be16(0),                    // protection index
+    ...fourcc(type),
+    0,                             // порожнє ім'я
+  ];
+  const infe = [...be32(8 + infeBody.length), ...fourcc('infe'), ...infeBody];
+  const iinfBody = [0, 0, 0, 0, ...be16(1), ...infe];
+  const iinf = [...be32(8 + iinfBody.length), ...fourcc('iinf'), ...iinfBody];
+
+  // Зміщення екстента абсолютне, тож його видно лише коли відомі
+  // розміри всього, що стоїть перед корисним навантаженням.
+  const ilocItem = (extentOffset: number) => [
+    ...be16(id),
+    ...be16(0),                    // construction_method
+    ...be16(0),                    // data_reference_index
+    ...be16(1),                    // extent_count
+    ...be32(extentOffset),
+    ...be32(payload.length),
+  ];
+  const ilocBody = (extentOffset: number) => [
+    1, 0, 0, 0,                    // version 1 + flags
+    0x44,                          // offset_size 4, length_size 4
+    0x00,                          // base_offset_size 0, index_size 0
+    ...be16(1),                    // item_count
+    ...ilocItem(extentOffset),
+  ];
+  const ilocLength = 8 + ilocBody(0).length;
+  const metaLength = 8 + 4 + iinf.length + ilocLength;
+  const payloadAt = ftyp.length + metaLength;
+
+  const iloc = [...be32(ilocLength), ...fourcc('iloc'), ...ilocBody(payloadAt)];
+  const meta = [...be32(metaLength), ...fourcc('meta'), 0, 0, 0, 0, ...iinf, ...iloc];
+
+  const out = opts.omitMeta ? [...ftyp, ...payload] : [...ftyp, ...meta, ...payload];
+  return new Uint8Array(out).buffer;
+}
+
 describe('readExifTakenAt', () => {
   it('читає DateTimeOriginal (little-endian)', () => {
     expect(readExifTakenAt(jpeg({ sub: [dto('2026:07:14 06:12:33')] })))
@@ -295,5 +378,62 @@ describe('readExifLocation відкидає непридатне', () => {
   it('обрізаний файл не валить розбір', () => {
     const full = jpeg({ gps: gpsOf(dms(49, 25, 22.4), 'N', dms(26, 59, 13.6), 'E') });
     expect(readExifLocation(full.slice(0, 40))).toBeNull();
+  });
+});
+
+describe('HEIC', () => {
+  it('час зйомки читається так само, як із JPEG', () => {
+    expect(readExifTakenAt(heic({}))).toBe('2021-05-04T07:08:09Z');
+  });
+
+  it('координати теж — вхід другий, розбір той самий', () => {
+    /*
+     * Заради цього HEIC і додано ВХОДОМ, а не другим розбором: місце
+     * зі знімка працює для айфона без жодного окремого рядка.
+     */
+    const tiff = tiffOf({
+      gps: [
+        { tag: 0x0001, type: 2, count: 2, value: 'N' },
+        { tag: 0x0002, type: 5, count: 3, value: [[50, 1], [27, 1], [0, 1]] },
+        { tag: 0x0003, type: 2, count: 2, value: 'E' },
+        { tag: 0x0004, type: 5, count: 3, value: [[30, 1], [31, 1], [0, 1]] },
+      ],
+    });
+    const found = readExifLocation(heic({ tiff }));
+
+    expect(found).not.toBeNull();
+    expect(found!.lat).toBeCloseTo(50.45, 2);
+    expect(found!.lng).toBeCloseTo(30.5167, 3);
+  });
+
+  it('елемент іншого типу не приймається за EXIF', () => {
+    /*
+     * `iinf` і `iloc` — два різні місця. Якби розбір брав перший-ліпший
+     * елемент, він прочитав би як дату мініатюру або сам знімок.
+     */
+    expect(readExifTakenAt(heic({ itemType: 'hvc1' }))).toBeNull();
+  });
+
+  it('номер елемента звіряється між iinf та iloc', () => {
+    expect(readExifTakenAt(heic({ itemId: 42 }))).toBe('2021-05-04T07:08:09Z');
+  });
+
+  it('без боксу meta — null, а не виняток', () => {
+    expect(readExifTakenAt(heic({ omitMeta: true }))).toBeNull();
+  });
+
+  it('зміщення до TIFF читається, а не вгадується', () => {
+    // Не всі файли кладуть перед TIFF саме 'Exif\0\0'; поле зміщення
+    // існує рівно для цього, і ігнорувати його означало б читати сміття.
+    expect(readExifTakenAt(heic({ skip: 10 }))).toBe('2021-05-04T07:08:09Z');
+  });
+
+  it('обрізаний файл не валить імпорт', () => {
+    const full = new Uint8Array(heic({}));
+    expect(readExifTakenAt(full.slice(0, 40).buffer)).toBeNull();
+  });
+
+  it('чужий файл лишається чужим', () => {
+    expect(readExifTakenAt(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]).buffer)).toBeNull();
   });
 });
