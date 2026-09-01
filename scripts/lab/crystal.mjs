@@ -39,6 +39,17 @@ function band(text) {
 }
 
 const years = arg('years', '11');
+/*
+ * Обнулити один доданок і перезняти — уся техніка цього проєкту. Різниця
+ * в профілі і є внесок того доданка.
+ */
+const off = arg('off', '');
+/*
+ * Смуга по X обмежує вимір ТІЛОМ. Без неї в медіану потрапляють переходи
+ * тіло↔тло — вони завжди 80%+ і ховають справжнє число за собою, рівно
+ * як і крайні плато, які `facetSeparations` уже відкидає.
+ */
+const xRange = arg('x', '');
 const quality = arg('quality', 'high');
 const theme = arg('theme', 'dark');
 const rows = band(arg('band', '380-520'));
@@ -53,7 +64,8 @@ const portal = await openPortal({
 });
 
 try {
-  const url = `${server.url}crystal-lab.html?years=${years}&quality=${quality}&theme=${theme}`;
+  const url = `${server.url}crystal-lab.html?years=${years}&quality=${quality}&theme=${theme}`
+    + (off === '' ? '' : `&off=${off}`);
   await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
   await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
   /*
@@ -64,19 +76,72 @@ try {
   await portal.page.waitForTimeout(9_000);
 
   mkdirSync(OUT, { recursive: true });
-  const file = join(OUT, `crystal-lab-${years}y-${quality}-${theme}.png`);
+  const tag = off === '' ? 'base' : `off-${off.replace(/,/g, '+')}`;
+  const file = join(OUT, `crystal-lab-${years}y-${quality}-${theme}-${tag}.png`);
   writeFileSync(file, await portal.page.screenshot());
+
+  /*
+   * ЧИ КРИСТАЛ УЗАГАЛІ НАМАЛЬОВАНИЙ — контрольним кадром у ТОМУ Ж прогоні.
+   *
+   * Без цієї перевірки оснастка вже брехала впевнено: коли бандл
+   * виявився звільненим, сцена малювалась цілком — руїна, обеліски,
+   * каміння, — і профіль звітував «ЧИТАЄТЬСЯ КРИСТАЛОМ, 85%», бо міряв
+   * обеліск проти неба. Два прогони з трьох.
+   *
+   * Перша редакція цієї перевірки не спрацювала й теж чесно про це
+   * каже: вона звіряла лічильник трикутників УСІЄЇ сцени (11 916 без
+   * кристала, 12 472 з ним) із числом трикутників кристала (2 284) — і
+   * 11 916 > 2 284 у будь-якому разі. Порівнювати треба сцену з собою,
+   * а не з частиною себе.
+   */
+  const controlUrl = `${url}&crystal=off`;
+  await portal.page.goto(controlUrl, { waitUntil: 'load', timeout: 60_000 });
+  await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
+  await portal.page.waitForTimeout(9_000);
+  const control = decodePng(await portal.page.screenshot());
+  const controlColumns = scanBand(control, { ...rows, x1: control.width }, await readToneMapping(portal.page));
+
+  await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
+  await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
+  await portal.page.waitForTimeout(9_000);
 
   const tone = await readToneMapping(portal.page);
   const image = decodePng(await portal.page.screenshot());
   const columns = scanBand(image, { ...rows, x1: image.width }, tone);
-  const plateaus = findPlateaus(columns);
+
+  /*
+   * Скільки стовпців смуги кристал справді змінив. Нуль означає, що його
+   * в кадрі немає, хай яким здоровим виглядає профіль.
+   */
+  let changed = 0;
+  for (let x = 0; x < Math.min(columns.length, controlColumns.length); x += 1) {
+    if (Math.abs(columns[x] - controlColumns[x]) > 0.01) changed += 1;
+  }
+  if (changed < 20) {
+    throw new Error(
+      `Кристала в кадрі немає: контрольний знімок (crystal=off) відрізняється лише в `
+      + `${changed} стовпцях зі ${columns.length}. Профіль не знімається — він показав би сцену без кристала.`,
+    );
+  }
+  console.log(`кристал змінив ${changed} стовпців смуги зі ${columns.length}`);
+  const all = findPlateaus(columns);
+  const bounds = /^(\d+)-(\d+)$/.exec(xRange);
+  const plateaus = bounds
+    ? all.filter((step) => step.from >= Number(bounds[1]) && step.to <= Number(bounds[2]))
+    : all;
   const spread = facetSeparations(plateaus);
 
   console.log(`знімок  ${file}`);
   console.log(`тонування  ${JSON.stringify(tone)}`);
-  console.log(`смуга  y ${rows.y0}–${rows.y1}, ширина ${image.width}`);
-  console.log(`плато  ${plateaus.length}`);
+  console.log(`смуга  y ${rows.y0}–${rows.y1}, ширина ${image.width}`
+    + (bounds ? `, тіло x ${bounds[1]}–${bounds[2]}` : '')
+    + (off === '' ? '' : `, вимкнено: ${off}`));
+  console.log(`плато  ${plateaus.length} (усього в смузі ${all.length})`);
+  if (plateaus.length === 0 && all.length > 0) {
+    for (const step of all) {
+      console.log(`   [поза межами] x ${step.from}–${step.to}  ${step.luminance.toFixed(4)}`);
+    }
+  }
   for (const step of plateaus) {
     console.log(`   x ${String(step.from).padStart(4)}–${String(step.to).padStart(4)}  ${step.luminance.toFixed(4)}`);
   }

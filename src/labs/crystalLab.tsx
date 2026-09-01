@@ -21,7 +21,7 @@
 // Сторінка НЕ входить у збірку продукту: вона є лише на dev-сервері,
 // тобто пара її не бачить і не платить за неї жодним байтом.
 // ============================================================
-import { StrictMode, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas } from '@react-three/fiber';
 import { crystalVeinBearings } from '@/engine/geometry';
@@ -31,7 +31,7 @@ import {
   crystalSceneRadius,
   crystalSubstrateSceneRadius,
 } from '@/engine/renderer/three';
-import type { CrystalMaterialQuality } from '@/engine/material';
+import type { CrystalMaterialQuality, CrystalMaterialState } from '@/engine/material';
 import { PortalStage } from '@/features/home/crystal3d/scene/PortalStage';
 import { EvolutionCrystalObject } from '@/features/home/crystal3d/evolution/EvolutionCrystalObject';
 import { EvolutionRuntimeProbe } from '@/features/home/crystal3d/evolution/EvolutionRuntimeProbe';
@@ -73,11 +73,72 @@ function valuesFrom(params: URLSearchParams, years: number): EvolutionSandboxVal
   };
 }
 
+/**
+ * Терми, які можна вимкнути по одному.
+ *
+ * Уся техніка цього проєкту тримається на одній дії: обнулити ОДИН доданок
+ * і перезняти. Різниця в профілі — і є внесок того доданка, і він
+ * регулярно не має нічого спільного з тим, що підказує код: «емісія
+ * розмиває грані» дала 0.047, «ключове світло заслабке» — ×4 і нуль.
+ *
+ * Тому перемикач тут, а не редагування конфігурації: вимір мусить
+ * коштувати один рядок запиту, інакше його не роблять.
+ */
+const SHADER_TERMS = [
+  'rimStrength', 'skyStrength', 'coreStrength', 'glassStrength',
+  'veilStrength', 'auroraStrength', 'axialTintStrength', 'innerFlowStrength',
+  'facetEdgeStrength', 'inclusionContrast', 'surfaceReliefStrength',
+  'surfaceVeinStrength',
+] as const;
+
+type ShaderTerm = (typeof SHADER_TERMS)[number];
+
+/**
+ * Обнулити названі терми в кожному тілі.
+ *
+ * Копія, а не мутація: стан рушія опублікований і незмінний, і лабораторія
+ * не має права це порушити навіть у себе вдома.
+ */
+function withTermsOff(material: CrystalMaterialState, off: readonly string[]): CrystalMaterialState {
+  if (off.length === 0) return material;
+  const terms = off.filter((name): name is ShaderTerm => (
+    (SHADER_TERMS as readonly string[]).includes(name)
+  ));
+  const zeroEmissive = off.includes('emissive');
+  const flatFacets = off.includes('facetTint');
+
+  return {
+    ...material,
+    bodies: material.bodies.map((body) => {
+      const shader = { ...body.shader };
+      for (const term of terms) shader[term] = 0;
+      return {
+        ...body,
+        shader,
+        ...(zeroEmissive ? { emissiveIntensity: 0 } : {}),
+        ...(flatFacets
+          ? { facets: { tints: [{ r: 1, g: 1, b: 1 }], cumulativeWeights: [1] } }
+          : {}),
+      };
+    }),
+  };
+}
+
 function CrystalLab() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const years = Math.max(1, Math.min(50, Number(params.get('years') ?? 4) || 4));
   const quality = (params.get('quality') ?? 'high') as CrystalMaterialQuality;
   const theme = params.get('theme') === 'light' ? 'light' : 'dark';
+  const off = useMemo(() => (params.get('off') ?? '').split(',').filter(Boolean), [params]);
+  /*
+   * Контрольний кадр: сцена без кристала.
+   *
+   * Потрібен, щоб довести, що кристал НАМАЛЬОВАНО, а не лише зібрано.
+   * Лічильник трикутників усієї сцени цього не доводить: без кристала
+   * вона малює 11 916, з ним 12 472 — тобто «11 916» саме по собі
+   * виглядає цілком здоровим числом.
+   */
+  const withoutCrystal = params.get('crystal') === 'off';
 
   const states = useMemo(() => {
     const sources = applyEvolutionSandboxSources({
@@ -101,6 +162,29 @@ function CrystalLab() {
     });
   }, [params, years, quality]);
 
+  const material = useMemo(
+    () => withTermsOff(states.material, off),
+    [states.material, off],
+  );
+
+  /*
+   * Скільки трикутників МАЄ бути в кристалі — за станом геометрії.
+   *
+   * Разом із тим, скільки їх намальовано насправді, це єдиний спосіб
+   * відрізнити «кристал гладкий» від «кристала немає». Виміряно, чому це
+   * потрібно: коли бандл виявився звільненим, сцена малювалась цілком —
+   * руїна, обеліски, каміння, — а скрипт упевнено звітував «читається
+   * кристалом, 85%», бо міряв обеліск проти неба.
+   */
+  const expectedTriangles = useMemo(
+    () => states.geometry.meshes.reduce(
+      (sum, mesh) => sum + Math.floor(mesh.indices.length / 3),
+      0,
+    ),
+    [states.geometry.meshes],
+  );
+  const [drawn, setDrawn] = useState(0);
+
   const veinBearings = useMemo(
     () => crystalVeinBearings(states.geometry.meshes),
     [states.geometry.meshes],
@@ -108,7 +192,12 @@ function CrystalLab() {
   const radius = crystalSceneRadius(states.geometry);
 
   return (
-    <div className="lab-stage" data-evolution-preview="ready">
+    <div
+      className="lab-stage"
+      data-evolution-preview="ready"
+      data-lab-expected-triangles={expectedTriangles}
+      data-lab-drawn-triangles={drawn}
+    >
       <Canvas
         dpr={[1, crystalRenderScale(quality, window.devicePixelRatio)]}
         camera={{ position: [0, 0.685, 7.1], fov: 42 }}
@@ -130,18 +219,20 @@ function CrystalLab() {
           freeCamera={false}
           motionMode={{ current: 'idle' }}
         >
-          <EvolutionCrystalObject
-            geometry={states.geometry}
-            material={states.material}
-            life={states.life}
-            substrateVisible={false}
-          />
+          {!withoutCrystal && (
+            <EvolutionCrystalObject
+              geometry={states.geometry}
+              material={material}
+              life={states.life}
+              substrateVisible={false}
+            />
+          )}
           {/*
             * Публікує сцену й КРИВУ ТОНУВАННЯ. Без другого вимір світла
             * обертав би криву, якої не застосовували: R3F ставить ACES за
             * замовчуванням, але `flat` на полотні це вимикає — і мовчки.
             */}
-          <EvolutionRuntimeProbe onMetrics={() => {}} />
+          <EvolutionRuntimeProbe onMetrics={(metrics) => setDrawn(metrics.triangles)} />
         </PortalStage>
       </Canvas>
     </div>
@@ -151,5 +242,26 @@ function CrystalLab() {
 const host = document.getElementById('root');
 if (host) {
   document.documentElement.dataset['artifact'] = 'crystal';
-  createRoot(host).render(<StrictMode><CrystalLab /></StrictMode>);
+  /*
+   * БЕЗ StrictMode — і чесно про те, чого я НЕ довів.
+   *
+   * Спершу оснастка два прогони з трьох малювала сцену взагалі без
+   * кристала. Гіпотеза була така: StrictMode у dev монтує двічі (mount →
+   * cleanup → mount), cleanup звільняє бандл, а мем його не перерахує, бо
+   * залежності ті самі, — тож другий монтаж дістає звільнений бандл.
+   * Портал це переживає випадково: там стани приходять асинхронно, тобто
+   * ПІСЛЯ подвійного монтажу.
+   *
+   * Знявши StrictMode, я дістав 3 чисті прогони з 3 і вирішив, що причину
+   * знайдено. Це було зарано: коли скрипт почав знімати ще й контрольний
+   * кадр (`crystal=off`), тобто робити ДРУГУ навігацію, порожніх кадрів
+   * не стало й зі StrictMode. Отже змінних було дві, а не одна, і котра з
+   * них лікує — не доведено.
+   *
+   * StrictMode лишається вимкненим як обережність, а не як діагноз.
+   * Справжній захист тут інший і не залежить від причини: скрипт звіряє
+   * кадр із контрольним і відмовляється міряти, якщо кристал нічого не
+   * змінив.
+   */
+  createRoot(host).render(<CrystalLab />);
 }
