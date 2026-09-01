@@ -306,6 +306,10 @@ export function applyEvolutionSandboxSources({
         id: 950_000 + index,
         status: 'done',
         createdAt: date,
+        // Синтетика: дата сценарію і Є датою завершення, тож обидва поля
+        // однакові — інакше пісочниця перевіряла б запасний шлях, а не той,
+        // яким ходить портал.
+        finishedAt: date,
       })),
     },
     sharedDaysOff: syntheticSharedDaysOff(safe.sharedDaysOff, startedAt, asOf),

@@ -344,3 +344,19 @@ button.sweep-strip-year { cursor: pointer; }
   font-size: 14px;
   line-height: 1.5;
 }
+
+/* Постер у рядку пошуку: маленький, бо це підказка «той самий фільм?»,
+   а не колода вотчліста. 2:3 — пропорція постера TMDB. */
+.sweep-found-poster {
+  flex: none;
+  width: 28px;
+  height: 42px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--surface-3);
+}
+
+.sweep-found-name small {
+  color: var(--muted);
+  font-weight: 400;
+}

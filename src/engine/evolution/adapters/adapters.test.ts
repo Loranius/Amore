@@ -204,12 +204,12 @@ describe('map, memories and media adapters', () => {
 
   it('emits one culture event per finished item, and never claims it is verified', () => {
     // ADR-0017: media is the seventh source. The evidence grade is the point —
-    // `media_items` has no completion date, so every event here is dated by the
-    // row's creation and must say so rather than pass as observed fact.
+    // `finished_at` was backfilled from `created_at` for existing rows
+    // (ADR-0080), so a date being present does not make it observed fact.
     const result = adaptMedia([
-      { id: 1, status: 'done', createdAt: '2025-08-12T10:00:00+03:00' },
-      { id: 2, status: 'watching', createdAt: '2025-08-12T18:00:00+03:00' },
-      { id: 3, status: 'done', createdAt: null },
+      { id: 1, status: 'done', createdAt: '2025-08-12T10:00:00+03:00', finishedAt: null },
+      { id: 2, status: 'watching', createdAt: '2025-08-12T18:00:00+03:00', finishedAt: null },
+      { id: 3, status: 'done', createdAt: null, finishedAt: null },
     ], context);
 
     expect(result.events).toHaveLength(1);

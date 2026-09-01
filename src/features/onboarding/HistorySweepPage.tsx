@@ -20,6 +20,7 @@ import { formatSinceDate } from '@/features/home/homeUtils';
 import { ANNIVERSARY_SUGGESTIONS, useHistorySweep } from './useHistorySweep';
 import { YEAR_MILESTONES, quietestYearIndex } from './sweepModel';
 import { SweepPlaces } from './SweepPlaces';
+import { SweepWatched } from './SweepWatched';
 import { YearStrip } from './YearStrip';
 import './historySweep.css';
 
@@ -233,6 +234,15 @@ export function HistorySweepPage() {
           count={sweep.placesByYear.get(active.index) ?? 0}
           isSaving={sweep.isSaving}
           onAdd={(place) => sweep.addPlace({ place, year: active })}
+        />
+      )}
+
+      {sweep.step === 'years' && active && (
+        <SweepWatched
+          year={active}
+          count={sweep.watchedByYear.get(active.index) ?? 0}
+          isSaving={sweep.isSaving}
+          onAdd={(item, type) => sweep.addWatched({ item, type, year: active })}
         />
       )}
 

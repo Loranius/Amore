@@ -258,6 +258,14 @@ export interface MediaItemRow {
   comment_lena: string | null;
   created_by: number | null;
   created_at: string;
+  /**
+   * Коли пара це закінчила. Пише портал при переході в `done`.
+   *
+   * Рядки, створені до 2026-09-01, засіяні з `created_at` — для них це
+   * оцінка, а не факт, і саме тому адаптер медіа й далі позначає всі свої
+   * події як `historical-estimate` (ADR-0080).
+   */
+  finished_at: string | null;
 }
 
 /** PK — композитний (user_id, tmdb_id): upsert з onConflict: 'user_id,tmdb_id'. */

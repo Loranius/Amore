@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type {
   EvolutionSourceSnapshot,
   MapPlaceSource,
+  MediaSource,
   PlanSource,
   WishlistSource,
 } from '@/engine/evolution/adapters';
@@ -118,8 +119,8 @@ describe('роки давньої пари', () => {
         rating: null, city: 'Львів', country: 'Україна',
       }],
       media: [
-        { id: 1, status: 'done', createdAt: `${year}-09-05` },
-        { id: 2, status: 'done', createdAt: `${year}-12-11` },
+        { id: 1, status: 'done', createdAt: `${year}-09-05`, finishedAt: null },
+        { id: 2, status: 'done', createdAt: `${year}-12-11`, finishedAt: null },
       ],
     }));
 
@@ -288,5 +289,76 @@ describe('мітка без дати невидима рушієві', () => {
 
     expect(withoutPlace).toBeCloseTo(0.480, 3);
     expect(withPlace).toBeCloseTo(0.566, 3);
+  });
+});
+
+// ============================================================
+// Медіа: 194 позиції в одному році — і що з цим зробила колонка.
+// ------------------------------------------------------------
+// До 2026-09-01 `adaptMedia` датував переглянуте днем СТВОРЕННЯ рядка,
+// бо іншої дати в таблиці не було. На робочій базі власника це поклало
+// всі 194 переглянуті позиції в ЧЕТВЕРТИЙ рік стосунків — той, коли
+// вотчліст завели в порталі, — а роки 1–3 не дістали від медіа нічого.
+//
+// Колонка `finished_at` (ADR-0080) розводить ці дві дати. Перевірки
+// нижче тримають обидва боки: що вона справді керує роком і що
+// запасний шлях на `created_at` нікуди не зник.
+// ============================================================
+
+function watched(id: number, finishedAt: string | null, createdAt: string): MediaSource {
+  return { id, status: 'done', createdAt, finishedAt };
+}
+
+describe('медіа датується завершенням, а не створенням рядка', () => {
+  it('рядок, СТВОРЕНИЙ сьогодні, піднімає той рік, у якому його закінчили', () => {
+    /*
+     * Саме цей випадок і є прохід по роках: пара каже «ми дивились це у
+     * сімнадцятому», рядок з'являється сьогодні. Без `finished_at` він
+     * ліг би в поточний рік, і крок обіцяв би те, чого не робить.
+     */
+    const summary = fills(sourcesWith({
+      media: [watched(1, `${MID_2017}T12:00:00.000Z`, '2026-09-01T10:00:00.000Z')],
+    }));
+
+    const seventeen = summary.years.find((year) => year.label === 2017)!;
+    expect(seventeen.fill).toBeGreaterThan(EMPTY_YEAR_FILL);
+  });
+
+  it('без дати завершення рік і далі бере день створення', () => {
+    /*
+     * Запасний шлях лишається чинним: 194 позиції власника засіяні
+     * рівно з `created_at`, і артефакт після міграції не зрушив.
+     */
+    const summary = fills(sourcesWith({
+      media: [watched(1, null, `${MID_2017}T12:00:00.000Z`)],
+    }));
+
+    expect(summary.years.find((year) => year.label === 2017)!.fill)
+      .toBeGreaterThan(EMPTY_YEAR_FILL);
+    expect(summary.years.find((year) => year.label === 2018)!.fill)
+      .toBeCloseTo(EMPTY_YEAR_FILL, 3);
+  });
+
+  it('четвертий модуль переводить рік через ціль, названу на початку', () => {
+    /*
+     * ADR-0077 назвав ціль числом: 0.68. Три модулі, які прохід мав до
+     * медіа, впирались у 0.613 — тобто ціль була недосяжна тим, що
+     * екран пропонував. Четвертий дає 0.707.
+     */
+    const three: Partial<EvolutionSourceSnapshot> = {
+      calendarEvents: [{
+        id: 1, date: START, type: 'anniversary', yearly: true, isMilestone: true,
+      }],
+      plans: [1, 2, 3].map((id) => donePlan(id, 'trip')),
+      mapPlaces: [1, 2, 3].map((id) => visitedPlace(id, MID_2017)),
+    };
+    const withMedia: Partial<EvolutionSourceSnapshot> = {
+      ...three,
+      media: [1, 2, 3].map((id) => watched(id, `${MID_2017}T12:00:00.000Z`, '2026-09-01')),
+    };
+
+    expect(fillOf2017(sourcesWith(three))).toBeCloseTo(0.613, 3);
+    expect(fillOf2017(sourcesWith(withMedia))).toBeCloseTo(0.707, 3);
+    expect(fillOf2017(sourcesWith(withMedia))).toBeGreaterThan(0.68);
   });
 });

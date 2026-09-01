@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
-import type { InsertRow } from '@/types';
+import type { InsertRow, MediaType, TmdbSearchResult } from '@/types';
 import {
   COUPLE_TIME_ZONE,
   coupleDay,
@@ -45,6 +45,12 @@ export interface MilestoneDraft {
 
 export interface PlaceDraft {
   place: PlaceCandidate;
+  year: RelationshipYearFill;
+}
+
+export interface WatchedDraft {
+  item: TmdbSearchResult;
+  type: MediaType;
   year: RelationshipYearFill;
 }
 
@@ -85,10 +91,13 @@ export interface HistorySweep {
   addAnniversary: (draft: AnniversaryDraft) => Promise<void>;
   addMilestone: (draft: MilestoneDraft) => Promise<void>;
   addPlace: (draft: PlaceDraft) => Promise<PlaceResult>;
+  addWatched: (draft: WatchedDraft) => Promise<void>;
   /** Скільки віх уже лежить у кожному році стосунків, за номером року. */
   milestonesByYear: Map<number, number>;
   /** Скільки ДАТОВАНИХ міток карти лежить у кожному році. */
   placesByYear: Map<number, number>;
+  /** Скільки переглянутого лежить у кожному році. */
+  watchedByYear: Map<number, number>;
   isSaving: boolean;
 }
 
@@ -209,6 +218,35 @@ export function useHistorySweep(): HistorySweep {
     },
   });
 
+  const addWatched = useMutation({
+    mutationFn: async ({ item, type, year }: WatchedDraft) => {
+      /*
+       * Четвертий модуль проходу, і він з'явився лише тоді, коли в
+       * `media_items` завелась дата завершення (ADR-0080). До неї рушій
+       * датував переглянуте днем СТВОРЕННЯ рядка — тобто «ми дивились це
+       * у сімнадцятому» лягло б у поточний рік, і крок обіцяв би те,
+       * чого не робить.
+       *
+       * Полудень середини року, як і у віх: пара пам'ятає рік, а не день.
+       */
+      const day = middleOfYear(year.startsAt, year.endsAt);
+      const row: InsertRow<'media_items'> = {
+        type,
+        title: item.title,
+        status: 'done',
+        poster_url: item.poster_url,
+        created_by: user.id,
+        finished_at: `${day}T12:00:00.000Z`,
+      };
+      const { error } = await supabase.from('media_items').insert(row);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await refresh();
+      await client.invalidateQueries({ queryKey: qk.media() });
+    },
+  });
+
   const data: PortalSources | undefined = sources.data;
   const relationshipStartedAt = data?.relationshipStartedAt.trim() ?? '';
 
@@ -253,6 +291,21 @@ export function useHistorySweep(): HistorySweep {
     return counts;
   }, [data, summary.years]);
 
+  const watchedByYear = useMemo(() => {
+    const counts = new Map<number, number>();
+    if (!data) return counts;
+    for (const year of summary.years) {
+      const within = data.snapshot.media.filter((item) => {
+        const at = item.finishedAt ?? item.createdAt;
+        return typeof at === 'string'
+          && at.slice(0, 10) >= year.startsAt
+          && at.slice(0, 10) < year.endsAt;
+      });
+      counts.set(year.index, within.length);
+    }
+    return counts;
+  }, [data, summary.years]);
+
   const step = sweepStepOf({
     relationshipStartedAt,
     yearlyAnniversaryCount: yearlyAnniversaries.length,
@@ -275,11 +328,14 @@ export function useHistorySweep(): HistorySweep {
       const year = yearContaining(summary.years, outcome.visitedAt);
       return { kind: 'taken', label: year?.label ?? null };
     },
+    addWatched: async (draft) => { await addWatched.mutateAsync(draft); },
     milestonesByYear,
     placesByYear,
+    watchedByYear,
     isSaving: setStartDate.isPending
       || addAnniversary.isPending
       || addMilestone.isPending
-      || addPlace.isPending,
+      || addPlace.isPending
+      || addWatched.isPending,
   };
 }

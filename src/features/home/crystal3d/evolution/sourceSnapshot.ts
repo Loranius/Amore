@@ -94,8 +94,9 @@ export function buildEvolutionMemoryLinks(
   );
 }
 
-/** The three columns the engine reads; see `useFinishedMedia`. */
-export type MediaRowsForEvolution = Pick<MediaItemRow, 'id' | 'status' | 'created_at'>;
+/** The columns the engine reads; see `useFinishedMedia`. */
+export type MediaRowsForEvolution =
+  Pick<MediaItemRow, 'id' | 'status' | 'created_at' | 'finished_at'>;
 
 export interface EvolutionSnapshotRows {
   events: readonly EventRow[];
@@ -150,6 +151,7 @@ export function buildEvolutionSourceSnapshot(
       id: item.id,
       status: item.status,
       createdAt: item.created_at,
+      finishedAt: item.finished_at,
     })),
   };
 }

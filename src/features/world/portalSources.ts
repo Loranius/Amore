@@ -88,7 +88,7 @@ export async function fetchPortalSources(): Promise<PortalSources> {
     supabase.from('memory_links').select('memory_id,source_type,source_id'),
     supabase
       .from('media_items')
-      .select('id,status,created_at')
+      .select('id,status,created_at,finished_at')
       .eq('status', 'done'),
     fetchPairWishlistEvolutionArchive(),
   ]);
@@ -176,6 +176,7 @@ export async function fetchPortalSources(): Promise<PortalSources> {
       id: item.id,
       status: item.status,
       createdAt: item.created_at,
+      finishedAt: item.finished_at,
     })),
   };
 

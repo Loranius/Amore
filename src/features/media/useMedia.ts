@@ -10,16 +10,20 @@ import { supabase, publicUrl } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
 import { compress, normalize } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
+import { nextFinishedAt } from './mediaConstants';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { MediaItemRow, MediaType, MediaStatus, InsertRow, TmdbSearchResult } from '@/types';
 
 const BUCKET = 'media-posters';
 
+/** Годинник одним місцем — щоб мутації не розводили два різні «зараз». */
+const nowIso = () => new Date().toISOString();
+
 async function loadItems(type: MediaType): Promise<MediaItemRow[]> {
   const { data, error } = await supabase
     .from('media_items')
     .select(
-      'id,type,title,status,poster_url,rating_dima,rating_lena,comment_dima,comment_lena,created_by,created_at',
+      'id,type,title,status,poster_url,rating_dima,rating_lena,comment_dima,comment_lena,created_by,created_at,finished_at',
     )
     .eq('type', type);
   if (error) throw error;
@@ -39,17 +43,19 @@ export function useMediaItems(type: MediaType) {
  * seventh event source, so a year needs to know *when* things were finished
  * and not merely how many. The sparkle count is `rows.length` at the call site.
  *
- * `created_at` stands in for a completion date the table does not keep; see
- * `adaptMedia` for what that costs.
+ * `finished_at` is the completion date the portal now writes; `created_at`
+ * remains only as the fallback for rows that predate it. See `adaptMedia`.
  */
 export function useFinishedMedia() {
   return useQuery({
     queryKey: [...qk.media(), 'finished'],
     staleTime: 5 * 60_000,
-    queryFn: async (): Promise<Pick<MediaItemRow, 'id' | 'status' | 'created_at'>[]> => {
+    queryFn: async (): Promise<
+      Pick<MediaItemRow, 'id' | 'status' | 'created_at' | 'finished_at'>[]
+    > => {
       const { data, error } = await supabase
         .from('media_items')
-        .select('id,status,created_at')
+        .select('id,status,created_at,finished_at')
         .eq('status', 'done');
       if (error) throw error;
       return data ?? [];
@@ -102,7 +108,13 @@ export function useMediaMutations(type: MediaType) {
     mutationFn: async (v: { title: string; status: MediaStatus; file?: File | undefined }) => {
       const { data, error } = await supabase
         .from('media_items')
-        .insert({ type, title: v.title, status: v.status, created_by: user.id })
+        .insert({
+          type,
+          title: v.title,
+          status: v.status,
+          created_by: user.id,
+          finished_at: nextFinishedAt(v.status, null, nowIso),
+        })
         .select('id')
         .single();
       if (error || !data) throw error ?? new Error('insert failed');
@@ -124,6 +136,7 @@ export function useMediaMutations(type: MediaType) {
         status: v.status,
         poster_url: v.item.poster_url,
         created_by: user.id,
+        finished_at: nextFinishedAt(v.status, null, nowIso),
       };
       const { error } = await supabase.from('media_items').insert(row);
       if (error) throw error;
@@ -153,10 +166,30 @@ export function useMediaMutations(type: MediaType) {
 
   // Редагувати назву/статус (+ опційна заміна постера).
   const edit = useMutation({
-    mutationFn: async (v: { id: number; title: string; status: MediaStatus; file?: File | undefined }) => {
-      const patch: { title: string; status: MediaStatus; poster_url?: string } = {
+    mutationFn: async (v: {
+      id: number;
+      title: string;
+      status: MediaStatus;
+      /** Дата, яка вже стоїть у рядку: без неї правка назви переписала б її. */
+      finishedAt: string | null;
+      file?: File | undefined;
+    }) => {
+      const patch: {
+        title: string;
+        status: MediaStatus;
+        poster_url?: string;
+        finished_at: string | null;
+      } = {
         title: v.title,
         status: v.status,
+        /*
+         * Дата ставиться Й СКИДАЄТЬСЯ разом зі статусом. Скидання не
+         * дрібниця: адаптер читає лише рядки в `done`, тож застаріла дата
+         * на кинутому серіалі рушієві не завадила б — але колонка почала б
+         * означати «колись була done», а не «закінчили тоді-то», і
+         * наступний читач повірив би підпису.
+         */
+        finished_at: nextFinishedAt(v.status, v.finishedAt, nowIso),
       };
       if (v.file) {
         const url = await uploadPoster(v.file, type, v.id);

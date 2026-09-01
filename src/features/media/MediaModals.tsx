@@ -16,7 +16,14 @@ interface MediaFormModalProps {
   item: MediaItemRow | null; // null → додавання
   onClose: () => void;
   onAdd: (v: { title: string; status: MediaStatus; file?: File | undefined }) => void;
-  onEdit: (v: { id: number; title: string; status: MediaStatus; file?: File | undefined }) => void;
+  onEdit: (v: {
+    id: number;
+    title: string;
+    status: MediaStatus;
+    /** Дата з рядка, який редагують: правка назви не має її переписувати. */
+    finishedAt: string | null;
+    file?: File | undefined;
+  }) => void;
 }
 
 export function MediaFormModal({ type, item, onClose, onAdd, onEdit }: MediaFormModalProps) {
@@ -28,7 +35,7 @@ export function MediaFormModal({ type, item, onClose, onAdd, onEdit }: MediaForm
   const save = () => {
     const t = title.trim();
     if (!t) return;
-    if (isEdit) onEdit({ id: item.id, title: t, status, file });
+    if (isEdit) onEdit({ id: item.id, title: t, status, finishedAt: item.finished_at, file });
     else onAdd({ title: t, status, file });
     onClose();
   };

@@ -141,6 +141,7 @@ describe('Evolution real-data snapshot mapping', () => {
         id: 9,
         status: 'done',
         created_at: '2025-04-05T12:00:00Z',
+        finished_at: null,
       }],
     });
 
@@ -161,7 +162,9 @@ describe('Evolution real-data snapshot mapping', () => {
       createdAt: '2025-04-04T09:00:00Z',
     });
     expect(snapshot.memoryLinks).toEqual([{ memoryId: 30, sourceType: 'place', sourceId: 7 }]);
-    expect(snapshot.media[0]).toEqual({ id: 9, status: 'done', createdAt: '2025-04-05T12:00:00Z' });
+    expect(snapshot.media[0]).toEqual({
+      id: 9, status: 'done', createdAt: '2025-04-05T12:00:00Z', finishedAt: null,
+    });
     expect(JSON.stringify(snapshot)).not.toContain('Не потрапляє у Blueprint');
     expect(JSON.stringify(snapshot)).not.toContain('example.test');
   });

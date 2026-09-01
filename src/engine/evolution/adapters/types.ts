@@ -105,10 +105,16 @@ export interface MediaSource {
   id: number;
   status: string;
   /**
-   * When the row was created. It stands in for a completion date, which
-   * `media_items` does not keep — see `adaptMedia`.
+   * When the row was created. Still carried, because it is the fallback for
+   * rows that have no completion date at all — see `adaptMedia`.
    */
   createdAt: string | null;
+  /**
+   * When the couple actually finished it, if the portal knows. Rows seeded by
+   * the 2026-09-01 migration carry `created_at` here, so a value being present
+   * does not make it a fact — see `adaptMedia`.
+   */
+  finishedAt: string | null;
 }
 
 export interface MemoryLinkSource {

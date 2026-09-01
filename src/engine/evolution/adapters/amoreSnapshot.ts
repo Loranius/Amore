@@ -74,6 +74,7 @@ export function toEvolutionSourceSnapshot(rows: AmoreEvolutionRows): EvolutionSo
       id: item.id,
       status: item.status,
       createdAt: item.created_at,
+      finishedAt: item.finished_at,
     })),
   };
 }
