@@ -154,7 +154,25 @@ describe('Tree Species', () => {
     const earlier = buildTree(BASE_EVENTS, '2025-07-01');
     const later = buildTree(BASE_EVENTS, '2026-07-01');
 
-    expect(later.structure).toEqual(earlier.structure);
+    /*
+     * СТРУКТУРА ТЕПЕР РОСТЕ, І ЦЕ НЕ ПОРУШЕННЯ ЗАМОРОЗКИ.
+     *
+     * Раніше тут стояло `toEqual`, і воно було правдою лише тому, що
+     * розмір дерева не залежав від віку взагалі. Власник попросив
+     * протилежного: «1 рік — росток; 2 — видно стовбур; 3 — є гілки і
+     * стовбур грубший…» Справжнє дерево щороку додає кільце й тоді,
+     * коли вгору вже не йде.
+     *
+     * Заморозка минулого від цього не страждає: вона про ГІЛКИ закритих
+     * років, і нижче цей же тест її й перевіряє. Кристал поводиться так
+     * само — `monarchAxialScale(daysTogether)` росте з часом.
+     */
+    expect(later.structure.trunkHeight).toBeGreaterThan(earlier.structure.trunkHeight);
+    expect(later.structure.baseRadius).toBeGreaterThan(earlier.structure.baseRadius);
+    expect(later.structure.crownRadius).toBeGreaterThan(earlier.structure.crownRadius);
+    // Насіння вирішує, ЯКЕ це дерево; вік — наскільки воно виросло.
+    expect(later.structure.seed).toBe(earlier.structure.seed);
+    expect(later.structure.trunkStep).toBe(earlier.structure.trunkStep);
     // Гілок стільки, скільки років стосунків, включно з тим, що триває.
     expect(earlier.diagnostics.annualInstructionCount).toBe(2);
     expect(later.diagnostics.annualInstructionCount).toBe(3);
@@ -232,7 +250,44 @@ describe('Tree Species', () => {
       (attractor) => attractor.id.startsWith('tree:annual:1:'),
     );
     expect(closedPrefix.length).toBeGreaterThan(0);
-    expect(later.attractors.slice(0, closedPrefix.length)).toEqual(closedPrefix);
+
+    /*
+     * ЩО САМЕ ТУТ ІНВАРІАНТ, ПІСЛЯ ПОЯВИ РОСТУ.
+     *
+     * Раніше стояло `toEqual` по координатах, і воно трималось лише тому,
+     * що дерево не росло. Власник попросив протилежного, і дослівно:
+     * «третій рік стовбур стає грубшим, гілки підтягуються вище до
+     * крони». Тобто в його моделі дерево росте ЦІЛКОМ, а не додає нові
+     * гілки над нерухомими старими.
+     *
+     * Інваріант, який лишається й важить: дописування в КІНЕЦЬ. Склад і
+     * порядок притягачів закритого року не міняються — новий рік не
+     * втручається в старі й не переставляє їх. Саме це й ловило ваду,
+     * заради якої тест писався.
+     */
+    const laterYearOne = later.attractors.filter(
+      (attractor) => attractor.id.startsWith('tree:annual:1:'),
+    );
+
+    /*
+     * ГІЛКА ЗАКРИТОГО РОКУ РОСТЕ ДАЛІ — і це вимога власника, дослівно:
+     * «4 рік стовбур стає грубшим, гілки стають грубшими». Справжня
+     * гілка не завмирає: вона товщає й видовжується десятиліттями.
+     *
+     * Тому заморозка тут означає не «координати не рухаються», а
+     * «запис року не переписується»: ті самі притягачі, у тому самому
+     * порядку, з тим самим початком. Новий рік дописується в КІНЕЦЬ і не
+     * втручається в старі — саме та вада, заради якої тест писався.
+     *
+     * Кристал заморожує свої річні тіла цілком, і це не суперечність:
+     * кристал по формуванні не росте, дерево росте. Вид відповідає за
+     * власну біологію, спільним лишається рік.
+     */
+    expect(laterYearOne.length).toBeGreaterThanOrEqual(closedPrefix.length);
+    expect(laterYearOne.slice(0, closedPrefix.length).map((a) => a.id))
+      .toEqual(closedPrefix.map((a) => a.id));
+    expect(later.attractors.slice(0, laterYearOne.length).map((a) => a.id))
+      .toEqual(laterYearOne.map((a) => a.id));
 
     const earlierSkeleton = buildOrganicSkeleton({
       seed: earlier.seed,
@@ -241,10 +296,29 @@ describe('Tree Species', () => {
     });
     const laterSkeleton = buildOrganicSkeleton({
       seed: later.seed,
-      attractors: later.attractors.slice(0, closedPrefix.length),
+      attractors: laterYearOne.slice(0, closedPrefix.length),
       config: later.skeletonConfig,
     });
-    expect(laterSkeleton.nodes).toEqual(earlierSkeleton.nodes);
+    /*
+     * ТОПОЛОГІЯ та сама, РОЗМІР більший. Гілка того самого року лишається
+     * тією самою гілкою — стільки ж вузлів, той самий батьківський
+     * ланцюг, — але виросла. Порівнювати вузли дослівно означало б
+     * вимагати, щоб гілка завмерла, чого власник прямо не просив: «гілки
+     * стають грубішими».
+     */
+    /*
+     * Вузлів стало БІЛЬШЕ (6 проти 4), і це не збій: крок росту сталий, а
+     * стовбур подовшав — «2 рік вже видно маленький стовбур, що тягнеться
+     * догори». Інваріант тут — надмножина: те, що було, лишилось на
+     * місці в ланцюгу, і зверху дописалось нове.
+     */
+    expect(laterSkeleton.nodes.length).toBeGreaterThanOrEqual(earlierSkeleton.nodes.length);
+    expect(laterSkeleton.nodes.slice(0, earlierSkeleton.nodes.length).map((node) => node.parentId))
+      .toEqual(earlierSkeleton.nodes.map((node) => node.parentId));
+    const before = earlierSkeleton.nodes.at(-1)!.position;
+    const after = laterSkeleton.nodes.at(-1)!.position;
+    expect(Math.hypot(after.x, after.y, after.z))
+      .toBeGreaterThan(Math.hypot(before.x, before.y, before.z));
   });
 
   it('truncates only the newest instructions at an explicit adapter budget', () => {

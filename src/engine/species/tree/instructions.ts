@@ -24,6 +24,11 @@ import type {
   TreeSpeciesDiagnostics,
   TreeStructureInstruction,
 } from './types';
+import {
+  treeCrownScale,
+  treeTrunkHeightScale,
+  treeTrunkRadiusScale,
+} from './growthLaw';
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -83,17 +88,44 @@ function directionRange(channel: EvolutionChannel): {
   return { minElevation: 0.7, elevationSpan: 0.25, minRadial: 0.38, radialSpan: 0.34 };
 }
 
-export function buildTreeStructure(artifactSeed: number): TreeStructureInstruction {
+/**
+ * Структура дерева — тепер із віком, а не лише з насінням.
+ *
+ * До цієї зміни функція брала САМЕ насіння, тож висота стовбура, радіус
+ * крони й товщина стояли сталими від першого дня: з роками мінялась лише
+ * кількість гілок. Це було записано й у рендерері: дерево виходило 4.97,
+ * 5.10, 5.23, 5.00 і 5.25 одиниць на 1, 3, 5, 10 і 20 роках — тобто
+ * розмір не відповідав вікові взагалі, і тому дерево підганялось під
+ * сталу висоту (`TREE_FIT_HEIGHT`).
+ *
+ * Насіння вирішує, ЯКЕ це дерево (пропорції пари, ADR-0004); вік вирішує,
+ * НАСКІЛЬКИ воно виросло. Ці дві ролі більше не змішані.
+ *
+ * @param daysTogether днів разом; закон росту — у `growthLaw.ts`
+ */
+export function buildTreeStructure(
+  artifactSeed: number,
+  daysTogether: number,
+): TreeStructureInstruction {
   const seed = stableSeed(artifactSeed, 'tree:structure');
+  const heightScale = treeTrunkHeightScale(daysTogether);
+  const radiusScale = treeTrunkRadiusScale(daysTogether);
+  const crownScale = treeCrownScale(daysTogether);
   return {
     id: 'tree:structure',
     seed,
-    trunkHeight: round6(2.72 + seededUnit(seed, 'trunk-height') * 0.26),
+    trunkHeight: round6((2.72 + seededUnit(seed, 'trunk-height') * 0.26) * heightScale),
+    /*
+     * Крок росту НЕ масштабується разом із деревом. Він задає, як часто
+     * ставиться вузол уздовж гілки; зменшити його разом із висотою
+     * означало б лишити ростку стільки ж вузлів, скільки в дорослого
+     * дерева, тобто ту саму кривизну на вдесятеро коротшій гілці.
+     */
     trunkStep: round6(0.33 + seededUnit(seed, 'trunk-step') * 0.035),
     branchStep: round6(0.225 + seededUnit(seed, 'branch-step') * 0.035),
-    crownRadius: round6(2.02 + seededUnit(seed, 'crown-radius') * 0.34),
-    crownHeight: round6(2.32 + seededUnit(seed, 'crown-height') * 0.34),
-    baseRadius: round6(0.265 + seededUnit(seed, 'base-radius') * 0.035),
+    crownRadius: round6((2.02 + seededUnit(seed, 'crown-radius') * 0.34) * crownScale),
+    crownHeight: round6((2.32 + seededUnit(seed, 'crown-height') * 0.34) * crownScale),
+    baseRadius: round6((0.265 + seededUnit(seed, 'base-radius') * 0.035) * radiusScale),
     radiusDecay: round6(0.7 + seededUnit(seed, 'radius-decay') * 0.045),
     upwardBias: round6(0.16 + seededUnit(seed, 'upward-bias') * 0.055),
     directionMemory: round6(0.31 + seededUnit(seed, 'direction-memory') * 0.07),

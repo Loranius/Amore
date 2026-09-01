@@ -36,7 +36,17 @@ export function buildTreeSpeciesBlueprint(
 
   const pressures = buildTreePressures(currentArtifact);
   const state = buildTreeState(currentArtifact, asOf, pressures);
-  const structure = buildTreeStructure(input.artifact.deterministicSeed);
+  /*
+   * Вік дерева — ті самі дні, якими росте кристал. Береться з артефакту, а
+   * не власним лічильником: третій закон року в цьому проєкті вже коштував
+   * розходжень (див. `species/shared`).
+   */
+  const daysTogether = Math.max(
+    0,
+    (Date.parse(asOf) - Date.parse(`${input.artifact.relationshipStartedAt}T00:00:00.000Z`))
+      / 86_400_000,
+  );
+  const structure = buildTreeStructure(input.artifact.deterministicSeed, daysTogether);
   /*
    * Роки рахує спільна модель (`species/shared`), тож дереву треба
    * правило високосного дня артефакту, а не власний лічильник років.

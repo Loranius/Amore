@@ -239,11 +239,34 @@ export function buildTreeTerrainBinding(
   );
   const radialSegments = config.radialSegmentsByLod[lod];
   const ringCount = config.ringCountByLod[lod];
+  /*
+   * ПЛАТО ПРИВ'ЯЗАНЕ ДО МЕЖІ КІЛЬЦЯ.
+   *
+   * Кільця розкладені лінійно (`surfaceRadius * ring / ringCount`), а
+   * пласким лишається те, що не далі за `plateauRadius`. Тобто пласка
+   * зона КВАНТУЄТЬСЯ кроком кільця, і опублікована обіцянка
+   * «плато накриває коріння» справджувалась лише поки крок був дрібним
+   * відносно плато.
+   *
+   * Коли дерево дістало вік (`species/tree/growthLaw.ts`), на молодому
+   * дереві крок став грубим відносно коріння — і найближче кільце впало
+   * ВСЕРЕДИНУ коріння: виміряно 0.1145 пласкої зони при 0.1200 покриття
+   * коренів, тобто кінці коренів вийшли б з-під землі.
+   *
+   * Вада була тут завжди; сталий розмір дерева її ховав. Округлення
+   * ВГОРУ до межі кільця строго збільшує пласку зону, тож гарантію воно
+   * лише зміцнює.
+   */
+  const ringStep = surfaceRadius / Math.max(1, ringCount);
+  const snappedPlateauRadius = round6(Math.min(
+    surfaceRadius,
+    Math.ceil(plateauRadius / Math.max(EPSILON, ringStep)) * ringStep,
+  ));
   const mesh = buildSurfaceMesh(
     center,
     contact.ground.levelY,
     surfaceRadius,
-    plateauRadius,
+    snappedPlateauRadius,
     reliefAmplitude,
     radialSegments,
     ringCount,

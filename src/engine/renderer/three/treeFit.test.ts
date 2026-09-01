@@ -129,19 +129,41 @@ describe('measureThreeTreeReach', () => {
 
 describe('fitThreeTree', () => {
   it('renders below the crystal ceiling, where real crystals actually sit', () => {
-    const fit = fitThreeTree(measureThreeTreeReach(content()));
-    // The ceiling is the size a fully mature druse reaches; fitting the tree to
-    // it drew it larger than any crystal the owner has seen, and on a wide
-    // screen the crown ran into the header. See TREE_FIT_HEIGHT.
+    // Стеля кристала — розмір дорослої друзи, тож порівнювати з нею треба
+    // ДОРОСЛЕ дерево: фікстура `content()` — це пара з 2024 року, тобто
+    // після появи закону росту вона молода й малює росток.
+    const fit = fitThreeTree({ minY: 0, maxY: 5.2, crownReach: 2, soilReach: 2 });
     expect(fit.height).toBeLessThan(ARTIFACT_FIT_HEIGHT);
     expect(fit.height).toBeGreaterThan(ARTIFACT_FIT_HEIGHT * 0.6);
     expect(fit.crownRadius * 2).toBeLessThanOrEqual(ARTIFACT_FIT_WIDTH + 1e-6);
   });
 
-  it('scales every tree to the same height, since the species has no age response', () => {
-    const short = fitThreeTree({ minY: 0, maxY: 3, crownReach: 1, soilReach: 1 });
-    const tall = fitThreeTree({ minY: 0, maxY: 6, crownReach: 2, soilReach: 2 });
-    expect(short.height).toBeCloseTo(tall.height, 6);
+  it('малий росток рендериться малим, а не дотягується до кадру', () => {
+    /*
+     * ПОПЕРЕДНЯ ВЕРСІЯ ЦЬОГО ТЕСТУ ЗВАЛАСЬ «scales every tree to the same
+     * height, since the species has no age response» — і була правдою:
+     * розмір дерева не залежав від віку взагалі (4.97 / 5.10 / 5.23 /
+     * 5.00 / 5.25 одиниць на 1, 3, 5, 10 і 20 роках).
+     *
+     * Тепер дерево росте (`species/tree/growthLaw.ts`), і підгонка стала
+     * еталонною: доросле заповнює кадр, росток лишається ростком. Якби
+     * вона й далі дотягувала кожне дерево до 2.7, увесь щойно доданий ріст
+     * був би невидимий — рівно та вада, через яку кристалу свого часу
+     * зробили `referenceScale`.
+     */
+    const sprout = fitThreeTree({ minY: 0, maxY: 1, crownReach: 0.3, soilReach: 0.4 });
+    const adult = fitThreeTree({ minY: 0, maxY: 5.2, crownReach: 2, soilReach: 2 });
+
+    expect(adult.height).toBeGreaterThan(sprout.height * 4);
+    expect(adult.height).toBeCloseTo(2.7, 2);
+  });
+
+  it('незвично велика крона все одно притискається до кадру', () => {
+    // Еталон — не дозвіл вилізти за екран: ширина лишається твердою межею.
+    const huge = fitThreeTree({ minY: 0, maxY: 40, crownReach: 20, soilReach: 20 });
+
+    expect(huge.height).toBeLessThanOrEqual(2.7 + 1e-6);
+    expect(huge.crownRadius * 2).toBeLessThanOrEqual(ARTIFACT_FIT_WIDTH + 1e-6);
   });
 
   it('lets width bind when a tree is wider than it is tall', () => {

@@ -149,24 +149,27 @@ export function measureThreeTreeReach(content: ThreeTreeFitContent): ThreeTreeRe
 }
 
 /**
- * Scene height the tree renders at.
+ * Висота, під яку підганяється ДОРОСЛЕ дерево.
  *
- * Not `ARTIFACT_FIT_HEIGHT`, and the difference matters. That number is the
- * crystal's *ceiling* — the size a fully mature druse reaches — and almost no
- * real crystal is there: the fit scales against a reference instead, so a
- * three-and-a-half-year couple renders about 2.3 units tall and a ten-year one
- * about 3.2. Fitting the tree to the ceiling drew it larger than any crystal
- * the owner has ever seen, and on a wide screen the crown ran into the header.
+ * Раніше під неї підганялось будь-яке: правило було `min(2.7/height, …)`,
+ * тобто масштаб щоразу дотягував дерево до тих самих 2.7. Тоді це було
+ * чесно — розмір дерева не залежав від віку взагалі (виміряно на тому
+ * самому конвеєрі: 4.97, 5.10, 5.23, 5.00 і 5.25 одиниць на 1, 3, 5, 10 і
+ * 20 роках), і крива росту в підгонці була б вигаданою, а не виведеною.
  *
- * The tree cannot use the crystal's reference rule, because it has nothing to
- * scale: measured across the same pipeline at one, three, five, ten and twenty
- * years, the published tree comes out 4.97, 5.10, 5.23, 5.00 and 5.25 engine
- * units tall. Its size does not answer to the relationship's age at all — the
- * work ADR-0004 did for the crystal has no counterpart on the tree yet. Until
- * it does, one fixed height in the middle of the crystal's real band is the
- * honest answer; a growth curve here would be invented, not derived.
+ * Тепер дерево справді росте (`species/tree/growthLaw.ts`), тож підгонка
+ * стала ЕТАЛОННОЮ, як у кристала: дорослі 40 років дають 2.7, а росток
+ * рендериться настільки малим, наскільки він малий.
  */
 const TREE_FIT_HEIGHT = 2.7;
+
+/**
+ * Висота дорослого дерева в одиницях рушія — те, що еталон відображає у 2.7.
+ *
+ * Узято з виміряних 4.97…5.25 при сталих розмірах: після зміни це і є
+ * висота на повному терміні, бо закон росту множить саме ті числа.
+ */
+const TREE_REFERENCE_HEIGHT = 5.2;
 
 /**
  * Fits a tree into the portal's frame.
@@ -178,7 +181,17 @@ const TREE_FIT_HEIGHT = 2.7;
 export function fitThreeTree(reach: ThreeTreeReach): ThreeTreeFit {
   const height = Math.max(1e-4, reach.maxY - reach.minY);
   const width = Math.max(1e-4, reach.crownReach * 2);
-  const scale = Math.min(TREE_FIT_HEIGHT / height, ARTIFACT_FIT_WIDTH / width);
+  /*
+   * Еталон, а не «дотягнути до кадру». Інакше росток масштабувався б до
+   * тієї самої висоти, що й сорокарічне дерево, і весь щойно доданий ріст
+   * був би невидимий — рівно та вада, через яку кристалу колись зробили
+   * `referenceScale` (ADR-0004).
+   */
+  const referenceScale = TREE_FIT_HEIGHT / TREE_REFERENCE_HEIGHT;
+  // Кадр лишається твердою межею: незвично велика крона все одно
+  // притискається, а не вилазить за екран.
+  const containScale = Math.min(TREE_FIT_HEIGHT / height, ARTIFACT_FIT_WIDTH / width);
+  const scale = Math.min(referenceScale, containScale);
   const lift = -reach.minY * scale;
 
   return {
