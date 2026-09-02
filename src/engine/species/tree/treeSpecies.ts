@@ -1,5 +1,6 @@
 import { parseEvolutionInstant } from '../../evolution/calendar';
 import { buildPressureLedger } from '../../evolution/ledger';
+import { treeDaysTogether } from './growthLaw';
 import { buildTreeGrowthInstructions, buildTreeStructure } from './instructions';
 import { buildTreePressures, buildTreeState } from './pressures';
 import type {
@@ -41,11 +42,7 @@ export function buildTreeSpeciesBlueprint(
    * не власним лічильником: третій закон року в цьому проєкті вже коштував
    * розходжень (див. `species/shared`).
    */
-  const daysTogether = Math.max(
-    0,
-    (Date.parse(asOf) - Date.parse(`${input.artifact.relationshipStartedAt}T00:00:00.000Z`))
-      / 86_400_000,
-  );
+  const daysTogether = treeDaysTogether(input.artifact.relationshipStartedAt, asOf);
   const structure = buildTreeStructure(input.artifact.deterministicSeed, daysTogether);
   /*
    * Роки рахує спільна модель (`species/shared`), тож дереву треба

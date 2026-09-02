@@ -46,6 +46,21 @@ export const DAYS_PER_YEAR = 365.2425;
  *   рік 20 — 0.65
  *   рік 40 — 1.00
  */
+/**
+ * Днів разом — з дати початку й «сьогодні» пари.
+ *
+ * Винесено сюди, бо цього числа потребують уже ДВОЄ: сама порода
+ * (`treeSpecies`) і скелетні гілки (`scaffold`). Коментар у `treeSpecies`
+ * попереджав рівно про це — «третій закон року в цьому проєкті вже коштував
+ * розходжень», — тож четвертої копії тут не буде.
+ */
+export function treeDaysTogether(relationshipStartedAt: string, asOf: string): number {
+  const started = Date.parse(`${relationshipStartedAt}T00:00:00.000Z`);
+  const now = Date.parse(asOf);
+  if (!Number.isFinite(started) || !Number.isFinite(now)) return 0;
+  return Math.max(0, (now - started) / 86_400_000);
+}
+
 export function treeAgeProgress(daysTogether: number): number {
   const days = Number.isFinite(daysTogether) ? Math.max(0, daysTogether) : 0;
   const years = days / DAYS_PER_YEAR;

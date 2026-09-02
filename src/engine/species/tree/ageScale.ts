@@ -30,6 +30,7 @@
 // результат, але перше коштує один прохід, а друге — два.
 // ============================================================
 import type { OrganicSkeletonState } from '../../labs/organic';
+export { treeDaysTogether } from './growthLaw';
 import { treeTrunkHeightScale } from './growthLaw';
 
 /**

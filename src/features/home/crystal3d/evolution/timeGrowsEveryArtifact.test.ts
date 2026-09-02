@@ -43,7 +43,7 @@ const asOfAfter = (years: number) =>
  */
 const AGES = [1, 2, 3, 5, 8, 12, 20, 30, 40] as const;
 
-function treeHeightAt(years: number, coupleId: string): number {
+function treeBuildAt(years: number, coupleId: string) {
   const asOf = asOfAfter(years);
   const artifact = buildArtifactFromSnapshot({
     coupleId, asOf, snapshot: EMPTY_SNAPSHOT,
@@ -52,14 +52,30 @@ function treeHeightAt(years: number, coupleId: string): number {
       timeZone: 'Europe/Kyiv', leapDayPolicy: 'feb-28',
     },
   }).blueprint;
-  const build = buildTreeLabPreviewFromArtifact({
+  return buildTreeLabPreviewFromArtifact({
     artifact, asOf, lod: 'medium', rulesVersion: 'dogma-test', asOfPolicy: 'fixed-fixture',
   });
+}
+
+function treeHeightAt(years: number, coupleId: string): number {
+  const build = treeBuildAt(years, coupleId);
   let top = Number.NEGATIVE_INFINITY;
   for (let index = 1; index < build.mesh.positions.length; index += 3) {
     if (build.mesh.positions[index]! > top) top = build.mesh.positions[index]!;
   }
   return top;
+}
+
+function treeWidthAt(years: number, coupleId: string): number {
+  const build = treeBuildAt(years, coupleId);
+  let reach = 0;
+  for (let index = 0; index + 2 < build.mesh.positions.length; index += 3) {
+    reach = Math.max(reach, Math.hypot(
+      build.mesh.positions[index]!,
+      build.mesh.positions[index + 2]!,
+    ));
+  }
+  return reach * 2;
 }
 
 describe('час — основна валюта росту', () => {
@@ -81,6 +97,60 @@ describe('час — основна валюта росту', () => {
      * відрізнятись у рази, інакше догма виконана буквою: 0.001 на рік теж
      * зростання.
      */
+    /*
+     * ШИРИНА КРОНИ — теж ріст, і доти вона гуляла: падінь 16-21 із 39 річних
+     * переходів, найгірше ×0.41 (рік 21: 2.62 -> 1.01). Причина була в тому,
+     * що ширину задавала одна випадкова нижня гілочка, яка цього року
+     * пережила скидання, а наступного ні. Відколи крону тримають скелетні
+     * гілки з законом вильоту (ADR-0093), гуляють лише прутики ВСЕРЕДИНІ
+     * огинальної.
+     *
+     * Поріг 0.85, а не «жодного падіння»: прутики симуляції подекуди
+     * дістають трохи далі за скелет, і їхнє миготіння лишається. Виміряно —
+     * найгірше падіння тепер ×0.86 проти ×0.41.
+     */
+    it('розсуває крону з роками, не даючи їй схлопуватись', () => {
+      for (const coupleId of ['dogma:one', 'dogma:two']) {
+        let previous = 0;
+        for (const years of AGES) {
+          const width = treeWidthAt(years, coupleId);
+          expect({ coupleId, years, collapsed: width < previous * 0.85 })
+            .toEqual({ coupleId, years, collapsed: false });
+          previous = Math.max(previous, width);
+        }
+        // І в підсумку крона таки ширшає в рази, а не тримається на місці.
+        expect(treeWidthAt(40, coupleId)).toBeGreaterThan(treeWidthAt(3, coupleId) * 3);
+      }
+    }, 300_000);
+
+    /*
+     * ГІЛКИ-СКЕЛЕТИ Є. Власник: «додавай, якщо їх немає, а їх немає,
+     * додавай». Доти медіана довжини гілки була 2-4% висоти на кожному віці.
+     */
+    it('має товсті бічні гілки, а не саму лише дрібноту', () => {
+      const build = treeBuildAt(20, 'dogma:one');
+      const scaffolds = build.frames.curves.filter(
+        (curve) => curve.branchId.startsWith('tree:scaffold:'),
+      );
+      expect(scaffolds.length).toBeGreaterThanOrEqual(5);
+
+      let top = Number.NEGATIVE_INFINITY;
+      for (let index = 1; index < build.mesh.positions.length; index += 3) {
+        if (build.mesh.positions[index]! > top) top = build.mesh.positions[index]!;
+      }
+      const longest = Math.max(...scaffolds.map((curve) => {
+        let sum = 0;
+        for (let index = 1; index < curve.samples.length; index += 1) {
+          const from = curve.samples[index - 1]!.position;
+          const to = curve.samples[index]!.position;
+          sum += Math.hypot(to.x - from.x, to.y - from.y, to.z - from.z);
+        }
+        return sum;
+      }));
+      // Половина висоти дерева — це вже скелет крони, а не прутик.
+      expect(longest / top).toBeGreaterThan(0.5);
+    }, 300_000);
+
     it('дорослішає в рази, а не на йоту', () => {
       const young = treeHeightAt(3, 'dogma:one');
       const old = treeHeightAt(40, 'dogma:one');

@@ -21,12 +21,19 @@ export {
   type TreeStructureInstruction,
 } from './types';
 export {
+  MAX_SCAFFOLD_BRANCHES,
+  SCAFFOLD_FIRST_YEAR,
+  addTreeScaffoldBranches,
+  scaffoldCountFor,
+} from './scaffold';
+export {
   TREE_FOLIAGE_TUNED_HEIGHT,
   TREE_SKELETON_HEIGHT_PER_TRUNK,
   scaleFoliageConfigToAge,
   scaleLeafGeometryConfigToAge,
   scaleOrganicSurfaceToAge,
   scaleTreeSkeletonToAge,
+  treeDaysTogether,
   treeFoliageScale,
   treeAgeSizeShare,
   treeSkeletonTargetHeight,

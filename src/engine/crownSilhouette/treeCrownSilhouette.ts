@@ -508,14 +508,36 @@ export function buildTreeCrownSilhouette(
     : 0;
   const viewReadabilityAccepted = viewReadability.every((view) => view.accepted);
 
-  if (!stableLeafOrderPreserved
-    || !instanceCountPreserved
-    || !crownCellProvenancePreserved
-    || !preservedEmptySectorIndices
-    || !preservedVerticalBands
-    || !silhouetteErrorNotIncreased
-    || !viewReadabilityAccepted) {
-    throw new Error('Tree Crown Silhouette preservation or multi-view acceptance contract failed.');
+  /*
+   * Помилка НАЗИВАЄ умову, яка впала, а не сам факт падіння.
+   *
+   * Тут сходяться сім різних інваріантів, і повідомлення «preservation or
+   * multi-view acceptance contract failed» однакове для всіх сімох. Коли
+   * контракт упав на одинадцяти роках із сорока в однієї пари, з нього не
+   * можна було дізнатись навіть того, геометрія це чи листя, — довелось
+   * дописувати діагностику, щоб просто прочитати причину. Друге таке
+   * розслідування вже не знадобиться.
+   */
+  const broken = [
+    ['stableLeafOrder', stableLeafOrderPreserved],
+    ['instanceCount', instanceCountPreserved],
+    ['crownCellProvenance', crownCellProvenancePreserved],
+    ['emptyOuterSectors', preservedEmptySectorIndices],
+    ['verticalBands', preservedVerticalBands],
+    ['silhouetteErrorNotIncreased', silhouetteErrorNotIncreased],
+    ['viewReadability', viewReadabilityAccepted],
+  ].filter(([, ok]) => !ok).map(([name]) => name);
+
+  if (broken.length > 0) {
+    throw new Error(
+      `Tree Crown Silhouette preservation or multi-view acceptance contract failed: ${broken.join(', ')}`
+      + ` (найгірша частка читаного листя ${minimumReadableFrontLeafFraction.toFixed(3)}`
+      + ` за порогу ${input.config.minimumReadableLeafFraction};`
+      + ` листя попереду в найгіршому напрямку: ${
+        viewReadability.filter((view) => !view.accepted)
+          .map((view) => `${view.frontLeafCount}/${view.readableFrontLeafCount}`).join(' ')
+      })`,
+    );
   }
 
   const stateWithoutSignature: Omit<TreeCrownSilhouetteState, 'signature'> = {

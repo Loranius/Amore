@@ -85,11 +85,13 @@ import {
   type TreeRootGeometryState,
 } from '@/engine/rootGeometry';
 import {
+  addTreeScaffoldBranches,
   buildTreeSpeciesBlueprint,
   scaleFoliageConfigToAge,
   scaleLeafGeometryConfigToAge,
   scaleOrganicSurfaceToAge,
   scaleTreeSkeletonToAge,
+  treeDaysTogether,
   treeFoliageScale,
   treeSkeletonTargetHeight,
   treeToOrganicField,
@@ -257,7 +259,22 @@ export function buildTreeLabPreviewFromArtifact({
     buildSelfOrganizingSkeleton({ seed: field.seed, config: field.selfOrganizingConfig }),
     treeSkeletonTargetHeight(species.structure.trunkHeight),
   );
-  const skeleton = grown.skeleton;
+  /*
+   * ГІЛКИ-СКЕЛЕТИ ДОДАЮТЬСЯ, А НЕ ВИРОЩУЮТЬСЯ (ADR-0093).
+   *
+   * Самоорганізація їх не дає й дати не може: річна сила насичена, а гілок
+   * більшає, тож бічний пагін не набирає навіть на одне міжвузля. Виміряно
+   * — медіана довжини гілки 2-4% висоти на КОЖНОМУ віці. Власник: «додавай,
+   * якщо їх немає, а їх немає, додавай».
+   *
+   * Після масштабування, а не до нього: довжина скелетної гілки — частка
+   * висоти, яку дерево СПРАВДІ має за законом віку.
+   */
+  const skeleton = addTreeScaffoldBranches(
+    grown.skeleton,
+    treeDaysTogether(artifact.relationshipStartedAt, asOf),
+    artifact.deterministicSeed,
+  );
   const frames = buildOrganicCurveFrames(skeleton);
   const composition = buildTreeComposition({ species, skeleton, frames, config: DEFAULT_TREE_COMPOSITION_CONFIG });
   const roots = buildTreeRootArchitecture({ species, composition, frames, config: DEFAULT_TREE_ROOT_ARCHITECTURE_CONFIG });
