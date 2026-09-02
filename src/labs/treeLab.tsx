@@ -72,6 +72,16 @@ function TreeLab() {
   const params = useMemo(() => new URLSearchParams(window.location.search), []);
   const years = Math.max(1, Math.min(80, Number(params.get('years') ?? 4) || 4));
   const theme = params.get('theme') === 'light' ? 'light' : 'dark';
+  /*
+   * Рівень деталізації задається запитом, бо телефон бачить `medium`, а не
+   * `high` — і саме на `medium` живуть інші числа: стеля трикутників 18 000
+   * замість 24 000, стеля листя 660 замість 720 і чотирирядкова пластинка
+   * листка замість п'ятирядкової. Дивитись на `high` і робити висновок про
+   * телефон — це те саме, що міряти одне дерево, а висновок писати про інше.
+   */
+  const lod = params.get('lod') === 'medium' ? 'medium'
+    : params.get('lod') === 'low' ? 'low'
+    : 'high';
   const [error, setError] = useState<string | null>(null);
 
   const build = useMemo(() => {
@@ -80,7 +90,7 @@ function TreeLab() {
       return buildTreeLabPreviewFromArtifact({
         artifact,
         asOf,
-        lod: 'high',
+        lod,
         rulesVersion: 'tree-lab-v1',
         asOfPolicy: 'fixed-fixture',
       });
@@ -88,7 +98,7 @@ function TreeLab() {
       setError(cause instanceof Error ? cause.message : String(cause));
       return null;
     }
-  }, [years]);
+  }, [years, lod]);
 
   if (error !== null) return <pre style={{ color: '#f88', padding: 16 }}>{error}</pre>;
   if (build === null) return null;

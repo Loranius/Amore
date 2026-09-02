@@ -60,6 +60,13 @@ const off = arg('off', '');
  */
 const xRange = arg('x', '');
 const quality = arg('quality', 'high');
+/*
+ * Рівень деталізації окремо від профілю пристрою: телефон бачить `medium`,
+ * і саме там живуть інші стелі (18 000 трикутників, 660 листків,
+ * чотирирядкова пластинка листка). Дивитись на `high` і робити висновок про
+ * телефон — це міряти одне дерево, а писати про інше.
+ */
+const lod = arg('lod', '');
 const theme = arg('theme', 'dark');
 const rows = band(arg('band', '380-520'));
 
@@ -74,6 +81,7 @@ const portal = await openPortal({
 
 try {
   const url = `${server.url}${species}-lab.html?years=${years}&quality=${quality}&theme=${theme}`
+    + (lod ? `&lod=${lod}` : '')
     + (off === '' ? '' : `&off=${off}`);
   await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
   await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
@@ -86,7 +94,7 @@ try {
 
   mkdirSync(OUT, { recursive: true });
   const tag = off === '' ? 'base' : `off-${off.replace(/,/g, '+')}`;
-  const file = join(OUT, `${species}-lab-${years}y-${quality}-${theme}-${tag}.png`);
+  const file = join(OUT, `${species}-lab-${years}y-${quality}${lod ? `-${lod}` : ''}-${theme}-${tag}.png`);
   writeFileSync(file, await portal.page.screenshot());
 
   /*
