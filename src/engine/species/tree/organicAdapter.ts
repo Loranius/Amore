@@ -382,6 +382,15 @@ function adapterApicalControl(
   return round6(clamp01(byAge - byCouple));
 }
 
+/** Показник трубкової моделі для дерева цього віку — див. `PIPE_EXPONENT_YOUNG`. */
+function adapterPipeExponent(years: number, config: TreeOrganicAdapterConfig): number {
+  return round6(
+    config.pipeExponentYoung
+    + (config.pipeExponentMature - config.pipeExponentYoung)
+      * treeAgeProgress(years * DAYS_PER_YEAR),
+  );
+}
+
 export const DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG: TreeOrganicAdapterConfig = {
   rulesVersion: 'tree-organic-adapter-v0.2.0',
   maxAttractors: 32,
@@ -563,16 +572,34 @@ export function treeToOrganicField(
         config.yearVigourKnee,
         config.yearVigourMaximum,
       )),
+      /*
+       * ОБИДВА ВІКОВІ ЧИСЛА ПОДАЮТЬСЯ ПО ЦИКЛАХ.
+       *
+       * Цикл `k` — це `k + 1`-й рік стосунків, і він мусить рости за тим
+       * значенням, яке дерево мало ТОДІ. Доти обидва подавались одним
+       * числом на всю симуляцію, тож щороку вся історія перерощувалась
+       * заново: популяція гілок гуляла від 38 до 87, а за нею ширина крони
+       * й кількість листя (ADR-0100). Це те саме «минуле не переписується»
+       * (`PRODUCT.md` §2), що вже дотримане у `vigourByCycle`.
+       *
+       * Скалярні поля лишаються значенням ПОТОЧНОГО віку: вони — запасний
+       * шлях для викликів без розкладу по циклах, і давати там значення
+       * першого року було б гірше за будь-яке.
+       */
       apicalControl: adapterApicalControl(
         blueprint.growth.length,
         structure.upwardBias,
         config,
       ),
+      apicalControlByCycle: blueprint.growth.map((_, index) => adapterApicalControl(
+        index + 1,
+        structure.upwardBias,
+        config,
+      )),
       // Стовбур товщає з роками — див. `PIPE_EXPONENT_YOUNG`.
-      pipeExponent: round6(
-        config.pipeExponentYoung
-        + (config.pipeExponentMature - config.pipeExponentYoung)
-          * treeAgeProgress(blueprint.growth.length * DAYS_PER_YEAR),
+      pipeExponent: adapterPipeExponent(blueprint.growth.length, config),
+      pipeExponentByCycle: blueprint.growth.map(
+        (_, index) => adapterPipeExponent(index + 1, config),
       ),
     },
     diagnostics: {

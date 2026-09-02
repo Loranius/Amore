@@ -405,3 +405,88 @@ describe('Tree Species — верхівкове панування з віком
     expect(DEFAULT_TREE_ORGANIC_ADAPTER_CONFIG.apicalControlMature).toBeGreaterThanOrEqual(0.6);
   });
 });
+
+/*
+ * МИНУЛЕ НЕ ПЕРЕПИСУЄТЬСЯ — У ТІЙ САМІЙ МОДЕЛІ, ЯКУ МАЛЮЄ ПОРТАЛ.
+ *
+ * Вище вже є перевірка з такою назвою, але вона будує `buildOrganicSkeleton`
+ * — просторову колонізацію, яку рендерер не вживає від ADR-0072. Реальний
+ * шлях — `buildSelfOrganizingSkeleton`, і саме там інваріант ламався.
+ *
+ * ЩО САМЕ ЛАМАЛОСЬ. `vigourByCycle` від початку йшов по циклах, а
+ * `apicalControl` і `pipeExponent` подавались ОДНИМ числом на всю
+ * симуляцію — і обидва стали віковими (ADR-0091). Отже щороку вся історія
+ * дерева перерощувалась із новим значенням: торішній цикл, який ішов за
+ * λ=0.70, цього року йшов за 0.69, і розходження компаундувалось. Виміряно
+ * наслідок на розгортці 0-40: популяція гілок гуляла від 38 до 87, а за нею
+ * ширина крони (падінь 8-14 із 43) і кількість листя (8-15).
+ *
+ * Інваріант тут найпряміший з можливих: дерево наступного року мусить
+ * МІСТИТИ торішнє вузол у вузол, бо різниця між ними — рівно один новий цикл.
+ */
+describe('Tree Species — рік не переписує попередніх', () => {
+  const cycles = (asOf: string) => treeToOrganicField(buildTree(BASE_EVENTS, asOf)).selfOrganizingConfig;
+
+  /*
+   * ЩО САМЕ ЛАМАЛОСЬ. `vigourByCycle` від початку йшов по циклах, а
+   * `apicalControl` і `pipeExponent` подавались ОДНИМ числом на всю
+   * симуляцію — і обидва стали віковими (ADR-0091). Отже щороку вся історія
+   * дерева перерощувалась із новим значенням: торішній цикл, який ішов за
+   * λ=0.70, цього року йшов за 0.69, і розходження компаундувалось.
+   * Виміряно наслідок на розгортці 0-40: популяція гілок гуляла від 38 до
+   * 87, а за нею ширина крони (падінь 8-14 із 43) і кількість листя (8-15).
+   *
+   * Це пряме порушення `PRODUCT.md` §2 «минуле не переписується».
+   *
+   * ОСТАННІЙ ЦИКЛ ВИКЛЮЧЕНО З ПОРІВНЯННЯ, і це не послаблення. Він — рік,
+   * який ЩЕ ТРИВАЄ, і його сила законно росте, поки рік добігає кінця:
+   * виміряно 2.45 на початку року й 9.70 після його завершення. Минуле тут
+   * — це роки, що вже закінчились.
+   */
+  it('дописує цикл, не міняючи жодного завершеного', () => {
+    const earlier = cycles('2030-01-01');
+    const later = cycles('2031-01-01');
+
+    for (const key of ['vigourByCycle', 'apicalControlByCycle', 'pipeExponentByCycle'] as const) {
+      const before = earlier[key] ?? [];
+      const after = later[key] ?? [];
+      expect({ key, grew: after.length === before.length + 1 })
+        .toEqual({ key, grew: true });
+      // Без останнього: він і є рік, що триває.
+      expect({ key, prefix: after.slice(0, before.length - 1) })
+        .toEqual({ key, prefix: before.slice(0, before.length - 1) });
+    }
+  });
+
+  it('тримає це на кількох роках поспіль', () => {
+    let previous = cycles('2028-01-01');
+    for (const asOf of ['2029-01-01', '2030-01-01', '2031-01-01', '2032-01-01']) {
+      const next = cycles(asOf);
+      for (const key of ['vigourByCycle', 'apicalControlByCycle', 'pipeExponentByCycle'] as const) {
+        const before = previous[key] ?? [];
+        const after = next[key] ?? [];
+        expect({ asOf, key, prefix: after.slice(0, before.length - 1) })
+          .toEqual({ asOf, key, prefix: before.slice(0, before.length - 1) });
+      }
+      previous = next;
+    }
+  });
+
+  /*
+   * І сам віковий закон: лідер слабшає з роками (ADR-0091), стовбур товщає
+   * (показник труби падає). Якби ці масиви заповнювались поточним віком —
+   * як воно й було, — усі значення в них були б ОДНАКОВІ.
+   */
+  it('дає кожному циклу значення ЙОГО віку, а не поточного', () => {
+    const config = cycles('2034-01-01');
+    const apical = config.apicalControlByCycle ?? [];
+    const pipe = config.pipeExponentByCycle ?? [];
+    expect(apical.length).toBeGreaterThan(3);
+    for (let index = 1; index < apical.length; index += 1) {
+      expect({ index, falling: apical[index]! < apical[index - 1]! })
+        .toEqual({ index, falling: true });
+      expect({ index, falling: pipe[index]! < pipe[index - 1]! })
+        .toEqual({ index, falling: true });
+    }
+  });
+});

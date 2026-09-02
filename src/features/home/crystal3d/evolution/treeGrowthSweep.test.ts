@@ -50,7 +50,12 @@ const PROFILES = {
   активна: { cal: 12, plan: 8, wish: 9, place: 14, mem: 24, media: 18, off: 45 },
 } as const;
 
-const AGES = [0, 0.25, 0.5, 1, 2, 3, 5, 8, 12, 20, 30, 40] as const;
+/*
+ * Роки 17, 18, 21 і 22 стоять тут не для рівності сітки: саме на цих
+ * переходах виміряно просідання підігнаної висоти (ADR-0100 §4). Сітка
+ * взагалі складена з місць, де вже ламалось, а не з рівних інтервалів.
+ */
+const AGES = [0, 0.25, 0.5, 1, 2, 3, 5, 8, 12, 17, 18, 20, 21, 22, 30, 40] as const;
 
 /*
  * Дерева будуються ОДИН раз на пару «профіль + вік».
@@ -120,6 +125,7 @@ function buildShot(years: number, profile: keyof typeof PROFILES) {
     .filter((node) => node.position.y < ground + (top - ground) * 0.05)
     .map((node) => node.radius));
   return {
+    rawHeight: top - ground,
     sceneHeight: fit.height,
     baseRadius,
     leaves: build.leaves.instances.length,
@@ -152,17 +158,39 @@ describe('дерево від 0 до 40 років', () => {
       }, 300_000);
 
       /*
-       * ВИСОТА В КАДРІ РОСТЕ. Допуск 2%: після насичення висоту притискає
-       * ширина кадру (`containScale`), тож ширша крона на тій самій висоті
-       * дає дерево на два відсотки нижчим. Виміряно — найгірше ×0.98.
+       * САМЕ ДЕРЕВО НЕ МЕНШАЄ НІКОЛИ. Це закон висоти (ADR-0092/0098) без
+       * жодного допуску: виміряно 0 падінь із 43 у кожному профілі.
        */
-      it('щороку вище в кадрі, ніж торік', () => {
+      it('щороку вище за себе торішнє', () => {
         let previous = 0;
         for (const years of AGES) {
-          const { sceneHeight } = shoot(years, profile);
-          expect({ years, shrank: sceneHeight < previous * 0.98 })
+          const { rawHeight } = shoot(years, profile);
+          expect({ years, shrank: rawHeight < previous - 1e-9 })
             .toEqual({ years, shrank: false });
-          previous = Math.max(previous, sceneHeight);
+          previous = rawHeight;
+        }
+      }, 300_000);
+
+      /*
+       * У КАДРІ дерево може просісти на кілька відсотків, і це НЕ ріст, а
+       * рамка. `fitThreeTree` притискає масштаб і по ширині
+       * (`ARTIFACT_FIT_WIDTH`), а крона дорослого дерева ширша за себе
+       * заввишки — тож рік, у якому листя дійшло до стелі, робить крону
+       * ширшою й опускає масштаб. Виміряно: два випадки з 43 у двох
+       * профілях із п'яти, найгірше ×0.93.
+       *
+       * Спроби прибрати це відкинуто виміром (ADR-0100 §5): звуження зрілої
+       * крони висоти не рятує, а ширину псує (×0.96 -> ×0.81), бо затиск
+       * тримає листяний хмарник, а не виліт скелетних гілок; підняти саму
+       * межу кадру не можна — доросла крона вже стоїть при його краю.
+       */
+      it('у кадрі не просідає більш ніж на сім відсотків', () => {
+        let peak = 0;
+        for (const years of AGES) {
+          const { sceneHeight } = shoot(years, profile);
+          expect({ years, shrank: sceneHeight < peak * 0.93 })
+            .toEqual({ years, shrank: false });
+          peak = Math.max(peak, sceneHeight);
         }
       }, 300_000);
 

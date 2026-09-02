@@ -100,6 +100,25 @@ export interface SelfOrganizingConfig {
    * Коротший за `cycles` список добирається `vigourPerCycle`.
    */
   vigourByCycle?: readonly number[];
+  /*
+   * ВЕРХІВКОВЕ ПАНУВАННЯ Й ПОКАЗНИК ТРУБИ — ПО ЦИКЛАХ, А НЕ ОДНЕ НА ВСЕ.
+   *
+   * Обидва стали віковими (ADR-0091), і обидва подавались одним числом на
+   * всю симуляцію. Отже щороку ВСЯ історія дерева перерощувалась із новим
+   * значенням: торішній цикл, який колись ішов за λ=0.70, цього року йшов за
+   * 0.69, і далі розходження компаундувалось. Виміряно наслідок — популяція
+   * гілок гуляла від 38 до 87 залежно від року, а за нею ширина крони
+   * (падінь 8-14 із 43, найгірше ×0.71) і кількість листя (8-15, ×0.73).
+   *
+   * Це пряме порушення `PRODUCT.md` §2 «минуле не переписується»: закритий
+   * рік мусить рости так, як він ріс.
+   *
+   * `vigourByCycle` цього ніколи не порушував — він від початку по циклах.
+   * Тепер так само й ці двоє: цикл `k` бере значення того віку, який дерево
+   * мало НА ТОМУ циклі.
+   */
+  apicalControlByCycle?: readonly number[];
+  pipeExponentByCycle?: readonly number[];
 
   // --- тіньова сітка ---
   /**
@@ -727,7 +746,7 @@ export function buildSelfOrganizingSkeleton(
       nodes,
       buds,
       Math.max(0, cycleVigour),
-      config.apicalControl,
+      config.apicalControlByCycle?.[cycle] ?? config.apicalControl,
     );
 
     // Порядок обходу впливає на форму, тож він заданий явно й стабільно.
@@ -897,14 +916,26 @@ export function buildSelfOrganizingSkeleton(
      * Один зворотний прохід на цикл коштує стільки ж, скільки збирання
      * світла, і робить обидва числа справжніми.
      */
-    applyPipeModel(nodes, config.tipRadius, config.pipeExponent);
+    applyPipeModel(
+      nodes,
+      config.tipRadius,
+      config.pipeExponentByCycle?.[cycle] ?? config.pipeExponent,
+    );
 
     // Сплячі йдуть у наступний цикл нарівні з новими.
     buds = [...nextBuds, ...dormant].sort((left, right) => left.sequence - right.sequence);
   }
 
-  // Товщина — наслідок гілок, а не заданий наперед конус.
-  applyPipeModel(nodes, config.tipRadius, config.pipeExponent);
+  /*
+   * Останній прохід іде показником ПОТОЧНОГО віку: товщина дерева — це те,
+   * яке воно зараз, а не яким було на середині свого життя. Ріст же кожного
+   * циклу відбувся за своїм — див. `pipeExponentByCycle`.
+   */
+  applyPipeModel(
+    nodes,
+    config.tipRadius,
+    config.pipeExponentByCycle?.at(-1) ?? config.pipeExponent,
+  );
 
   // Кінцевий вузол гілки — той, у кого немає дитини з тим самим `branchId`.
   for (const node of nodes) {
