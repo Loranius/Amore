@@ -16,15 +16,17 @@ import { SearchIcon } from '@/components/icons/UiIcon';
 import { usePlaceSearch } from '@/features/memories/usePlaceSearch';
 import { placeLabel } from '@/features/memories/momentPlace';
 import type { PlaceCandidate } from '@/features/memories/momentPlace';
-import type { PlaceResult } from './useHistorySweep';
+import { SweepEntryList } from './SweepEntryList';
+import type { PlaceResult, SweepEntry } from './useHistorySweep';
 import type { RelationshipYearFill } from './yearFills';
 
 interface SweepPlacesProps {
   year: RelationshipYearFill;
-  /** Скільки датованих міток уже лежить у цьому році. */
-  count: number;
+  /** Мітки, датовані цим роком — з іменами, бо число нічого не пояснює. */
+  entries: readonly SweepEntry[];
   isSaving: boolean;
   onAdd: (place: PlaceCandidate) => Promise<PlaceResult>;
+  onRemove: (entry: SweepEntry) => void;
 }
 
 /** Що сказати парі після дотику. Третій рядок — відмова, названа вголос. */
@@ -42,7 +44,7 @@ function outcomeText(result: PlaceResult, title: string, label: number): string 
   }
 }
 
-export function SweepPlaces({ year, count, isSaving, onAdd }: SweepPlacesProps) {
+export function SweepPlaces({ year, entries, isSaving, onAdd, onRemove }: SweepPlacesProps) {
   const [query, setQuery] = useState('');
   const [said, setSaid] = useState('');
   const { found, searching } = usePlaceSearch(query);
@@ -54,8 +56,8 @@ export function SweepPlaces({ year, count, isSaving, onAdd }: SweepPlacesProps) 
   }
 
   return (
-    <section className="sweep-step">
-      <h2 className="sweep-question">Де ви були того року?</h2>
+    <div className="sweep-part">
+      <h2 className="sweep-sub">Де ви були того року?</h2>
       <p className="sweep-hint">
         {/*
           * Названо числом навмисно: пара має бачити, що це не «ще одне
@@ -99,11 +101,19 @@ export function SweepPlaces({ year, count, isSaving, onAdd }: SweepPlacesProps) 
 
       {said !== '' && <p className="sweep-said">{said}</p>}
 
-      <p className="sweep-hint">
-        {count === 0
-          ? 'У цьому році ще немає жодного місця на карті.'
-          : `У цьому році вже ${count} на карті.`}
-      </p>
-    </section>
+      {/*
+        * «Прибрати» тут означає ЗНЯТИ ДАТУ, а не видалити мітку, і кнопка
+        * каже саме це. `ensurePlacePin` або створює мітку, або лише датує
+        * наявну, і заднім числом ці два випадки не розрізнити; видалення
+        * стерло б місце, яке пара, можливо, поставила на карту сама.
+        */}
+      <SweepEntryList
+        entries={entries}
+        isSaving={isSaving}
+        onRemove={onRemove}
+        removeVerb="Зняти дату"
+        empty="У цьому році ще немає жодного місця на карті."
+      />
+    </div>
   );
 }

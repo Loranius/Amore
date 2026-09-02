@@ -85,7 +85,9 @@
   color: var(--text);
 }
 
-.sweep-added {
+/* Підсумок розбору світлин: скільки днів у якому році. Плашки, а не
+   список — це звіт про те, що ЗАРАЗ станеться, і прибирати тут нічого. */
+.sweep-tally {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -94,7 +96,7 @@
   list-style: none;
 }
 
-.sweep-added-item {
+.sweep-tally-item {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -104,6 +106,141 @@
   color: var(--text);
   font-size: 12px;
   font-weight: 600;
+}
+
+/* ── Чим рік наповнений ──────────────────────────────────────
+   Тут стояли плашки `.sweep-added` — самі дати в ряд, без назв і без
+   способу прибрати. Список замість них, бо саме безіменний перелік і
+   був половиною скарги: «візуально важко зрозуміти що де». */
+
+.sweep-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sweep-entry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 14px;
+}
+
+.sweep-entry-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sweep-entry-name small {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/*
+ * Рядок пари, а не проходу: видно, рахується, але не прибирається
+ * звідси. Різниця несе стан, тож вона в РАМЦІ й у відсутності кнопки, а
+ * не в кольорі: The Rare Colour Rule лишає колір за станом «обрано /
+ * помилка», і другий його голос тут читався б як попередження, якого
+ * немає.
+ *
+ * ТЕКСТ ЛИШАЄТЬСЯ ПОВНОГО КОЛЬОРУ, і це виміряно, а не вирішено на око.
+ * Перша редакція давала йому `--muted`: на нічній темі вийшло 4.43 проти
+ * порога 4.5 для тексту 14px. Тьмяний рядок — це ІНФОРМАЦІЯ, яку пара
+ * мусить прочитати, а не вимкнений контрол; «сюди не можна» кажуть
+ * штрихова рамка й відсутній хрестик, і цього досить.
+ */
+.sweep-entry--foreign {
+  border-style: dashed;
+  background: none;
+}
+
+.sweep-entry-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  /* 32 замість 44: кнопка живе всередині рядка 40px і поруч із нею
+     нічого натисного немає, тож промах нікуди не веде. */
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 140ms ease, color 140ms ease;
+}
+
+.sweep-entry-remove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--danger) 14%, transparent);
+  color: var(--text);
+}
+
+.sweep-entry-remove:disabled { opacity: 0.4; cursor: default; }
+
+/* Підтвердження ВСЕРЕДИНІ рядка: воно не потребує ані перебивання, ані
+   захищеного фокуса, а показує рівно те, що зникне. */
+.sweep-entry-confirm {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+}
+
+.sweep-entry-yes,
+.sweep-entry-no {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.sweep-entry-yes {
+  border-color: color-mix(in srgb, var(--danger) 44%, transparent);
+  background: color-mix(in srgb, var(--danger) 16%, var(--surface-2));
+}
+
+.sweep-entry-yes:disabled { opacity: 0.5; cursor: default; }
+.sweep-entry-no { color: var(--muted); }
+
+.sweep-more {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sweep-empty { font-size: 13px; }
+
+/* Примітка про чужі рядки — одна на панель року, і вона живе під усіма
+   трьома списками, а не під кожним. */
+.sweep-foreign-note {
+  padding: 0 16px 16px;
+  font-size: 13px;
 }
 
 /* ── Смуга років ─────────────────────────────────────────────
@@ -208,13 +345,68 @@ button.sweep-strip-year { cursor: pointer; }
   font-variant-numeric: tabular-nums;
 }
 
-/* ── Перемикач років ─────────────────────────────────────── */
+/* ── Панель одного року ──────────────────────────────────────
+   Тут стояли ТРИ окремі картки — «що було», «де ви були», «що ви
+   дивились», — однакові на вигляд, і тільки перша казала, про який рік
+   мова. Прогорнувши її на телефоні, пара відповідала невідомо про що:
+   саме це власник назвав «візуально важко зрозуміти що де».
 
-.sweep-year-nav {
+   Тепер це одна панель під спільною шапкою з роком, а три питання
+   всередині розділені волосяною лінією. Картки в картці тут бути не
+   може: вкладена картка — це завжди зайвий рівень, а не група. */
+
+.sweep-year {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  /* Шапка липне до верху панелі — без цього її зрізало б заокруглення. */
+  overflow: clip;
+}
+
+/*
+ * ШАПКА ЛИПКА. Панель на телефоні заввишки в кілька екранів, і рік мусить
+ * лишатись видимим, поки пара в ньому: інакше повертається рівно та вада,
+ * яку панель і закриває. Там, де прокрутки немає, правило нічого не
+ * змінює — липкий елемент просто стоїть, де стояв; там, де предок ховає
+ * переповнення, воно тихо вироджується в звичайний блок, і це теж не
+ * ламає нічого.
+ */
+.sweep-year-head {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+/* Питання всередині панелі — на рівень нижче за питання картки: над ними
+   вже стоїть рік, і два дисплейні рівні поспіль читались би як два
+   розділи. */
+.sweep-part {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.sweep-part + .sweep-part {
+  border-top: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+}
+
+.sweep-sub {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
 }
 
 .sweep-year-arrow {
@@ -240,8 +432,8 @@ button.sweep-strip-year { cursor: pointer; }
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  font-size: 16px;
-  font-weight: 700;
+  font-size: 18px;
+  font-weight: 800;
   color: var(--text);
   font-variant-numeric: tabular-nums;
 }

@@ -172,9 +172,9 @@ function ImportPlanView({
           </p>
 
           {years.length > 0 && (
-            <ul className="sweep-added">
+            <ul className="sweep-tally">
               {years.map(([yearIndex, days]) => (
-                <li className="sweep-added-item" key={yearIndex}>
+                <li className="sweep-tally-item" key={yearIndex}>
                   {yearIndex}-й рік · {days} {dayWord(days)}
                 </li>
               ))}

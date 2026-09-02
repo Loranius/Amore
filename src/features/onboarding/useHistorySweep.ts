@@ -32,6 +32,71 @@ import {
   type HistoryFillSummary,
   type RelationshipYearFill,
 } from './yearFills';
+import {
+  sweepEntriesFor,
+  type SweepEntry,
+  type SweepEntryKind,
+  type SweepEntryRows,
+} from './sweepEntries';
+
+export type { SweepEntry, SweepEntryKind };
+
+/** Річниця так, як її бачить пара: назва, а не самий рядок дати. */
+export interface SweepAnniversary {
+  id: number;
+  title: string;
+  date: string;
+}
+
+const ENTRIES_KEY = ['onboarding', 'sweep-entries'] as const;
+
+/**
+ * ДРУГИЙ запит, і навмисно окремий від `fetchPortalSources`.
+ *
+ * Той запит приносить рівно те, з чого рушій рахує ріст, і назв у ньому
+ * немає — вони йому не потрібні. Дописати їх туди означало б розширити
+ * гарячий спільний шлях (його читає ще й світ рифа) заради одного
+ * рідкісного екрана онбордингу.
+ *
+ * А назви тут головні: без них список року — це та сама п'ятірка без
+ * імені, з якої почалась скарга.
+ */
+async function fetchSweepEntries(): Promise<SweepEntryRows & {
+  anniversaries: SweepAnniversary[];
+}> {
+  const [plans, places, watched, events] = await Promise.all([
+    supabase.from('plans').select('id,title,status,start_date,completed_at,date_precision')
+      .eq('status', 'done'),
+    supabase.from('map_pins').select('id,title,city,visited_at').not('visited_at', 'is', null),
+    supabase.from('media_items').select('id,title,type,finished_at').eq('status', 'done'),
+    supabase.from('events').select('id,title,date').eq('type', 'anniversary').eq('yearly', true)
+      .order('date', { ascending: true }),
+  ]);
+  if (plans.error) throw plans.error;
+  if (places.error) throw places.error;
+  if (watched.error) throw watched.error;
+  if (events.error) throw events.error;
+
+  return {
+    plans: (plans.data ?? []).map((row) => ({
+      id: row.id,
+      title: row.title,
+      status: row.status,
+      startDate: row.start_date,
+      completedAt: row.completed_at,
+      datePrecision: row.date_precision,
+    })),
+    places: (places.data ?? []).map((row) => ({
+      id: row.id, title: row.title, city: row.city, visitedAt: row.visited_at,
+    })),
+    watched: (watched.data ?? []).map((row) => ({
+      id: row.id, title: row.title, type: row.type, finishedAt: row.finished_at,
+    })),
+    anniversaries: (events.data ?? []).map((row) => ({
+      id: row.id, title: row.title, date: row.date,
+    })),
+  };
+}
 
 export type { SweepStep };
 
@@ -108,7 +173,7 @@ export interface HistorySweep {
   error: Error | null;
   relationshipStartedAt: string;
   /** Щорічні річниці, які вже є: саме вони піднімають усі минулі роки. */
-  yearlyAnniversaries: { id: number; date: string }[];
+  yearlyAnniversaries: SweepAnniversary[];
   summary: HistoryFillSummary;
   setStartDate: (date: string) => Promise<void>;
   addAnniversary: (draft: AnniversaryDraft) => Promise<void>;
@@ -119,12 +184,17 @@ export interface HistorySweep {
     plan: PhotoImportPlan<File>,
     onProgress?: (progress: ImportProgress) => void,
   ) => Promise<PhotoImportResult>;
-  /** Скільки віх уже лежить у кожному році стосунків, за номером року. */
-  milestonesByYear: Map<number, number>;
-  /** Скільки ДАТОВАНИХ міток карти лежить у кожному році. */
-  placesByYear: Map<number, number>;
-  /** Скільки переглянутого лежить у кожному році. */
-  watchedByYear: Map<number, number>;
+  /*
+   * ТУТ БУЛИ ТРИ ЛІЧИЛЬНИКИ — `milestonesByYear`, `placesByYear`,
+   * `watchedByYear`, — і саме вони й були скаргою: «Уже 5», «вже 1 на
+   * карті». П'ять чого, екран не казав, тож пара не могла ні побачити,
+   * що наробила, ні знайти зайве (ADR-0103). Замість числа — імена.
+   */
+  /** Чим рік НАПОВНЕНИЙ — назвами, а не числом. */
+  entriesFor: (year: RelationshipYearFill) => Record<SweepEntryKind, SweepEntry[]>;
+  /** Прибрати те, що екран сам поклав. Інше він прибирати не має права. */
+  removeEntry: (entry: SweepEntry) => Promise<void>;
+  removeAnniversary: (id: number) => Promise<void>;
   isSaving: boolean;
 }
 
@@ -141,9 +211,17 @@ export function useHistorySweep(): HistorySweep {
     retry: 1,
   });
 
+  const entries = useQuery({
+    queryKey: ENTRIES_KEY,
+    queryFn: fetchSweepEntries,
+    staleTime: 0,
+    retry: 1,
+  });
+
   const refresh = useCallback(async () => {
     await Promise.all([
       client.invalidateQueries({ queryKey: SOURCES_KEY }),
+      client.invalidateQueries({ queryKey: ENTRIES_KEY }),
       client.invalidateQueries({ queryKey: qk.events() }),
       client.invalidateQueries({ queryKey: qk.settings() }),
       client.invalidateQueries({ queryKey: qk.plans() }),
@@ -275,6 +353,48 @@ export function useHistorySweep(): HistorySweep {
     },
   });
 
+  /*
+   * ВИДАЛЕННЯ — рівно зворотне до того, що екран робить.
+   *
+   * Віха й переглянуте створювались рядком, тож і прибираються рядком.
+   * Мітка карти — ні: `ensurePlacePin` або створює її, або лише ДАТУЄ
+   * наявну, і розрізнити ці два випадки заднім числом нічим. Видалити
+   * мітку означало б із певною ймовірністю стерти місце, яке пара
+   * поставила на карту сама. Тому тут знімається ДАТА: рік опускається
+   * рівно на те, що прохід йому дав, а мітка лишається на карті. Список
+   * називає це вголос — мовчазна різниця між «видалено» і «знято дату»
+   * була б гіршою за обидві.
+   */
+  const removeEntry = useMutation({
+    mutationFn: async (entry: SweepEntry) => {
+      if (!entry.removable) {
+        throw new Error('Цей запис створено не тут — прибрати його можна лише там, де він живе.');
+      }
+      if (entry.kind === 'place') {
+        const { error } = await supabase
+          .from('map_pins').update({ visited_at: null }).eq('id', entry.id);
+        if (error) throw error;
+        return;
+      }
+      const table = entry.kind === 'milestone' ? 'plans' : 'media_items';
+      const { error } = await supabase.from(table).delete().eq('id', entry.id);
+      if (error) throw error;
+    },
+    onSuccess: async () => {
+      await refresh();
+      await client.invalidateQueries({ queryKey: qk.mapPins() });
+      await client.invalidateQueries({ queryKey: qk.media() });
+    },
+  });
+
+  const removeAnniversary = useMutation({
+    mutationFn: async (id: number) => {
+      const { error } = await supabase.from('events').delete().eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: refresh,
+  });
+
   /**
    * Створити по спогаду на кожен день зі знімків.
    *
@@ -327,11 +447,18 @@ export function useHistorySweep(): HistorySweep {
   const data: PortalSources | undefined = sources.data;
   const relationshipStartedAt = data?.relationshipStartedAt.trim() ?? '';
 
-  const yearlyAnniversaries = useMemo(() => (
-    (data?.snapshot.calendarEvents ?? [])
+  /*
+   * Назви беруться з `fetchSweepEntries`, а НЕ зі знімка рушія: у знімку
+   * їх немає, і саме тому екран показував парі чотири однакові плашки
+   * самих дат. Поки другий запит не приїхав, працює знімок — щоб крок
+   * не стрибав, — але вже без назви.
+   */
+  const yearlyAnniversaries = useMemo((): SweepAnniversary[] => {
+    if (entries.data) return entries.data.anniversaries;
+    return (data?.snapshot.calendarEvents ?? [])
       .filter((event) => event.type === 'anniversary' && event.yearly === true)
-      .map((event) => ({ id: event.id, date: event.date }))
-  ), [data]);
+      .map((event) => ({ id: event.id, title: '', date: event.date }));
+  }, [entries.data, data]);
 
   const summary = useMemo((): HistoryFillSummary => {
     if (!data || relationshipStartedAt === '') {
@@ -340,48 +467,18 @@ export function useHistorySweep(): HistorySweep {
     return relationshipYearFills(data, asOf, `couple:${data.userIds.join('-')}`);
   }, [data, relationshipStartedAt, asOf]);
 
-  const milestonesByYear = useMemo(() => {
-    const counts = new Map<number, number>();
-    if (!data) return counts;
-    const done = data.snapshot.plans.filter((plan) => plan.status === 'done');
-    for (const year of summary.years) {
-      const within = done.filter((plan) => {
-        const at = plan.completedAt ?? plan.endDate ?? plan.startDate;
-        return typeof at === 'string' && at >= year.startsAt && at < year.endsAt;
-      });
-      counts.set(year.index, within.length);
-    }
-    return counts;
-  }, [data, summary.years]);
 
-  const placesByYear = useMemo(() => {
-    const counts = new Map<number, number>();
-    if (!data) return counts;
-    for (const year of summary.years) {
-      const within = data.snapshot.mapPlaces.filter((place) => (
-        typeof place.visitedAt === 'string'
-        && place.visitedAt.slice(0, 10) >= year.startsAt
-        && place.visitedAt.slice(0, 10) < year.endsAt
-      ));
-      counts.set(year.index, within.length);
-    }
-    return counts;
-  }, [data, summary.years]);
 
-  const watchedByYear = useMemo(() => {
-    const counts = new Map<number, number>();
-    if (!data) return counts;
-    for (const year of summary.years) {
-      const within = data.snapshot.media.filter((item) => {
-        const at = item.finishedAt ?? item.createdAt;
-        return typeof at === 'string'
-          && at.slice(0, 10) >= year.startsAt
-          && at.slice(0, 10) < year.endsAt;
-      });
-      counts.set(year.index, within.length);
-    }
-    return counts;
-  }, [data, summary.years]);
+
+  const entryRows = entries.data;
+  const entriesFor = useCallback(
+    (year: RelationshipYearFill) => (
+      entryRows
+        ? sweepEntriesFor(entryRows, year)
+        : { milestone: [], place: [], watched: [] }
+    ),
+    [entryRows],
+  );
 
   const step = sweepStepOf({
     relationshipStartedAt,
@@ -407,13 +504,15 @@ export function useHistorySweep(): HistorySweep {
     },
     addWatched: async (draft) => { await addWatched.mutateAsync(draft); },
     importPhotos,
-    milestonesByYear,
-    placesByYear,
-    watchedByYear,
+    entriesFor,
+    removeEntry: async (entry) => { await removeEntry.mutateAsync(entry); },
+    removeAnniversary: async (id) => { await removeAnniversary.mutateAsync(id); },
     isSaving: setStartDate.isPending
       || addAnniversary.isPending
       || addMilestone.isPending
       || addPlace.isPending
-      || addWatched.isPending,
+      || addWatched.isPending
+      || removeEntry.isPending
+      || removeAnniversary.isPending,
   };
 }

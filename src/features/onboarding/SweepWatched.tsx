@@ -18,13 +18,16 @@ import { useState } from 'react';
 import { SearchIcon } from '@/components/icons/UiIcon';
 import { useTmdbSearch } from '@/features/media/useTmdb';
 import type { MediaType, TmdbSearchResult } from '@/types';
+import { SweepEntryList } from './SweepEntryList';
+import type { SweepEntry } from './useHistorySweep';
 import type { RelationshipYearFill } from './yearFills';
 
 interface SweepWatchedProps {
   year: RelationshipYearFill;
-  count: number;
+  entries: readonly SweepEntry[];
   isSaving: boolean;
   onAdd: (item: TmdbSearchResult, type: MediaType) => Promise<void>;
+  onRemove: (entry: SweepEntry) => void;
 }
 
 const KINDS: readonly { type: MediaType; label: string }[] = [
@@ -32,7 +35,7 @@ const KINDS: readonly { type: MediaType; label: string }[] = [
   { type: 'series', label: 'Серіал' },
 ];
 
-export function SweepWatched({ year, count, isSaving, onAdd }: SweepWatchedProps) {
+export function SweepWatched({ year, entries, isSaving, onAdd, onRemove }: SweepWatchedProps) {
   const [type, setType] = useState<MediaType>('movie');
   const [query, setQuery] = useState('');
   const [said, setSaid] = useState('');
@@ -46,8 +49,8 @@ export function SweepWatched({ year, count, isSaving, onAdd }: SweepWatchedProps
   }
 
   return (
-    <section className="sweep-step">
-      <h2 className="sweep-question">Що ви дивились того року?</h2>
+    <div className="sweep-part">
+      <h2 className="sweep-sub">Що ви дивились того року?</h2>
       <p className="sweep-hint">
         Кіно й серіали — окремий модуль, тож перший же фільм важить стільки ж,
         скільки перша віха: рік складається з того, скількох різних частин
@@ -106,11 +109,13 @@ export function SweepWatched({ year, count, isSaving, onAdd }: SweepWatchedProps
 
       {said !== '' && <p className="sweep-said">{said}</p>}
 
-      <p className="sweep-hint">
-        {count === 0
-          ? 'У цьому році ще нічого не позначено переглянутим.'
-          : `У цьому році вже ${count} переглянутих.`}
-      </p>
-    </section>
+      <SweepEntryList
+        entries={entries}
+        isSaving={isSaving}
+        onRemove={onRemove}
+        removeVerb="Прибрати"
+        empty="У цьому році ще нічого не позначено переглянутим."
+      />
+    </div>
   );
 }
