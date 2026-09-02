@@ -18,7 +18,7 @@
 // ============================================================
 import { describe, expect, it } from 'vitest';
 import { buildArtifactFromSnapshot } from '@/engine/evolution/adapters';
-import { TREE_SCAFFOLD_REACH_SHARE } from '@/engine/species/tree';
+import { TREE_CROWN_HALF_WIDTH_SHARE } from '@/engine/species/tree';
 import { buildReefPlan } from '@/engine/species/reef';
 import { buildTreeLabPreviewFromArtifact } from '../treeLab/buildTreeLabPreview';
 import { buildCrystalPipelineStates } from './crystalPipeline';
@@ -163,7 +163,7 @@ describe('час — основна валюта росту', () => {
        * «сама лише дрібнота», медіана 2-4% висоти, — і при цьому
        * пересувається разом із законом, а не всупереч йому.
        */
-      expect(longest / top).toBeGreaterThan(TREE_SCAFFOLD_REACH_SHARE * 0.9);
+      expect(longest / top).toBeGreaterThan(TREE_CROWN_HALF_WIDTH_SHARE * 0.9);
     }, 300_000);
 
     it('дорослішає в рази, а не на йоту', () => {

@@ -99,6 +99,7 @@ import {
   treeFoliageScale,
   treeSkeletonTargetHeight,
   treeToOrganicField,
+  applyTreeCrownEnvelope,
   type TreeOrganicField,
   type TreeSpeciesBlueprint,
 } from '@/engine/species/tree';
@@ -288,10 +289,36 @@ export function buildTreeLabPreviewFromArtifact({
    * свого комірця з вузла, до якого кріпиться, тож стовбур має бути вже
    * готовий (`rootFlare.ts`, ADR-0106).
    */
-  const skeleton = addTreeScaffoldBranches(
-    applyTreeRootFlare(grown.skeleton),
-    daysTogether,
-    artifact.deterministicSeed,
+  /*
+   * ОГИНАЛЬНА КРОНИ — ПІСЛЯ ОБРІЗАННЯ Й ПІСЛЯ ЗАКОНУ ВИСОТИ (ADR-0107 §2).
+   *
+   * Самоорганізація не має поняття крони: пагін іде туди, де світліше, і
+   * зупиняється, коли бракує сили. Без стелі виходив стовп 0.32-0.34
+   * завширшки від чверті зросту до самої маківки.
+   *
+   * ПОРЯДОК ТУТ ВИМІРЯНИЙ, А НЕ ВГАДАНИЙ, і мінявся він двічі.
+   *
+   * Спершу стеля стояла ДО обрізання — і не робила нічого: на сирому скелеті
+   * вона чесно зводила верхівку з 0.31 на 0.07, але обрізання потім знімало
+   * саме ту верхівку, дерево ставало нижчим, і те, що лишалось, знову міряло
+   * 0.33 по всій висоті. Стеля мусить бачити ТУ висоту, яку дерево матиме.
+   *
+   * Потім вона стояла до скелетних гілок — і верхівка знову лишалась
+   * пласкою, 0.37 при стелі 0.17. Причиною були не самі гілки (вони сидять
+   * рівно на стелі, бо беруть ту саму огинальну), а БІЧНІ ПАГОНИ на них:
+   * пагін відходить убік на 0.55 залишку гілки й виносив крону за оболонку.
+   *
+   * Тепер стеля — останнє, що робиться зі скелетом, і під неї підпадає все,
+   * що в кроні є. Скелетні гілки від цього не рухаються взагалі: їхній
+   * виліт І Є огинальна.
+   */
+  const skeleton = applyTreeCrownEnvelope(
+    addTreeScaffoldBranches(
+      applyTreeRootFlare(grown.skeleton),
+      daysTogether,
+      artifact.deterministicSeed,
+    ),
+    treeCrownNarrowing(daysTogether),
   );
   const frames = buildOrganicCurveFrames(skeleton);
   const composition = buildTreeComposition({ species, skeleton, frames, config: DEFAULT_TREE_COMPOSITION_CONFIG });

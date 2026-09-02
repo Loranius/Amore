@@ -26,8 +26,15 @@ export {
   addTreeScaffoldBranches,
   pruneThinTwigsForScaffolds,
   scaffoldCountFor,
-  TREE_SCAFFOLD_REACH_SHARE,
 } from './scaffold';
+export {
+  TREE_CROWN_BOTTOM_SHARE,
+  TREE_CROWN_HALF_WIDTH_SHARE,
+  TREE_CROWN_WIDEST_AT,
+  applyTreeCrownEnvelope,
+  treeCrownHalfWidthAt,
+  treeCrownRadiusShare,
+} from './crownProfile';
 export {
   TREE_ROOT_FLARE,
   TREE_ROOT_FLARE_SPAN,
