@@ -117,8 +117,15 @@ describe('Tree Crown Silhouette', () => {
     expect(spreading.diagnostics.frontClosureInwardLeafCount).toBeGreaterThan(0);
     expect(Math.max(...spreading.profiles.map((profile) => profile.sourceRadialRatio)))
       .toBeGreaterThan(DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.frontClosureTargetRadialRatio);
+    /*
+     * Третій доданок з'явився разом зі стелею крони (ADR-0108): вона шарів
+     * не знає, тож зсунутим буває й внутрішній листок. Тотожність лишається
+     * тотожністю — саме тому доданок додано, а не поріг ослаблено.
+     */
     expect(first.diagnostics.adjustedLeafCount).toBe(
-      first.diagnostics.adjustedOuterLeafCount + first.diagnostics.adjustedMiddleLeafCount,
+      first.diagnostics.adjustedOuterLeafCount
+        + first.diagnostics.adjustedMiddleLeafCount
+        + first.diagnostics.adjustedInnerLeafCount,
     );
     expect(first.diagnostics.stableLeafOrderPreserved).toBe(true);
     expect(first.diagnostics.instanceCountPreserved).toBe(true);
@@ -156,9 +163,16 @@ describe('Tree Crown Silhouette', () => {
       );
       if (profile.layer === 'outer') {
         expect(profile.envelopeErrorAfter).toBeLessThanOrEqual(profile.envelopeErrorBefore + 1e-6);
-        expect(Math.abs(profile.radialOffsetRatio)).toBeLessThanOrEqual(
-          DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.maximumRadialOffsetRatio + 1e-6,
-        );
+        /*
+         * Дозвіл `maximumRadialOffsetRatio` в'яже НУДЖЕННЯ до оболонки.
+         * Стеля крони (ADR-0108) — інший рух: вона заводить листок під
+         * оболонку на скільки треба, бо листка за кроною не буває.
+         */
+        if (!profile.ceilingClamped) {
+          expect(Math.abs(profile.radialOffsetRatio)).toBeLessThanOrEqual(
+            DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.maximumRadialOffsetRatio + 1e-6,
+          );
+        }
       }
       if (profile.frontClosureSelected) {
         expect(profile.layer).toBe('middle');
@@ -168,9 +182,19 @@ describe('Tree Crown Silhouette', () => {
         );
       }
       if (profile.layer === 'inner') {
-        expect(profile.adjusted).toBe(false);
+        /*
+         * Внутрішній листок не НУДЯТЬ до оболонки — його там не видно, і
+         * рухати його означало б платити за невидиме. Але стеля крони
+         * (ADR-0108) шарів не знає: листок за оболонкою це листок поза
+         * кроною, хай яким глибоким його визнала глибина крони. Тому
+         * недоторканність внутрішнього шару тепер стосується всього, крім
+         * стелі, а РОЗМІР його картки не міняється й тоді.
+         */
         expect(profile.scaleMultiplier).toBe(1);
-        expect(profile.renderPosition).toEqual(profile.sourcePosition);
+        if (!profile.ceilingClamped) {
+          expect(profile.adjusted).toBe(false);
+          expect(profile.renderPosition).toEqual(profile.sourcePosition);
+        }
         expect(profile.frontClosureSelected).toBe(false);
         expect(profile.frontClosureInwardOffsetRatio).toBe(0);
         expect(profile.frontClosureScaleDelta).toBe(0);

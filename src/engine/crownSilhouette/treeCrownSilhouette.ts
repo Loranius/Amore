@@ -4,7 +4,7 @@ import {
   roundVec,
   seededUnit,
 } from '../growth/math';
-import type { TreeSilhouette } from '../composition';
+import { TREE_CROWN_BOTTOM_SHARE, treeCrownHalfWidthAt } from '../species/tree';
 import type {
   BuildTreeCrownSilhouetteInput,
   TreeCrownSilhouetteProfile,
@@ -140,22 +140,46 @@ function verticalBandIndex(
   return Math.min(count - 1, Math.floor(normalized * count));
 }
 
-function targetEnvelopeRatio(silhouette: TreeSilhouette, normalizedHeight: number): number {
+/*
+ * ОГИНАЛЬНА ТУТ БУЛА ДРУГИМ, СУПЕРЕЧЛИВИМ ЗАКОНОМ КРОНИ — ADR-0108.
+ *
+ * Стояло чотири дуги за архетипом силуету, і всі чотири мали спільну
+ * властивість: НІЖНЯ МЕЖА 0.62. Тобто на будь-якій висоті — біля самої
+ * землі й на маківці однаково — контракт вважав, що листок мусить стояти
+ * щонайменше на 62% радіуса коробки, і совав його НАЗОВНІ, поки не
+ * впирався у власну стелю зсуву.
+ *
+ * Виміряно на сорокарічному дереві: з 616 листків контракт посунув назовні
+ * 289 і всередину 7, а картку збільшив 399 разів. Позицій за огинальною
+ * крони було 245 до нього й 260 після. Тобто шар, заведений «доводити
+ * листя до оболонки крони», роздував крону там, де оболонки вже не було.
+ *
+ * Це те саме, що ADR-0107 знайшов у симуляції, тільки на поверх вище:
+ * закон форми, виведений із самої форми. Тепер тут стоїть огинальна ПОРОДИ
+ * (`crownProfile.ts`) — та сама, за якою йдуть гілки симуляції, скелетні
+ * гілки й еталонне дерево.
+ *
+ * ЧОМУ ЧЕРЕЗ `bounds.height`, А НЕ `bounds.radius`. Огинальна оголошена в
+ * частках ВИСОТИ дерева, а `sourceRadialRatio` міряється радіусом коробки
+ * (тривимірним, тобто близьким до половини діагоналі). Перерахунок робить
+ * обидва боки порівняння одиницями коробки й нічого не вигадує.
+ */
+function targetEnvelopeRatio(
+  normalizedHeight: number,
+  boundsHeight: number,
+  boundsRadius: number,
+): number {
   const h = clamp(normalizedHeight, 0, 1);
-  const centered = h * 2 - 1;
-  const ovalArc = Math.sqrt(Math.max(0, 1 - centered * centered));
-
-  if (silhouette === 'columnar') {
-    return round6(clamp(0.68 + ovalArc * 0.16, 0.62, 0.9));
-  }
-  if (silhouette === 'umbrella') {
-    const crownArc = Math.pow(Math.sin(Math.PI * clamp(h * 0.82 + 0.09, 0, 1)), 0.68);
-    return round6(clamp(0.62 + crownArc * 0.34, 0.62, 0.98));
-  }
-  if (silhouette === 'windswept') {
-    return round6(clamp(0.7 + ovalArc * 0.22 + (h - 0.5) * 0.04, 0.64, 0.98));
-  }
-  return round6(clamp(0.68 + ovalArc * 0.28, 0.64, 0.98));
+  /*
+   * Нижче за низ крони стеля не нульова, а рівна найвужчому місцю самої
+   * крони — так само, як у `applyTreeCrownEnvelope`. Листя там росте на
+   * гілках, які ПОЧИНАЮТЬСЯ під кроною, і втягувати його в стовбур
+   * означало б оголити ті гілки.
+   */
+  const share = h < TREE_CROWN_BOTTOM_SHARE
+    ? treeCrownHalfWidthAt(TREE_CROWN_BOTTOM_SHARE) * (h / TREE_CROWN_BOTTOM_SHARE)
+    : treeCrownHalfWidthAt(h);
+  return round6((share * boundsHeight) / boundsRadius);
 }
 
 function average(values: readonly number[]): number {
@@ -236,11 +260,14 @@ function signatureFor(state: Omit<TreeCrownSilhouetteState, 'signature'>): strin
     state.sourceLeafOrientationSignature,
     state.profiles.length,
     state.diagnostics.adjustedLeafCount,
+    state.diagnostics.adjustedInnerLeafCount,
+    state.diagnostics.ceilingClampedLeafCount,
     state.diagnostics.frontClosureLeafCount,
     state.diagnostics.frontClosureInwardLeafCount,
     state.diagnostics.emptyOuterSectorIndices.join(','),
     state.diagnostics.maximumRadialOffsetRatio.toFixed(6),
     state.diagnostics.maximumFrontClosureInwardOffsetRatio.toFixed(6),
+    state.diagnostics.maximumCeilingInwardOffsetRatio.toFixed(6),
     state.diagnostics.maximumScaleDelta.toFixed(6),
     state.diagnostics.averageEnvelopeErrorAfter.toFixed(6),
     state.diagnostics.minimumReadableFrontLeafFraction.toFixed(6),
@@ -265,6 +292,7 @@ export function buildTreeCrownSilhouette(
   let adjustedLeafCount = 0;
   let adjustedOuterLeafCount = 0;
   let adjustedMiddleLeafCount = 0;
+  let adjustedInnerLeafCount = 0;
   let frontClosureLeafCount = 0;
   let frontClosureInwardLeafCount = 0;
   let untouchedInnerLeafCount = 0;
@@ -272,7 +300,9 @@ export function buildTreeCrownSilhouette(
   let maximumRadialOffset = 0;
   let maximumRadialOffsetRatio = 0;
   let maximumFrontClosureInwardOffsetRatio = 0;
+  let maximumCeilingInwardOffsetRatio = 0;
   let maximumScaleDelta = 0;
+  let ceilingClampedLeafCount = 0;
 
   for (let index = 0; index < input.leaves.instances.length; index += 1) {
     const leaf = input.leaves.instances[index]!;
@@ -303,7 +333,30 @@ export function buildTreeCrownSilhouette(
       0,
       1,
     );
-    const targetRatio = targetEnvelopeRatio(input.composition.silhouette, normalizedHeight);
+    const targetRatio = targetEnvelopeRatio(
+      normalizedHeight,
+      input.composition.bounds.height,
+      input.composition.bounds.radius,
+    );
+    /*
+     * ОБОЛОНКА КРОНИ — ТАМ, ДЕ ЛИСТОК КІНЧАЄТЬСЯ, А НЕ ТАМ, ДЕ ВІН
+     * ЧІПЛЯЄТЬСЯ (ADR-0108).
+     *
+     * Досі і нудження, і похибка міряли ПОЧАТОК картки. Картка ж має
+     * довжину, і на сорокарічному дереві вона виносила крону далеко за
+     * оболонку: позиції під стелею, а кінчиків за нею 357 із 616,
+     * найдальший на 0.199 висоти дерева. Крону видно по кінчиках, і еталон
+     * — теж оболонка листя, а не точки кріплення.
+     *
+     * Тому виліт картки віднімається від стелі один раз і в одному місці,
+     * а далі його бачать усі троє: нудження, стеля й похибка. Інакше
+     * контракт суперечив би сам собі — власна перевірка
+     * `silhouetteErrorNotIncreased` падала саме на цьому, коли стеля вже
+     * знала про картку, а похибка ще ні.
+     */
+    const cardReachBefore = (leaf.length * (depth.scaleMultiplier ?? 1))
+      / input.composition.bounds.radius;
+    const surfaceRatio = round6(Math.max(0, targetRatio - cardReachBefore));
     const sourceSectorIndex = sectorIndex(relativeX, relativeZ, input.config.azimuthSectorCount);
     const sourceVerticalBandIndex = verticalBandIndex(
       sourcePosition.y,
@@ -327,8 +380,8 @@ export function buildTreeCrownSilhouette(
     let frontClosureInwardOffsetRatio = 0;
     let radialOffset = 0;
     let renderPosition = { ...sourcePosition };
-    const errorBefore = Math.abs(targetRatio - sourceRadialRatio);
-    const signedError = targetRatio - sourceRadialRatio;
+    const errorBefore = Math.abs(surfaceRatio - sourceRadialRatio);
+    const signedError = surfaceRatio - sourceRadialRatio;
 
     if (frontClosureSelected && horizontalDistance > EPSILON) {
       const maximumInward = Math.min(
@@ -353,17 +406,97 @@ export function buildTreeCrownSilhouette(
       ));
     }
 
+    /*
+     * СТЕЛЯ — ОКРЕМИЙ КРОК, І ВОНА НЕ ЗНАЄ ПРО ШАРИ.
+     *
+     * Усе вище — це доведення листка ДО оболонки: воно зважене на шар
+     * (`response`), обмежене `maximumRadialOffsetRatio` і має право не
+     * спрацювати. Стеля — інше твердження: листка ЗА кроною не буває.
+     * Внутрішній листок (`response` нуль) її слухається так само, як
+     * зовнішній, бо «внутрішній» — це про глибину в кроні, а не про дозвіл
+     * стояти поза нею.
+     *
+     * Виміряно, чому це мусить бути повний захід, а не половина: найдальший
+     * листок сорокарічного дерева стояв на 0.195 висоти за огинальною при
+     * півширині крони 0.38 — тобто на півкрони назовні. Обмеження на
+     * 45% власного радіуса (як у нудження вище) лишало б його все одно
+     * поза кроною.
+     *
+     * Через вісь це не тягне ніколи: стеля невід'ємна, і листок сідає рівно
+     * на неї.
+     */
+    /*
+     * Листок ближче за десяту частку міліметра до осі стеля не чіпає, і це
+     * не косметика: позиції округлюються до шести знаків, тож у листка,
+     * який стоїть майже НА осі, після зсуву на 90% радіуса координати
+     * можуть перекинутись через нуль — а разом із ними й азимутний сектор,
+     * який контракт нижче зобов'язаний зберегти. Такий листок і без стелі
+     * усередині будь-якої оболонки.
+     */
+    let ceilingClamped = false;
+    const ceilingBefore = sourceRadialRatio + radialOffsetRatio;
+    if (ceilingBefore > surfaceRatio && horizontalDistance > 1e-4) {
+      /*
+       * Десятину відстані від осі листок лишає собі завжди. Це не запас
+       * «про всяк випадок», а те, чим тримається інваріант нижче:
+       * `sourceSectorIndex !== renderSectorIndex` кидає виняток, а сектор
+       * рахується через `atan2` від зсуву до центра — на самій осі він
+       * невизначений. Виміряно: без цієї десятини контракт падав на
+       * листі під низом крони, де стеля дорівнює нулю.
+       *
+       * Найдальший листок сорокарічного дерева стояв на 0.195 висоти за
+       * огинальною, і щоб завести його під неї, треба забрати дві третини
+       * його радіуса. Тому дозвіл саме 0.9, а не 0.45, як у нудження вище:
+       * там ішлося про доведення до оболонки, тут — про те, що листок поза
+       * кроною не лишається поза кроною.
+       */
+      radialOffsetRatio = round6(Math.max(
+        surfaceRatio - sourceRadialRatio,
+        -sourceRadialRatio * 0.9,
+      ));
+      ceilingClamped = true;
+      ceilingClampedLeafCount += 1;
+    }
+
+    /*
+     * Зсув — це МНОЖЕННЯ ПРОМЕНЯ, і саме тому кут береться з нього, а не з
+     * округленої точки.
+     *
+     * Рух суто радіальний, тобто азимут не міняється за побудовою. Але
+     * позиції округлюються до шести знаків, а сектор рахується через
+     * `atan2` уже з округленої точки — і листок, що стоїть РІВНО на межі
+     * секторів, перекидається через неї на 1e-6. Доти цього не траплялось,
+     * бо контракт рухав листя щонайбільше на 5.5% радіуса; заведення стелі
+     * (ADR-0108) дало зсуви до 90%, і похибка округлення разом із ними
+     * виросла на порядок. Впало це на догмі «дерево росте щороку», де
+     * контракт кинув виняток замість дерева.
+     *
+     * Тому нижче зберігається ОКРУГЛЕНА точка (її й малюють), а сектор і
+     * радіус беруться з неокругленого променя. Різниця між ними — півтори
+     * десятимільйонні одиниці сцени, тобто менше за товщину будь-чого, що
+     * дерево має.
+     */
+    let renderRelativeX = relativeX;
+    let renderRelativeZ = relativeZ;
     if (Math.abs(radialOffsetRatio) > EPSILON && horizontalDistance > EPSILON) {
       radialOffset = round6(radialOffsetRatio * input.composition.bounds.radius);
-      const inverseDistance = 1 / horizontalDistance;
+      const scale = Math.max(0, (horizontalDistance + radialOffset) / horizontalDistance);
+      renderRelativeX = relativeX * scale;
+      renderRelativeZ = relativeZ * scale;
       renderPosition = roundVec({
-        x: sourcePosition.x + relativeX * inverseDistance * radialOffset,
+        x: input.composition.bounds.center.x + renderRelativeX,
         y: sourcePosition.y,
-        z: sourcePosition.z + relativeZ * inverseDistance * radialOffset,
+        z: input.composition.bounds.center.z + renderRelativeZ,
       });
     }
 
-    const envelopeScaleDelta = frontClosureSelected
+    /*
+     * Листок, який заводять ПІД стелю, не зменшується: він саме той, що
+     * тримає оболонку крони, і зменшити його означало б обміняти форму на
+     * дірку. Зменшення лишається тільки там, де воно й було осмислене —
+     * коли листок не дотягує до оболонки.
+     */
+    const envelopeScaleDelta = frontClosureSelected || signedError < 0
       ? 0
       : signedError * input.config.envelopeResponse * 0.45 * response;
     const normalizedFrontDepth = clamp(
@@ -394,12 +527,35 @@ export function buildTreeCrownSilhouette(
         -input.config.maximumScaleDelta,
         input.config.maximumScaleDelta,
       );
-    const scaleMultiplier = round6(1 + totalScaleDelta);
-
-    const renderRelativeX = renderPosition.x - input.composition.bounds.center.x;
-    const renderRelativeZ = renderPosition.z - input.composition.bounds.center.z;
     const renderRadialRatio = Math.hypot(renderRelativeX, renderRelativeZ)
       / input.composition.bounds.radius;
+    /*
+     * КАРТКА ТЕЖ НЕ ПЕРЕРОСТАЄ ОБОЛОНКУ.
+     *
+     * Збільшення картки — той самий рух назовні, тільки іншим важелем:
+     * листок стоїть на місці, а його кінчик їде. Без цієї межі стеля
+     * заводила листок під оболонку, а `envelopeScaleDelta` тут-таки
+     * виштовхував його кінчик назад — і власна перевірка контракту
+     * «похибка не зросла» ловила це на окремих листках (0.000718 ->
+     * 0.000797).
+     */
+    const growthRoom = cardReachBefore > EPSILON
+      ? Math.max(0, (targetRatio - renderRadialRatio) / cardReachBefore)
+      : Number.POSITIVE_INFINITY;
+    /*
+     * Стеля тільки НЕ ДАЄ РОСТИ; зменшити картку вона не може.
+     *
+     * Місця під оболонкою іноді немає зовсім — біля самої маківки й під
+     * низом крони оболонка вужча за довжину картки. Тоді це питання не
+     * силуету, а геометрії листка (`leafGeometry`), і платити за нього
+     * зникомим листком означало б проміняти видиму ваду на іншу видиму
+     * ваду. Тому нижня межа тут — одиниця: картка лишається такою, якою її
+     * зробили вище за течією.
+     */
+    const scaleMultiplier = round6(Math.min(
+      1 + totalScaleDelta,
+      Math.max(1, growthRoom),
+    ));
     const renderSectorIndex = sectorIndex(
       renderRelativeX,
       renderRelativeZ,
@@ -411,10 +567,25 @@ export function buildTreeCrownSilhouette(
       input.composition.bounds.height,
       input.config.verticalBandCount,
     );
-    const errorAfter = Math.abs(targetRatio - renderRadialRatio);
+    const cardReachAfter = (leaf.length * (depth.scaleMultiplier ?? 1) * scaleMultiplier)
+      / input.composition.bounds.radius;
+    const errorAfter = Math.abs(targetRatio - (renderRadialRatio + cardReachAfter));
     const adjusted = Math.abs(radialOffset) > EPSILON || Math.abs(scaleMultiplier - 1) > EPSILON;
 
-    if (depth.layer === 'inner') untouchedInnerLeafCount += 1;
+    /*
+     * ВНУТРІШНІЙ ЛИСТОК ТЕПЕР ТЕЖ БУВАЄ ЗСУНУТИЙ — ADR-0108.
+     *
+     * Доти лічильник був однозначний: `response` для внутрішнього шару
+     * нуль, тобто його не чіпали ніколи. Стеля крони шарів не знає — листок
+     * за оболонкою це листок поза кроною, хай яким глибоким його визнала
+     * глибина крони, — тож внутрішніх зсунутих стало ненульове число, і
+     * тотожність «зсунутих = зовнішні + середні» перестала бути правдою.
+     * Замість того щоб її ослабити, заведено третій доданок.
+     */
+    if (depth.layer === 'inner') {
+      if (adjusted) adjustedInnerLeafCount += 1;
+      else untouchedInnerLeafCount += 1;
+    }
     if (depth.layer === 'middle') {
       if (adjusted) adjustedMiddleLeafCount += 1;
       else untouchedMiddleLeafCount += 1;
@@ -430,10 +601,25 @@ export function buildTreeCrownSilhouette(
     if (frontClosureInwardOffsetRatio < -EPSILON) frontClosureInwardLeafCount += 1;
     if (adjusted) adjustedLeafCount += 1;
     maximumRadialOffset = Math.max(maximumRadialOffset, Math.abs(radialOffset));
+    /*
+     * СТЕЛЯ МІРЯЄТЬСЯ ОКРЕМИМ ЧИСЛОМ, і це та сама причина, з якої окремо
+     * міряється затягування (`maximumFrontClosureInwardOffsetRatio`):
+     * `maximumRadialOffsetRatio` означає «наскільки контракт дозволяє собі
+     * ПІДСУНУТИ листок до оболонки», і його стеля в налаштуваннях — 0.08.
+     * Стеля крони — не підсування, а межа існування: вона заводить листок
+     * під оболонку на скільки треба. Класти обидва в одне число означало б
+     * зробити перевірку «не більше за дозволене» безглуздою.
+     */
     maximumRadialOffsetRatio = Math.max(
       maximumRadialOffsetRatio,
-      frontClosureSelected ? 0 : Math.abs(radialOffsetRatio),
+      frontClosureSelected || ceilingClamped ? 0 : Math.abs(radialOffsetRatio),
     );
+    if (ceilingClamped) {
+      maximumCeilingInwardOffsetRatio = Math.max(
+        maximumCeilingInwardOffsetRatio,
+        Math.abs(radialOffsetRatio),
+      );
+    }
     maximumFrontClosureInwardOffsetRatio = Math.max(
       maximumFrontClosureInwardOffsetRatio,
       Math.abs(frontClosureInwardOffsetRatio),
@@ -460,6 +646,7 @@ export function buildTreeCrownSilhouette(
       radialOffset,
       radialOffsetRatio,
       frontClosureSelected,
+      ceilingClamped,
       frontClosureInwardOffsetRatio,
       frontClosureScaleDelta: round6(frontClosureScaleDelta),
       scaleMultiplier,
@@ -579,9 +766,11 @@ export function buildTreeCrownSilhouette(
       adjustedLeafCount,
       adjustedOuterLeafCount,
       adjustedMiddleLeafCount,
+      adjustedInnerLeafCount,
       frontClosureLeafCount,
       frontClosureInwardLeafCount,
       untouchedInnerLeafCount,
+      ceilingClampedLeafCount,
       untouchedMiddleLeafCount,
       occupiedOuterSectorIndices,
       emptyOuterSectorIndices,
@@ -590,6 +779,7 @@ export function buildTreeCrownSilhouette(
       maximumRadialOffset: round6(maximumRadialOffset),
       maximumRadialOffsetRatio: round6(maximumRadialOffsetRatio),
       maximumFrontClosureInwardOffsetRatio: round6(maximumFrontClosureInwardOffsetRatio),
+      maximumCeilingInwardOffsetRatio: round6(maximumCeilingInwardOffsetRatio),
       maximumScaleDelta: round6(maximumScaleDelta),
       averageEnvelopeErrorBefore: round6(averageEnvelopeErrorBefore),
       averageEnvelopeErrorAfter: round6(averageEnvelopeErrorAfter),

@@ -48,6 +48,14 @@ export interface TreeCrownSilhouetteProfile {
   verticalBandIndex: number;
   sourceRadialRatio: number;
   targetEnvelopeRatio: number;
+  /**
+   * Чи заводила цей листок під оболонку стеля крони (ADR-0108).
+   *
+   * Відрізняється від `adjusted` тим, що це ІНШИЙ рух: `radialOffsetRatio`
+   * тоді не підпорядковується `maximumRadialOffsetRatio`, бо стеля — межа
+   * існування, а не дозвіл підсунути.
+   */
+  ceilingClamped: boolean;
   radialOffset: number;
   radialOffsetRatio: number;
   frontClosureSelected: boolean;
@@ -104,6 +112,10 @@ export interface TreeCrownSilhouetteState {
     adjustedLeafCount: number;
     adjustedOuterLeafCount: number;
     adjustedMiddleLeafCount: number;
+    /** Скільки внутрішніх листків зсунула стеля крони (ADR-0108). */
+    adjustedInnerLeafCount: number;
+    /** Скільки листків стеля крони завела під оболонку (ADR-0108). */
+    ceilingClampedLeafCount: number;
     frontClosureLeafCount: number;
     frontClosureInwardLeafCount: number;
     untouchedInnerLeafCount: number;
@@ -115,6 +127,8 @@ export interface TreeCrownSilhouetteState {
     maximumRadialOffset: number;
     maximumRadialOffsetRatio: number;
     maximumFrontClosureInwardOffsetRatio: number;
+    /** Найбільший захід під оболонку, зроблений стелею крони (ADR-0108). */
+    maximumCeilingInwardOffsetRatio: number;
     maximumScaleDelta: number;
     averageEnvelopeErrorBefore: number;
     averageEnvelopeErrorAfter: number;
