@@ -8,6 +8,18 @@ import type { WorldMotionMode } from '@/features/world/sceneDirector';
 import { PortalCameraRig } from '../scene/PortalEnvironment';
 import { portalCameraFrame } from '../scene/portalScene';
 import { useTreeEnvironmentTextures } from './TreeEnvironmentTextures';
+import { metres } from './sceneScale';
+import {
+  GRASS_CARD_BASE,
+  GRASS_CARD_HEIGHT,
+  buildGrassInstances,
+  buildRockInstances,
+  clamp01,
+  treeMeadowRadius,
+  hash2,
+  terrainHeight,
+  treeMeadowShadows,
+} from './meadow';
 
 type TreeTexturedStageProps = {
   theme: 'light' | 'dark';
@@ -22,18 +34,6 @@ type TreeTexturedStageProps = {
   children: ReactNode;
 };
 
-type GroundInstance = {
-  x: number;
-  y: number;
-  z: number;
-  rotationX: number;
-  rotationY: number;
-  rotationZ: number;
-  scaleX: number;
-  scaleY: number;
-  scaleZ: number;
-  tone: number;
-};
 
 const PALETTE = {
   light: {
@@ -49,42 +49,6 @@ const PALETTE = {
     skyLight: '#c8e2f3', groundLight: '#5b704f', rim: '#bdd8f6',
   },
 } as const;
-
-const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
-const smoothStep = (edge0: number, edge1: number, value: number) => {
-  const t = clamp01((value - edge0) / Math.max(0.0001, edge1 - edge0));
-  return t * t * (3 - 2 * t);
-};
-const hash2 = (x: number, z: number, salt: number) => {
-  const value = Math.sin(x * 127.1 + z * 311.7 + salt * 74.7) * 43758.5453123;
-  return value - Math.floor(value);
-};
-const valueNoise = (x: number, z: number, salt: number) => {
-  const x0 = Math.floor(x);
-  const z0 = Math.floor(z);
-  const tx = x - x0;
-  const tz = z - z0;
-  const sx = tx * tx * (3 - 2 * tx);
-  const sz = tz * tz * (3 - 2 * tz);
-  const n00 = hash2(x0, z0, salt);
-  const n10 = hash2(x0 + 1, z0, salt);
-  const n01 = hash2(x0, z0 + 1, salt);
-  const n11 = hash2(x0 + 1, z0 + 1, salt);
-  const nx0 = THREE.MathUtils.lerp(n00, n10, sx);
-  const nx1 = THREE.MathUtils.lerp(n01, n11, sx);
-  return THREE.MathUtils.lerp(nx0, nx1, sz);
-};
-const terrainHeight = (x: number, z: number, radius: number) => {
-  const radial = Math.min(1, Math.hypot(x, z) / radius);
-  const distance = Math.hypot(x, z);
-  const summitMask = smoothStep(0.55, 2.2, distance);
-  const dome = -radius * 0.2 * Math.pow(radial, 1.58);
-  const broad = (valueNoise(x * 0.25, z * 0.25, 3) - 0.5) * 0.72;
-  const medium = (valueNoise(x * 0.62, z * 0.62, 11) - 0.5) * 0.22;
-  const ridge = Math.sin(x * 0.53 + z * 0.19) * 0.055;
-  const edgeWeight = 0.48 + radial * 0.52;
-  return dome + (broad + medium + ridge) * summitMask * edgeWeight;
-};
 
 function buildTerrainGeometry(radius: number) {
   /*
@@ -156,15 +120,19 @@ function buildGrassTuftGeometry() {
    *
    * Тепер текстура несе сім билин віялом (`createGrassBladeTexture`), тож
    * картці треба ширини, щоб те віяло було видно.
+   *
+   * РОЗМІРИ В МЕТРАХ (`sceneScale.ts`). Було 0.30×0.25 одиниці — тобто
+   * жмуток метр тридцять заввишки при дереві 4.9 м. Тепер картка описана
+   * тим, чим вона є: сорок сантиметрів лугової трави.
    */
   const cards = [
-    { yaw: 0, width: 0.30, height: 0.25, x: 0, z: 0 },
-    { yaw: 1.08, width: 0.26, height: 0.22, x: 0.025, z: 0.008 },
-    { yaw: -1.02, width: 0.25, height: 0.21, x: -0.022, z: 0.018 },
-    { yaw: 2.06, width: 0.21, height: 0.18, x: 0.015, z: -0.018 },
-    { yaw: -2.14, width: 0.20, height: 0.17, x: -0.018, z: -0.012 },
+    { yaw: 0, width: metres(0.34), height: GRASS_CARD_HEIGHT, x: 0, z: 0 },
+    { yaw: 1.08, width: metres(0.30), height: metres(0.32), x: metres(0.035), z: metres(0.011) },
+    { yaw: -1.02, width: metres(0.28), height: metres(0.30), x: metres(-0.031), z: metres(0.026) },
+    { yaw: 2.06, width: metres(0.24), height: metres(0.26), x: metres(0.021), z: metres(-0.026) },
+    { yaw: -2.14, width: metres(0.22), height: metres(0.24), x: metres(-0.026), z: metres(-0.017) },
   ] as const;
-  const baseY = -0.21;
+  const baseY = -GRASS_CARD_BASE;
 
   cards.forEach((card) => {
     const start = positions.length / 3;
@@ -207,87 +175,6 @@ function buildGrassTuftGeometry() {
   return geometry;
 }
 
-function buildGrassInstances(hillRadius: number, soilRadius: number, groundY: number) {
-  const instances: GroundInstance[] = [];
-  const count = 235;
-  const minRadius = Math.max(soilRadius * 1.38, 1.08);
-  const maxRadius = hillRadius * 0.76;
-  const golden = Math.PI * (3 - Math.sqrt(5));
-
-  /*
-   * КУПИНАМИ, А НЕ РІВНО ПО ВСІЙ ГАЛЯВИНІ.
-   *
-   * Розкладка золотим кутом — це НАЙРІВНІШИЙ можливий розподіл на крузі;
-   * саме тому нею сіють соняшникове насіння. Для лугу це рівно навпаки те,
-   * що треба: трава росте купинами, між якими видно землю, і рівний розсів
-   * читається як візерунок, а не як заріст.
-   *
-   * Тому центри купин лишаються на золотому куті (щоб вони самі не збивались
-   * у грудку), а кожен кущик сідає біля свого центру.
-   */
-  const clumpCount = Math.max(1, Math.round(count / 7));
-  for (let i = 0; i < count; i += 1) {
-    const clump = i % clumpCount;
-    const radialSeed = hash2(clump, 2, 101);
-    const clumpAngle = clump * golden + (hash2(clump, 3, 103) - 0.5) * 0.82;
-    const clumpRadius = Math.sqrt(
-      minRadius * minRadius + (maxRadius * maxRadius - minRadius * minRadius) * radialSeed,
-    );
-    // Розкид усередині купини росте з відстанню від дерева, щоб дальні
-    // купини не виглядали дрібнішими за ближні.
-    const scatter = 0.22 + (clumpRadius / maxRadius) * 0.5;
-    const angle = clumpAngle + (hash2(i, 11, 149) - 0.5) * scatter * 0.9;
-    const radius = clumpRadius + (hash2(i, 12, 151) - 0.5) * scatter * 2.4;
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    const localY = terrainHeight(x, z, hillRadius);
-    const bladeHeight = THREE.MathUtils.lerp(0.3, 0.58, hash2(i, 4, 107));
-    const tuftWidth = THREE.MathUtils.lerp(0.82, 1.2, hash2(i, 5, 109));
-    instances.push({
-      x,
-      y: groundY + localY + bladeHeight * 0.5,
-      z,
-      rotationX: (hash2(i, 6, 113) - 0.5) * 0.08,
-      rotationY: angle + hash2(i, 7, 127) * Math.PI,
-      rotationZ: (hash2(i, 8, 131) - 0.5) * 0.12,
-      scaleX: tuftWidth,
-      scaleY: bladeHeight / 0.42,
-      scaleZ: tuftWidth,
-      tone: hash2(i, 9, 137),
-    });
-  }
-  return instances;
-}
-
-function buildRockInstances(hillRadius: number, soilRadius: number, groundY: number) {
-  const instances: GroundInstance[] = [];
-  const count = 18;
-  const minRadius = Math.max(soilRadius * 1.5, 1.5);
-  const maxRadius = hillRadius * 0.73;
-
-  for (let i = 0; i < count; i += 1) {
-    const angle = (i / count) * Math.PI * 2 + hash2(i, 1, 211) * 0.8;
-    const radius = THREE.MathUtils.lerp(minRadius, maxRadius, 0.18 + hash2(i, 2, 223) * 0.82);
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    const scaleX = THREE.MathUtils.lerp(0.2, 0.55, hash2(i, 3, 227));
-    const scaleY = THREE.MathUtils.lerp(0.14, 0.35, hash2(i, 4, 229));
-    const scaleZ = THREE.MathUtils.lerp(0.22, 0.52, hash2(i, 5, 233));
-    instances.push({
-      x,
-      y: groundY + terrainHeight(x, z, hillRadius) + scaleY * 0.18,
-      z,
-      rotationX: (hash2(i, 6, 239) - 0.5) * 0.52,
-      rotationY: hash2(i, 7, 241) * Math.PI * 2,
-      rotationZ: (hash2(i, 8, 251) - 0.5) * 0.42,
-      scaleX,
-      scaleY,
-      scaleZ,
-      tone: hash2(i, 9, 257),
-    });
-  }
-  return instances;
-}
 
 export function TreeTexturedStage({
   theme,
@@ -308,7 +195,10 @@ export function TreeTexturedStage({
   const aspect = size.height > 0 ? size.width / size.height : 1;
   const frame = useMemo(() => portalCameraFrame(aspect, crownRadius, treeHeight), [aspect, crownRadius, treeHeight]);
   const palette = PALETTE[theme];
-  const hillRadius = useMemo(() => Math.max(8, soilRadius * 4.2, crownRadius * 3.8), [soilRadius, crownRadius]);
+  const hillRadius = useMemo(
+    () => treeMeadowRadius(soilRadius, crownRadius, treeHeight),
+    [soilRadius, crownRadius, treeHeight],
+  );
   const terrainGeometry = useMemo(() => buildTerrainGeometry(hillRadius), [hillRadius]);
   const grassGeometry = useMemo(() => buildGrassTuftGeometry(), []);
   const grassInstances = useMemo(() => buildGrassInstances(hillRadius, soilRadius, groundY), [hillRadius, soilRadius, groundY]);
@@ -330,6 +220,27 @@ export function TreeTexturedStage({
       mesh.setMatrixAt(index, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
+    /*
+     * СФЕРА ВІДСІКАННЯ — ПІСЛЯ ЗАПИСУ МАТРИЦЬ, А НЕ ДО НЬОГО.
+     *
+     * `InstancedMesh` рахує свою сферу ОДИН раз, під час першого кадру, і
+     * далі не перераховує. Матриці ж пишуться тут, у ефекті, тобто ПІСЛЯ
+     * першого кадру: на той момент усі інстанси стоять в одній точці, і
+     * сфера виходить завбільшки з одну травинку в центрі сцени. Далі
+     * `Frustum.intersectsObject` міряє нею весь луг.
+     *
+     * ВИМІРЯНО НА ЖИВІЙ СЦЕНІ (`data-evolution-rendered-triangles`):
+     * перший рік — 9 499 трикутників і 18 викликів малювання, 3.68 року —
+     * 28 742 і 24. Шість викликів зникали: трава, квіти (стебла й
+     * голівки), опад (листя й гілочки). На знімку першого року пагорб
+     * стояв ЛИСИЙ, і виглядало це як «трави замало», а не як помилка.
+     *
+     * Вік тут ні до чого — до кадру потрапляє чи ні та сама точка y=0,
+     * бо кадр молодого дерева менший. Саме тому вада ховалась: доти
+     * предмети лугу були втричі більші, і їхня початкова сфера частіше
+     * зачіпала кадр.
+     */
+    mesh.computeBoundingSphere();
   }, [grassInstances]);
 
   useEffect(() => {
@@ -349,14 +260,13 @@ export function TreeTexturedStage({
       mesh.setColorAt(index, color);
     });
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [rockInstances, palette.stoneA, palette.stoneB]);
 
-  const rootShadowScaleX = Math.max(1.15, soilRadius * 1.45);
-  const rootShadowScaleZ = Math.max(0.68, soilRadius * 0.82);
-  const crownShadowScaleX = Math.max(1.9, crownRadius * 0.95);
-  const crownShadowScaleZ = Math.max(0.95, crownRadius * 0.48);
+  const shadows = treeMeadowShadows(soilRadius, crownRadius);
   const skyRadius = Math.max(52, frame.distance + 30);
+
 
   return (
     <>
@@ -427,7 +337,7 @@ export function TreeTexturedStage({
         * (`contactShadow`), а сила така, щоб її було видно числом, а не
         * тільки в коді.
         */}
-      <mesh position={[0.08, groundY + 0.018, -0.04]} rotation={[-Math.PI / 2, 0, 0]} scale={[rootShadowScaleX, rootShadowScaleZ, 1]}>
+      <mesh position={[metres(0.35), groundY + 0.018, metres(-0.18)]} rotation={[-Math.PI / 2, 0, 0]} scale={[shadows.rootScaleX, shadows.rootScaleZ, 1]}>
         <circleGeometry args={[1, 40]} />
         <meshBasicMaterial
           map={textures.contactShadow}
@@ -439,7 +349,7 @@ export function TreeTexturedStage({
           polygonOffsetFactor={-1}
         />
       </mesh>
-      <mesh position={[0.72, groundY + 0.014, -0.5]} rotation={[-Math.PI / 2, 0, -0.18]} scale={[crownShadowScaleX, crownShadowScaleZ, 1]}>
+      <mesh position={[shadows.crownOffsetX, groundY + 0.014, shadows.crownOffsetZ]} rotation={[-Math.PI / 2, 0, -0.18]} scale={[shadows.crownScaleX, shadows.crownScaleZ, 1]}>
         <circleGeometry args={[1, 48]} />
         <meshBasicMaterial
           map={textures.contactShadow}

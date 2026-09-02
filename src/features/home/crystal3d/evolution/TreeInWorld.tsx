@@ -18,6 +18,7 @@ import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
 import { TreeTexturedStage } from '../treeScene/TreeTexturedStage';
+import { treeMeadowRadius } from '../treeScene/meadow';
 import { TreeLifeDetailsPolished } from '../treeScene/TreeLifeDetailsPolished';
 import { TreeLabObject } from '../treeLab/TreeLabObject';
 import type { TreeLabPreviewBuild } from '../treeLab/buildTreeLabPreview';
@@ -47,9 +48,12 @@ export function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; them
     })),
     [build],
   );
+  // ТА САМА функція, що в `TreeTexturedStage`. Доти радіус лугу рахувався
+  // тут і там окремо однаковим виразом — і трава з квітами сіялись би на
+  // інший круг, ніж той, який намальовано, щойно один із двох зміниться.
   const hillRadius = useMemo(
-    () => Math.max(8, fit.soilRadius * 4.2, fit.crownRadius * 3.8),
-    [fit.soilRadius, fit.crownRadius],
+    () => treeMeadowRadius(fit.soilRadius, fit.crownRadius, fit.height),
+    [fit.soilRadius, fit.crownRadius, fit.height],
   );
 
   /*
@@ -97,6 +101,8 @@ export function TreeInWorld({ build, theme }: { build: TreeLabPreviewBuild; them
             theme={theme}
             hillRadius={hillRadius}
             soilRadius={fit.soilRadius}
+            crownRadius={fit.crownRadius}
+            treeHeight={fit.height}
             groundY={fit.groundY}
             reducedMotion={reduceMotion}
           />

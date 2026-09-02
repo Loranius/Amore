@@ -34,7 +34,7 @@ export {
   CRYSTAL_GROUND_BASELINE,
 } from './bundle';
 export type { ThreeCrystalRenderBundle } from './bundle';
-export { fitThreeTree, measureThreeTreeReach } from './treeFit';
+export { fitThreeTree, measureThreeTreeReach, TREE_FIT_HEIGHT } from './treeFit';
 export type { ThreeTreeFit, ThreeTreeFitContent, ThreeTreeReach } from './treeFit';
 export {
   TREE_LEAF_SWAY_ATTRIBUTE,

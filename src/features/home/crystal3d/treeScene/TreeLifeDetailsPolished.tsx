@@ -2,24 +2,25 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { createGrassBladeTexture } from './TreeEnvironmentTextures';
+import { metres } from './sceneScale';
+import { BUTTERFLY_WING_RADIUS, buildGroundItems, butterflyFlight } from './meadow';
 
 type Props = {
   theme: 'light' | 'dark';
   hillRadius: number;
   soilRadius: number;
   groundY: number;
+  /*
+   * Крона й висота приходять сюди НЕ для того, щоб дрібниці росли з
+   * деревом — вони лишаються свого розміру в метрах. Вони потрібні, щоб
+   * знати, ДЕ дерево: опад має лежати під кроною, а метелики — літати
+   * коло неї, а не за краєм кадру.
+   */
+  crownRadius: number;
+  treeHeight: number;
   reducedMotion: boolean;
 };
 
-type GroundItem = {
-  x: number;
-  y: number;
-  z: number;
-  rotation: number;
-  scale: number;
-  tone: number;
-  phase: number;
-};
 
 const PALETTE = {
   light: {
@@ -36,46 +37,6 @@ const PALETTE = {
   },
 } as const;
 
-const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
-const hash2 = (x: number, z: number, salt: number) => {
-  const value = Math.sin(x * 127.1 + z * 311.7 + salt * 74.7) * 43758.5453123;
-  return value - Math.floor(value);
-};
-const hash = (index: number, salt: number) => hash2(index, salt * 0.17, salt);
-const smoothStep = (edge0: number, edge1: number, value: number) => {
-  const t = clamp01((value - edge0) / Math.max(0.0001, edge1 - edge0));
-  return t * t * (3 - 2 * t);
-};
-const valueNoise = (x: number, z: number, salt: number) => {
-  const x0 = Math.floor(x);
-  const z0 = Math.floor(z);
-  const tx = x - x0;
-  const tz = z - z0;
-  const sx = tx * tx * (3 - 2 * tx);
-  const sz = tz * tz * (3 - 2 * tz);
-  const n00 = hash2(x0, z0, salt);
-  const n10 = hash2(x0 + 1, z0, salt);
-  const n01 = hash2(x0, z0 + 1, salt);
-  const n11 = hash2(x0 + 1, z0 + 1, salt);
-  return THREE.MathUtils.lerp(
-    THREE.MathUtils.lerp(n00, n10, sx),
-    THREE.MathUtils.lerp(n01, n11, sx),
-    sz,
-  );
-};
-const terrainHeight = (x: number, z: number, radius: number) => {
-  const radial = Math.min(1, Math.hypot(x, z) / radius);
-  const distance = Math.hypot(x, z);
-  const summitMask = smoothStep(0.55, 2.2, distance);
-  const dome = -radius * 0.2 * Math.pow(radial, 1.58);
-  const broad = (valueNoise(x * 0.25, z * 0.25, 3) - 0.5) * 0.72;
-  const medium = (valueNoise(x * 0.62, z * 0.62, 11) - 0.5) * 0.22;
-  const ridge = Math.sin(x * 0.53 + z * 0.19) * 0.055;
-  return dome + (broad + medium + ridge) * summitMask * (0.48 + radial * 0.52);
-};
-const groundYAt = (x: number, z: number, radius: number, groundY: number) =>
-  groundY + terrainHeight(x, z, radius);
-
 function makeGrassTuftGeometry() {
   const positions: number[] = [];
   const uvs: number[] = [];
@@ -90,8 +51,9 @@ function makeGrassTuftGeometry() {
    * читалась би як два різні види трави без причини.
    */
   const cards = [
-    [0, 0.30, 0.26], [1.05, 0.26, 0.23], [-1.08, 0.25, 0.22],
-    [2.08, 0.21, 0.19], [-2.1, 0.20, 0.18],
+    [0, metres(0.34), metres(0.36)], [1.05, metres(0.30), metres(0.32)],
+    [-1.08, metres(0.28), metres(0.30)], [2.08, metres(0.24), metres(0.26)],
+    [-2.1, metres(0.22), metres(0.25)],
   ] as const;
   cards.forEach(([yaw, width, height]) => {
     const start = positions.length / 3;
@@ -130,8 +92,21 @@ function makeGrassTuftGeometry() {
   return geometry;
 }
 
+/*
+ * ОПАЛИЙ ЛИСТОК — ДВАНАДЦЯТЬ САНТИМЕТРІВ.
+ *
+ * Обрис лишився той самий; змінилась лише одиниця, в якій він написаний.
+ * Було 0.185 одиниці завдовжки — при метрі сцени це вісімдесят два
+ * сантиметри, і на знімку трирічної пари ці листки лежали на лузі
+ * рудими плитами з чверть крони завширшки. Саме вони, а не камені,
+ * найгучніше казали «сцена завелика».
+ */
+const DRY_LEAF_LENGTH = metres(0.12);
+
 function makeDryLeafGeometry() {
   const geometry = new THREE.BufferGeometry();
+  // Обрис нормований на власну довжину, тож `DRY_LEAF_LENGTH` і є довжина.
+  const k = DRY_LEAF_LENGTH / 0.185;
   geometry.setAttribute('position', new THREE.Float32BufferAttribute([
     0, 0.005, 0.09,
     0.055, 0, 0.025,
@@ -139,32 +114,12 @@ function makeDryLeafGeometry() {
     0, 0, -0.095,
     -0.045, 0.004, -0.052,
     -0.058, 0, 0.028,
-  ], 3));
+  ].map((value) => value * k), 3));
   geometry.setIndex([0, 1, 2, 0, 2, 3, 0, 3, 4, 0, 4, 5]);
   geometry.computeVertexNormals();
   return geometry;
 }
 
-function buildGroundItems(count: number, minRadius: number, maxRadius: number, hillRadius: number, groundY: number, salt: number) {
-  const items: GroundItem[] = [];
-  const golden = Math.PI * (3 - Math.sqrt(5));
-  for (let i = 0; i < count; i += 1) {
-    const angle = i * golden + (hash(i, salt) - 0.5) * 0.92;
-    const radius = Math.sqrt(minRadius * minRadius + (maxRadius * maxRadius - minRadius * minRadius) * hash(i, salt + 2));
-    const x = Math.cos(angle) * radius;
-    const z = Math.sin(angle) * radius;
-    items.push({
-      x,
-      y: groundYAt(x, z, hillRadius, groundY),
-      z,
-      rotation: angle + hash(i, salt + 3) * Math.PI,
-      scale: THREE.MathUtils.lerp(0.72, 1.2, hash(i, salt + 5)),
-      tone: hash(i, salt + 7),
-      phase: hash(i, salt + 11) * Math.PI * 2,
-    });
-  }
-  return items;
-}
 
 function BreezeGrass({ theme, hillRadius, soilRadius, groundY, reducedMotion }: Props) {
   const ref = useRef<THREE.InstancedMesh>(null);
@@ -172,7 +127,7 @@ function BreezeGrass({ theme, hillRadius, soilRadius, groundY, reducedMotion }: 
   const geometry = useMemo(() => makeGrassTuftGeometry(), []);
   const texture = useMemo(() => createGrassBladeTexture(theme), [theme]);
   const items = useMemo(
-    () => buildGroundItems(72, Math.max(soilRadius * 1.5, 1.3), hillRadius * 0.7, hillRadius, groundY, 101),
+    () => buildGroundItems(130, Math.max(soilRadius * 1.5, metres(1.1)), hillRadius * 0.7, hillRadius, groundY, 101),
     [hillRadius, soilRadius, groundY],
   );
 
@@ -191,6 +146,8 @@ function BreezeGrass({ theme, hillRadius, soilRadius, groundY, reducedMotion }: 
       mesh.setMatrixAt(index, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
+    // Сфера відсікання — після запису матриць; див. `TreeTexturedStage`.
+    mesh.computeBoundingSphere();
   }, [items]);
 
   useFrame((state, delta) => {
@@ -245,18 +202,18 @@ function BreezeGrass({ theme, hillRadius, soilRadius, groundY, reducedMotion }: 
   );
 }
 
-function DryLitter({ theme, hillRadius, soilRadius, groundY }: Props) {
+function DryLitter({ theme, hillRadius, soilRadius, crownRadius, groundY }: Props) {
   const leafRef = useRef<THREE.InstancedMesh>(null);
   const twigRef = useRef<THREE.InstancedMesh>(null);
   const palette = PALETTE[theme];
   const leafGeometry = useMemo(() => makeDryLeafGeometry(), []);
   const leaves = useMemo(
-    () => buildGroundItems(20, Math.max(soilRadius * 0.72, 0.55), Math.max(soilRadius * 1.75, 1.55), hillRadius, groundY, 151),
-    [hillRadius, soilRadius, groundY],
+    () => buildGroundItems(44, Math.max(soilRadius * 0.5, metres(0.3)), Math.max(crownRadius * 1.1, soilRadius * 1.9, metres(1.4)), hillRadius, groundY, 151),
+    [hillRadius, soilRadius, crownRadius, groundY],
   );
   const twigs = useMemo(
-    () => buildGroundItems(8, Math.max(soilRadius * 0.8, 0.7), Math.max(soilRadius * 1.85, 1.7), hillRadius, groundY, 181),
-    [hillRadius, soilRadius, groundY],
+    () => buildGroundItems(18, Math.max(soilRadius * 0.6, metres(0.4)), Math.max(crownRadius * 1.2, soilRadius * 2, metres(1.6)), hillRadius, groundY, 181),
+    [hillRadius, soilRadius, crownRadius, groundY],
   );
 
   useEffect(() => () => leafGeometry.dispose(), [leafGeometry]);
@@ -268,7 +225,7 @@ function DryLitter({ theme, hillRadius, soilRadius, groundY }: Props) {
     const b = new THREE.Color(palette.leafB);
     const color = new THREE.Color();
     leaves.forEach((item, index) => {
-      dummy.position.set(item.x, item.y + 0.016, item.z);
+      dummy.position.set(item.x, item.y + metres(0.01), item.z);
       dummy.rotation.set((item.tone - 0.5) * 0.08, item.rotation, (item.tone - 0.5) * 0.12);
       dummy.scale.setScalar(item.scale);
       dummy.updateMatrix();
@@ -277,6 +234,7 @@ function DryLitter({ theme, hillRadius, soilRadius, groundY }: Props) {
       mesh.setColorAt(index, color);
     });
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
   }, [leaves, palette]);
   useEffect(() => {
@@ -284,13 +242,14 @@ function DryLitter({ theme, hillRadius, soilRadius, groundY }: Props) {
     if (!mesh) return;
     const dummy = new THREE.Object3D();
     twigs.forEach((item, index) => {
-      dummy.position.set(item.x, item.y + 0.022, item.z);
+      dummy.position.set(item.x, item.y + metres(0.015), item.z);
       dummy.rotation.set(Math.PI / 2, item.rotation, (item.tone - 0.5) * 0.18);
       dummy.scale.setScalar(item.scale);
       dummy.updateMatrix();
       mesh.setMatrixAt(index, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
+    mesh.computeBoundingSphere();
   }, [twigs]);
 
   return (
@@ -299,19 +258,22 @@ function DryLitter({ theme, hillRadius, soilRadius, groundY }: Props) {
         <meshStandardMaterial color="#ffffff" roughness={1} side={THREE.DoubleSide} />
       </instancedMesh>
       <instancedMesh ref={twigRef} args={[undefined, undefined, twigs.length]}>
-        <cylinderGeometry args={[0.008, 0.012, 0.22, 5]} />
+        <cylinderGeometry args={[metres(0.006), metres(0.009), metres(0.3), 5]} />
         <meshStandardMaterial color={palette.twig} roughness={1} />
       </instancedMesh>
     </>
   );
 }
 
+/** Довжина стеблинки в геометрії — з неї рахується масштаб інстансу. */
+const FLOWER_STEM_LENGTH = metres(0.3);
+
 function Flowers({ theme, hillRadius, soilRadius, groundY }: Props) {
   const stemRef = useRef<THREE.InstancedMesh>(null);
   const headRef = useRef<THREE.InstancedMesh>(null);
   const palette = PALETTE[theme];
   const flowers = useMemo(
-    () => buildGroundItems(32, Math.max(soilRadius * 1.65, 1.45), hillRadius * 0.64, hillRadius, groundY, 211),
+    () => buildGroundItems(46, Math.max(soilRadius * 1.65, metres(1.3)), hillRadius * 0.64, hillRadius, groundY, 211),
     [hillRadius, soilRadius, groundY],
   );
   useEffect(() => {
@@ -325,13 +287,25 @@ function Flowers({ theme, hillRadius, soilRadius, groundY }: Props) {
       new THREE.Color(palette.flowerC),
     ];
     flowers.forEach((item, index) => {
-      const height = 0.18 + item.tone * 0.12;
+      /*
+       * КВІТКА В ТРАВІ, А НЕ ЛЕДЕНЕЦЬ НА ПАЛИЧЦІ.
+       *
+       * Перша метрична редакція дала стебло 26-48 см із голівкою ⌀10 см
+       * зверху, і на знімку це читалось саме льодяником: гола зелена
+       * паличка над стриженим лугом. Річ не в розмірі голівки, а в
+       * ПРОПОРЦІЇ до трави: жмуток має 22-42 см, і квітка мусить сидіти в
+       * ньому, а не стирчати над ним удвічі вище.
+       *
+       * 16-30 см ставить голівку на рівень верхівок трави — стебло
+       * ховається між билинами, видно квітку.
+       */
+      const height = metres(0.16) + item.tone * metres(0.14);
       dummy.position.set(item.x, item.y + height * 0.5, item.z);
       dummy.rotation.set(0, item.rotation, 0);
-      dummy.scale.set(item.scale, height / 0.24, item.scale);
+      dummy.scale.set(item.scale, height / FLOWER_STEM_LENGTH, item.scale);
       dummy.updateMatrix();
       stems.setMatrixAt(index, dummy.matrix);
-      dummy.position.set(item.x, item.y + height + 0.025, item.z);
+      dummy.position.set(item.x, item.y + height + metres(0.02), item.z);
       dummy.scale.setScalar(0.78 + item.scale * 0.25);
       dummy.updateMatrix();
       heads.setMatrixAt(index, dummy.matrix);
@@ -340,49 +314,62 @@ function Flowers({ theme, hillRadius, soilRadius, groundY }: Props) {
     });
     stems.instanceMatrix.needsUpdate = true;
     heads.instanceMatrix.needsUpdate = true;
+    stems.computeBoundingSphere();
+    heads.computeBoundingSphere();
     if (heads.instanceColor) heads.instanceColor.needsUpdate = true;
   }, [flowers, palette]);
   return (
     <>
       <instancedMesh ref={stemRef} args={[undefined, undefined, flowers.length]}>
-        <cylinderGeometry args={[0.007, 0.011, 0.24, 5]} />
+        <cylinderGeometry args={[metres(0.004), metres(0.006), FLOWER_STEM_LENGTH, 5]} />
         <meshStandardMaterial color={palette.stemA} roughness={1} />
       </instancedMesh>
       <instancedMesh ref={headRef} args={[undefined, undefined, flowers.length]}>
-        <icosahedronGeometry args={[0.047, 0]} />
+        <icosahedronGeometry args={[metres(0.035), 0]} />
         <meshStandardMaterial color="#ffffff" roughness={0.92} />
       </instancedMesh>
     </>
   );
 }
 
-function Clouds({ theme, groundY, reducedMotion }: Pick<Props, 'theme' | 'groundY' | 'reducedMotion'>) {
-  const group = useRef<THREE.Group>(null);
-  const palette = PALETTE[theme];
-  const cloudGroups: Array<[number, number, number, number]> = [
-    [-10, groundY + 10.5, -25, 1.1],
-    [1.5, groundY + 12.2, -30, 0.9],
-    [11, groundY + 9.8, -26, 1.05],
-  ];
-  useFrame((state) => {
-    if (reducedMotion || !group.current) return;
-    group.current.position.x = Math.sin(state.clock.elapsedTime * 0.028) * 0.9;
-  });
-  return (
-    <group ref={group}>
-      {cloudGroups.map(([x, y, z, s], index) => (
-        <group key={index} position={[x, y, z]} scale={s}>
-          {[-1.1, -0.45, 0.25, 0.95].map((offset, puff) => (
-            <mesh key={puff} position={[offset, Math.sin(puff * 1.3) * 0.18, (puff % 2) * 0.18]}>
-              <sphereGeometry args={[0.75 + puff * 0.08, 9, 6]} />
-              <meshBasicMaterial color={palette.cloud} transparent opacity={0.22} depthWrite={false} fog={false} />
-            </mesh>
-          ))}
-        </group>
-      ))}
-    </group>
-  );
-}
+/*
+ * ТУТ СТОЯЛИ ТРИ ХМАРИ — 1 080 ТРИКУТНИКІВ, ЯКИХ НЕ БАЧИВ НІХТО.
+ *
+ * Дванадцять кульок сиділи на висоті 9.8-12.2 над землею, на z від -25 до
+ * -30, і малювались `fog={false}`, тобто крізь туман. Порахувано по самій
+ * камері (`portalCameraFrame`): камера дивиться в ціль, опущену на 8.05°
+ * нижче горизонту, півкут кадру по вертикалі 21°.
+ *
+ *   вік пари  найближча хмара над віссю огляду
+ *   3.7 року  23.6°  — за кадром
+ *   12 років  22.4°  — за кадром
+ *   20 років  21.6°  — за кадром
+ *   40 років  21.1°  — на самому ребрі
+ *
+ * Тобто хмар не було видно ЖОДНОГО разу за перші тридцять з гаком років —
+ * рівно та сама вада, через яку з `TreeTexturedStage` прибрали три пагорби
+ * й сонце. Знімок трирічної пари це підтверджує прямо: небо чисте.
+ *
+ * Прибрано, а не пересунуто. Хмара на своєму місці — це хмара БІЛЯ
+ * ГОРИЗОНТУ, а горизонт тут малює текстура неба (`createSkyTexture`);
+ * дванадцять сфер, підвішених під верхнім ребром кадру, вигадували б
+ * глибину, якої в цій сцені немає. Якщо хмари треба — їм місце в текстурі
+ * неба, і це окреме рішення власника, а не побічний ефект зміни масштабу.
+ */
+
+/*
+ * МЕТЕЛИК ЗАВБІЛЬШКИ З МЕТЕЛИКА, І ТАМ, ДЕ ЙОГО ВИДНО.
+ *
+ * Було двічі не так. Розмах крил 0.105 одиниці — це сорок сім сантиметрів,
+ * тобто птах, а не метелик; і обидва сиділи на СТАЛИХ висотах 2.15 та 2.72
+ * над землею, тоді як верхнє ребро кадру стоїть на `0.49 + 1.12 * висота
+ * дерева`. У трирічної пари дерево має 1.10, ребро — 1.72, а метелики
+ * літали на 2.15 і 2.72: обидва ПОВНІСТЮ за кадром, і разом із хмарами це
+ * складало близько 1 200 трикутників, які малювались щокадру в нікуди.
+ *
+ * Тепер розмір у метрах (сім сантиметрів розмаху), а місце — від самого
+ * дерева: коло крони, куди метелик і летить.
+ */
 
 function Butterfly({ base, phase, color, reducedMotion }: { base: [number, number, number]; phase: number; color: string; reducedMotion: boolean }) {
   const group = useRef<THREE.Group>(null);
@@ -392,7 +379,12 @@ function Butterfly({ base, phase, color, reducedMotion }: { base: [number, numbe
     if (reducedMotion) return;
     const t = state.clock.elapsedTime + phase;
     if (group.current) {
-      group.current.position.set(base[0] + Math.sin(t * 0.5) * 0.45, base[1] + Math.sin(t * 0.8) * 0.16, base[2] + Math.cos(t * 0.45) * 0.32);
+      // Розліт теж у метрах: півметра вбік, а не два.
+      group.current.position.set(
+        base[0] + Math.sin(t * 0.5) * metres(0.5),
+        base[1] + Math.sin(t * 0.8) * metres(0.18),
+        base[2] + Math.cos(t * 0.45) * metres(0.35),
+      );
       group.current.rotation.y = Math.sin(t * 0.38) * 0.55;
     }
     const flap = Math.sin(t * 8) * 0.7;
@@ -400,17 +392,17 @@ function Butterfly({ base, phase, color, reducedMotion }: { base: [number, numbe
     if (right.current) right.current.rotation.y = -0.4 - flap;
   });
   return (
-    <group ref={group} position={base} scale={0.7}>
-      <mesh ref={left} position={[-0.05, 0, 0]} rotation={[0.08, 0.4, 0.15]}>
-        <circleGeometry args={[0.075, 6, 0, Math.PI]} />
+    <group ref={group} position={base}>
+      <mesh ref={left} position={[-BUTTERFLY_WING_RADIUS * 0.7, 0, 0]} rotation={[0.08, 0.4, 0.15]}>
+        <circleGeometry args={[BUTTERFLY_WING_RADIUS, 6, 0, Math.PI]} />
         <meshBasicMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.82} />
       </mesh>
-      <mesh ref={right} position={[0.05, 0, 0]} rotation={[0.08, -0.4, -0.15]}>
-        <circleGeometry args={[0.075, 6, Math.PI, Math.PI]} />
+      <mesh ref={right} position={[BUTTERFLY_WING_RADIUS * 0.7, 0, 0]} rotation={[0.08, -0.4, -0.15]}>
+        <circleGeometry args={[BUTTERFLY_WING_RADIUS, 6, Math.PI, Math.PI]} />
         <meshBasicMaterial color={color} side={THREE.DoubleSide} transparent opacity={0.82} />
       </mesh>
       <mesh scale={[0.35, 1.1, 0.35]}>
-        <sphereGeometry args={[0.028, 6, 5]} />
+        <sphereGeometry args={[BUTTERFLY_WING_RADIUS * 0.37, 6, 5]} />
         <meshBasicMaterial color="#40382f" />
       </mesh>
     </group>
@@ -419,14 +411,24 @@ function Butterfly({ base, phase, color, reducedMotion }: { base: [number, numbe
 
 export function TreeLifeDetailsPolished(props: Props) {
   const palette = PALETTE[props.theme];
+  const [first, second] = butterflyFlight(props.crownRadius, props.treeHeight);
   return (
     <>
       <BreezeGrass {...props} />
       <Flowers {...props} />
       <DryLitter {...props} />
-      <Clouds theme={props.theme} groundY={props.groundY} reducedMotion={props.reducedMotion} />
-      <Butterfly base={[1.55, props.groundY + 2.15, 0.55]} phase={0.4} color={palette.butterflyA} reducedMotion={props.reducedMotion} />
-      <Butterfly base={[-2.1, props.groundY + 2.72, -1.1]} phase={2.7} color={palette.butterflyB} reducedMotion={props.reducedMotion} />
+      <Butterfly
+        base={[first[0], props.groundY + first[1], first[2]]}
+        phase={0.4}
+        color={palette.butterflyA}
+        reducedMotion={props.reducedMotion}
+      />
+      <Butterfly
+        base={[second[0], props.groundY + second[1], second[2]]}
+        phase={2.7}
+        color={palette.butterflyB}
+        reducedMotion={props.reducedMotion}
+      />
     </>
   );
 }

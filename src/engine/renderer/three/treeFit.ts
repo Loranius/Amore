@@ -161,7 +161,7 @@ export function measureThreeTreeReach(content: ThreeTreeFitContent): ThreeTreeRe
  * стала ЕТАЛОННОЮ, як у кристала: дорослі 40 років дають 2.7, а росток
  * рендериться настільки малим, наскільки він малий.
  */
-const TREE_FIT_HEIGHT = 2.7;
+export const TREE_FIT_HEIGHT = 2.7;
 
 /**
  * Висота дорослого дерева в одиницях рушія — те, що еталон відображає у 2.7.
