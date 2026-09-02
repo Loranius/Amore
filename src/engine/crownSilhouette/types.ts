@@ -22,6 +22,13 @@ export interface TreeCrownSilhouetteConfig {
   viewDirectionCount: number;
   minimumReadableFacingDot: number;
   minimumReadableLeafFraction: number;
+  /**
+   * Скільки листя мусить бути попереду, щоб частку читаного взагалі рахувати.
+   *
+   * Нижче цього числа напрямок приймається без розмови: не тому, що якість
+   * не важлива, а тому, що частки від однієї-шести карток не існує як міри.
+   */
+  minimumReadableSampleSize: number;
 }
 
 export interface TreeCrownSilhouetteProfile {

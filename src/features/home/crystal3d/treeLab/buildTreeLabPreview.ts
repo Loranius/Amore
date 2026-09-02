@@ -94,6 +94,7 @@ import {
   scaleTreeSkeletonToAge,
   treeCrownNarrowing,
   treeDaysTogether,
+  treeSlenderness,
   treeFoliageScale,
   treeSkeletonTargetHeight,
   treeToOrganicField,
@@ -267,6 +268,7 @@ export function buildTreeLabPreviewFromArtifact({
     ),
     treeSkeletonTargetHeight(species.structure.trunkHeight),
     treeCrownNarrowing(daysTogether),
+    treeSlenderness(daysTogether),
   );
   /*
    * ГІЛКИ-СКЕЛЕТИ ДОДАЮТЬСЯ, А НЕ ВИРОЩУЮТЬСЯ (ADR-0093).

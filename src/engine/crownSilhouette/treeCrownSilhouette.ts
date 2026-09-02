@@ -208,8 +208,12 @@ function buildViewReadability(
     const readableFrontLeafFraction = frontLeafCount > 0
       ? readableFrontLeafCount / frontLeafCount
       : 0;
-    const accepted = frontLeafCount > 0
-      && readableFrontLeafFraction >= input.config.minimumReadableLeafFraction;
+    /*
+     * Замалу вибірку приймаємо без розмови — див. `minimumReadableSampleSize`.
+     * Порожній напрямок так само приймається: там немає крони, яку судити.
+     */
+    const accepted = frontLeafCount < input.config.minimumReadableSampleSize
+      || readableFrontLeafFraction >= input.config.minimumReadableLeafFraction;
 
     result.push({
       viewIndex,

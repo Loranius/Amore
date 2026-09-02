@@ -214,6 +214,37 @@ function round6(value: number): number {
  * висоту, якої немає, — це `Infinity` в кожному вузлі, а рушій має
  * заборону на нескінченність у канонічному виході.
  */
+/*
+ * СТРУНКІСТЬ — висота, поділена на діаметр основи, і саме вона тут закон.
+ *
+ * Розгортка від нуля до сорока років по п'яти профілях заповнення показала,
+ * що радіус основи падає в 17-18 переходах із 43, найгірше ×0.39. Тобто
+ * стовбур ТОНШАВ з роками — просто в протилежність власниковому «3 рік
+ * стовбур стає грубшим… 40 років — міцний товстий стовбур».
+ *
+ * Причина не в законі, а в тому, що закону не було. Товщину давала трубкова
+ * модель: `радіус = радіус кінчика × N^(1/показник)`, де N — число кінчиків.
+ * Кінчиків у симуляції від 38 до 87 залежно від року, тож і радіус скакав
+ * разом із ними. ADR-0091 підняв СЕРЕДНЮ товщину показником труби, але шум
+ * від числа кінчиків нікуди не дівся.
+ *
+ * Тепер так само, як із висотою: закон дає РОЗМІР, симуляція лишає собі
+ * ФОРМУ. Радіус основи виводиться зі стрункості, а трубкова модель і далі
+ * вирішує, як товщина розподілена вздовж дерева — усі радіуси множаться на
+ * одне число, тож звуження до кінчика лишається її.
+ *
+ * Числа стрункості взято з ADR-0091, де їх виміряли як бажані: молоде дерево
+ * стрункіше (34), доросле осідає на 29. Обидва в межах живих дерев (20-60).
+ */
+const SLENDERNESS_YOUNG = 34;
+const SLENDERNESS_MATURE = 29;
+
+/** Стрункість дерева цього віку: висота на діаметр основи. */
+export function treeSlenderness(daysTogether: number): number {
+  return SLENDERNESS_YOUNG
+    + (SLENDERNESS_MATURE - SLENDERNESS_YOUNG) * treeAgeProgress(daysTogether);
+}
+
 export interface ScaledTreeSkeleton {
   skeleton: OrganicSkeletonState;
   /**
@@ -232,6 +263,7 @@ export function scaleTreeSkeletonToAge(
   skeleton: OrganicSkeletonState,
   targetHeight: number,
   narrowing = 1,
+  slenderness = 0,
 ): ScaledTreeSkeleton {
   if (!Number.isFinite(targetHeight) || targetHeight <= 0) return { skeleton, factor: 1 };
   if (skeleton.nodes.length === 0) return { skeleton, factor: 1 };
@@ -246,8 +278,26 @@ export function scaleTreeSkeletonToAge(
   if (!Number.isFinite(raw) || raw <= 1e-6) return { skeleton, factor: 1 };
 
   const factor = targetHeight / raw;
+
+  /*
+   * Радіуси множаться СВОЇМ числом, а не масштабом висоти: висота — один
+   * закон, товщина — другий. Коли стрункості не задано (0), лишається старе
+   * рівномірне масштабування, щоб функція була придатна й без закону.
+   */
+  let radiusFactor = factor;
+  if (slenderness > 0) {
+    let base = 0;
+    const baseBand = bottom + raw * 0.05;
+    for (const node of skeleton.nodes) {
+      if (node.position.y <= baseBand && node.radius > base) base = node.radius;
+    }
+    if (base > 1e-9) radiusFactor = targetHeight / (2 * slenderness) / base;
+  }
+
   // Тотожність не переписує вузлів: та сама пам'ять, той самий хеш.
-  if (Math.abs(factor - 1) < 1e-9 && Math.abs(narrowing - 1) < 1e-9) {
+  if (Math.abs(factor - 1) < 1e-9
+    && Math.abs(narrowing - 1) < 1e-9
+    && Math.abs(radiusFactor - 1) < 1e-9) {
     return { skeleton, factor: 1 };
   }
 
@@ -261,7 +311,7 @@ export function scaleTreeSkeletonToAge(
         y: round6(node.position.y * factor),
         z: round6(node.position.z * factor * narrowing),
       },
-      radius: round6(node.radius * factor),
+      radius: round6(node.radius * radiusFactor),
     })),
   };
   return { skeleton: scaled, factor };

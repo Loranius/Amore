@@ -35,6 +35,7 @@ export {
   scaleOrganicSurfaceToAge,
   scaleTreeSkeletonToAge,
   treeCrownNarrowing,
+  treeSlenderness,
   treeDaysTogether,
   treeFoliageScale,
   treeAgeSizeShare,
