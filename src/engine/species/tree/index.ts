@@ -26,6 +26,7 @@ export {
   addTreeScaffoldBranches,
   pruneThinTwigsForScaffolds,
   scaffoldCountFor,
+  TREE_SCAFFOLD_REACH_SHARE,
 } from './scaffold';
 export {
   TREE_FOLIAGE_TUNED_HEIGHT,

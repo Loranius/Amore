@@ -18,6 +18,7 @@
 // ============================================================
 import { describe, expect, it } from 'vitest';
 import { buildArtifactFromSnapshot } from '@/engine/evolution/adapters';
+import { TREE_SCAFFOLD_REACH_SHARE } from '@/engine/species/tree';
 import { buildReefPlan } from '@/engine/species/reef';
 import { buildTreeLabPreviewFromArtifact } from '../treeLab/buildTreeLabPreview';
 import { buildCrystalPipelineStates } from './crystalPipeline';
@@ -147,8 +148,22 @@ describe('час — основна валюта росту', () => {
         }
         return sum;
       }));
-      // Половина висоти дерева — це вже скелет крони, а не прутик.
-      expect(longest / top).toBeGreaterThan(0.5);
+      /*
+       * ПОРІГ ІДЕ ВІД ЗАКОНУ, А НЕ ВІД ОКА (ADR-0105).
+       *
+       * Було «більше за половину висоти» — число з часів, коли виліт
+       * скелетної гілки становив 0.62 висоти й робив дерево ШИРШИМ, НІЖ
+       * ВИЩИМ. Тепер виліт узято з еталона (0.38), і гілка, яка справді
+       * дістає до краю крони, міряється приблизно в 0.42 висоти: вона ще
+       * й підводиться, тож довша за власний виліт.
+       *
+       * Тому поріг тепер прив'язаний до самої частки: найдовша гілка
+       * мусить дотягуватись щонайменше до дев'яти десятих обіцяної
+       * півширини крони. Це ловить те саме, заради чого тест писався —
+       * «сама лише дрібнота», медіана 2-4% висоти, — і при цьому
+       * пересувається разом із законом, а не всупереч йому.
+       */
+      expect(longest / top).toBeGreaterThan(TREE_SCAFFOLD_REACH_SHARE * 0.9);
     }, 300_000);
 
     it('дорослішає в рази, а не на йоту', () => {

@@ -75,12 +75,36 @@ const CROWN_TOP_SHARE = 0.88;
  * (падінь 16-21 із 39 річних переходів, найгірше ×0.41). Коли її задає
  * закон, вона монотонна за побудовою, а прутики гуляють УСЕРЕДИНІ огинальної.
  *
- * 0.45 -> 0.62: молоде дерево вужче за доросле і як частка теж, а в
- * абсолютних одиницях виліт росте з 0.50 на третьому році до 3.29 на
- * сороковому — бо росте й сама висота.
+ * ЧИСЛО ВЗЯТО З ЕТАЛОНА, А НЕ З ОКА (ADR-0104, ADR-0105).
+ *
+ * Було 0.45 -> 0.62 за віком. Еталонне дерево
+ * (`scripts/models/reference-tree.py`) міряється в 0.410 півширини на
+ * висоту; наше давало **0.661**, тобто крона ширша, ніж дерево високе —
+ * 1.32 проти 0.82. Це і є визначення КУЩА, і саме тому скарга власника
+ * «більше на кущ схоже» не полагодилась, коли криву росту піднімали двічі:
+ * піднімали розмір, а кущем робить пропорція.
+ *
+ * Виліт тут дорівнює півширині крони майже точно, бо дуга розтягується так,
+ * щоб кінчик сів рівно на нього. Виміряно на розгортці, сороковий рік:
+ *
+ *   0.62 -> ширина 0.661, відстань профілів 0.358   (як було)
+ *   0.44 -> 0.489, 0.193
+ *   0.38 -> 0.399, 0.151                            (взято)
+ *   0.34 -> 0.404, 0.145  — далі не вужчає
+ *
+ * Нижче 0.38 ширину задає вже не виліт, а сама симуляція, тож зменшувати
+ * далі нічого не дає. 0.399 проти еталонних 0.410 — розбіжність у 3%.
+ *
+ * ОДНЕ ЧИСЛО, А НЕ ДВА ЗА ВІКОМ. Розгортка показала, що молодий кінець не
+ * важить нічого: 0.45/0.38 і 0.38/0.38 дають на всіх чотирьох віках ту саму
+ * ширину до третього знака й ті самі трикутники. Причина в тому, що вік уже
+ * ВРАХОВАНО множником `treeCrownNarrowing` нижче, і другий віковий закон
+ * поруч із ним лише подвоював те саме — до того ж після зміни він мусив би
+ * йти НАЗАД (0.45 на молодому проти 0.38 на дорослому), тобто два закони
+ * тягли б у різні боки. Лишився один: частка з еталона, помножена на
+ * звуження за віком.
  */
-const REACH_SHARE_YOUNG = 0.45;
-const REACH_SHARE_MATURE = 0.62;
+export const TREE_SCAFFOLD_REACH_SHARE = 0.38;
 
 /**
  * Кут ВІДХОДУ від вертикалі: нижні гілки розлогіші, верхні тягнуться вгору.
@@ -244,12 +268,11 @@ function heightShareFor(index: number): number {
   return CROWN_BASE_SHARE + (CROWN_TOP_SHARE - CROWN_BASE_SHARE) * (index / span);
 }
 
-/** Виліт гілки: росте з віком дерева й зменшується догори по кроні. */
-function reachShareFor(index: number, maturity: number, narrowing: number): number {
+/** Виліт гілки: частка з еталона, вужча догори по кроні й за віком. */
+function reachShareFor(index: number, narrowing: number): number {
   const span = Math.max(1, MAX_SCAFFOLD_BRANCHES - 1);
-  const byAge = REACH_SHARE_YOUNG + (REACH_SHARE_MATURE - REACH_SHARE_YOUNG) * maturity;
   // Крона найширша нижче середини, а не на маківці; звуження — за віком.
-  return byAge * (1 - 0.45 * (index / span)) * narrowing;
+  return TREE_SCAFFOLD_REACH_SHARE * (1 - 0.45 * (index / span)) * narrowing;
 }
 
 /**
@@ -453,7 +476,6 @@ export function addTreeScaffoldBranches(
   const height = top - bottom;
   if (!Number.isFinite(height) || height <= 1e-6) return skeleton;
 
-  const maturity = treeAgeProgress(daysTogether);
   const azimuthSeed = seededUnit(artifactSeed, 'scaffold:azimuth') * Math.PI * 2;
   /*
    * ПОРЯДКОВИЙ НОМЕР СТАВИТЬ СКЕЛЕТИ ВІДРАЗУ ЗА СТОВБУРОМ, а не в кінець.
@@ -480,7 +502,7 @@ export function addTreeScaffoldBranches(
     if (!anchor) continue;
 
     const span = Math.max(1, MAX_SCAFFOLD_BRANCHES - 1);
-    const reach = height * reachShareFor(index, maturity, treeCrownNarrowing(daysTogether));
+    const reach = height * reachShareFor(index, treeCrownNarrowing(daysTogether));
     if (reach <= 1e-6) continue;
 
     const azimuth = azimuthSeed + (index / count) * Math.PI * 2
