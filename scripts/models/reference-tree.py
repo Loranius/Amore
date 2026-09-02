@@ -98,13 +98,26 @@ ROOT_FLARE = 1.9
 SCAFFOLDS = 6
 """Скелетних гілок від стовбура. Менше — читається виделкою, більше — мітлою."""
 
-TIERS = 3
+TIERS = 5
 """
-Ярусів листя.
+Ярусів листя — тепер це АМПЛІТУДА горбкуватості оболонки, а не окремі кулі.
 
-Головне, що `amore-tree-look` виніс із п'яти моделей власника: дерево
-читається деревом не густиною листя, а ПРОСВІТАМИ між ярусами. Рівномірна
-куля листя — це та сама «броколі», і жодна деталізація її не рятує.
+БУЛО ТРИ ОКРЕМІ КУЛІ, І ЦЕ ЛАМАЛО САМУ МІРКУ. Крона складалась із трьох
+кілець кульок плюс шапки. Куля — це еліпсоїд: біля свого верху й низу вона
+сходить у точку, тож МІЖ кільцями огинальна провалювалась. Виміряно у
+верхній чверті: 0.40, 0.29, 0.38, 0.23, 0.35, 0.13 — пилка з розмахом у
+30%. Проти такої сходинки неможливо судити, чи сходиться крона в НАШОГО
+дерева: половина різниці була б шумом еталона, а не формою. Шість кілець
+замість трьох пилку не прибрали — вона просто стала частішою.
+
+Тепер крона — ОБОЛОНКА ОБЕРТАННЯ за тим самим профілем, який оголошено
+вгорі (`CROWN_SPREAD`, `WIDEST_AT`), із горбами по висоті й по азимуту.
+Мірка бере максимальний радіус смуги, тобто саме огинальну, і тепер
+огинальна є рівно тим, що файл про себе каже.
+
+Просвіти між ярусами від цього не зникають як ідея — вони лишаються в
+горбах оболонки, — але вони й не могли б бути виміряні силуетом: силует
+бачить зовнішній край, а не діри всередині крони.
 """
 
 PIPE_EXPONENT = 2.0
@@ -161,32 +174,62 @@ def taper_tube(bm, path, radii, ring=8):
     return rings
 
 
-def foliage_blob(bm, centre, radius, squash, rng):
+def crown_radius_at(height_share: float) -> float:
     """
-    Один ярус листя — сплюснута сфера з нерівним краєм.
+    Профіль крони — рівно те, що оголошено вгорі файла.
 
-    Не гладка куля: рівний край читається кулею, а не листям, і зіпсував би
-    саме той вимір, заради якого еталон існує — силует.
+    Найширше місце на `WIDEST_AT`, звідти звуження в обидва боки; показник
+    1.7 робить спад догори крутішим за спад донизу, як у листяної крони,
+    що сходить на верхівці й тримає ширину під собою.
     """
-    temp = bmesh.new()
-    bmesh.ops.create_icosphere(
-        temp, subdivisions=FOLIAGE_SUBDIVISIONS, radius=radius,
-    )
-    for vert in temp.verts:
-        noise = 1.0 + (rng.random() - 0.5) * 0.22
-        vert.co.x *= noise
-        vert.co.y *= noise
-        vert.co.z *= noise * squash
-        vert.co += centre
-    mapping = {}
-    for vert in temp.verts:
-        mapping[vert] = bm.verts.new(vert.co)
-    for face in temp.faces:
-        try:
-            bm.faces.new(tuple(mapping[v] for v in face.verts))
-        except ValueError:
-            pass  # дубльована грань на шві — байдуже, це мірка
-    temp.free()
+    if height_share < CROWN_BOTTOM or height_share > CROWN_TOP:
+        return 0.0
+    span = max(WIDEST_AT - CROWN_BOTTOM, CROWN_TOP - WIDEST_AT)
+    falloff = 1.0 - min(1.0, abs(height_share - WIDEST_AT) / span) ** 1.7
+    return CROWN_SPREAD * HEIGHT * 0.5 * falloff
+
+
+def crown_shell(bm, rng):
+    """
+    Оболонка крони — поверхня обертання за профілем, із горбами.
+
+    Горби двох родів: по ВИСОТІ (яруси, `TIERS`) і по АЗИМУТУ, плюс дрібний
+    шум на кожній вершині. Без них оболонка була б ідеальним тілом обертання
+    й читалась би кулею, а не кроною; з ними огинальна лишається тим, що
+    оголошено, і при цьому не гладенькою.
+    """
+    rings = 26
+    segments = 20
+    grid = []
+    for ring in range(rings + 1):
+        t = ring / rings
+        share = CROWN_BOTTOM + (CROWN_TOP - CROWN_BOTTOM) * t
+        base = crown_radius_at(share)
+        row = []
+        for segment in range(segments):
+            angle = (segment / segments) * math.tau
+            # Горби тільки ВСЕРЕДИНУ (множники ≤ 1): інакше вони піднімають
+            # максимум смуги, і виміряна ширина перестає дорівнювати
+            # оголошеній — а саме її еталон і мусить давати.
+            tier = 1.0 - 0.10 * (0.5 - 0.5 * math.cos(share * math.tau * TIERS))
+            lobe = 1.0 - 0.09 * (0.5 - 0.5 * math.cos(angle * 3.0 + share * 5.0))
+            grain = 1.0 - rng.random() * 0.06
+            radius = base * tier * lobe * grain
+            row.append(bm.verts.new(Vector((
+                math.cos(angle) * radius,
+                math.sin(angle) * radius,
+                share * HEIGHT,
+            ))))
+        grid.append(row)
+
+    for ring in range(rings):
+        lower, upper = grid[ring], grid[ring + 1]
+        for segment in range(segments):
+            nxt = (segment + 1) % segments
+            try:
+                bm.faces.new((lower[segment], lower[nxt], upper[nxt], upper[segment]))
+            except ValueError:
+                pass  # виродилась у лінію на самій верхівці — не біда, це мірка
 
 
 def build() -> str:
@@ -231,53 +274,46 @@ def build() -> str:
             math.sin(azimuth) * math.cos(elevation),
             math.sin(elevation),
         ))
-        path, radii = [], []
-        for step in range(BRANCH_SEGMENTS + 1):
-            t = step / BRANCH_SEGMENTS
-            # Дуга: гілка виходить угору й вирівнюється — так вона несе
-            # власну вагу, і так вона виглядає на кожному живому дереві.
-            rise = math.sin(elevation) * (1.0 - t * 0.55)
-            horizontal = reach * t / max(1e-6, math.cos(elevation))
-            point = origin + Vector((
-                direction.x * horizontal,
-                direction.y * horizontal,
-                rise * horizontal * 0.9,
-            ))
-            path.append(point)
-            radii.append(scaffold_radius * (1.0 - 0.82 * t))
+        def arc(span_reach: float):
+            points = []
+            for step in range(BRANCH_SEGMENTS + 1):
+                t = step / BRANCH_SEGMENTS
+                # Дуга: гілка виходить угору й вирівнюється — так вона несе
+                # власну вагу, і так вона виглядає на кожному живому дереві.
+                rise = math.sin(elevation) * (1.0 - t * 0.55)
+                horizontal = span_reach * t / max(1e-6, math.cos(elevation))
+                points.append(origin + Vector((
+                    direction.x * horizontal,
+                    direction.y * horizontal,
+                    rise * horizontal * 0.9,
+                )))
+            return points
+
+        """
+        ГІЛКА НЕ ВИХОДИТЬ ЗА ОГОЛОШЕНУ КРОНУ, і це не косметика.
+
+        Перша редакція давала верхній скелетній гілці виліт 0.31 висоти й
+        підйом майже до маківки — тобто саме той плаский зріз угорі, який
+        еталон мусить ЛОВИТИ в нашому дереві. Мірка тоді читала б власну
+        ваду еталона як норму.
+
+        Тут виліт підтягується так, щоб кінчик сів усередину профілю крони
+        на власній висоті. Дві ітерації, бо підйом сам залежить від вильоту.
+        """
+        for _ in range(2):
+            tip = arc(reach)[-1]
+            allowed = crown_radius_at(tip.z / HEIGHT) * 0.92
+            radial = math.hypot(tip.x, tip.y)
+            if radial > allowed > 0:
+                reach *= allowed / radial
+        path = arc(reach)
+        radii = [scaffold_radius * (1.0 - 0.82 * (step / BRANCH_SEGMENTS))
+                 for step in range(BRANCH_SEGMENTS + 1)]
         taper_tube(bm, path, radii, ring=6)
         tips.append((path[-1], scaffold_radius * 0.18, share))
 
-    # --- листя ярусами -------------------------------------------
-    # Кожен ярус — своя висота й свій радіус; між ними лишається небо.
-    crown_low = CROWN_BOTTOM * HEIGHT
-    crown_high = CROWN_TOP * HEIGHT
-    for tier in range(TIERS):
-        t = (tier + 0.5) / TIERS
-        y = crown_low + (crown_high - crown_low) * t
-        # Профіль крони: найширша на WIDEST_AT, звужується в обидва боки.
-        height_share = y / HEIGHT
-        falloff = 1.0 - min(1.0, abs(height_share - WIDEST_AT) / 0.46) ** 1.7
-        radius = CROWN_SPREAD * HEIGHT * 0.5 * max(0.30, falloff)
-        blobs = 3 + tier
-        for blob in range(blobs):
-            azimuth = (blob / blobs) * math.tau + tier * 0.7
-            offset = radius * (0.42 + rng.random() * 0.18)
-            centre = Vector((
-                math.cos(azimuth) * offset,
-                math.sin(azimuth) * offset,
-                y + (rng.random() - 0.5) * HEIGHT * 0.05,
-            ))
-            foliage_blob(bm, centre, radius * 0.46, 0.72, rng)
-
-    # Верхівка: одна шапка, інакше дерево кінчається зрізом.
-    foliage_blob(
-        bm,
-        Vector((0.0, 0.0, crown_high - HEIGHT * 0.07)),
-        CROWN_SPREAD * HEIGHT * 0.5 * 0.34,
-        0.78,
-        rng,
-    )
+    # --- листя оболонкою -----------------------------------------
+    crown_shell(bm, rng)
 
     mesh = bpy.data.meshes.new('ReferenceTree')
     bm.to_mesh(mesh)

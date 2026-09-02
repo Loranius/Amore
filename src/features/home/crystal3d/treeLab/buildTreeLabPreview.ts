@@ -86,6 +86,7 @@ import {
 } from '@/engine/rootGeometry';
 import {
   addTreeScaffoldBranches,
+  applyTreeRootFlare,
   buildTreeSpeciesBlueprint,
   pruneThinTwigsForScaffolds,
   scaleFoliageConfigToAge,
@@ -282,8 +283,13 @@ export function buildTreeLabPreviewFromArtifact({
    * Після масштабування, а не до нього: довжина скелетної гілки — частка
    * висоти, яку дерево СПРАВДІ має за законом віку.
    */
+  /*
+   * КОМЕЛЬ — після закону товщини й ДО скелетних гілок: гілка бере товщину
+   * свого комірця з вузла, до якого кріпиться, тож стовбур має бути вже
+   * готовий (`rootFlare.ts`, ADR-0106).
+   */
   const skeleton = addTreeScaffoldBranches(
-    grown.skeleton,
+    applyTreeRootFlare(grown.skeleton),
     daysTogether,
     artifact.deterministicSeed,
   );

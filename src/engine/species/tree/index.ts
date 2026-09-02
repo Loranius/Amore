@@ -29,6 +29,11 @@ export {
   TREE_SCAFFOLD_REACH_SHARE,
 } from './scaffold';
 export {
+  TREE_ROOT_FLARE,
+  TREE_ROOT_FLARE_SPAN,
+  applyTreeRootFlare,
+} from './rootFlare';
+export {
   TREE_FOLIAGE_TUNED_HEIGHT,
   TREE_SKELETON_HEIGHT_PER_TRUNK,
   scaleFoliageConfigToAge,
