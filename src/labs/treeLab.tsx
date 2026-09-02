@@ -31,21 +31,39 @@ const DAYS_PER_YEAR = 365.2425;
  * іншою парою з іншим насінням — саме на цьому вже вийшов хибний вимір
  * пропорції кристала (ADR-0089 §1).
  */
-function artifactFor(years: number) {
+/**
+ * Профілі заповнення модулів — ті самі, якими йде розгортка 0-40.
+ *
+ * Лабораторія довго вміла показувати лише одну пару, а розгортка тим часом
+ * міряла п'ять; найгірші просідання траплялись САМЕ в інших профілях, і
+ * подивитись на них не було як. Числа — подій на рік у кожному модулі.
+ */
+const FILL_PROFILES = {
+  порожня: { cal: 0, plan: 0, wish: 0, place: 0, mem: 0, media: 0, off: 0 },
+  тиха: { cal: 1, plan: 0, wish: 1, place: 0, mem: 2, media: 0, off: 4 },
+  середня: { cal: 4, plan: 2, wish: 2, place: 3, mem: 8, media: 4, off: 15 },
+  активна: { cal: 12, plan: 8, wish: 9, place: 14, mem: 24, media: 18, off: 45 },
+  лабораторна: { cal: 6, plan: 4, wish: 5, place: 7, mem: 12, media: 9, off: 30 },
+} as const;
+
+type FillProfile = keyof typeof FILL_PROFILES;
+
+function artifactFor(years: number, fill: FillProfile = 'лабораторна') {
   const asOf = new Date(
     Date.parse(`${START}T00:00:00.000Z`) + years * DAYS_PER_YEAR * 86_400_000,
   ).toISOString();
+  const profile = FILL_PROFILES[fill];
   const sources = applyEvolutionSandboxSources({
     enabled: true,
     values: {
       relationshipDays: Math.round(years * DAYS_PER_YEAR),
-      calendarEvents: Math.round(years * 6),
-      completedPlans: Math.round(years * 4),
-      fulfilledWishes: Math.round(years * 5),
-      visitedPlaces: Math.round(years * 7),
-      memories: Math.round(years * 12),
-      finishedMedia: Math.round(years * 9),
-      sharedDaysOff: Math.round(years * 30),
+      calendarEvents: Math.round(years * profile.cal),
+      completedPlans: Math.round(years * profile.plan),
+      fulfilledWishes: Math.round(years * profile.wish),
+      visitedPlaces: Math.round(years * profile.place),
+      memories: Math.round(years * profile.mem),
+      finishedMedia: Math.round(years * profile.media),
+      sharedDaysOff: Math.round(years * profile.off),
     },
     asOf,
     relationshipStartedAt: START,
@@ -55,7 +73,7 @@ function artifactFor(years: number) {
     },
   });
   const artifact = buildArtifactFromSnapshot({
-    coupleId: 'amore-couple:tree-lab',
+    coupleId: fill === 'лабораторна' ? 'amore-couple:tree-lab' : `amore:sweep:${fill}`,
     asOf,
     snapshot: sources.snapshot,
     engineConfig: {
@@ -82,11 +100,14 @@ function TreeLab() {
   const lod = params.get('lod') === 'medium' ? 'medium'
     : params.get('lod') === 'low' ? 'low'
     : 'high';
+  const fillParam = params.get('fill') ?? '';
+  const fill: FillProfile = (Object.keys(FILL_PROFILES) as FillProfile[])
+    .includes(fillParam as FillProfile) ? fillParam as FillProfile : 'лабораторна';
   const [error, setError] = useState<string | null>(null);
 
   const build = useMemo(() => {
     try {
-      const { artifact, asOf } = artifactFor(years);
+      const { artifact, asOf } = artifactFor(years, fill);
       return buildTreeLabPreviewFromArtifact({
         artifact,
         asOf,
@@ -98,7 +119,7 @@ function TreeLab() {
       setError(cause instanceof Error ? cause.message : String(cause));
       return null;
     }
-  }, [years, lod]);
+  }, [years, lod, fill]);
 
   if (error !== null) return <pre style={{ color: '#f88', padding: 16 }}>{error}</pre>;
   if (build === null) return null;

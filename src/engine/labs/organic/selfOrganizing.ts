@@ -734,7 +734,11 @@ export function buildSelfOrganizingSkeleton(
     // 2a. Голодні гілки відмирають — і аж тоді ділиться сила, щоб та, що
     // дісталась би мертвій, дісталась живим.
     shedNodes += shedStarvedBranches(
-      nodes, cycle, config.sheddingLight, config.sheddingGraceCycles, config.sheddingTolerance,
+      nodes,
+      cycle,
+      config.sheddingLight,
+      config.sheddingGraceCycles,
+      config.sheddingTolerance,
     );
     buds = buds.filter((bud) => !nodes[bud.nodeIndex]!.shed);
     if (buds.length === 0) break;

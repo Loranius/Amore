@@ -260,6 +260,35 @@ export function buildTreeFoliage(input: BuildTreeFoliageInput): TreeFoliageState
   let maxClusterBudgetReached = false;
   let maxLeafBudgetReached = false;
 
+  /*
+   * СПЕРШУ ПО ОДНОМУ ЗГУСТКУ КОЖНІЙ ГІЛЦІ, І ЛИШЕ ПОТІМ РЕШТА.
+   *
+   * Досі бюджет витрачався гілка за гілкою: перша брала всі свої сім
+   * згустків, друга свої шість, і так доки не скінчиться — а хвіст лишався
+   * ЗОВСІМ голим. Виміряно на розгортці 0-40: у профілі «середня» на шостому
+   * році 43 гілки зі 109 не мали жодного листка, тобто 40% дерева стояло
+   * голою дротиною. На знімку дванадцятого року це три довгі прутики, що
+   * стирчать із крони.
+   *
+   * Це ТА САМА вада, яку ADR-0075 уже лагодив («43 згустки з 140, і 32 гілки
+   * з 50 лишились зовсім голими»), і повернулась вона тому, що тодішнє
+   * виправлення зменшило витрату на згусток, а не змінило ПОРЯДОК витрати.
+   * Відколи гілок стало вчетверо більше, порядок знову став вирішальним.
+   *
+   * Тепер два проходи. Перший роздає по одному згустку кожній гілці — це
+   * гарантує, що жодна не лишиться голою, доки бюджету вистачає бодай на
+   * одну на кожну. Другий добирає решту в тому самому порядку, що й раніше.
+   * Обрізається й далі ПІЗНІШЕ, просто «пізніше» тепер означає «другий
+   * згусток на гілці», а не «остання гілка».
+   */
+  interface PendingBranch {
+    branch: TreeCompositionBranch;
+    curve: OrganicBranchCurve;
+    role: FoliageBranchRole;
+    slotCount: number;
+  }
+
+  const pending: PendingBranch[] = [];
   for (const curve of input.frames.curves) {
     const branch = branchesById.get(curve.branchId);
     if (!branch || curve.samples.length === 0) continue;
@@ -272,40 +301,53 @@ export function buildTreeFoliage(input: BuildTreeFoliageInput): TreeFoliageState
     if (branch.role !== 'trunk' && branch.generation < input.config.minimumGeneration) {
       continue;
     }
-    const role = branch.role;
     eligibleBranchIds.push(branch.branchId);
-    const slotCount = slotCountFor(curve, role, input.config);
+    pending.push({
+      branch,
+      curve,
+      role: branch.role,
+      slotCount: slotCountFor(curve, branch.role, input.config),
+    });
+  }
 
-    for (let slot = 0; slot < slotCount; slot += 1) {
-      const candidate = buildCandidate(
-        input.species.artifactSeed,
-        curve,
-        branch,
-        role,
-        slot,
-        slotCount,
-        input,
-      );
-      candidateClusterCount += 1;
+  const emit = (entry: PendingBranch, slot: number): void => {
+    const candidate = buildCandidate(
+      input.species.artifactSeed,
+      entry.curve,
+      entry.branch,
+      entry.role,
+      slot,
+      entry.slotCount,
+      input,
+    );
+    candidateClusterCount += 1;
 
-      if (clusters.length >= input.config.maxClusters) {
-        maxClusterBudgetReached = true;
-        truncatedClusterIds.push(candidate.id);
-        continue;
-      }
-      if (totalLeafCount + candidate.leafCount > input.config.maxLeaves) {
-        maxLeafBudgetReached = true;
-        truncatedClusterIds.push(candidate.id);
-        continue;
-      }
-
-      clusters.push({
-        ...candidate,
-        sequence: clusters.length,
-      });
-      totalLeafCount += candidate.leafCount;
-      emittedByBranch.set(branch.branchId, (emittedByBranch.get(branch.branchId) ?? 0) + 1);
+    if (clusters.length >= input.config.maxClusters) {
+      maxClusterBudgetReached = true;
+      truncatedClusterIds.push(candidate.id);
+      return;
     }
+    if (totalLeafCount + candidate.leafCount > input.config.maxLeaves) {
+      maxLeafBudgetReached = true;
+      truncatedClusterIds.push(candidate.id);
+      return;
+    }
+
+    clusters.push({ ...candidate, sequence: clusters.length });
+    totalLeafCount += candidate.leafCount;
+    emittedByBranch.set(
+      entry.branch.branchId,
+      (emittedByBranch.get(entry.branch.branchId) ?? 0) + 1,
+    );
+  };
+
+  // Прохід перший: по одному на гілку.
+  for (const entry of pending) {
+    if (entry.slotCount > 0) emit(entry, 0);
+  }
+  // Прохід другий: решта, у тому самому порядку гілок.
+  for (const entry of pending) {
+    for (let slot = 1; slot < entry.slotCount; slot += 1) emit(entry, slot);
   }
 
   const occupiedCellIds = [...new Set(clusters.map((cluster) => cluster.crownCellId))].sort();

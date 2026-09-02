@@ -170,17 +170,37 @@ export function buildTreeLeafGeometry(
   const emittedByCluster = new Set<string>();
   let candidateInstanceCount = 0;
 
-  for (const cluster of input.foliage.clusters) {
-    const count = targetInstanceCount(cluster, fraction);
-    for (let localIndex = 0; localIndex < count; localIndex += 1) {
-      const id = `tree:leaf:${cluster.id}:${localIndex}`;
-      candidateInstanceCount += 1;
-      if (instances.length >= maxInstances) {
-        truncatedInstanceIds.push(id);
-        continue;
-      }
-      instances.push(buildInstance(cluster, localIndex, instances.length, input));
-      emittedByCluster.add(cluster.id);
+  /*
+   * СПЕРШУ ПО ОДНОМУ ЛИСТКУ КОЖНОМУ ЗГУСТКУ, І ЛИШЕ ПОТІМ РЕШТА.
+   *
+   * Та сама вада, що поверхом вище у `treeFoliage` (ADR-0101), тільки
+   * дрібнішим кроком: бюджет витрачався згусток за згустком, тож останні
+   * лишались БЕЗ ЖОДНОГО листка. Виміряно на розгортці 0-40: до сімнадцяти
+   * згустків без листя, тобто сімнадцять місць на гілках, де листю належало
+   * бути й не було.
+   *
+   * Обрізається й далі пізніше — просто «пізніше» тепер означає «другий
+   * листок у згустку», а не «останній згусток».
+   */
+  const counts = input.foliage.clusters.map((cluster) => targetInstanceCount(cluster, fraction));
+  const push = (clusterIndex: number, localIndex: number): void => {
+    const cluster = input.foliage.clusters[clusterIndex]!;
+    const id = `tree:leaf:${cluster.id}:${localIndex}`;
+    candidateInstanceCount += 1;
+    if (instances.length >= maxInstances) {
+      truncatedInstanceIds.push(id);
+      return;
+    }
+    instances.push(buildInstance(cluster, localIndex, instances.length, input));
+    emittedByCluster.add(cluster.id);
+  };
+
+  for (let index = 0; index < counts.length; index += 1) {
+    if (counts[index]! > 0) push(index, 0);
+  }
+  for (let index = 0; index < counts.length; index += 1) {
+    for (let localIndex = 1; localIndex < counts[index]!; localIndex += 1) {
+      push(index, localIndex);
     }
   }
 

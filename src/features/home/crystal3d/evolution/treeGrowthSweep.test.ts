@@ -125,6 +125,8 @@ function buildShot(years: number, profile: keyof typeof PROFILES) {
     .filter((node) => node.position.y < ground + (top - ground) * 0.05)
     .map((node) => node.radius));
   return {
+    bareBranches: build.foliage.diagnostics.branchIdsWithoutFoliage.length,
+    emptyClusters: build.leaves.diagnostics.clusterIdsWithoutInstances.length,
     rawHeight: top - ground,
     sceneHeight: fit.height,
     baseRadius,
@@ -191,6 +193,26 @@ describe('дерево від 0 до 40 років', () => {
           expect({ years, shrank: sceneHeight < peak * 0.93 })
             .toEqual({ years, shrank: false });
           peak = Math.max(peak, sceneHeight);
+        }
+      }, 300_000);
+
+      /*
+       * ЖОДНОЇ ГОЛОЇ ГІЛКИ Й ЖОДНОГО ПОРОЖНЬОГО ЗГУСТКА.
+       *
+       * Виміряно до ADR-0101: у профілі «середня» на шостому році 43 гілки
+       * зі 109 не мали ЖОДНОГО листка — 40% дерева стояло голою дротиною, і
+       * на знімку дванадцятого року це три довгі прутики, що стирчать із
+       * крони. Причина була в порядку витрати бюджету: перші гілки брали всі
+       * свої згустки, а хвіст лишався ні з чим.
+       *
+       * Сусідній тест `leaves no eligible branch bare` це стеріг, але тільки
+       * на фікстурі віком два з половиною роки, де гілок удесятеро менше.
+       */
+      it('не лишає жодної гілки без листя на жодному віці', () => {
+        for (const years of AGES) {
+          const { bareBranches, emptyClusters } = shoot(years, profile);
+          expect({ years, bareBranches, emptyClusters })
+            .toEqual({ years, bareBranches: 0, emptyClusters: 0 });
         }
       }, 300_000);
 

@@ -241,7 +241,19 @@ describe('Tree Foliage', () => {
     );
 
     for (const cluster of partialFoliage.clusters) {
-      expect(fullById.get(cluster.id)).toEqual(cluster);
+      /*
+       * `sequence` виключено, як і в сусідній перевірці обрізання: це номер
+       * у ПОРЯДКУ ВИПУСКУ, а цей тест саме порядок і міняє, забираючи гілки.
+       *
+       * Відколи бюджет роздається двома проходами — по одному згустку кожній
+       * гілці, потім решта (ADR-0101) — номер згустка залежить від того,
+       * скільки гілок узагалі є. Це не втрата стабільності: сама тотожність
+       * згустка (`id`), його місце в просторі, радіус, густота й гілка, на
+       * якій він сидить, лишаються тими самими. Саме їх тест і стереже.
+       */
+      const { sequence: _partialSequence, ...stable } = cluster;
+      const { sequence: _fullSequence, ...expected } = fullById.get(cluster.id)!;
+      expect(expected).toEqual(stable);
     }
   });
 
