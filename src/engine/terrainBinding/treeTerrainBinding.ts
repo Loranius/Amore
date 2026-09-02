@@ -258,8 +258,28 @@ export function buildTreeTerrainBinding(
    * лише зміцнює.
    */
   const ringStep = surfaceRadius / Math.max(1, ringCount);
+  /*
+   * ОКРУГЛЕННЯ НЕ СМІЄ З'ЇСТИ ОСТАННЄ КІЛЬЦЕ.
+   *
+   * Стеля тут була `surfaceRadius`, і цього виявилось замало. На `low`
+   * кілець лише чотири, тож крок 0.0723; плато 0.241 округлювалось до
+   * 0.289 — тобто ТОЧНО в поверхню, — і за плато не лишалось жодного
+   * кільця. А край ґрунту ліпиться саме поза плато (`reliefRatio`), тож
+   * ґрунт ставав ідеальним колом: виміряно край 0.2894..0.2894 проти
+   * 0.2557..0.2864 на `high`.
+   *
+   * Це та сама вада, що й в ADR-0090, з іншого кінця: там округлення
+   * ЗАБУВАЛИ й коріння вилазило зі схилу, тут воно з'їдало все. Ловить її
+   * чужий тест «shapes the soil rim without folding one ring inside
+   * another», і саме він і впав, коли дерево трохи змінило пропорції.
+   *
+   * Одне кільце під край — це мінімум, за якого `reliefRatio` взагалі має
+   * де змінитись від нуля до одиниці.
+   */
   const snappedPlateauRadius = round6(Math.min(
-    surfaceRadius,
+    // Обмеження не сміє опустити плато нижче за саме коріння — інакше це
+    // була б вада ADR-0090 з протилежного боку. Тому спершу максимум.
+    Math.max(plateauRadius, surfaceRadius - ringStep),
     Math.ceil(plateauRadius / Math.max(EPSILON, ringStep)) * ringStep,
   ));
   const mesh = buildSurfaceMesh(
