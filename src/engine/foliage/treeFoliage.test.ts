@@ -4,6 +4,7 @@ import {
   buildTreeComposition,
 } from '../composition';
 import { buildOrganicCurveFrames } from '../labs/organic';
+import { scaleFoliageConfigToAge } from '@/engine/species/tree';
 import { buildTreeLabPreview } from '@/features/home/crystal3d/treeLab/buildTreeLabPreview';
 import { DEFAULT_TREE_FOLIAGE_CONFIG } from './config';
 import { buildTreeFoliage } from './treeFoliage';
@@ -49,8 +50,19 @@ describe('Tree Foliage', () => {
       } else {
         expect(cluster.generation).toBeGreaterThanOrEqual(1);
       }
-      expect(cluster.radius).toBeGreaterThanOrEqual(DEFAULT_TREE_FOLIAGE_CONFIG.minClusterRadius);
-      expect(cluster.radius).toBeLessThanOrEqual(DEFAULT_TREE_FOLIAGE_CONFIG.maxClusterRadius);
+      /*
+       * Смуга радіуса помножена на `ageScale`, і це не послаблення тесту, а
+       * саме те, що він мусить перевіряти після ADR-0092: розмір дерева —
+       * закон часу, тож `minClusterRadius` у конфізі означає «на дорослому
+       * дереві». На фікстурі віком два з половиною роки згусток 0.14
+       * дорівнював би чверті самого дерева.
+       */
+      expect(cluster.radius).toBeGreaterThanOrEqual(
+        DEFAULT_TREE_FOLIAGE_CONFIG.minClusterRadius * build.ageScale - 1e-6,
+      );
+      expect(cluster.radius).toBeLessThanOrEqual(
+        DEFAULT_TREE_FOLIAGE_CONFIG.maxClusterRadius * build.ageScale + 1e-6,
+      );
       expect(cluster.density).toBeGreaterThanOrEqual(0);
       expect(cluster.density).toBeLessThanOrEqual(1);
       expect(cluster.leafCount).toBeGreaterThanOrEqual(
@@ -183,7 +195,9 @@ describe('Tree Foliage', () => {
       species: build.species,
       frames: build.frames,
       composition: build.composition,
-      config: DEFAULT_TREE_FOLIAGE_CONFIG,
+      // Той самий закон віку, що й у конвеєра, — інакше порівнювали б
+      // дерево із законом проти дерева без нього (ADR-0092).
+      config: scaleFoliageConfigToAge(DEFAULT_TREE_FOLIAGE_CONFIG, build.ageScale),
     });
 
     expect(JSON.stringify(build.species)).toBe(speciesBefore);
@@ -218,7 +232,9 @@ describe('Tree Foliage', () => {
       species: full.species,
       frames: partialFrames,
       composition: partialComposition,
-      config: DEFAULT_TREE_FOLIAGE_CONFIG,
+      // Той самий закон віку, що й у конвеєра, — інакше порівнювали б
+      // дерево із законом проти дерева без нього (ADR-0092).
+      config: scaleFoliageConfigToAge(DEFAULT_TREE_FOLIAGE_CONFIG, full.ageScale),
     });
     const fullById = new Map(
       full.foliage.clusters.map((cluster) => [cluster.id, cluster] as const),
@@ -236,7 +252,7 @@ describe('Tree Foliage', () => {
       frames: build.frames,
       composition: build.composition,
       config: {
-        ...DEFAULT_TREE_FOLIAGE_CONFIG,
+        ...scaleFoliageConfigToAge(DEFAULT_TREE_FOLIAGE_CONFIG, build.ageScale),
         maxClusters: 4,
         maxLeaves: 60,
       },

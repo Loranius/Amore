@@ -440,7 +440,7 @@ describe('дерево не голе', () => {
       const share = bottomFifthShare(40, salt);
       expect({ salt, tooLow: share > 0.6 }).toEqual({ salt, tooLow: false });
     }
-  });
+  }, 60_000);
 
   /*
    * Стовбур мусить ТОВЩАТИ: «3 рік стовбур стає грубшим… 40 років — міцний

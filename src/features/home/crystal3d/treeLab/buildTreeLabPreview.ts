@@ -50,6 +50,7 @@ import {
   type TreeLeafOrientationState,
 } from '@/engine/leafOrientation';
 import {
+  DEFAULT_ORGANIC_SURFACE_CONFIG,
   buildOrganicCurveFrames,
   buildSelfOrganizingSkeleton,
   buildBudgetedOrganicSweepMesh,
@@ -85,6 +86,12 @@ import {
 } from '@/engine/rootGeometry';
 import {
   buildTreeSpeciesBlueprint,
+  scaleFoliageConfigToAge,
+  scaleLeafGeometryConfigToAge,
+  scaleOrganicSurfaceToAge,
+  scaleTreeSkeletonToAge,
+  treeFoliageScale,
+  treeSkeletonTargetHeight,
   treeToOrganicField,
   type TreeOrganicField,
   type TreeSpeciesBlueprint,
@@ -151,6 +158,15 @@ export interface TreeLabPreviewBuild {
    * з екрана — так само, як `radialSegmentsUsed` у коренів.
    */
   trunkBudget: BudgetedOrganicSweepMesh;
+  /**
+   * Множник довжин цього дерева проти дорослого — див. `ageScale.ts`.
+   *
+   * Публікується, бо без нього перевірити дерево неможливо: сталі листя,
+   * згустків і кори — це довжини, і після закону віку вони значать
+   * `конфіг × ageScale`, а не сам конфіг. Три чужі тести саме на цьому й
+   * упали, і правильна відповідь була не послабити їх, а дати їм число.
+   */
+  ageScale: number;
   buildMs: number;
 }
 
@@ -229,18 +245,47 @@ export function buildTreeLabPreviewFromArtifact({
    * Опублікований скелет має ту саму форму, тож усе нижче за течією —
    * кадри кривих, композиція, крона, корені, меш, бюджети — не змінилось.
    */
-  const skeleton = buildSelfOrganizingSkeleton({
-    seed: field.seed,
-    config: field.selfOrganizingConfig,
-  });
+  /*
+   * РОЗМІР — ЗАКОН ЧАСУ, ФОРМА — СИМУЛЯЦІЯ (ADR-0092).
+   *
+   * Симуляція чесно моделює конкуренцію за світло, а конкуренція скидає
+   * гілки, тож її розмір гуляє: на порожній історії сорокарічне дерево
+   * виходило нижчим за восьмирічне. Догма власника цього не допускає, тому
+   * висоту скелета задає вік, а симуляція лишає собі форму.
+   */
+  const grown = scaleTreeSkeletonToAge(
+    buildSelfOrganizingSkeleton({ seed: field.seed, config: field.selfOrganizingConfig }),
+    treeSkeletonTargetHeight(species.structure.trunkHeight),
+  );
+  const skeleton = grown.skeleton;
   const frames = buildOrganicCurveFrames(skeleton);
   const composition = buildTreeComposition({ species, skeleton, frames, config: DEFAULT_TREE_COMPOSITION_CONFIG });
   const roots = buildTreeRootArchitecture({ species, composition, frames, config: DEFAULT_TREE_ROOT_ARCHITECTURE_CONFIG });
   const groundContact = buildTreeGroundContact({ species, roots, config: DEFAULT_TREE_GROUND_CONTACT_CONFIG });
   const terrain = buildTreeTerrainBinding({ species, contact: groundContact, lod, config: DEFAULT_TREE_TERRAIN_BINDING_CONFIG });
   const rootGeometry = buildTreeRootGeometry({ roots, contact: groundContact, terrain, lod, config: DEFAULT_TREE_ROOT_GEOMETRY_CONFIG });
-  const foliage = buildTreeFoliage({ species, frames, composition, config: DEFAULT_TREE_FOLIAGE_CONFIG });
-  const leaves = buildTreeLeafGeometry({ foliage, lod, config: DEFAULT_TREE_LEAF_GEOMETRY_CONFIG });
+  /*
+   * Листя й згустки — теж довжини, тож і вони йдуть за віком. Інакше на
+   * ростку заввишки 0.71 сидів би листок завдовжки 0.32.
+   */
+  /*
+   * Округлюється ОДИН РАЗ і далі вживається саме округленим — і те саме
+   * число публікується. Інакше конвеєр рахував би повною точністю, а тест,
+   * що взяв опубліковане, — округленою, і згустки розходились би на 1e-6.
+   * Рівно це й сталось: 0.035919 проти 0.035918.
+   */
+  const ageScale = Math.round(treeFoliageScale(species.structure.trunkHeight) * 1e6) / 1e6;
+  const foliage = buildTreeFoliage({
+    species,
+    frames,
+    composition,
+    config: scaleFoliageConfigToAge(DEFAULT_TREE_FOLIAGE_CONFIG, ageScale),
+  });
+  const leaves = buildTreeLeafGeometry({
+    foliage,
+    lod,
+    config: scaleLeafGeometryConfigToAge(DEFAULT_TREE_LEAF_GEOMETRY_CONFIG, ageScale),
+  });
   const materials = buildTreeMaterialState({ species, composition, foliage, leaves, config: DEFAULT_TREE_MATERIAL_CONFIG });
   const canopyDepth = buildTreeCanopyDepth({ composition, foliage, leaves, materials, config: DEFAULT_TREE_CANOPY_DEPTH_CONFIG });
   const canopyLight = buildTreeCanopyLight({ composition, leaves, canopy: canopyDepth, materials, config: DEFAULT_TREE_CANOPY_LIGHT_CONFIG });
@@ -287,7 +332,7 @@ export function buildTreeLabPreviewFromArtifact({
       rootTriangles: rootGeometry.diagnostics.triangleCount,
     }),
     maxAxialStride: TREE_TRUNK_MAX_AXIAL_STRIDE,
-  });
+  }, scaleOrganicSurfaceToAge(DEFAULT_ORGANIC_SURFACE_CONFIG, grown.factor));
   const mesh = trunk.mesh;
   const barkSurface = buildTreeBarkSurface({
     species,
@@ -402,6 +447,7 @@ export function buildTreeLabPreviewFromArtifact({
     productionAcceptance,
     trunkBudget: trunk,
     mesh,
+    ageScale,
     buildMs,
   };
 }

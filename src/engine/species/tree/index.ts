@@ -20,3 +20,14 @@ export {
   type TreeSpeciesState,
   type TreeStructureInstruction,
 } from './types';
+export {
+  TREE_FOLIAGE_TUNED_HEIGHT,
+  TREE_SKELETON_HEIGHT_PER_TRUNK,
+  scaleFoliageConfigToAge,
+  scaleLeafGeometryConfigToAge,
+  scaleOrganicSurfaceToAge,
+  scaleTreeSkeletonToAge,
+  treeFoliageScale,
+  treeAgeSizeShare,
+  treeSkeletonTargetHeight,
+} from './ageScale';

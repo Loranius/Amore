@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { scaleLeafGeometryConfigToAge } from '@/engine/species/tree';
 import { buildTreeLabPreview } from '@/features/home/crystal3d/treeLab/buildTreeLabPreview';
 import { DEFAULT_TREE_LEAF_GEOMETRY_CONFIG } from './config';
 import { buildTreeLeafGeometry } from './treeLeafGeometry';
@@ -108,7 +109,8 @@ describe('Tree Leaf Geometry', () => {
       foliage: build.foliage,
       lod: 'medium',
       config: {
-        ...DEFAULT_TREE_LEAF_GEOMETRY_CONFIG,
+        // Довжина листка — теж закон віку (ADR-0092); стеля кількості — ні.
+        ...scaleLeafGeometryConfigToAge(DEFAULT_TREE_LEAF_GEOMETRY_CONFIG, build.ageScale),
         maxInstancesByLod: {
           ...DEFAULT_TREE_LEAF_GEOMETRY_CONFIG.maxInstancesByLod,
           medium: 12,
