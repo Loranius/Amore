@@ -146,6 +146,10 @@ const COLLAR_SHARE = 0.55;
  */
 const PRUNED_TWIGS_PER_SCAFFOLD_SET = 50;
 
+/** Секторів на коло для вирівнювання обрізання. */
+const BALANCE_SECTORS = 12;
+
+
 /** Частка радіуса стовбура в місці кріплення, яку бере гілка. */
 
 /*
@@ -283,12 +287,59 @@ export function pruneThinTwigsForScaffolds(
     if (node.branchId === ORGANIC_TRUNK_BRANCH_ID) continue;
     thickest.set(node.branchId, Math.max(thickest.get(node.branchId) ?? 0, node.radius));
   }
-  const doomed = new Set(
-    [...thickest.entries()]
-      .sort(([leftId, left], [rightId, right]) => left - right || leftId.localeCompare(rightId))
-      .slice(0, count)
-      .map(([branchId]) => branchId),
-  );
+  /*
+   * ОБИРАЄМО НЕ ПРОСТО НАЙТОНШІ, А НАЙТОНШІ З ГУСТОГО БОКУ.
+   *
+   * Крона десятирічного дерева хилилась набік, і чотири гіпотези поспіль
+   * виміряно НУЛЕМ: нахил стовбура (0.014-0.059 висоти), зсув усього листя
+   * від осі (0.02-0.07 радіуса), підсилення листя за роллю, гілки-втікачі
+   * за огинальною крони (таких немає жодної за будь-якої межі). Лишалась
+   * одна причина: прутики симуляції просто густіші з одного боку — не
+   * викидом, а розподілом.
+   *
+   * Обрізання ж однаково відбувається — п'ятдесят гілок ідуть під ніж заради
+   * бюджету (`PRUNED_TWIGS_PER_SCAFFOLD_SET`). Отже вибір, ЯКІ саме, — це
+   * безкоштовний важіль: беремо по колу, щоразу з найгустішого сектора, і
+   * всередині сектора найтоншу. Дерево від цього не рідшає — воно
+   * вирівнюється.
+   *
+   * Сектор рахується від осі стовбура, дванадцять на коло: дрібніше — і в
+   * секторі лишається по одній гілці, тобто «найгустіший» перестає щось
+   * означати.
+   */
+  const sectorOf = (branchId: string): number => {
+    const nodes = skeleton.nodes.filter((node) => node.branchId === branchId);
+    let x = 0; let z = 0;
+    for (const node of nodes) { x += node.position.x; z += node.position.z; }
+    let angle = Math.atan2(z / Math.max(1, nodes.length), x / Math.max(1, nodes.length));
+    if (angle < 0) angle += Math.PI * 2;
+    return Math.min(BALANCE_SECTORS - 1, Math.floor((angle / (Math.PI * 2)) * BALANCE_SECTORS));
+  };
+
+  const bySector = new Map<number, { branchId: string; radius: number }[]>();
+  for (const [branchId, radius] of thickest) {
+    const sector = sectorOf(branchId);
+    const bucket = bySector.get(sector);
+    if (bucket) bucket.push({ branchId, radius });
+    else bySector.set(sector, [{ branchId, radius }]);
+  }
+  for (const bucket of bySector.values()) {
+    bucket.sort((left, right) => (left.radius - right.radius)
+      || (left.branchId < right.branchId ? -1 : left.branchId > right.branchId ? 1 : 0));
+  }
+
+  const doomed = new Set<string>();
+  while (doomed.size < count) {
+    let fullest = -1;
+    let fullestSize = 0;
+    for (const [sector, bucket] of [...bySector.entries()].sort(([a], [b]) => a - b)) {
+      if (bucket.length > fullestSize) { fullestSize = bucket.length; fullest = sector; }
+    }
+    if (fullest < 0 || fullestSize <= 1) break;
+    const victim = bySector.get(fullest)!.shift();
+    if (!victim) break;
+    doomed.add(victim.branchId);
+  }
   if (doomed.size === 0) return skeleton;
   /*
    * Гілка, що росла З відкинутої, лишилась би висіти в повітрі, тож
