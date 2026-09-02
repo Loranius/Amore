@@ -24,6 +24,7 @@ export {
   MAX_SCAFFOLD_BRANCHES,
   SCAFFOLD_FIRST_YEAR,
   addTreeScaffoldBranches,
+  pruneThinTwigsForScaffolds,
   scaffoldCountFor,
 } from './scaffold';
 export {

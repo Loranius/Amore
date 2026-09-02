@@ -88,7 +88,10 @@ describe('гілки-скелети', () => {
    */
   it('не лишає жодного напрямку без гілки попереду', () => {
     const grown = addTreeScaffoldBranches(trunkSkeleton(), 20 * DAYS_PER_YEAR, 11);
-    const tips = scaffoldsOf(grown).filter((node) => node.terminal);
+    // Кінчики САМИХ скелетних гілок, без пагонів на них (ADR-0093 §7).
+    const tips = scaffoldsOf(grown).filter(
+      (node) => node.terminal && !node.branchId.includes(':twig:'),
+    );
     expect(tips).toHaveLength(MAX_SCAFFOLD_BRANCHES);
 
     for (let view = 0; view < 36; view += 1) {
@@ -122,6 +125,11 @@ describe('гілки-скелети', () => {
     const second = addTreeScaffoldBranches(base, 20 * DAYS_PER_YEAR, 11);
     expect(first).toEqual(second);
     expect(base.nodes).toHaveLength(10);
-    expect(first.nodes.length).toBe(10 + MAX_SCAFFOLD_BRANCHES * 8);
+    /*
+     * Сім скелетних гілок по вісім вузлів плюс по чотири пагони на кожну по
+     * три вузли: 10 + 7×8 + 7×4×3 = 150. Пагони додано, бо сім гілок на 128
+     * комірок оболонки крони лишали 56 із них порожніми (ADR-0093 §7).
+     */
+    expect(first.nodes.length).toBe(10 + MAX_SCAFFOLD_BRANCHES * 8 + MAX_SCAFFOLD_BRANCHES * 4 * 3);
   });
 });

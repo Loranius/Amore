@@ -87,6 +87,7 @@ import {
 import {
   addTreeScaffoldBranches,
   buildTreeSpeciesBlueprint,
+  pruneThinTwigsForScaffolds,
   scaleFoliageConfigToAge,
   scaleLeafGeometryConfigToAge,
   scaleOrganicSurfaceToAge,
@@ -255,8 +256,14 @@ export function buildTreeLabPreviewFromArtifact({
    * виходило нижчим за восьмирічне. Догма власника цього не допускає, тому
    * висоту скелета задає вік, а симуляція лишає собі форму.
    */
+  const daysTogether = treeDaysTogether(artifact.relationshipStartedAt, asOf);
   const grown = scaleTreeSkeletonToAge(
-    buildSelfOrganizingSkeleton({ seed: field.seed, config: field.selfOrganizingConfig }),
+    // Спершу вирішуємо, які гілки існують, і лише потім доводимо до висоти
+    // закону: обрізання після масштабування знімало верхівку (ADR-0093 §8).
+    pruneThinTwigsForScaffolds(
+      buildSelfOrganizingSkeleton({ seed: field.seed, config: field.selfOrganizingConfig }),
+      daysTogether,
+    ),
     treeSkeletonTargetHeight(species.structure.trunkHeight),
   );
   /*
@@ -272,7 +279,7 @@ export function buildTreeLabPreviewFromArtifact({
    */
   const skeleton = addTreeScaffoldBranches(
     grown.skeleton,
-    treeDaysTogether(artifact.relationshipStartedAt, asOf),
+    daysTogether,
     artifact.deterministicSeed,
   );
   const frames = buildOrganicCurveFrames(skeleton);
