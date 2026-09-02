@@ -33,6 +33,7 @@
 // ============================================================
 import type { OrganicSkeletonNode, OrganicSkeletonState } from '../../labs/organic';
 import { ORGANIC_TRUNK_BRANCH_ID } from '../../labs/organic';
+import { treeCrownNarrowing } from './ageScale';
 import { treeAgeProgress } from './growthLaw';
 import { seededUnit } from './math';
 
@@ -149,6 +150,29 @@ const PRUNED_TWIGS_PER_SCAFFOLD_SET = 50;
 /** Секторів на коло для вирівнювання обрізання. */
 const BALANCE_SECTORS = 12;
 
+/*
+ * ЧИСТА ВИСОТА СТОВБУРА — частка висоти, на якій дерево не тримає гілок.
+ *
+ * Власник, побачивши живий портал на 1345-й день: «замале дерево для трьох
+ * років, більше на кущ схоже». Виміряно на його ж дереві — найнижчий листок
+ * стоїть на **4%** висоти, а ширина крони дорівнює 1.07 висоти. Тобто листя
+ * починається від землі, а крона така ж широка, як дерево високе.
+ *
+ * Чотири відсотки — це не оцінка, це ЦИТАТА: у `selfOrganizingConfig`
+ * записано «25% — це дерево з видимим стовбуром, а не кущ (4%)». Тобто
+ * механізм скидання гілок мав дати 25%, і дає — але не раніше, ніж набіжать
+ * цикли: `sheddingGraceCycles` 2 плюс накопичення голоду означає, що на
+ * третьому році скидати ще нічого. Виміряно по роках: 4% на трьох, 4% на
+ * п'яти, 13% на десяти, 19% на двадцяти, 23% на сорока.
+ *
+ * У живого дерева чиста висота береться з ДВОХ джерел: нижні гілки
+ * відмирають від затінення (це вже є) і просто не закладаються на молодому
+ * пагоні (цього не було). Друге тут і додано — інакше пара мусить чекати
+ * десять років, щоб її дерево перестало бути кущем.
+ */
+const BOLE_SHARE_YOUNG = 0.2;
+const BOLE_SHARE_MATURE = 0.26;
+
 
 /** Частка радіуса стовбура в місці кріплення, яку бере гілка. */
 
@@ -221,11 +245,11 @@ function heightShareFor(index: number): number {
 }
 
 /** Виліт гілки: росте з віком дерева й зменшується догори по кроні. */
-function reachShareFor(index: number, maturity: number): number {
+function reachShareFor(index: number, maturity: number, narrowing: number): number {
   const span = Math.max(1, MAX_SCAFFOLD_BRANCHES - 1);
   const byAge = REACH_SHARE_YOUNG + (REACH_SHARE_MATURE - REACH_SHARE_YOUNG) * maturity;
-  // Крона найширша нижче середини, а не на маківці.
-  return byAge * (1 - 0.45 * (index / span));
+  // Крона найширша нижче середини, а не на маківці; звуження — за віком.
+  return byAge * (1 - 0.45 * (index / span)) * narrowing;
 }
 
 /**
@@ -282,11 +306,20 @@ export function pruneThinTwigsForScaffolds(
    */
   const count = scaffoldCountFor(daysTogether) > 0 ? PRUNED_TWIGS_PER_SCAFFOLD_SET : 0;
   if (count <= 0) return skeleton;
+  let top = Number.NEGATIVE_INFINITY;
+  let bottom = Number.POSITIVE_INFINITY;
+  const nodesByBranch = new Map<string, OrganicSkeletonNode[]>();
   const thickest = new Map<string, number>();
   for (const node of skeleton.nodes) {
+    if (node.position.y > top) top = node.position.y;
+    if (node.position.y < bottom) bottom = node.position.y;
     if (node.branchId === ORGANIC_TRUNK_BRANCH_ID) continue;
     thickest.set(node.branchId, Math.max(thickest.get(node.branchId) ?? 0, node.radius));
+    const bucket = nodesByBranch.get(node.branchId);
+    if (bucket) bucket.push(node);
+    else nodesByBranch.set(node.branchId, [node]);
   }
+  if (!Number.isFinite(top - bottom) || top - bottom <= 1e-6) return skeleton;
   /*
    * ОБИРАЄМО НЕ ПРОСТО НАЙТОНШІ, А НАЙТОНШІ З ГУСТОГО БОКУ.
    *
@@ -316,8 +349,25 @@ export function pruneThinTwigsForScaffolds(
     return Math.min(BALANCE_SECTORS - 1, Math.floor((angle / (Math.PI * 2)) * BALANCE_SECTORS));
   };
 
+  /*
+   * Гілки нижче чистої висоти йдуть під ніж першими й поза лічильником:
+   * це не «скільки ми можемо дозволити собі відкинути заради бюджету», а
+   * «де дерево взагалі не тримає гілок».
+   */
+  const boleShare = BOLE_SHARE_YOUNG
+    + (BOLE_SHARE_MATURE - BOLE_SHARE_YOUNG) * treeAgeProgress(daysTogether);
+  const boleLine = bottom + (top - bottom) * boleShare;
+  const doomed = new Set<string>();
+  for (const [branchId, nodes] of nodesByBranch) {
+    if (branchId === ORGANIC_TRUNK_BRANCH_ID) continue;
+    let highest = Number.NEGATIVE_INFINITY;
+    for (const node of nodes) if (node.position.y > highest) highest = node.position.y;
+    if (highest < boleLine) doomed.add(branchId);
+  }
+
   const bySector = new Map<number, { branchId: string; radius: number }[]>();
   for (const [branchId, radius] of thickest) {
+    if (doomed.has(branchId)) continue;
     const sector = sectorOf(branchId);
     const bucket = bySector.get(sector);
     if (bucket) bucket.push({ branchId, radius });
@@ -328,8 +378,8 @@ export function pruneThinTwigsForScaffolds(
       || (left.branchId < right.branchId ? -1 : left.branchId > right.branchId ? 1 : 0));
   }
 
-  const doomed = new Set<string>();
-  while (doomed.size < count) {
+  const budgetTarget = doomed.size + count;
+  while (doomed.size < budgetTarget) {
     let fullest = -1;
     let fullestSize = 0;
     for (const [sector, bucket] of [...bySector.entries()].sort(([a], [b]) => a - b)) {
@@ -430,7 +480,7 @@ export function addTreeScaffoldBranches(
     if (!anchor) continue;
 
     const span = Math.max(1, MAX_SCAFFOLD_BRANCHES - 1);
-    const reach = height * reachShareFor(index, maturity);
+    const reach = height * reachShareFor(index, maturity, treeCrownNarrowing(daysTogether));
     if (reach <= 1e-6) continue;
 
     const azimuth = azimuthSeed + (index / count) * Math.PI * 2

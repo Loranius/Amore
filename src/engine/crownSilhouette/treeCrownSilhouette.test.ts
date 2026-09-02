@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildTreeLabPreview } from '@/features/home/crystal3d/treeLab/buildTreeLabPreview';
+import { buildArtifactBlueprint, type EvolutionEventInput } from '@/engine/evolution';
+import {
+  buildTreeLabPreview,
+  buildTreeLabPreviewFromArtifact,
+} from '@/features/home/crystal3d/treeLab/buildTreeLabPreview';
 import { DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG } from './config';
 import { buildTreeCrownSilhouette } from './treeCrownSilhouette';
 
@@ -17,6 +21,57 @@ function rebuild(lod: 'high' | 'medium' | 'low' = 'medium') {
       config: DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG,
     }),
   };
+}
+
+/**
+ * Доросле дерево — двадцять років, по дванадцять подій на рік.
+ *
+ * Потрібне тому, що затягування листя всередину працює лише на кроні, яка
+ * СПРАВДІ відходить убік, а фікстура — пара на два з половиною роки. Відколи
+ * ширина крони стала законом віку (ADR-0097), молоде дерево вузьке за
+ * побудовою: 0.60 висоти проти 1.27 у сорокарічного. Це не втрата покриття,
+ * а перенесення перевірки туди, де механізм узагалі має спрацьовувати.
+ */
+function spreadingCrown() {
+  const years = 20;
+  const start = new Date(Date.UTC(2026 - years, 7, 30));
+  const spanMs = years * 365.2425 * 86_400_000;
+  const events: EvolutionEventInput[] = [];
+  for (let index = 0; index < years * 12; index += 1) {
+    const day = new Date(start.getTime() + ((index + 0.5) * spanMs) / (years * 12));
+    events.push({
+      id: `silhouette:${index}`,
+      occurredAt: `${day.toISOString().slice(0, 10)}T12:00:00+03:00`,
+      source: 'memories-preview@1',
+      evidence: 'verified',
+      channels: { remembrance: 0.5, culture: 0.3, exploration: 0.4 },
+      portalActivity: 0.3,
+    });
+  }
+  const build = buildTreeLabPreviewFromArtifact({
+    artifact: buildArtifactBlueprint({
+      coupleId: 'amore:silhouette-spread',
+      config: {
+        engineVersion: 'tree-preview-1.0.0',
+        relationshipStartedAt: start.toISOString().slice(0, 10),
+        timeZone: 'Europe/Kyiv',
+        leapDayPolicy: 'feb-28',
+      },
+      events,
+    }),
+    asOf: '2026-08-30T12:00:00+03:00',
+    lod: 'medium',
+    rulesVersion: 'tree-species-silhouette',
+  });
+  return buildTreeCrownSilhouette({
+    composition: build.composition,
+    leaves: build.leaves,
+    canopyDepth: build.canopyDepth,
+    canopyLight: build.canopyLight,
+    phenology: build.phenology,
+    leafOrientation: build.leafOrientation,
+    config: DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG,
+  });
 }
 
 describe('Tree Crown Silhouette', () => {
@@ -49,8 +104,18 @@ describe('Tree Crown Silhouette', () => {
      * формулювання: механізм працює лише на кроні, що справді відходить
      * убік, і на попередньому дереві такої не було.
      */
-    expect(first.diagnostics.frontClosureInwardLeafCount).toBeGreaterThan(0);
-    expect(Math.max(...first.profiles.map((profile) => profile.sourceRadialRatio)))
+    /*
+     * ЗАТЯГУВАННЯ ПЕРЕВІРЯЄТЬСЯ НА ДОРОСЛОМУ ДЕРЕВІ, а не на фікстурі.
+     *
+     * Коментар вище лишається чинним, але описує вже третій стан. Відколи
+     * ширина крони — закон віку (ADR-0097), фікстура на два з половиною роки
+     * знову вузька за побудовою (0.60 висоти), тож механізм на ній не
+     * спрацьовує — і це правильно, а не вада. Тому перевірка переїхала на
+     * двадцятирічне дерево, де крона справді відходить убік.
+     */
+    const spreading = spreadingCrown();
+    expect(spreading.diagnostics.frontClosureInwardLeafCount).toBeGreaterThan(0);
+    expect(Math.max(...spreading.profiles.map((profile) => profile.sourceRadialRatio)))
       .toBeGreaterThan(DEFAULT_TREE_CROWN_SILHOUETTE_CONFIG.frontClosureTargetRadialRatio);
     expect(first.diagnostics.adjustedLeafCount).toBe(
       first.diagnostics.adjustedOuterLeafCount + first.diagnostics.adjustedMiddleLeafCount,

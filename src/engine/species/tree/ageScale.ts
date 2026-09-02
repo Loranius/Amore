@@ -31,7 +31,7 @@
 // ============================================================
 import type { OrganicSkeletonState } from '../../labs/organic';
 export { treeDaysTogether } from './growthLaw';
-import { treeTrunkHeightScale } from './growthLaw';
+import { treeAgeProgress, treeTrunkHeightScale } from './growthLaw';
 
 /**
  * Висота скелета дорослого дерева, поділена на висоту стовбура з закону.
@@ -80,6 +80,32 @@ export const TREE_FOLIAGE_TUNED_HEIGHT = 4.4;
  */
 export function treeFoliageScale(lawTrunkHeight: number): number {
   return treeSkeletonTargetHeight(lawTrunkHeight) / TREE_FOLIAGE_TUNED_HEIGHT;
+}
+
+/*
+ * ВУЗЬКА КРОНА МОЛОДОГО ДЕРЕВА.
+ *
+ * Власник на живому порталі, 1345-й день: «замале дерево для трьох років,
+ * більше на кущ схоже». Виміряно на його ж дереві: ширина крони **1.07
+ * висоти**, тобто крона — куля. У живого саджанця цього віку крона вужча за
+ * висоту приблизно вдвічі; кулю має старе дерево, і саме тому куля на
+ * молодому читається кущем.
+ *
+ * Ширину давали ОБИДВА джерела нарівно: огинальна скелетних гілок на трьох
+ * роках сягає 0.98 висоти, а найширший прутик симуляції — 1.07. Тому
+ * звуження прикладається й до скелета симуляції, і до вильоту скелетних
+ * гілок; окремо жодне з них ширини не міняло (виміряно: молодий виліт
+ * 0.45 / 0.38 / 0.32 / 0.26 дає 1.07 незмінно).
+ *
+ * Це НЕ спотворення заради силуету. Молодий пагін і в природі росте вгору
+ * різкіше, ніж убік: гілка відходить під гострішим кутом, поки над нею
+ * немає затінення. Звуження по x і z — найпростіше вираження того самого.
+ *
+ *   вік  1 рік  -> 0.45      вік 10 років -> 0.76
+ *   вік  3.7    -> 0.56      вік 20+      -> 1.00 (без змін)
+ */
+export function treeCrownNarrowing(daysTogether: number): number {
+  return Math.min(1, 0.37 + 0.97 * treeAgeProgress(daysTogether));
 }
 
 /** Наскільки дерево цього віку менше за доросле — частка закону. */
@@ -205,6 +231,7 @@ export interface ScaledTreeSkeleton {
 export function scaleTreeSkeletonToAge(
   skeleton: OrganicSkeletonState,
   targetHeight: number,
+  narrowing = 1,
 ): ScaledTreeSkeleton {
   if (!Number.isFinite(targetHeight) || targetHeight <= 0) return { skeleton, factor: 1 };
   if (skeleton.nodes.length === 0) return { skeleton, factor: 1 };
@@ -220,16 +247,19 @@ export function scaleTreeSkeletonToAge(
 
   const factor = targetHeight / raw;
   // Тотожність не переписує вузлів: та сама пам'ять, той самий хеш.
-  if (Math.abs(factor - 1) < 1e-9) return { skeleton, factor: 1 };
+  if (Math.abs(factor - 1) < 1e-9 && Math.abs(narrowing - 1) < 1e-9) {
+    return { skeleton, factor: 1 };
+  }
 
   const scaled = {
     ...skeleton,
     nodes: skeleton.nodes.map((node) => ({
       ...node,
       position: {
-        x: round6(node.position.x * factor),
+        // Звуження — тільки по горизонталі: висота лишається законом.
+        x: round6(node.position.x * factor * narrowing),
         y: round6(node.position.y * factor),
-        z: round6(node.position.z * factor),
+        z: round6(node.position.z * factor * narrowing),
       },
       radius: round6(node.radius * factor),
     })),
