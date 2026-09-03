@@ -288,6 +288,36 @@ const SIDE_TWIG_ANGLE_RAD = 0.8;
 /** Вузлів на пагін: він короткий, і дуга йому не потрібна. */
 const NODES_PER_SIDE_TWIG = 3;
 
+/*
+ * ПАГОНИ ЛІДЕРА — те, чим у дерева з одним провідником наповнений верх
+ * крони (ADR-0112).
+ *
+ * ADR-0111 опустив найвищу скелетну гілку з 0.88 на 0.72 зросту, і підстава
+ * була правильна: скелетна гілка майже на маківці — це не те, як росте
+ * дерево з одним лідером. Але друга половина того твердження — «верх крони
+ * це сам лідер і приріст останніх років» — лишилась НЕПРАВДОЮ: лідер ніс
+ * листя (`trunkTerminalStart` 0.62), а гілок над найвищим скелетом не мав
+ * жодних. Листя тому липло до стовбура, і на знімку між кроною й лідером
+ * зяяв шов: смуга 57 пікселів між сусідніми 179 і 68.
+ *
+ * ЩО СПЕРШУ НЕ СПРАЦЮВАЛО. Я спробував не додавати нічого, а вигнути самі
+ * скелетні гілки так, щоб їхній кінчик хилився вниз під власною вагою —
+ * тобто зробити дугу, яка підводиться й опадає. Виміряно на екрані: крона
+ * ОСІЛА. Пікселів листя 19 656 -> 18 058, а шов не зник, а переїхав нижче
+ * (смуга 63 замість 179 на шостому поверсі з дванадцяти). Причина проста:
+ * хилення вкорочує вертикальний розмах гілки, тож верх крони не
+ * наповнюється, а порожніє ще й знизу. Правку відкинуто.
+ *
+ * Отже верхові крони потрібна ВЛАСНА будова, а не інакше вигнута чужа.
+ */
+export const LEADER_SHOOTS = 8;
+
+/** Найвища частка зросту, на якій ще сидить пагін лідера. */
+const LEADER_TOP_SHARE = 0.94;
+
+/** Кут пагона лідера від вертикалі: він майже горизонтальний. */
+const LEADER_LIFT_RAD = 0.35;
+
 /** Частка від власної основи, яку гілка лишає кінчику. */
 const TIP_SHARE = 0.18;
 
@@ -812,6 +842,68 @@ export function addTreeScaffoldBranches(
     }
   }
   added.push(...twigs);
+
+  /*
+   * Пагони лідера — після всього іншого, тим самим порядком міркувань, що й
+   * бічні пагони: листя обходить гілки за порядковим номером, і верх крони
+   * має дістати свою чергу разом із рештою скелета, а не після дрібноти
+   * симуляції.
+   *
+   * Виліт береться з ОГИНАЛЬНОЇ на власній висоті пагона — тій самій, за
+   * якою йдуть скелетні гілки й симуляція. Біля маківки вона вже вузька, тож
+   * пагони самі коротшають, і жодного окремого закону для цього не треба.
+   */
+  const leaderNarrowing = treeCrownNarrowing(daysTogether);
+  for (let index = 0; index < LEADER_SHOOTS; index += 1) {
+    const share = CROWN_TOP_SHARE
+      + ((index + 1) / LEADER_SHOOTS) * (LEADER_TOP_SHARE - CROWN_TOP_SHARE);
+    const anchor = anchorAt(trunk, bottom + height * share);
+    if (!anchor) continue;
+    const anchorShare = (anchor.height - bottom) / height;
+    const reach = height * treeCrownHalfWidthAt(anchorShare, leaderNarrowing);
+    if (reach <= 1e-6) continue;
+
+    /*
+     * Азимути продовжують коло скелетних гілок, а не починають своє: два
+     * незалежні кола дали б пари, що дивляться в один бік, і крона стала б
+     * односторонньою з тих напрямків, де вони збіглись.
+     */
+    const azimuth = azimuthSeed + ((count + index) / (count + LEADER_SHOOTS)) * Math.PI * 2
+      + (seededUnit(artifactSeed, `leader:jitter:${index}`) - 0.5) * (Math.PI / LEADER_SHOOTS);
+    const branchId = `tree:leader:${index}`;
+    const horizontal = Math.cos(LEADER_LIFT_RAD);
+    const rise = Math.sin(LEADER_LIFT_RAD) * reach;
+    const headroom = Math.max(0, (top - anchor.height) * 0.92);
+    const riseScale = rise > headroom && rise > 1e-6 ? headroom / rise : 1;
+    const step = {
+      x: Math.cos(azimuth) * horizontal,
+      y: Math.sin(LEADER_LIFT_RAD) * riseScale,
+      z: Math.sin(azimuth) * horizontal,
+    };
+    let parentId = anchor.node.id;
+    const baseRadius = Math.max(1e-4, anchor.node.radius * COLLAR_SHARE);
+    for (let node = 1; node <= NODES_PER_SIDE_TWIG; node += 1) {
+      const along = node / NODES_PER_SIDE_TWIG;
+      sequence += 1;
+      added.push({
+        id: `${branchId}:${node}`,
+        branchId,
+        parentId,
+        attractorId: null,
+        sequence,
+        generation: 1,
+        position: {
+          x: round6(anchor.node.position.x + step.x * reach * along),
+          y: round6(anchor.height + step.y * reach * along),
+          z: round6(anchor.node.position.z + step.z * reach * along),
+        },
+        direction: { x: round6(step.x), y: round6(step.y), z: round6(step.z) },
+        radius: round6(Math.max(1e-4, baseRadius * (1 - (1 - TIP_SHARE) * along))),
+        terminal: node === NODES_PER_SIDE_TWIG,
+      });
+      parentId = `${branchId}:${node}`;
+    }
+  }
 
   if (added.length === 0) return skeleton;
 

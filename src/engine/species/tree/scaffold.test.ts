@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ORGANIC_TRUNK_BRANCH_ID, type OrganicSkeletonState } from '../../labs/organic';
 import {
+  LEADER_SHOOTS,
   MAX_SCAFFOLD_BRANCHES,
   SCAFFOLD_FIRST_YEAR,
   addTreeScaffoldBranches,
@@ -141,10 +142,103 @@ describe('гілки-скелети', () => {
     expect(first).toEqual(second);
     expect(base.nodes).toHaveLength(10);
     /*
-     * Сім скелетних гілок по вісім вузлів плюс по чотири пагони на кожну по
-     * три вузли: 10 + 7×8 + 7×4×3 = 150. Пагони додано, бо сім гілок на 128
-     * комірок оболонки крони лишали 56 із них порожніми (ADR-0093 §7).
+     * Сім скелетних гілок по вісім вузлів, по чотири пагони на кожну по три
+     * вузли, плюс вісім пагонів лідера по три: 10 + 7×8 + 7×4×3 + 8×3 = 174.
+     *
+     * Пагони на гілках додано, бо сім гілок на 128 комірок оболонки крони
+     * лишали 56 із них порожніми (ADR-0093 §7). Пагони ЛІДЕРА — бо над
+     * найвищою скелетною гілкою (0.72 зросту після ADR-0111) не було
+     * жодної будови взагалі: листя липло просто до стовбура (ADR-0112).
      */
-    expect(first.nodes.length).toBe(10 + MAX_SCAFFOLD_BRANCHES * 8 + MAX_SCAFFOLD_BRANCHES * 4 * 3);
+    expect(first.nodes.length).toBe(
+      10
+      + MAX_SCAFFOLD_BRANCHES * 8
+      + MAX_SCAFFOLD_BRANCHES * 4 * 3
+      + LEADER_SHOOTS * 3,
+    );
+  });
+});
+
+describe('пагони лідера', () => {
+  /*
+   * ЩО ВОНИ ЗАКРИВАЮТЬ. ADR-0111 опустив найвищу скелетну гілку з 0.88 на
+   * 0.72 зросту, і підстава була правильна — скелетна гілка майже на
+   * маківці не буває в дерева з одним провідником. Але над нею не лишилось
+   * НІЯКОЇ будови: лідер ніс листя, а гілок не мав, тож листя липло до
+   * стовбура.
+   *
+   * Тест стереже три речі, які легко втратити мовчки: що пагони взагалі є,
+   * що вони СПРАВДІ вгорі, і що вони не пробивають верхівку. Ширину їм
+   * задає огинальна породи, і окремої перевірки на неї тут немає навмисно —
+   * вона стоїть у `crownProfile.test.ts`, де живе сам закон.
+   */
+  const shootsOf = (skeleton: OrganicSkeletonState) =>
+    skeleton.nodes.filter((node) => node.branchId.startsWith('tree:leader:'));
+
+  it('з\'являються разом зі скелетними гілками, а не раніше', () => {
+    // Росток лишається ростком: до третього року в нього немає нічого.
+    const seedling = addTreeScaffoldBranches(trunkSkeleton(), 1 * DAYS_PER_YEAR, 11);
+    expect(shootsOf(seedling)).toHaveLength(0);
+
+    const grown = addTreeScaffoldBranches(trunkSkeleton(), 20 * DAYS_PER_YEAR, 11);
+    expect(new Set(shootsOf(grown).map((node) => node.branchId)).size).toBe(LEADER_SHOOTS);
+  });
+
+  it('СИДЯТЬ ВИЩЕ ЗА ВСІ СКЕЛЕТНІ ГІЛКИ', () => {
+    /*
+     * Головне тут. Пагін лідера, який опинився серед скелетних гілок, — це
+     * просто ще одна гілка, і весь сенс зникає: верх крони знову
+     * лишається порожнім, а середина глушиться.
+     */
+    const grown = addTreeScaffoldBranches(trunkSkeleton(), 20 * DAYS_PER_YEAR, 11);
+    /*
+     * Міряється КРІПЛЕННЯ, а не найвищий вузол: скелетна гілка підіймається
+     * від свого вузла (`ADR-0111`), тож її кінчик буває вище за основу
+     * пагона — і це нормально, вони переплітаються. Не нормально було б,
+     * якби пагін лідера ЧІПЛЯВСЯ нижче за скелетну гілку.
+     */
+    const byId = new Map(grown.nodes.map((node) => [node.id, node]));
+    const attachmentOf = (prefix: string) => Math.max(...grown.nodes
+      .filter((node) => node.branchId.startsWith(prefix) && node.parentId !== null
+        && byId.get(node.parentId)?.branchId === ORGANIC_TRUNK_BRANCH_ID)
+      .map((node) => byId.get(node.parentId!)!.position.y));
+
+    expect(attachmentOf('tree:leader:')).toBeGreaterThan(attachmentOf('tree:scaffold:'));
+  });
+
+  it('не пробивають верхівку на жодному віці', () => {
+    // Та сама догма, що й для скелетних гілок: висота — закон віку.
+    const base = trunkSkeleton();
+    const top = Math.max(...base.nodes.map((node) => node.position.y));
+    for (const years of [3, 8, 20, 40]) {
+      const grown = addTreeScaffoldBranches(base, years * DAYS_PER_YEAR, 11);
+      for (const node of shootsOf(grown)) {
+        expect({ years, above: node.position.y > top + 1e-6 }).toEqual({ years, above: false });
+      }
+    }
+  });
+
+  it('коротшають догори, бо огинальна там вужча', () => {
+    const grown = addTreeScaffoldBranches(trunkSkeleton(), 20 * DAYS_PER_YEAR, 11);
+    const byBranch = new Map<string, number>();
+    for (const node of shootsOf(grown)) {
+      const radial = Math.hypot(node.position.x, node.position.z);
+      byBranch.set(node.branchId, Math.max(byBranch.get(node.branchId) ?? 0, radial));
+    }
+    const ordered = [...byBranch.entries()].sort(([left], [right]) => (
+      left < right ? -1 : left > right ? 1 : 0
+    ));
+    /*
+     * «Не довший за попередній», а не «строго коротший»: на грубому
+     * стовбурі (тут десять вузлів на всю висоту) сусідні пагони чіпляються
+     * за ОДИН вузол, дістають однакову висоту й, отже, однаковий виліт.
+     * Вимагати строгого спадання означало б перевіряти щільність фікстури.
+     */
+    for (let index = 1; index < ordered.length; index += 1) {
+      // Допуск — сітка округлення позицій (`round6`): два пагони на одному
+      // вузлі різняться в сьомому знаку, і це не спадання, а шум.
+      expect(ordered[index]![1]).toBeLessThanOrEqual(ordered[index - 1]![1] + 1e-6);
+    }
+    expect(ordered.at(-1)![1]).toBeLessThan(ordered[0]![1]);
   });
 });
