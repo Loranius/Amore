@@ -34,7 +34,12 @@
 import type { OrganicSkeletonNode, OrganicSkeletonState } from '../../labs/organic';
 import { ORGANIC_TRUNK_BRANCH_ID } from '../../labs/organic';
 import { treeCrownNarrowing } from './ageScale';
-import { TREE_CROWN_BOTTOM_SHARE, treeCrownHalfWidthAt } from './crownProfile';
+import {
+  TREE_CROWN_BOTTOM_SHARE,
+  TREE_CROWN_WIDEST_AT,
+  treeCrownHalfWidthAt,
+  treeCrownRiseLimit,
+} from './crownProfile';
 import { treeAgeProgress } from './growthLaw';
 import { seededUnit } from './math';
 
@@ -72,7 +77,11 @@ export const SCAFFOLD_FIRST_YEAR = 3;
  * скелетну гілку туди, де вона в такого дерева й буває.
  */
 const CROWN_BASE_SHARE = TREE_CROWN_BOTTOM_SHARE;
-const CROWN_TOP_SHARE = 0.88;
+
+/** Частка висоти дерева, на якій крона найширша — те саме, що в огинальної. */
+const WIDEST_SHARE = TREE_CROWN_BOTTOM_SHARE
+  + TREE_CROWN_WIDEST_AT * (1 - TREE_CROWN_BOTTOM_SHARE);
+const CROWN_TOP_SHARE = 0.72;
 
 /*
  * ВИЛІТ, А НЕ ДОВЖИНА — і це різниця, яку показав вимір.
@@ -656,9 +665,42 @@ export function addTreeScaffoldBranches(
      * Тому стискається САМЕ ПІДЙОМ, а не виліт: виліт — це закон крони,
      * а підйом гілки й у природі тим менший, чим вище вона сидить.
      */
+    /*
+     * ГІЛКА ПІДІЙМАЄТЬСЯ ЛИШЕ ДОТИ, ДОКИ КРОНА ЩЕ ШИРШАЄ (ADR-0111).
+     *
+     * Виліт береться з висоти, на якій гілка СИДИТЬ, а кінчається вона
+     * вище — і там огинальна вже вужча, тож стеля крони тягла кінчик
+     * назад. Оголошеного вильоту гілка не досягала ніколи: 0.379 замість
+     * 0.425 на сорока роках. Ширину тим часом тримали прутики симуляції,
+     * і коли ті на тридцять четвертому році просідають (2.02 -> 1.24),
+     * крона просідала з ними — всупереч догмі «дерево не меншає».
+     *
+     * Тепер підйом обмежений висотою, на якій огинальна ще ВМІЩАЄ цей
+     * виліт. Гілка з-під найширшого місця має куди підійматись; гілка на
+     * найширшому місці й вище лягає горизонтально — і так воно в дерева й
+     * є: найширші гілки це найгоризонтальніші гілки.
+     */
     const headroom = Math.max(0, (top - anchor.height) * 0.92);
+    /*
+     * І ТІЛЬКИ ДЛЯ ГІЛОК З-ПІД НАЙШИРШОГО МІСЦЯ.
+     *
+     * Межа існує, щоб гілка ДОНЕСЛА свій виліт, а ширину крони задають
+     * саме нижні-середні гілки. Вище за найширше місце виліт малий і на
+     * ширину крони не впливає, зате підйом там — єдине, чим наповнюється
+     * верх крони. Виміряно на екрані: коли межу наклали на всі гілки,
+     * одразу над найвищою з них відкрилась дірка — смуга 58 пікселів між
+     * сусідніми 178 і 68.
+     */
+    const anchorShare = (anchor.height - bottom) / height;
+    const riseLimit = anchorShare < WIDEST_SHARE
+      ? Math.max(0, bottom + height * treeCrownRiseLimit(
+        reach / height,
+        treeCrownNarrowing(daysTogether),
+      ) - anchor.height)
+      : headroom;
+    const allowed = Math.min(headroom, riseLimit);
     const rise = tip.vertical * stretch;
-    const riseScale = rise > headroom && rise > 1e-6 ? headroom / rise : 1;
+    const riseScale = rise > allowed && rise > 1e-6 ? allowed / rise : 1;
 
     for (let step = 1; step <= NODES_PER_SCAFFOLD; step += 1) {
       const along = step / NODES_PER_SCAFFOLD;

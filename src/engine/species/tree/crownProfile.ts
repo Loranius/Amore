@@ -106,6 +106,44 @@ export function treeCrownHalfWidthAt(heightShare: number, narrowing = 1): number
   return TREE_CROWN_HALF_WIDTH_SHARE * treeCrownRadiusShare(local) * narrowing;
 }
 
+/**
+ * До якої висоти гілка може ПІДНЯТИСЬ, не вилізши за огинальну.
+ *
+ * Гілка бере виліт із висоти, на якій СИДИТЬ, а кінчається вище — і там
+ * огинальна вже вужча. Стеля (`applyTreeCrownEnvelope`) чесно тягне той
+ * кінчик назад, тож оголошеного вильоту гілка не досягає ніколи: виміряно
+ * на сорока роках 0.379 замість 0.425, тобто на 11% менше. А ширина крони
+ * тим часом трималась на прутиках симуляції, які подекуди стирчать далі за
+ * скелет, — і коли симуляція на тридцять четвертому році просідає
+ * (2.02 -> 1.24), разом із нею просідає й крона, всупереч догмі
+ * `PRODUCT.md` §6.
+ *
+ * Тут рахується найвища висота, на якій огинальна ще ВМІЩАЄ заданий виліт.
+ * Нижче за найширше місце крона ще ширшає, тож гілка має куди підійматись;
+ * від найширшого місця й вище — гілка мусить лягти горизонтально, і так
+ * воно в дерева й є: найширші гілки — це найгоризонтальніші гілки.
+ *
+ * `reachShare` — виліт у частках висоти дерева. Вертає частку висоти
+ * дерева; якщо навіть найширше місце вужче за виліт, вертає саме його.
+ */
+export function treeCrownRiseLimit(reachShare: number, narrowing = 1): number {
+  const widest = TREE_CROWN_BOTTOM_SHARE + TREE_CROWN_WIDEST_AT * (1 - TREE_CROWN_BOTTOM_SHARE);
+  if (treeCrownHalfWidthAt(widest, narrowing) <= reachShare) return widest;
+  /*
+   * Двійковий пошук по спадній вітці профілю. Двадцять кроків — це 1e-6
+   * висоти, тобто дрібніше за округлення позицій; більше не має сенсу, а
+   * менше почало б залежати від того, де саме зупинився пошук.
+   */
+  let low = widest;
+  let high = 1;
+  for (let step = 0; step < 20; step += 1) {
+    const middle = (low + high) / 2;
+    if (treeCrownHalfWidthAt(middle, narrowing) >= reachShare) low = middle;
+    else high = middle;
+  }
+  return low;
+}
+
 const round6 = (value: number): number => Math.round(value * 1e6) / 1e6;
 
 /**
