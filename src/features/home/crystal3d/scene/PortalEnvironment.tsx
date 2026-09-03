@@ -14,7 +14,6 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { PortalRuin } from './PortalRuin';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -31,23 +30,24 @@ import {
   PORTAL_PALETTES,
   portalCameraTurn,
   portalCameraView,
-  buildPortalStarField,
   type PortalCameraFrame,
 } from './portalScene';
 import {
-  buildPortalCelestialArcGeometry,
-  buildPortalHazeField,
-} from './portalSceneDecor';
+  CAVE_CEILING_HEIGHT,
+  CAVE_DRUSE_CLUSTERS,
+  buildPortalCaveDruseGeometry,
+  buildPortalCaveFloorGeometry,
+  buildPortalCaveOculusGeometry,
+  buildPortalCaveShellGeometry,
+} from './portalCave';
 
 export interface PortalEnvironmentProps {
-  /** Насіння артефакта: небо в кожної пари своє й незмінне. */
+  /** Насіння артефакта: печера в кожної пари своя й незмінна. */
   seed: number;
   theme: 'light' | 'dark';
   /** Профіль якості з пайплайну кристала — сцена не має права коштувати
    *  більше за сам артефакт на слабкому пристрої. */
   quality: 'high' | 'balanced' | 'low' | 'fallback';
-  /** Stops atmospheric drift and emissive breathing for accessibility. */
-  reduceMotion: boolean;
   /** Кадр камери для поточного аспекту; сцена й камера мусять читати
    *  одні й ті самі числа, тож він приходить згори. */
   frame: PortalCameraFrame;
@@ -65,188 +65,124 @@ export interface PortalEnvironmentProps {
   veinReach: number;
 }
 
-function starCount(quality: PortalEnvironmentProps['quality']): number {
-  if (quality === 'high') return 260;
-  if (quality === 'balanced') return 200;
-  if (quality === 'low') return 140;
-  return 90;
-}
-
-function hazeCount(quality: PortalEnvironmentProps['quality']): number {
-  if (quality === 'high') return 7;
-  if (quality === 'balanced') return 6;
-  if (quality === 'low') return 5;
-  return 3;
-}
-
-const ATMOSPHERE_VERTEX_SHADER = /* glsl */`
-  attribute vec3 color;
-  attribute float pointSize;
-  attribute float pointAlpha;
-  varying vec3 vColor;
-  varying float vAlpha;
-
-  void main() {
-    vColor = color;
-    vAlpha = pointAlpha;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = pointSize;
-  }
-`;
-
-const ATMOSPHERE_FRAGMENT_SHADER = /* glsl */`
-  varying vec3 vColor;
-  varying float vAlpha;
-
-  void main() {
-    float radius = length(gl_PointCoord - vec2(0.5)) * 2.0;
-    float falloff = smoothstep(1.0, 0.0, radius);
-    float alpha = vAlpha * falloff * falloff;
-    if (alpha < 0.002) discard;
-    gl_FragColor = vec4(vColor, alpha);
-  }
-`;
+/*
+ * ТУТ ЖИЛО НЕБО, І ВОНО ПІШЛО РАЗОМ ІЗ ХРАМОМ.
+ *
+ * Зорі, туманність і небесні дуги малювались одним point pass із власним
+ * шейдером; `starCount`/`hazeCount` роздавали їм кількість за профілем
+ * якості. Усе це описувало ВІДКРИТИЙ простір над руїною.
+ *
+ * У печері неба немає — є розлом у склепінні, і крізь нього видно рівно
+ * один диск (`buildPortalCaveOculusGeometry`). Лишити зорі означало б
+ * малювати їх крізь камінь: вони йшли `depthTest`, але сфера радіусом 34
+ * стоїть ЗА стіною, тобто половина кадру світилась би точками там, де
+ * має бути порода.
+ */
 
 export function PortalEnvironment({
   seed,
   theme,
   quality,
-  reduceMotion,
   frame,
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
-  const pixelRatio = useThree((state) => state.gl.getPixelRatio());
-  const skyRef = useRef<THREE.Group>(null);
 
-  const celestialArcGeometry = useMemo(() => buildPortalCelestialArcGeometry(seed), [seed]);
-  const stars = useMemo(() => buildPortalStarField(seed, starCount(quality)), [seed, quality]);
-  const haze = useMemo(() => buildPortalHazeField(seed, hazeCount(quality)), [quality, seed]);
+  const caveShell = useMemo(() => buildPortalCaveShellGeometry(seed), [seed]);
+  const caveFloor = useMemo(() => buildPortalCaveFloorGeometry(seed), [seed]);
+  const caveOculus = useMemo(() => buildPortalCaveOculusGeometry(seed), [seed]);
+  /*
+   * Друза коштує трикутників, тож її кількість веде профіль якості — і
+   * на запасному рендерері її немає взагалі. Це єдина частина печери, яку
+   * можна не малювати: стіни без друзи лишаються печерою, друза без стін
+   * висить у порожнечі.
+   */
+  const druseClusters = CAVE_DRUSE_CLUSTERS[quality];
+  const caveDruse = useMemo(
+    () => (druseClusters > 0 ? buildPortalCaveDruseGeometry(seed, druseClusters) : null),
+    [seed, druseClusters],
+  );
 
-  useEffect(() => () => celestialArcGeometry.dispose(), [celestialArcGeometry]);
-
-  const starGeometry = useMemo(() => {
-    const count = stars.count + haze.count;
-    const positions = new Float32Array(count * 3);
-    const colours = new Float32Array(count * 3);
-    const sizes = new Float32Array(count);
-    const alphas = new Float32Array(count);
-    positions.set(stars.positions);
-    colours.set(stars.colors);
-    const ratio = Math.min(1.5, Math.max(1, pixelRatio));
-    for (let index = 0; index < stars.count; index += 1) {
-      const brightness = Math.max(
-        stars.colors[index * 3]!,
-        stars.colors[index * 3 + 1]!,
-        stars.colors[index * 3 + 2]!,
-      );
-      sizes[index] = (1.15 + brightness * 0.95) * ratio;
-      alphas[index] = palette.starOpacity * (0.45 + brightness * 0.55);
-    }
-    const hazeColour = new THREE.Color(palette.haze);
-    for (let index = 0; index < haze.count; index += 1) {
-      const target = stars.count + index;
-      positions.set(haze.positions.subarray(index * 3, index * 3 + 3), target * 3);
-      hazeColour.toArray(colours, target * 3);
-      sizes[target] = haze.sizes[index]! * ratio;
-      alphas[target] = palette.hazeOpacity * haze.alphas[index]!;
-    }
-    const geometry = new THREE.BufferGeometry();
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-    geometry.setAttribute('color', new THREE.BufferAttribute(colours, 3));
-    geometry.setAttribute('pointSize', new THREE.BufferAttribute(sizes, 1));
-    geometry.setAttribute('pointAlpha', new THREE.BufferAttribute(alphas, 1));
-    return geometry;
-  }, [haze, palette.haze, palette.hazeOpacity, palette.starOpacity, pixelRatio, stars]);
-
-  useEffect(() => () => starGeometry.dispose(), [starGeometry]);
-
+  useEffect(() => () => {
+    caveShell.dispose();
+    caveFloor.dispose();
+    caveOculus.dispose();
+    caveDruse?.dispose();
+  }, [caveShell, caveFloor, caveOculus, caveDruse]);
 
   /*
-   * Лишилось тільки небо.
-   *
-   * Тут же «дихала» емісія релікварію й чотирьох світильників храму —
-   * разом із самим храмом вони пішли. Руїна не світиться: вона камінь,
-   * і єдине, що має світитись у цьому кадрі, — кристал пари.
+   * Раніше тут повільно оберталось небо. Печера не обертається: камінь
+   * стоїть, і рухається в цьому кадрі тільки сам артефакт.
    */
-  useFrame((_, delta) => {
-    if (!reduceMotion && skyRef.current !== null) {
-      skyRef.current.rotation.y = (skyRef.current.rotation.y + delta * 0.0024) % (Math.PI * 2);
-    }
-  });
 
   return (
     <>
       <fog attach="fog" args={[palette.fog, frame.fogNear, frame.fogFar]} />
 
       {/*
-        Руїна замість зібраного з частин храму.
+        ПЕЧЕРА ЗАМІСТЬ ХРАМУ (ADR-0117).
         ------------------------------------------------------------
-        Тут стояли підлога, вісімнадцять колон з арками, полотнища, лози,
-        чотири світильники з власними point light'ами й металевий
-        релікварій — усе процедурне, з власними числами в кожного.
+        Тут стояла авторська руїна `amore_ruin.glb` — мармуровий подіум,
+        обеліски, золоте кільце, — а до неї храм, зібраний кодом із
+        вісімнадцяти колон, арок і світильників.
 
-        Власник замінив це однією авторською руїною. Кристал росте з її
-        п'єдесталу: `PortalRuin` саджає верх `Stand` рівно на
-        `PORTAL_GROUND_Y`, тож площина, на якій стоять кристали, не
-        зрушила ані на одиницю — про заміну сцени не знає жоден інший
-        файл.
+        Власник скасував цей світ разом із `PRODUCT.md` і `DESIGN.md`. І
+        причина не в тому, що руїна погана: `amore-crystal-look` каже
+        прямо, що гладка суцільна поверхня під кристалом читається
+        п'єдесталом, хай як її формувати. Жеода, яку ADR-0115 підняв
+        коміром, стояла на мармуровій плиті — тобто порода лежала на
+        підставці.
+
+        Підлога печери лягає рівно на `PORTAL_GROUND_Y`, як і верх
+        п'єдесталу руїни до неї. Про заміну сцени не дізнається жоден
+        інший файл.
       */}
-      <PortalRuin theme={theme} quality={quality} />
+      {/*
+        Камінь НАМАЛЬОВАНИЙ, а не освітлений — `meshBasicMaterial` із
+        вершинним кольором. Причина виміряна й записана в `portalCave.ts`:
+        світло, якого досить, щоб побачити стіну за десять одиниць,
+        залило б кристал за три, а різниця яскравості сусідніх граней і є
+        те, що робить кристал кристалом. Жодне джерело сцени печери не
+        торкається, тож ця різниця лишається такою, як її виміряли.
+      */}
+      <mesh geometry={caveShell} frustumCulled={false}>
+        <meshBasicMaterial color={palette.caveRock} vertexColors />
+      </mesh>
+      <mesh geometry={caveFloor} frustumCulled={false}>
+        <meshBasicMaterial color={palette.caveFloor} vertexColors />
+      </mesh>
 
-      {/* Зорі й кілька великих м'яких плям туманності йдуть одним point pass.
-          Дуги — окрема лінійна геометрія. Разом вони дають глибину верхній
-          половині кадру, але лишають її переважно порожньою. */}
-      <group ref={skyRef}>
-        <points geometry={starGeometry} frustumCulled={false}>
-          <shaderMaterial
-            vertexShader={ATMOSPHERE_VERTEX_SHADER}
-            fragmentShader={ATMOSPHERE_FRAGMENT_SHADER}
-            transparent
-            depthWrite={false}
-            depthTest
-            blending={THREE.AdditiveBlending}
-            toneMapped={false}
-            fog={false}
+      {/* Розлом у склепінні. Він не отвір, а диск: справжня дірка лишила б
+          оболонку відкритою, і туман зали витікав би крізь неї у фон. */}
+      <mesh geometry={caveOculus} frustumCulled={false}>
+        <meshBasicMaterial color={palette.oculus} toneMapped={false} fog={false} />
+      </mesh>
+
+      {/* Друза по стінах — те, що робить печеру КРИСТАЛЬНОЮ. Уночі вона
+          світиться сама й є другим джерелом світла після артефакта; удень
+          не світиться взагалі: при денному промені світний кристал на стіні
+          читається лампою, а не мінералом. */}
+      {caveDruse !== null && (
+        <mesh geometry={caveDruse} frustumCulled={false}>
+          <meshStandardMaterial
+            color={palette.caveDruse}
+            emissive={palette.caveDruse}
+            emissiveIntensity={palette.caveDruseEmissive}
+            roughness={0.32}
+            metalness={0}
+            flatShading
           />
-        </points>
-        <lineSegments geometry={celestialArcGeometry} frustumCulled={false}>
-          <lineBasicMaterial
-            color={palette.celestialArc}
-            transparent
-            opacity={palette.celestialArcOpacity}
-            depthWrite={false}
-            toneMapped={false}
-            fog={false}
-          />
-        </lineSegments>
-      </group>
+        </mesh>
+      )}
 
-      {/* Слабке світло від кореня (§10 брифу). Дешевше за будь-яку «пляму» в
-          геометрії й на відміну від неї реагує на нахил каменю.
+      {/* Промінь із розлому. Напрямлене світло згори — єдине, що
+          відрізняє день від ночі в печері: удень воно веде сцену, уночі
+          лишається слабким натяком місяця. */}
+      <directionalLight
+        position={[0.6, PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT, 0.4]}
+        intensity={palette.oculusIntensity}
+        color={palette.oculus}
+      />
 
-          **Було найсильнішим джерелом у сцені, а не найслабшим.** Виміряно за
-          формулою згасання three (decay 2 з обрізанням) уздовж висоти
-          підігнаного артефакта, на колоніях в 1, 7 і 25 років:
-
-            ключ / уся заливка   0.36–0.48 у найгіршій точці
-
-          тобто там, де кристал найширший і граней найбільше, заливка була
-          вдвічі-втричі сильніша за ключ. Це рівно та вада, яку коментар вище
-          в PortalStage описує й вважає виправленою — тільки там рахували
-          лише напрямлені джерела та ambient, а це точкове ніхто не рахував.
-          Різниця яскравості між сусідніми площинами — це і є те, що робить
-          грань гранню; при такій заливці її не лишається.
-
-          Три зміни, кожна виміряна розгорткою:
-            позиція  y = ground+1.15 → +0.35, тобто справді біля кореня;
-                     низ тепер світиться у 2.41 раза сильніше за верх, а було
-                     0.43 — світло падало згори, а не піднімалось від жили;
-            сила     2.2–2.6 → 0.42–0.5;
-            z        лишається 0.9. Ближче до осі — і ближнє поле точкового
-                     джерела вибухає: при z=0.5 ключ/заливка падає до 0.74.
-
-          Разом із ключем 1.9 це дає ключ/заливка ≥ 1.42 у найгіршій точці на
-          всіх розмірах колонії й в обох темах. */}
       <pointLight
         position={[0, PORTAL_GROUND_Y + 0.35, 0.9]}
         distance={6.5}

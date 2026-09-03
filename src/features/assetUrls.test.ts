@@ -79,10 +79,30 @@ describe('адреси асетів рахуються від бази заст�
     ).toEqual([]);
   });
 
-  it('модель руїни адресується від бази', () => {
-    // Точковий випадок, з якого все почалось: 404 на GitHub Pages.
-    const source = readFileSync(join(SRC, 'features/home/crystal3d/scene/PortalRuin.tsx'), 'utf8');
-    expect(source).toContain('import.meta.env.BASE_URL');
-    expect(bare(source)).not.toContain("'/models/");
+  it('КОЖЕН, хто називає модель, рахує адресу від бази', () => {
+    /*
+     * Тут стояв точковий випадок, з якого все почалось: `PortalRuin.tsx`
+     * і 404 на GitHub Pages. Руїни більше немає — світом кристала стала
+     * печера (ADR-0117), — і разом із файлом зникла б перевірка.
+     *
+     * Зникнути вона не має права: вада була не в тому файлі, а в звичці
+     * писати голий слеш. Тому замість одного імені тут ПРАВИЛО — будь-який
+     * рядок із `models/` мусить стояти поруч із `BASE_URL` у своєму файлі.
+     */
+    const offenders: string[] = [];
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8');
+      /*
+       * Чужий хост не рахується: `wishlistPortraitSegmentation.ts` тягне
+       * модель сегментації з `storage.googleapis.com`, і база застосунку
+       * до неї не має жодного стосунку. Правило про АДРЕСИ ВСЕРЕДИНІ
+       * САЙТА, тобто про ті, що не мають схеми.
+       */
+      const local = [...bare(source).matchAll(/['"`]([^'"`]*models\/[^'"`]*)['"`]/g)]
+        .some((match) => !match[1]!.includes('://'));
+      if (!local) continue;
+      if (!source.includes('import.meta.env.BASE_URL')) offenders.push(file.slice(SRC.length));
+    }
+    expect(offenders, 'адреса моделі без BASE_URL — це 404 на GitHub Pages').toEqual([]);
   });
 });

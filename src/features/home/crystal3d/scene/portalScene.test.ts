@@ -715,9 +715,9 @@ describe('portal geometry', () => {
   });
 
   it('accounts for every object the environment draws', () => {
-    // Базові дев'ять проходів плюс ґрунт, оздоблення колонади, кристальні
-    // маяки та небесні дуги. Туманність ділить наявний point pass із зорями.
-    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(13);
+    // Печера малює рівно чотири: камінь стін, підлогу, диск розлому й
+    // друзу. Було тринадцять — храм, колонада, декор і небо.
+    expect(PORTAL_ENVIRONMENT_DRAW_CALLS).toBe(4);
   });
 
   it('lights the crystal from the colonnade without lighting the whole field', () => {
@@ -759,13 +759,27 @@ describe('portal geometry', () => {
     }
   });
 
-  it('costs the same for every couple', () => {
-    // The slab's fracture and the cracks are seeded per artifact, so their
-    // shape differs between couples — but the triangle budget is a constant
-    // the acceptance test subtracts, and a count that moved with the seed
-    // would make it a lie for everyone but the couple it was measured on.
-    const counts = [1, 77, 4242, 999_999].map((seed) => measurePortalEnvironmentTriangles(seed));
-    expect(new Set(counts).size).toBe(1);
+  it('лишається під стелею для КОЖНОЇ пари й на кожному профілі', () => {
+    /*
+     * Тут стояло «коштує однаково для кожної пари», і для храму це була
+     * правда: насіння зсувало вершини, але не додавало трикутників.
+     *
+     * Печера (ADR-0117) так не влаштована: у кущі друзи від трьох до
+     * шести кристалів, і скільки саме — вирішує насіння пари. Тобто
+     * рівності більше не існує, і вдавати її означало б або прибити
+     * випадкове число однієї пари, або відмовитись від друзи.
+     *
+     * Стереже те саме: сцена не має права тихо роздутись понад стелю,
+     * яку віднімає приймальний тест.
+     */
+    const qualities = ['high', 'balanced', 'low', 'fallback'] as const;
+    for (const seed of [1, 77, 4242, 999_999]) {
+      for (const quality of qualities) {
+        const cost = measurePortalEnvironmentTriangles(seed, quality);
+        expect(cost, `${seed}/${quality}`).toBeLessThanOrEqual(PORTAL_ENVIRONMENT_TRIANGLES);
+        expect(cost).toBeGreaterThan(0);
+      }
+    }
   });
 });
 
@@ -865,10 +879,15 @@ describe('portal arches', () => {
 });
 
 describe('portal environment cost', () => {
-  it('publishes the triangle count it actually draws', () => {
-    // Приймальний тест віднімає це число від намальованих трикутників, щоб
-    // звірити решту з бюджетом геометрії кристала. Розійдеться з реальними
-    // буферами — і перевірка бюджету почне брехати.
-    expect(PORTAL_ENVIRONMENT_TRIANGLES).toBe(measurePortalEnvironmentTriangles());
+  it('стеля не задерта: реальна вартість близька до неї, а не вдесятеро менша', () => {
+    /*
+     * Стеля, яку ніхто не дістає, — не межа, а дозвіл. Виміряно 5 308
+     * трикутників на найдорожчому профілі при стелі 6 000, тобто запас
+     * 12%. Якщо колись стане вдвічі менше — стеля мусить опуститись
+     * разом із вартістю, інакше вона перестане щось стерегти.
+     */
+    const cost = measurePortalEnvironmentTriangles(1, 'high');
+    expect(cost).toBeLessThanOrEqual(PORTAL_ENVIRONMENT_TRIANGLES);
+    expect(cost).toBeGreaterThan(PORTAL_ENVIRONMENT_TRIANGLES * 0.7);
   });
 });

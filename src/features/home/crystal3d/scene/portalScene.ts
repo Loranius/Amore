@@ -17,25 +17,19 @@ import { mulberry32 } from '../../mulberry32';
 import {
   PORTAL_RELIC_OUTER_RADIUS,
   PORTAL_RELIC_TOP_RADIUS,
-  buildPortalRelicBodyGeometry,
-  buildPortalRelicEngravingGeometry,
-  buildPortalRelicGlowGeometry,
 } from './portalRelicPedestal';
 // Колона приходить моделлю заради різьблення капітелі. Арка — профільований
 // локальний архівольт без модельного прямокутного спандрела; обидві геометрії
 // нормалізовані, а розкладка нижче володіє їхніми світовими трансформами.
+import { PORTAL_PILLAR_ASPECT } from './portalColonnadeMesh';
 import {
-  PORTAL_PILLAR_ASPECT,
-  buildPortalArchGeometry as buildModelledArch,
-  buildPortalPillarGeometry as buildModelledPillar,
-} from './portalColonnadeMesh';
-import {
-  PORTAL_DECOR_DRAW_CALLS,
-  PORTAL_DECOR_TRIANGLES,
-  buildPortalColonnadeDecorGeometry,
-  buildPortalCrystalLampGeometry,
-  buildPortalGroundDecorGeometry,
-} from './portalSceneDecor';
+  CAVE_DRUSE_CLUSTERS,
+  buildPortalCaveDruseGeometry,
+  buildPortalCaveFloorGeometry,
+  buildPortalCaveOculusGeometry,
+  buildPortalCaveShellGeometry,
+} from './portalCave';
+
 
 /** Площина, на якій стоїть артефакт; уся сцена відраховується від неї. */
 export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
@@ -51,96 +45,44 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * (так само один) + арки + зорі/туманність + чотири декор-проходи: ґрунт,
  * колонада, кристальні маяки та небесні дуги.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 9 + PORTAL_DECOR_DRAW_CALLS;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 4;
 
 /**
- * Скільки трикутників додає оточення. Той самий привід, що й у draw
- * call'ах: приймальний тест звіряє намальовані трикутники з бюджетом
- * геометрії кристала, і без цього числа сцена мовчки з'їла б перевірку.
+ * СТЕЛЯ трикутників оточення, а не точне число.
  *
- * Значення прибите свідомо — рахувати його в рантаймі означало б
- * будувати геометрію двічі. За тим, щоб воно не розійшлось із реальними
- * буферами, стежить portalScene.test.ts.
+ * Було 22 992 плюс декор — прибите значення, яке звіряли рівністю. Печера
+ * (ADR-0117) так не міряється: кількість кристалів у кущі друзи залежить
+ * від насіння пари, тож точного числа, спільного на всіх, не існує.
+ *
+ * Тому тут стеля, і тест перевіряє САМЕ ЇЇ: реальна вартість на кількох
+ * насіннях і всіх профілях якості мусить лишатись під нею. Рівність,
+ * якої не буває, замінили на межу, яка буває, — і межа стереже те саме:
+ * сцена не має права тихо роздутись.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 22_992 + PORTAL_DECOR_TRIANGLES;
-
-/** Сегментів у диску поля; єдине місце, що задає його вартість. */
-const FIELD_SEGMENTS = 64;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 6_000;
 
 /**
- * Реальна вартість оточення — джерело правди для константи вище.
+ * Реальна вартість оточення — джерело правди для стелі вище.
  *
- * Напрямки жили на вартість не впливають: вони зсувають вершини, але не
- * додають і не прибирають жодного трикутника. Саме тому константа лишається
- * однією на всі пари.
+ * Будує ті самі чотири геометрії, які малює `PortalEnvironment`, і рахує
+ * їхні трикутники. Дорого, і саме тому це функція для тесту, а не для
+ * рантайму.
  */
 export function measurePortalEnvironmentTriangles(
-  _seed = 1,
-  _bearings: readonly number[] = [],
-  _veinReach = 0,
+  seed = 1,
+  quality: 'high' | 'balanced' | 'low' | 'fallback' = 'high',
 ): number {
-  const relicBody = buildPortalRelicBodyGeometry();
-  const relicEngraving = buildPortalRelicEngravingGeometry();
-  const relicGlow = buildPortalRelicGlowGeometry();
-  const pillar = buildModelledPillar();
-  const lamp = buildPortalLampGeometry();
-  const arch = buildModelledArch();
-  const floor = buildPortalTempleFloorGeometry();
-  const costFrame = portalCameraFrame(0.5, 1);
-  const standingPillars = portalPillarInstances(costFrame, 0.5).length;
-  const standingArches = portalArchInstances(costFrame, 0.5).length;
-  const pillarInstances = portalPillarInstances(costFrame, 0.5);
-  const decorPalette = {
-    rock: '#888888',
-    rockAccent: '#aaaaaa',
-    moss: '#557755',
-    grass: '#446644',
-    plinth: '#777777',
-  };
-  const groundDecor = buildPortalGroundDecorGeometry(
-    _seed,
-    1,
-    PORTAL_TEMPLE_FLOOR_Y,
-    pillarInstances,
-    decorPalette,
-  );
-  const colonnadeDecor = buildPortalColonnadeDecorGeometry(_seed, pillarInstances, {
-    banner: '#665588',
-    vine: '#335544',
-    vineAccent: '#557766',
-  });
-  const crystalLamps = buildPortalCrystalLampGeometry(_seed, 1, PORTAL_TEMPLE_FLOOR_Y);
-  const triangles = (geometry: THREE.BufferGeometry): number => {
-    const index = geometry.getIndex();
-    return index === null
-      ? geometry.getAttribute('position').count / 3
-      : index.count / 3;
-  };
-
-  const total = FIELD_SEGMENTS
-    + triangles(relicBody)
-    + triangles(relicEngraving)
-    + triangles(relicGlow)
-    // Колонада — замкнене кільце: рахується фактична кількість і колон, і
-    // прольотів. standingPillars - 1 недораховував одну завершальну арку.
-    + triangles(pillar) * standingPillars
-    + triangles(lamp) * standingPillars
-    + triangles(arch) * standingArches
-    + triangles(floor)
-    + triangles(groundDecor)
-    + triangles(colonnadeDecor)
-    + triangles(crystalLamps);
-
-  relicBody.dispose();
-  relicEngraving.dispose();
-  relicGlow.dispose();
-  pillar.dispose();
-  lamp.dispose();
-  arch.dispose();
-  floor.dispose();
-  groundDecor.dispose();
-  colonnadeDecor.dispose();
-  crystalLamps.dispose();
+  const pieces = [
+    buildPortalCaveShellGeometry(seed),
+    buildPortalCaveFloorGeometry(seed),
+    buildPortalCaveOculusGeometry(seed),
+    buildPortalCaveDruseGeometry(seed, CAVE_DRUSE_CLUSTERS[quality]),
+  ];
+  let total = 0;
+  for (const piece of pieces) {
+    total += piece.getAttribute('position').count / 3;
+    piece.dispose();
+  }
   return total;
 }
 
@@ -1433,6 +1375,28 @@ export interface PortalPalette {
   keyColour: string;
   rimIntensity: number;
   rimColour: string;
+  /* ── Печера (ADR-0117) ────────────────────────────────────
+     Світом кристала стала кристальна печера замість храму. Камінь,
+     підлога, друза по стінах і розлом у склепінні — чотири ролі, і
+     кожна є в обох порах доби, бо тема міняє світло, а не продукт.
+
+     У печері немає полудня, тож світла тема — це не «той самий храм при
+     сонці», а та сама печера під ДЕННИМ ПРОМЕНЕМ крізь розлом. Звідси
+     дві різниці, які не виводяться множенням нічних чисел: удень
+     світиться розлом, а не друза, і туман удень — кам'яна імла, а не
+     небо. Небесний туман робив залу відкритим простором. */
+  /** Камінь стін і склепіння. */
+  caveRock: string;
+  /** Підлога зали — темніша за стіни: на неї падає найменше з розлому. */
+  caveFloor: string;
+  /** Кварц, що росте зі стін. Той самий мінерал, що артефакт. */
+  caveDruse: string;
+  /** Скільки друза світиться сама. Уночі — джерело, удень — камінь. */
+  caveDruseEmissive: number;
+  /** Що видно крізь розлом у склепінні. */
+  oculus: string;
+  /** Сила світла, яке падає з розлому вниз. */
+  oculusIntensity: number;
   /** Сила світіння фіолетового скла в кільці реліквіарію. */
   inlayEmissive: number;
   /* Металевість реліквіарію.
@@ -1512,9 +1476,16 @@ export function portalLampReach(
 export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
   // ── Полудень ──────────────────────────────────────────────
   light: {
-    // Туман кольору неба: удалині храм має танути в небі, а не в бузковій
-    // імлі. Це те, що робить сцену відкритою, а не залою.
-    fog: '#cfe3f4',
+    /*
+     * Туман — КАМ'ЯНА ІМЛА, а не небо.
+     *
+     * Тут стояв `#cfe3f4` із поясненням «удалині храм має танути в небі,
+     * і це те, що робить сцену відкритою, а не залою». Відколи сцена
+     * САМЕ ЗАЛА (ADR-0117), небесний туман працює точно навпаки: він
+     * вимиває дальню стіну до кольору неба, і печера читається відкритим
+     * простором із камінням.
+     */
+    fog: '#9d94a8',
     field: '#e9e3d7',
     dais: '#e3d6bb',
     // Емісії вдень немає: подіум, що світиться при сонці, читається як
@@ -1574,6 +1545,16 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     // 2.15 → 0.28. Перша спроба на 0.55 усе одно давала фіолетову трубку:
     // матеріал іде повз тонмапінг, тож «трохи менше» тут не працює —
     // світіння при сонці має бути на порядок слабшим, а не на третину.
+    // Камінь удень видно, але це камінь у печері: сірий із теплим
+    // підпалом від променя, а не білий мармур.
+    caveRock: '#8a8090',
+    caveFloor: '#736a7e',
+    caveDruse: '#c2a9e6',
+    // Удень друза не світиться: при денному промені світний кристал на
+    // стіні читається лампою, а не мінералом.
+    caveDruseEmissive: 0.2,
+    oculus: '#e8f1fb',
+    oculusIntensity: 2.1,
     inlayEmissive: 0.28,
     daisMetalness: 0.3,
   },
@@ -1619,6 +1600,33 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     rimIntensity: 0.26,
     /** Прохолодний бузковий. */
     rimColour: '#cfc4f5',
+    /*
+     * ЧОМУ КАМІНЬ СВІТЛІШИЙ, НІЖ «ніч у печері».
+     *
+     * Перша пара була `#241d33` / `#1a1526`, і кадр показав чорноту:
+     * базовий колір множиться на яскравість грані (0.4–1.0) і ще раз
+     * гаситься туманом, який на стіні за одинадцять одиниць дає близько
+     * третини. Три множники поспіль — і темний камінь стає нулем.
+     *
+     * Тобто колір тут не «як виглядає камінь», а «що лишиться від нього
+     * після трьох множень».
+     */
+    caveRock: '#4b3f6b',
+    caveFloor: '#382f52',
+    caveDruse: '#a670e8',
+    /*
+     * 1.4 → 0.55. Друза світилась як ЛАМПА: при такій емісії кристал на
+     * стіні яскравіший за камінь навколо вчетверо й перестає читатись
+     * мінералом — світиться сам собою в темряві.
+     *
+     * Уночі в печері справді має світитись артефакт; друза лише ловить
+     * його світло й трохи тримає власне, щоб не зникнути в тіні.
+     */
+    caveDruseEmissive: 0.55,
+    // Нічне небо в розломі: майже темрява, але не чорнота — інакше
+    // розлом читається дірою в моделі.
+    oculus: '#2a2444',
+    oculusIntensity: 0.32,
     inlayEmissive: 2.45,
     daisMetalness: 0.72,
   },
