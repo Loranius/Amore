@@ -1,3 +1,4 @@
+import { TREE_CROWN_BOTTOM_SHARE } from '../species/tree';
 import type { TreeCompositionBranch } from '../composition';
 import {
   add,
@@ -151,6 +152,49 @@ interface ClusterCandidate {
   crownCellId: string;
 }
 
+/**
+ * Найнижча висота, на якій дерево тримає листя.
+ *
+ * ЧИСТИЙ СТОВБУР — ЦЕ ВІДСУТНІСТЬ ЛИСТЯ, А НЕ ВІДСУТНІСТЬ ГІЛОК (ADR-0109).
+ *
+ * Еталонне дерево міряється в 0.275 чистого стовбура, наше давало 0.175, і
+ * розклад по смугах силуету назвав винного точно: на сорока роках у смузі
+ * 0.20-0.25 зросту гілки дають 0.097 півширини, а ЛИСТЯ — 0.200. Тобто
+ * стовбур був зайнятий не деревиною, а кронами, що звисали з чотирьох
+ * гілок, які починаються під кроною й ідуть угору.
+ *
+ * Прибрати ті гілки не можна: на сороковому році всі чотири — носії, і
+ * саме на них тримається крона (ADR-0107 §1). Але в живого дерева гілка,
+ * яка проходить крізь затінений низ, деревину там має, а листя не має:
+ * нижнє листя відмирає першим, бо світла йому не дістається. Саме це тут і
+ * записано.
+ */
+function foliageFloorFor(input: BuildTreeFoliageInput): number {
+  /*
+   * МІРЯЄТЬСЯ ВІД СТОВБУРА, А НЕ ВІД ГАБАРИТНОЇ КОРОБКИ, і це не смак.
+   *
+   * Чистий стовбур — властивість САМЕ стовбура, тож і мірка його. Але є й
+   * друга, жорсткіша причина: коробка залежить від того, які гілки в дерева
+   * зараз є. Тест «згустки не переїжджають, коли пізніших гілок ще немає»
+   * спіймав це одразу — той самий згусток сідав на 36-й відлік у повному
+   * дереві й на 39-й у неповному, бо неповне нижче. Стовбур же в обох
+   * однаковий, і підлога виходить та сама.
+   */
+  const trunk = input.frames.curves.find((curve) => curve.branchId === 'organic:trunk')
+    ?? input.frames.curves.find((curve) => curve.generation === 0);
+  if (!trunk || trunk.samples.length === 0) {
+    return input.composition.bounds.min.y
+      + input.composition.bounds.height * TREE_CROWN_BOTTOM_SHARE;
+  }
+  let top = Number.NEGATIVE_INFINITY;
+  let bottom = Number.POSITIVE_INFINITY;
+  for (const sample of trunk.samples) {
+    if (sample.position.y > top) top = sample.position.y;
+    if (sample.position.y < bottom) bottom = sample.position.y;
+  }
+  return bottom + (top - bottom) * TREE_CROWN_BOTTOM_SHARE;
+}
+
 function buildCandidate(
   artifactSeed: number,
   curve: OrganicBranchCurve,
@@ -182,10 +226,20 @@ function buildCandidate(
       + ((slot + 1) / slotCount) * (1 - terminalStart)
       + jitter,
   );
+  const floor = foliageFloorFor(input);
   const terminalSamples = curve.samples.filter(
-    (sample) => sample.normalizedDistance >= terminalStart,
+    (sample) => sample.normalizedDistance >= terminalStart && sample.position.y >= floor,
   );
-  const sample = nearestSample(terminalSamples.length > 0 ? terminalSamples : curve.samples, targetDistance);
+  /*
+   * Запасний набір — теж НЕ НИЖЧЕ підлоги. Гілка, у якої вище підлоги немає
+   * жодного відліку, сюди не доходить узагалі: вона не придатна до листя
+   * (див. `pending` нижче), а не «гола».
+   */
+  const aboveFloor = curve.samples.filter((sample) => sample.position.y >= floor);
+  const sample = nearestSample(
+    terminalSamples.length > 0 ? terminalSamples : (aboveFloor.length > 0 ? aboveFloor : curve.samples),
+    targetDistance,
+  );
   const radialUnit = seededUnit(artifactSeed, `${id}:radius`);
   const branchThickness = clamp01(branch.meanRadius / 0.14);
   const radiusMix = clamp01(radialUnit * 0.72 + branchThickness * 0.28);
@@ -288,6 +342,7 @@ export function buildTreeFoliage(input: BuildTreeFoliageInput): TreeFoliageState
     slotCount: number;
   }
 
+  const foliageFloor = foliageFloorFor(input);
   const pending: PendingBranch[] = [];
   for (const curve of input.frames.curves) {
     const branch = branchesById.get(curve.branchId);
@@ -301,6 +356,13 @@ export function buildTreeFoliage(input: BuildTreeFoliageInput): TreeFoliageState
     if (branch.role !== 'trunk' && branch.generation < input.config.minimumGeneration) {
       continue;
     }
+    /*
+     * Гілка, що вся лежить у чистому стовбурі, НЕ ПРИДАТНА до листя — так
+     * само, як надто молода вище. Це не те саме, що «гола»: голою зветься
+     * придатна гілка, якій не дісталось бюджету, і таких лишається нуль.
+     * Плутати ці двоє означало б записати виправлення у ваду.
+     */
+    if (!curve.samples.some((sample) => sample.position.y >= foliageFloor)) continue;
     eligibleBranchIds.push(branch.branchId);
     pending.push({
       branch,

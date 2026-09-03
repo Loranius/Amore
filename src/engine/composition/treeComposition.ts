@@ -488,6 +488,7 @@ export function buildTreeComposition(
     artifactSeed: input.species.artifactSeed,
     silhouette,
     axis,
+    base: roundVec(base),
     bounds,
     branches,
     score: scoreComposition(

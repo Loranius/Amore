@@ -171,14 +171,20 @@ function targetEnvelopeRatio(
 ): number {
   const h = clamp(normalizedHeight, 0, 1);
   /*
-   * Нижче за низ крони стеля не нульова, а рівна найвужчому місцю самої
-   * крони — так само, як у `applyTreeCrownEnvelope`. Листя там росте на
-   * гілках, які ПОЧИНАЮТЬСЯ під кроною, і втягувати його в стовбур
-   * означало б оголити ті гілки.
+   * НИЖЧЕ ЗА НИЗ КРОНИ СТЕЛЯ ДЛЯ ЛИСТЯ НУЛЬОВА — І ЦЕ НЕ ТЕ САМЕ, ЩО ДЛЯ
+   * ГІЛОК (ADR-0109).
+   *
+   * `applyTreeCrownEnvelope` тримає під низом крони ненульову стелю, бо
+   * гілки, які ПОЧИНАЮТЬСЯ під кроною, мусять мати куди вийти вбік —
+   * інакше на сорока роках у стовбур втягнуло б чотирьох носіїв, на яких
+   * крона й тримається.
+   *
+   * Листю така поступка не потрібна й шкідлива: відколи згустки не сідають
+   * нижче за низ крони (`treeFoliage.ts`), усе, що там лишається, — це
+   * розсип із згустків ВИЩЕ, і його місце коло стовбура. Чистий стовбур —
+   * це відсутність листя, а не відсутність деревини.
    */
-  const share = h < TREE_CROWN_BOTTOM_SHARE
-    ? treeCrownHalfWidthAt(TREE_CROWN_BOTTOM_SHARE) * (h / TREE_CROWN_BOTTOM_SHARE)
-    : treeCrownHalfWidthAt(h);
+  const share = h < TREE_CROWN_BOTTOM_SHARE ? 0 : treeCrownHalfWidthAt(h);
   return round6((share * boundsHeight) / boundsRadius);
 }
 
@@ -213,8 +219,8 @@ function buildViewReadability(
     let readableFrontLeafCount = 0;
 
     for (const profile of profiles) {
-      const relativeX = profile.renderPosition.x - input.composition.bounds.center.x;
-      const relativeZ = profile.renderPosition.z - input.composition.bounds.center.z;
+      const relativeX = profile.renderPosition.x - input.composition.base.x;
+      const relativeZ = profile.renderPosition.z - input.composition.base.z;
       const frontProjection = relativeX * direction.x + relativeZ * direction.z;
       if (frontProjection < 0) continue;
 
@@ -323,9 +329,27 @@ export function buildTreeCrownSilhouette(
       throw new Error(`Tree Crown Silhouette cannot resolve upstream profiles for "${leaf.id}".`);
     }
 
+    /*
+     * РАДІУС МІРЯЄТЬСЯ ВІД СТОВБУРА, А НЕ ВІД ЦЕНТРА КОРОБКИ (ADR-0109).
+     *
+     * Огинальна крони — тіло обертання довкола стовбура; так її задає
+     * порода (`crownProfile.ts`), так її будує еталон і так її міряє
+     * `treeSilhouetteProfile`. Тут же все радіальне рахувалось від центра
+     * ГАБАРИТНОЇ КОРОБКИ, а він у дерева з несиметричною кроною відходить
+     * від стовбура на десяту частину зросту — виміряно на сорока роках
+     * 0.53 при висоті 5.04.
+     *
+     * Наслідок був не абстрактний: стеля чесно заводила листок під
+     * оболонку, рахуючи від коробки, а від стовбура він лишався на 0.114
+     * зросту в смузі, де огинальна дозволяє нуль. Тобто чистий стовбур
+     * тримався зайнятим, хоч кожне окреме число казало, що все гаразд.
+     *
+     * Сектори й смуги рахуються звідти ж: рух радіальний саме довкола осі,
+     * тож інваріант «сектор збережено» тримається за побудовою.
+     */
     const sourcePosition = depth.renderPosition;
-    const relativeX = sourcePosition.x - input.composition.bounds.center.x;
-    const relativeZ = sourcePosition.z - input.composition.bounds.center.z;
+    const relativeX = sourcePosition.x - input.composition.base.x;
+    const relativeZ = sourcePosition.z - input.composition.base.z;
     const horizontalDistance = Math.hypot(relativeX, relativeZ);
     const sourceRadialRatio = round6(horizontalDistance / input.composition.bounds.radius);
     const normalizedHeight = clamp(
@@ -484,9 +508,9 @@ export function buildTreeCrownSilhouette(
       renderRelativeX = relativeX * scale;
       renderRelativeZ = relativeZ * scale;
       renderPosition = roundVec({
-        x: input.composition.bounds.center.x + renderRelativeX,
+        x: input.composition.base.x + renderRelativeX,
         y: sourcePosition.y,
-        z: input.composition.bounds.center.z + renderRelativeZ,
+        z: input.composition.base.z + renderRelativeZ,
       });
     }
 

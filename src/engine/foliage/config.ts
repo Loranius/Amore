@@ -1,7 +1,7 @@
 import type { TreeFoliageConfig } from './types';
 
 export const DEFAULT_TREE_FOLIAGE_CONFIG: TreeFoliageConfig = {
-  rulesVersion: 'tree-foliage-v3.0.0',
+  rulesVersion: 'tree-foliage-v3.1.0',
   minimumGeneration: 1,
   /*
    * ЛИСТЯ ПОЧИНАЄТЬСЯ З 0.22 ДОВЖИНИ ГІЛКИ, а було з 0.3.
