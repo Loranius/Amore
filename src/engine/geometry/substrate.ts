@@ -131,6 +131,63 @@ const TROUGH_FALL = 0.75;
  * 0.045/0.075 дає відношення 1.67 і вже падає.
  */
 const GEODE_WALL_HEIGHT = 0.026;
+
+/**
+ * КОМІР ЖЕОДИ — порода, що встає ЗА колонією, а не між кристалами.
+ * ------------------------------------------------------------
+ * Стінка вище (`GEODE_WALL_HEIGHT`) тричі йшла вниз — 0.15 → 0.085 →
+ * 0.026 — і щоразу з тієї самої причини: вона стоїть НА тому самому
+ * контурі, на якому стоять діти, тож будь-яка помітна висота ховала
+ * річне кільце, яке за ADR-0058 має читатись літописом. Тобто задача
+ * була нерозв'язна в тому місці, де її розв'язували.
+ *
+ * Еталон (ADR-0114) показав, де вона розв'язна. У справжній жеоді порода
+ * встає ЗА друзою: дрібні кристали стоять усередині порожнини, а стінка
+ * — по краю конкреції, утричі далі від осі, ніж сам монарх. Виміряно:
+ * еталон дає `rockSpread` 3.02 і `rockRise` 0.335, наша підкладка — 2.11
+ * і 0.168, а рваність вінця 0.013 проти 0.155, тобто камінь лежить
+ * ПЛАСКО.
+ *
+ * Тому комір — окреме кільце ЗОВНІ контуру. Шов, губа, тріщина й
+ * ADR-0003 лишаються тим, чим були: комір нічого з них не торкається,
+ * бо починається там, де вони кінчаються.
+ */
+const GEODE_COLLAR_REACH = 1.22;
+/**
+ * Висота гребеня коміра, частка довжини монарха.
+ *
+ * Проти дітей це вже не питання: гребінь стоїть за ними. Проти монарха
+ * 0.2 дає виміряні `rockRise` близько третини його висоти — рівно те,
+ * що оголошує еталон (`GEODE_WALL_SHARE = 0.34`).
+ */
+const GEODE_COLLAR_HEIGHT = 0.2;
+/**
+ * Наскільки рваний гребінь: найнижча його точка між розломами стоїть на
+ * цю частку нижче найвищої.
+ *
+ * Без цього числа порода з рівним верхом читається ЧАШЕЮ — посудиною, у
+ * яку кристал поставили, — і жоден інший розмір цього не рятує
+ * (`amore-crystal-look`: гладка суцільна поверхня під кристалом
+ * читається п'єдесталом, хай як її формувати).
+ */
+const GEODE_COLLAR_RAGGED = 0.32;
+/** Скільки контрольних точок має рваність. Просте число, як і в контуру. */
+const GEODE_COLLAR_POINTS = 11;
+
+/**
+ * Стеля гребеня, виміряна НАЙВИЩОЮ ДИТИНОЮ, а не монархом.
+ *
+ * Тут стоїть вибір, який `sharedRoot.test.ts` уже назвав відкритим:
+ * §4 хоче породу, ADR-0058 хоче, щоб кожен рік лишався видимим. Комір
+ * зробив вибір можливим замість неможливого — він стоїть ЗА кільцем
+ * років, а не на ньому, — але на молодій колонії монарх усе одно
+ * набагато більший за свою першу дитину, і 0.2 його довжини сховали б
+ * найсильніший рік на 90%. Виміряно: 0.897 при дозволених 0.5.
+ *
+ * Тому гребінь бере менше з двох. На дорослій колонії вирішує монарх, на
+ * молодій — діти, і літопис лишається читабельним у обох.
+ */
+const GEODE_COLLAR_CHILD_SHARE = 0.45;
 /*
  * 0.15 → 0.085 → 0.026, услід за губою й у тій самій пропорції: правило
  * «стінка вища за губу принаймні в 1.8 раза» тримає розломи читабельними,
@@ -321,12 +378,24 @@ const BRANCH_BASE_REACH = 0.18;
 
 /** Smooth seeded noise around the circle, so the edge breaks without spiking. */
 function edgeNoise(seed: number, angle: number): number {
+  return smoothRing(seed, 'vein:edge', angle, EDGE_NOISE_POINTS);
+}
+
+/**
+ * Гладкий насінний шум по колу — 0…1, без стрибка на замиканні.
+ *
+ * Винесено з `edgeNoise`, коли рваність вінця стала другим споживачем.
+ * Мітка входить у насіння, тож два різні кільця шуму на тому самому
+ * артефакті не збігаються — інакше вінець провалювався б рівно там, де
+ * контур і так вужчий, і рваність читалася б як звуження.
+ */
+function smoothRing(seed: number, label: string, angle: number, points: number): number {
   const turns = angle / (Math.PI * 2);
-  const scaled = (turns - Math.floor(turns)) * EDGE_NOISE_POINTS;
+  const scaled = (turns - Math.floor(turns)) * points;
   const index = Math.floor(scaled);
   const t = scaled - index;
-  const left = seededUnit(seed, `vein:edge:${index % EDGE_NOISE_POINTS}`);
-  const right = seededUnit(seed, `vein:edge:${(index + 1) % EDGE_NOISE_POINTS}`);
+  const left = seededUnit(seed, `${label}:${index % points}`);
+  const right = seededUnit(seed, `${label}:${(index + 1) % points}`);
   const eased = t * t * (3 - 2 * t);
   return left + (right - left) * eased;
 }
@@ -512,6 +581,31 @@ function geodeWallAt(
 }
 
 /**
+ * Висота гребеня коміра в напрямку `angle`, над `y = 0`.
+ *
+ * Ті самі розломи, що в стінки (`geodeWallAt`): вони описують один розкол
+ * породи, і два різні набори тріщин на одному тілі читались би як дві
+ * різні жеоди, вставлені одна в одну.
+ */
+function geodeCollarAt(angle: number, crest: number, seed: number): number {
+  let openness = 0;
+  for (let index = 0; index < GEODE_BREAK_COUNT; index += 1) {
+    const at = seededUnit(seed, `geode:break:${index}`) * Math.PI * 2;
+    const width = 0.32 + seededUnit(seed, `geode:break:${index}:width`) * 0.3;
+    let delta = Math.abs(angle - at) % (Math.PI * 2);
+    if (delta > Math.PI) delta = Math.PI * 2 - delta;
+    if (delta >= width) continue;
+    const inside = 1 - delta / width;
+    openness = Math.max(openness, inside * inside * (3 - 2 * inside));
+  }
+  // Множник завжди ≤ 1, щоб оголошена висота гребеня лишалась тим, що
+  // виміряється: інакше гребінь подекуди вилазив би вище названого.
+  const ragged = 1 - GEODE_COLLAR_RAGGED
+    * smoothRing(seed, 'geode:collar', angle, GEODE_COLLAR_POINTS);
+  return crest * ragged * (1 - GEODE_BREAK_DEPTH * openness);
+}
+
+/**
  * Published profile. The vein is not a lathe, so this describes its envelope
  * rather than its construction — it exists because `CrystalMeshData` carries a
  * profile for every mesh, and readers use it for bounds and identity.
@@ -640,9 +734,52 @@ export function buildCrystalSubstrateMesh(
   const troughDepth = round6(Math.min(nodeRadius * TROUGH_DEPTH, depth * 0.55));
   // Стінка жеоди — порода, що встає по периметру. Див. `GEODE_WALL_HEIGHT`.
   const wallHeight = round6(monarchLength * GEODE_WALL_HEIGHT);
+
+  /*
+   * Гребінь коміра: менше з двох — частка монарха й частка найвищої
+   * дитини. Див. `GEODE_COLLAR_CHILD_SHARE`.
+   */
+  const monarchId = bodies[0]!.id;
+  let tallestChild = 0;
+  for (const mesh of meshes) {
+    if (mesh.bodyId === monarchId || mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
+    tallestChild = Math.max(tallestChild, mesh.bounds.max.y);
+  }
+  const crest = round6(tallestChild > 0
+    ? Math.min(monarchLength * GEODE_COLLAR_HEIGHT, tallestChild * GEODE_COLLAR_CHILD_SHARE)
+    : monarchLength * GEODE_COLLAR_HEIGHT);
+  const collarHeights: number[] = [];
+  for (let segment = 0; segment < OUTLINE_SEGMENTS; segment += 1) {
+    const angle = (segment / OUTLINE_SEGMENTS) * Math.PI * 2;
+    collarHeights.push(round6(geodeCollarAt(angle, crest, artifactSeed)));
+  }
+  /*
+   * Профіль оголошує ДОСЯГНУТУ вершину, а не задуману.
+   *
+   * Гребінь рваний, тож жодна точка не сягає повних `crest`. Читачі
+   * профілю звіряють із цим числом РІВНІСТЬ («чи є на тілі точка на
+   * вершині породи»), і номінальне значення зробило б таку перевірку
+   * недосяжною за побудовою.
+   */
+  const collarTop = collarHeights.reduce((most, value) => Math.max(most, value), 0);
   // Профіль оголошує НАЙВИЩУ точку тіла: висота стінки, а не губи. Інакше
   // споживачі профілю (обрізка, межі) вважали б жеоду нижчою, ніж вона є.
-  const profile = veinProfile(widest, height + wallHeight, depth, veinBearings(bodies));
+  /*
+   * Профіль оголошує НАЙШИРШУ й НАЙВИЩУ точку тіла. Відколи є комір,
+   * обидві — його: підкладка сягає далі за контур і встає вище за губу.
+   * Оголосити старі числа означало б сказати споживачам профілю (обрізка,
+   * межі сцени, п'єдестал порталу), що жеоди немає.
+   */
+  const collarRadius = round6(
+    Math.max(1e-4, monarchRadius * 0.92)
+    + (widest - Math.max(1e-4, monarchRadius * 0.92)) * GEODE_COLLAR_REACH,
+  );
+  const profile = veinProfile(
+    collarRadius,
+    Math.max(height + wallHeight, collarTop),
+    depth,
+    veinBearings(bodies),
+  );
 
   const positions: number[] = [];
   const indices: number[] = [];
@@ -734,7 +871,10 @@ export function buildCrystalSubstrateMesh(
    * One ring. `toward` is 1 at the vein's outline and 0 at the monarch's
    * footprint; `y` of null means the ring follows the fissure's own floor.
    */
-  const pushRing = (toward: number, y: number | null): void => {
+  const pushRing = (
+    toward: number,
+    y: number | ((angle: number, segment: number) => number) | null,
+  ): void => {
     ringStarts.push(positions.length / 3);
     for (let segment = 0; segment < OUTLINE_SEGMENTS; segment += 1) {
       const angle = (segment / OUTLINE_SEGMENTS) * Math.PI * 2;
@@ -742,7 +882,8 @@ export function buildCrystalSubstrateMesh(
       const radius = edge <= inner ? edge : inner + (edge - inner) * toward;
       const x = Math.sin(angle) * radius;
       const z = Math.cos(angle) * radius;
-      positions.push(round6(x), round6(y ?? topHeightAt(x, z)), round6(z));
+      const height = typeof y === 'function' ? y(angle, segment) : y;
+      positions.push(round6(x), round6(height ?? topHeightAt(x, z)), round6(z));
     }
   };
 
@@ -755,7 +896,16 @@ export function buildCrystalSubstrateMesh(
   // in a hard black outline that read as a plinth the crystals stand on. Wider
   // below, the same wall leans inward and catches the light as a bevel. It also
   // means the vein is broadest exactly where the base caps are buried.
-  pushRing(FLOOR_FLARE, -depth);
+  /*
+   * КОМІР ІДЕ ПЕРШИМ, І САМЕ ВІН НЕСЕ ПІДОШВУ.
+   *
+   * Найнижче кільце — це опублікована базова кришка (`baseCapTriangleCount`
+   * нижче рахує саме його трикутники), тож розширити треба його, а не
+   * додати щось під ним: інакше кришка лишилась би всередині коміра й
+   * жеода мала б дно в двох місцях.
+   */
+  pushRing(GEODE_COLLAR_REACH * FLOOR_FLARE, -depth);
+  pushRing(GEODE_COLLAR_REACH, (_angle, segment) => collarHeights[segment]!);
   // The outer lip is the one top ring pinned flat: it is where the crack meets
   // the platform, and a lip that wandered would read as a torn edge rather than
   // as stone that split.
@@ -809,7 +959,15 @@ export function buildCrystalSubstrateMesh(
     bodyId: CRYSTAL_SUBSTRATE_BODY_ID,
     hostBodyId: null,
     lod: 'high',
-    profile: { ...profile, seamTriangleCount, seamRimHeight: height, geodeWallHeight: wallHeight },
+    /*
+     * `geodeWallHeight` — «вершина породи по периметру» (ADR-0060). Відколи
+     * порода встає коміром ЗА колонією, вершина — його, а не низького
+     * коміра на самому стику: старе число сказало б споживачам профілю,
+     * що жеоди немає.
+     */
+    profile: {
+      ...profile, seamTriangleCount, seamRimHeight: height, geodeWallHeight: collarTop,
+    },
     positions,
     normals: [],
     indices,
