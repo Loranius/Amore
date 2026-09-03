@@ -187,8 +187,8 @@ export function PortalEnvironment({
         position={[0, PORTAL_GROUND_Y + 0.35, 0.9]}
         distance={6.5}
         decay={2}
-        intensity={palette.daisLightIntensity}
-        color={palette.daisLight}
+        intensity={palette.rootLightIntensity}
+        color={palette.rootLight}
       />
     </>
   );

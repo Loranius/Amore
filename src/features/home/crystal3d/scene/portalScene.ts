@@ -7,21 +7,11 @@
 // — у WebGL-камері. Тут та сама сцена перенесена в 3D і стоїть на тій
 // самій площині, що й артефакт (CRYSTAL_GROUND_BASELINE).
 //
-// Модуль навмисно чистий: кадрування камери, розкладка колон і поле
-// зір — це арифметика, яку можна перевірити тестом без WebGL.
+// Модуль навмисно чистий: кадрування камери, палітра й вартість оточення —
+// це арифметика, яку можна перевірити тестом без WebGL. Геометрію будує
+// `portalCave.ts`, і саме тому THREE тут більше не імпортується.
 // ============================================================
-import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
-import { mulberry32 } from '../../mulberry32';
-import {
-  PORTAL_RELIC_OUTER_RADIUS,
-  PORTAL_RELIC_TOP_RADIUS,
-} from './portalRelicPedestal';
-// Колона приходить моделлю заради різьблення капітелі. Арка — профільований
-// локальний архівольт без модельного прямокутного спандрела; обидві геометрії
-// нормалізовані, а розкладка нижче володіє їхніми світовими трансформами.
-import { PORTAL_PILLAR_ASPECT } from './portalColonnadeMesh';
 import {
   CAVE_DRUSE_CLUSTERS,
   buildPortalCaveDruseGeometry,
@@ -342,1049 +332,38 @@ export function portalCameraFrame(
   };
 }
 
-// ── Подіум ──────────────────────────────────────────────────
-// Профіль обертання, y відраховується від PORTAL_GROUND_Y. Верхня площина
-// подіуму втоплена рівно на товщину кам'яної плити, бо плита лежить у цій
-// заглибині — а от ЇЇ верхня грань уже точно на нулі, тобто на площині, на
-// якій рушій ставить кристали. Будь-яке відхилення або підвісило б жилу в
-// повітрі, або втопило її в камені (2026-08-03: саме друге й було).
-
-/** Товщина кам'яної плити платформи. */
-const SLAB_THICKNESS = 0.075;
-
-const DAIS_PROFILE: readonly (readonly [number, number])[] = [
-  [0, -0.62],
-  [1.9, -0.62],
-  [1.9, -0.44],
-  [1.66, -0.44],
-  [1.66, -0.26],
-  [1.44, -0.26],
-  [1.44, -0.1],
-  [1.3, -0.1],
-  // Recessed by exactly the platform's thickness. The stone slab lies in this
-  // recess, so it is the *slab's* top face that lands on 0 — see SLAB_TOP.
-  [1.3, -SLAB_THICKNESS],
-  [0, -SLAB_THICKNESS],
-];
-
-/** Радіус верхньої площини подіуму в базовій геометрії. */
-export const PORTAL_DAIS_TOP_RADIUS = PORTAL_RELIC_TOP_RADIUS;
-/** Зовнішній металевий край релікварію в базовому масштабі сцени. */
-export const PORTAL_DAIS_OUTER_RADIUS = PORTAL_RELIC_OUTER_RADIUS;
-
-/**
- * Наскільки верх подіуму має бути ширшим за видиму друзу.
+/*
+ * ТУТ ЖИВ ХРАМ — І ЙОГО БІЛЬШЕ НЕМАЄ.
+ * ------------------------------------------------------------
+ * Дев'ятсот сімдесят п'ять рядків: подіум, ритуальна плита з тріщинами,
+ * дванадцять рун, інкрустація, вісімнадцять колон із розкладкою й
+ * арками, підлога храму, чаші вогню на колонах і зоряне небо. Плюс п'ять
+ * сусідніх файлів — `portalColonnadeMesh`, `portalRelicPedestal`,
+ * `portalPlatformMesh`, `portalSceneDecor`, `platformTexture` — і їхні
+ * тести.
  *
- * Кварцова жила більше не є видимою підкладкою релікварію, тому не має права
- * роздувати його масштаб. 1.18 лишає напис і світловий обвід навколо крайніх
- * дочірніх кристалів, але тримає зовнішній край приблизно в півтора радіуса
- * від видимої друзи — як у портретному референсі, а не біля країв екрана.
+ * Світом кристала стала печера (ADR-0116, ADR-0117). Жодне з цього більше
+ * не малюється, а мертвий код із тестами гірший за відсутній: тести
+ * стережуть форму, якої ніхто не бачить, і кожен, хто читає цей файл,
+ * витрачає час на храм, якого немає.
  *
- * Стелю знижено разом із профілем: тепер вона відповідає фізичній межі
- * видимої композиції, а не допускає масштабування від невидимої підкладки.
- */
-export const PORTAL_DAIS_CLEARANCE = 1.18;
-
-/**
- * Стеля масштабу подіуму — її задають колони.
- *
- * Колони стоять на полі, а не на подіумі. Обмежує **передня** пара, і це не
- * очевидно: вона дзеркальна задній по z, але стоїть ближче до камери, тож
- * півширина кадру на її глибині менша й у світових координатах вона ближча до
- * осі. На найвужчому реальному кадрі вона відходить від осі на ≈2.81 проти
- * ≈2.99 у задньої.
- *
- * Нова стеля 1.75 відповідає renderer-independent фізичній межі кристальної
- * композиції. Навіть на ній край має радіус 2.73 — далеко від колонади 13.2,
- * але не перетворюється на другу підлогу під усім храмом.
- */
-export const PORTAL_DAIS_MAX_SCALE = 1.75;
-
-/**
- * Масштаб подіуму під конкретний артефакт.
- *
- * Подіум був константою, і це трималось рівно доти, доки всі друзи були
- * дрібні. Тепер він читає радіус видимих кристалів, а не невидимої підкладки:
- * підкладка не має права збільшувати презентаційний реквізит і зменшувати
- * головний артефакт у мобільному кадрі.
- *
- * Тільки збільшує: подіум, менший за спроєктований, зробив би сцену
- * тіснішою, ніж її кадрувала камера.
- */
-export function portalDaisScale(visibleCrystalRadius: number): number {
-  const radius = Number.isFinite(visibleCrystalRadius) ? Math.max(0, visibleCrystalRadius) : 0;
-  const needed = (radius * PORTAL_DAIS_CLEARANCE) / PORTAL_DAIS_TOP_RADIUS;
-  return Math.min(PORTAL_DAIS_MAX_SCALE, Math.max(1, Number(needed.toFixed(4))));
-}
-/** Наскільки навколишнє поле нижче за верх подіуму. */
-export const PORTAL_FIELD_DROP = 0.3;
-/** Visible temple tiles sit just above the dark field so their seams stay legible. */
-export const PORTAL_TEMPLE_FLOOR_Y = PORTAL_GROUND_Y - PORTAL_FIELD_DROP + 0.02;
-
-export function buildPortalDaisGeometry(): THREE.LatheGeometry {
-  const points = DAIS_PROFILE.map(([radius, y]) => new THREE.Vector2(radius, y));
-  const geometry = new THREE.LatheGeometry(points, 64);
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-// ── Кам'яна платформа ───────────────────────────────────────
-// Суцільна верхня поверхня подіуму. Кристали ростуть просто з неї — крізь
-// кварцову жилу, яку публікує рушій (engine/geometry/substrate.ts), — а
-// камінь навколо вигинається рівно там, де під ним іде жила.
-//
-// Тут була ритуальна плита-кільце з розламаним внутрішнім обводом: усередині
-// того обводу поверхня провалювалась на товщину плити, і під друзою виходило
-// кругле заглиблення. Огляд (2026-08-03) відхилив його — тепер обводу немає
-// зовсім, а пролом у камені є лише один, і це сама жила.
-
-/** Зовнішній — трохи всередині обводу подіуму, щоб фаска подіуму лишалась видною. */
-const SLAB_OUTER = 1.27;
-const SLAB_SEGMENTS = 36;
-
-/**
- * Верхня грань каменю — рівно площина артефакта.
- *
- * Це був справжній баг, і виміряний. Плита лежала **поверх** тієї самої
- * площини, на якій рушій ставить кристали, тобто камінь стояв на 0.075 вище за
- * основи кристалів і за кварцову жилу. Жила підіймається над площиною лише на
- * 0.024 в одиницях сцени, тож вона була похована під платформою з будь-якого
- * кута — а кристали виглядали зрізаними біля основи й підвішеними.
- *
- * Тепер плита втоплена в подіум: її низ на `-SLAB_THICKNESS`, верх на нулі.
- * Ту саму глибину вибрано в профілі подіуму, тож видима товщина каменю не
- * змінилась — змінилось лише те, від чого вона відраховується.
- */
-const SLAB_TOP = 0;
-
-/**
- * Скільки напрямків жили платформа підхоплює, якщо їх передали.
- *
- * Стримано: жила має 2–3 головні гілки, і камінь мусить читатись як їхнє
- * продовження, а не як власна система розломів. Раніше тут було дев'ять
- * рівномірних напрямків від власного насіння — саме та друга система.
- */
-const CRACK_COUNT = 3;
-
-/**
- * Напрямки, у яких камінь платформи піднято.
- *
- * Перший аргумент — насіння артефакта, другий — напрямки гілок кварцової жили
- * з опублікованого профілю субстрату. Коли вони є, камінь іде за ними: жила
- * розсунула його зсередини, тож будь-який інший напрямок був би розломом
- * нізвідки. Насіннєвий запас лишається для випадків, коли профіль старий і
- * напрямків у ньому немає, — тоді краще стриманий вигин, ніж пласка плита.
- */
-export function portalCrackAngles(seed: number, bearings: readonly number[] = []): number[] {
-  const fromVein = bearings.filter(Number.isFinite).slice(0, CRACK_COUNT);
-  if (fromVein.length > 0) return fromVein;
-  const random = mulberry32(seed ^ 0x0c2ac);
-  return Array.from(
-    { length: CRACK_COUNT },
-    (_, index) => (index / CRACK_COUNT) * Math.PI * 2 + (random() - 0.5) * 0.35,
-  );
-}
-
-/** Найменша кутова відстань між двома напрямками. */
-function angularGap(left: number, right: number): number {
-  const tau = Math.PI * 2;
-  const raw = Math.abs(((left - right) % tau + tau) % tau);
-  return Math.min(raw, tau - raw);
-}
-
-/** Наскільки плита піднімається просто над тріщиною. */
-const SLAB_SWELL = 0.055;
-/** Кутова ширина вигину; ширше — і вигини зіллються в купол. */
-const SLAB_SWELL_SPREAD = 0.42;
-
-/**
- * Підйом плити на заданому напрямку.
- *
- * Плита не просто розколота — її вигнуло тим, що йшло знизу. Вигин
- * найсильніший на самій тріщині й згасає вбік, тож між тріщинами камінь
- * лишається пласким і злам читається як злам, а не як брижі.
- */
-function slabSwell(angle: number, cracks: readonly number[]): number {
-  let swell = 0;
-  for (const crack of cracks) {
-    const gap = angularGap(angle, crack) / SLAB_SWELL_SPREAD;
-    swell += SLAB_SWELL * Math.exp(-gap * gap);
-  }
-  return Math.min(SLAB_SWELL * 1.6, swell);
-}
-
-/**
- * Профіль вигину вздовж радіуса.
- *
- * Вигин не купол, а гребінь: над самою жилою камінь плаский, підіймається
- * одразу за нею й полого сходить до обводу.
- *
- * Пласка серцевина тут не косметика, і причин дві. При куполі вершина
- * припадала б рівно на вісь, де всі сегменти сходяться в одну точку, і
- * поверхня стала б віялом різнонахилених клинів. А головне — вигин, що
- * починається всередині сліду жили, підіймається **над кварцом** і ховає його:
- * жила стоїть на 0.024 над площиною артефакта, а камінь вигинався до 0.118.
- * Саме тому `veinReach` тут аргумент, а не константа: платформа зобов'язана
- * лишити шов у спокої, хоч би якою широкою була жила в цієї пари.
- */
-function slabRidge(radius: number, veinReach: number): number {
-  const clear = Math.max(0, Math.min(SLAB_OUTER * 0.75, veinReach));
-  const span = Math.max(1e-6, SLAB_OUTER - clear);
-  const along = Math.max(0, Math.min(1, (radius - clear) / span));
-  const rise = Math.min(1, along / 0.3);
-  const eased = rise * rise * (3 - 2 * rise);
-  // Сила прийшла зсередини, тож на обводі від вигину лишається третина.
-  return eased * (1 - along * 0.7);
-}
-
-/**
- * Висота поверхні платформи в точці.
- *
- * Одна функція на всіх, хто на камені лежить: сама платформа, руни й золота
- * інкрустація. Інкрустація спершу була пласким кільцем на сталій висоті — і
- * щойно камінь вигнуло, вигин її накрив, тобто золото зникло. Інкрустація
- * вкладена *в* камінь, тож вона мусить вигинатись разом із ним.
- */
-export function portalSlabSurfaceY(
-  angle: number,
-  radius: number,
-  seed: number,
-  bearings: readonly number[] = [],
-  veinReach = 0,
-): number {
-  return slabSurfaceY(angle, radius, portalCrackAngles(seed, bearings), veinReach);
-}
-
-/** Наскільки інкрустація підведена над каменем плити. */
-export const PORTAL_INLAY_CLEARANCE = 0.005;
-
-function slabSurfaceY(
-  angle: number,
-  radius: number,
-  cracks: readonly number[],
-  veinReach: number,
-): number {
-  return SLAB_TOP + slabSwell(angle, cracks) * slabRidge(radius, veinReach);
-}
-
-/** Радіуси кілець верхньої площини — від осі до обводу, без жодного розриву. */
-const SLAB_RINGS: readonly number[] = [0, 0.18, 0.36, 0.58, 0.8, 1];
-
-/**
- * Платформа як суцільне тіло: верхня площина від осі до обводу і зовнішній
- * бортик. Не індексована — flatShading по гранях і є тим фасетним каменем, що
- * на референсі, а спільні вершини усереднили б нормалі якраз на ребрах.
- *
- * `bearings` — напрямки гілок кварцової жили (профіль субстрату). Камінь
- * піднімається саме над ними.
- */
-export function buildPortalRitualSlabGeometry(
-  seed: number,
-  bearings: readonly number[] = [],
-  veinReach = 0,
-): THREE.BufferGeometry {
-  const cracks = portalCrackAngles(seed, bearings);
-  const positions: number[] = [];
-  const triangle = (
-    a: readonly [number, number, number],
-    b: readonly [number, number, number],
-    c: readonly [number, number, number],
-  ): void => {
-    positions.push(a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2]);
-  };
-  const point = (angle: number, radius: number): readonly [number, number, number] => [
-    Math.sin(angle) * radius,
-    slabSurfaceY(angle, radius, cracks, veinReach),
-    Math.cos(angle) * radius,
-  ];
-
-  for (let index = 0; index < SLAB_SEGMENTS; index += 1) {
-    const a0 = (index / SLAB_SEGMENTS) * Math.PI * 2;
-    const a1 = ((index + 1) / SLAB_SEGMENTS) * Math.PI * 2;
-
-    for (let ring = 0; ring < SLAB_RINGS.length - 1; ring += 1) {
-      const inner = SLAB_RINGS[ring]! * SLAB_OUTER;
-      const outer = SLAB_RINGS[ring + 1]! * SLAB_OUTER;
-      const o0 = point(a0, outer);
-      const o1 = point(a1, outer);
-      if (inner <= 0) {
-        // Серцевина: одне віяло на пласкій ділянці, тож усі його трикутники
-        // лежать в одній площині й flatShading не робить із них зірки.
-        triangle(point(a0, 0), o0, o1);
-        continue;
-      }
-      const i0 = point(a0, inner);
-      const i1 = point(a1, inner);
-      triangle(i0, o0, i1);
-      triangle(i1, o0, o1);
-    }
-
-    // Зовнішній бортик — товщина каменю, видима з-під фаски подіуму. Низ
-    // тепер у заглибині подіуму, а не на його верхній площині: саме цей зсув
-    // і опускає всю плиту так, щоб її верх збігся з площиною артефакта.
-    const out0 = point(a0, SLAB_OUTER);
-    const out1 = point(a1, SLAB_OUTER);
-    const floor0: readonly [number, number, number] = [out0[0], -SLAB_THICKNESS, out0[2]];
-    const floor1: readonly [number, number, number] = [out1[0], -SLAB_THICKNESS, out1[2]];
-    triangle(out0, floor0, out1);
-    triangle(out1, floor0, floor1);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-/** Наскільки різьблення підведене над каменем плити. */
-const CRACK_CLEARANCE = PORTAL_INLAY_CLEARANCE;
-
-/** Скільки рун викарбувано на кільці. */
-const RUNE_COUNT = 12;
-/** Радіус, на якому вони лежать — між середнім і зовнішнім золотими кільцями. */
-/** Між першим і другим кільцем — там для них є смуга завширшки 0.07. */
-const RUNE_RADIUS = 1.1;
-const RUNE_SIZE = 0.05;
-
-/**
- * Рунічні візерунки по кільцю плити.
- *
- * Замінюють радіальні тріщини, які тут були: самі тріщини переїхали в геометрію
- * рушія, де кожен кристал ріже плиту власними, а їхні довжина, ширина й глибина
- * йдуть від його радіуса. Кільце лишилось порожнім, і на референсі саме там
- * стоїть різьблення.
- *
- * Кожна руна — кутник із двох штрихів, як на референсі: рівно стільки форми,
- * щоб читалось як знак, і жодної спроби зобразити алфавіт, якого не існує.
- */
-export function buildPortalRuneGeometry(
-  seed: number,
-  bearings: readonly number[] = [],
-  veinReach = 0,
-): THREE.BufferGeometry {
-  const random = mulberry32(seed ^ 0x2c0de);
-  const positions: number[] = [];
-  const cracks = portalCrackAngles(seed, bearings);
-
-  const stroke = (
-    angle: number,
-    radius: number,
-    alongTangent: number,
-    alongRadial: number,
-    thickness: number,
-  ): void => {
-    const sx = Math.sin(angle);
-    const cz = Math.cos(angle);
-    // Локальні осі руни: вздовж радіуса й по дотичній.
-    const rx = sx;
-    const rz = cz;
-    const tx = cz;
-    const tz = -sx;
-    const cx = sx * radius;
-    const czz = cz * radius;
-    const y = slabSurfaceY(angle, radius, cracks, veinReach) + CRACK_CLEARANCE;
-    const half = thickness * 0.5;
-    const corner = (u: number, v: number): readonly [number, number, number] => [
-      cx + tx * u + rx * v,
-      y,
-      czz + tz * u + rz * v,
-    ];
-    const a = corner(-alongTangent * 0.5 - half, -alongRadial * 0.5 - half);
-    const b = corner(alongTangent * 0.5 + half, alongRadial * 0.5 - half);
-    const c = corner(alongTangent * 0.5 + half, alongRadial * 0.5 + half);
-    const d = corner(-alongTangent * 0.5 - half, -alongRadial * 0.5 + half);
-    positions.push(
-      a[0], a[1], a[2], b[0], b[1], b[2], c[0], c[1], c[2],
-      a[0], a[1], a[2], c[0], c[1], c[2], d[0], d[1], d[2],
-    );
-  };
-
-  for (let index = 0; index < RUNE_COUNT; index += 1) {
-    const angle = (index / RUNE_COUNT) * Math.PI * 2;
-    const size = RUNE_SIZE * (0.8 + random() * 0.4);
-    const flip = random() < 0.5 ? 1 : -1;
-    // Кутник: поперечний штрих і радіальний, що виходить з його кінця.
-    stroke(angle, RUNE_RADIUS, size * 1.6, 0, size * 0.22);
-    stroke(angle + (size * 0.7 * flip) / RUNE_RADIUS, RUNE_RADIUS + size * 0.55, 0, size * 1.1, size * 0.22);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-/**
- * Золоті кільця по обводу верхньої площини. Два кільця одним buffer'ом —
- * інкрустація не варта другого draw call'а.
- */
-export function buildPortalInlayGeometry(
-  seed: number,
-  bearings: readonly number[] = [],
-  veinReach = 0,
-): THREE.BufferGeometry {
-  const cracks = portalCrackAngles(seed, bearings);
-  // Три кільця різного радіуса, як на референсі: вузьке ближче до друзи,
-  // широке посередині, вузьке по обводу. Усі лежать далеко за жилою й
-  // повторюють вигин каменю — інакше вигин їх накриває, і золото зникає рівно
-  // на гребенях, де воно найпомітніше.
-  const bands: readonly (readonly [number, number])[] = [
-    [1.045, 1.065],
-    [1.135, 1.155],
-    [1.245, 1.262],
-  ];
-  const segments = 96;
-  const positions: number[] = [];
-  const point = (angle: number, radius: number): readonly [number, number, number] => [
-    Math.sin(angle) * radius,
-    slabSurfaceY(angle, radius, cracks, veinReach) + CRACK_CLEARANCE,
-    Math.cos(angle) * radius,
-  ];
-
-  for (const [innerRadius, outerRadius] of bands) {
-    for (let index = 0; index < segments; index += 1) {
-      const a0 = (index / segments) * Math.PI * 2;
-      const a1 = ((index + 1) / segments) * Math.PI * 2;
-      const i0 = point(a0, innerRadius);
-      const i1 = point(a1, innerRadius);
-      const o0 = point(a0, outerRadius);
-      const o1 = point(a1, outerRadius);
-      positions.push(
-        i0[0], i0[1], i0[2], o0[0], o0[1], o0[2], i1[0], i1[1], i1[2],
-        i1[0], i1[1], i1[2], o0[0], o0[1], o0[2], o1[0], o1[1], o1[2],
-      );
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-// ── Колони ──────────────────────────────────────────────────
-
-export interface PortalPillarPlacement {
-  /** Глибина за площиною артефакта (від'ємна = вглиб кадру). */
-  z: number;
-  /**
-   * Частка півширини кадру, на якій стоїть **внутрішня грань** колони:
-   * 1 = грань точно на краю кадру.
-   *
-   * Саме грань, а не вісь. Для далеких колон різниця мізерна — їхній радіус
-   * малий проти півширини кадру на тій глибині. Для колони перед артефактом
-   * вона вирішальна: при радіусі 0.5 і півширині 0.52 колона, поставлена
-   * віссю на край, закриває половину екрана.
-   */
-  edgeFraction: number;
-  height: number;
-  radius: number;
-}
-
-/**
- * Три пари, і всі три **позаду** артефакта.
- *
- * Тут колись стояла пара перед кристалом. Задум був у тому, щоб глядач
- * опинявся всередині зали, а не навпроти неї, і як задум він чесний — але
- * колона на передньому плані бореться з кристалом за увагу, а акцент тут
- * рівно один. Ближню пару відсунуто за артефакт, і додано третю, ще дальшу:
- * колонада тепер **відступає в глибину** й читається як тло, яким і має бути.
- *
- * Кожна дальша пара вища, ширша й ближча до осі кадру. Це не декоративний
- * градієнт: перспектива й так зменшує далеке, тож колона тієї самої висоти на
- * подвійній глибині виглядала б удвічі нижчою, і ряд читався б як спадна
- * сходинка замість однакових колон, що йдуть углиб.
- *
- * Обмеження, яке їх тримає: у проєкції на екран жодна не заходить на артефакт,
- * інакше замість обрамлення вийде затулянка. За цим стежить portalScene.test.ts.
- */
-export const PORTAL_PILLARS: readonly PortalPillarPlacement[] = [
-  { z: -3.2, edgeFraction: 0.94, height: 5.2, radius: 0.42 },
-  { z: -7.4, edgeFraction: 0.86, height: 6.4, radius: 0.5 },
-  { z: -12.2, edgeFraction: 0.78, height: 7.4, radius: 0.58 },
-];
-
-export interface PortalPillarInstance {
-  position: readonly [number, number, number];
-  /** Множник до нормалізованої геометрії; її точний aspect задає модель. */
-  scale: readonly [number, number, number];
-  rotationY: number;
-}
-
-/**
- * Розкладка колон для конкретного кадру. Камера дивиться вздовж -Z, тож
- * глибина колони — це distance + |z|.
- */
-/**
- * Скільки колон стоїть у кільці, і на якому радіусі.
- *
- * Кільце, а не два ряди по краях кадру. Ряди були розкладкою під **екран**:
- * колони їхали з аспектом, щоб триматись його країв, і на широкому екрані
- * розходились так, що між ними не лишалось зали — лише два стовпи обабіч.
- * Референс тримається інакше: це кільце колон навколо подіуму, а кадр його
- * просто обрізає. Тоді колонада має власну форму, незалежну від того, у яке
- * вікно на неї дивляться.
- *
- * Радіус — від подіуму, не від кадру: зала оточує артефакт, а не екран.
- */
-export const PORTAL_COLONNADE_COUNT = 18;
-/**
- * Радіус кільця більший за відстань камери, і це вимога, а не запас.
- *
- * Замкнене кільце ставить колони й перед артефактом теж. Поки радіус був
- * менший за відстань камери, ці ближні колони опинялись **між** глядачем і
- * кристалом. Винесене за камеру, кільце тим самим боком проходить позаду неї —
- * у кадр не входить нічого, а аркада лишається замкненою.
- */
-/**
- * Фактична висота колони від підлоги до верхівки капітелі.
- *
- * Раніше 6.6 помилково використовувалось як Y-scale моделі, хоча сама модель
- * уже має висоту 1.3132. У світі колона виростала до 8.67, а п'ята арки
- * лишалась на 3.30 — арка проходила просто крізь середину стовпа, і над нею
- * стирчав випадковий «другий поверх». 3.34 зберігає попередню видиму висоту
- * арки, але тепер це висота самої колони, а не прихований множник.
- */
-const COLONNADE_PILLAR_WORLD_HEIGHT = 3.34;
-const COLONNADE_PILLAR_RADIUS = 0.52;
-export const PORTAL_COLONNADE_RADIUS = 13.2;
-
-/**
- * Кільце замкнене — арка за аркою по всьому колу, без розриву.
- *
- * Тут був сектор, вирізаний перед артефактом: боялися, що замкнене кільце
- * поставить колону просто перед кристалом. Виміряно — не поставить. Кільце
- * стоїть на радіусі PORTAL_COLONNADE_RADIUS, а камера ближча за нього, тож
- * колони «переднього» боку опиняються **позаду глядача** й у кадр не входять
- * узагалі. Розрив нічого не рятував і лише робив аркаду незамкненою рівно там,
- * де її однаково не видно.
+ * Повертається одним `git revert`, якщо власник передумає.
  */
 
-export function portalPillarInstances(
-  frame: PortalCameraFrame,
-  aspect: number,
-): PortalPillarInstance[] {
-  void frame;
-  void aspect;
-  const instances: PortalPillarInstance[] = [];
-  const step = (Math.PI * 2) / PORTAL_COLONNADE_COUNT;
-  for (let index = 0; index < PORTAL_COLONNADE_COUNT; index += 1) {
-    // Півкроку зсуву, щоб жодна колона не стала точно на вісь позаду
-    // артефакта: з парною кількістю рівно одна там і опинялась, і в кадрі це
-    // читалось як чорна щогла, що проходить крізь кристал.
-    const angle = (index + 0.5) * step;
-    // Одна й та сама колона по всьому колу. Розкладка перебирала три різні —
-    // спадок від рядів, де дальша пара мусила бути вищою, щоб перспектива не
-    // читала ряд як сходинку. У кільці всі колони рівновіддалені від центру,
-    // тож різні висоти читаються не як глибина, а як щербатий ряд.
-    const placement = PORTAL_PILLARS[0]!;
-    void placement;
-    instances.push({
-      position: [
-        Math.sin(angle) * PORTAL_COLONNADE_RADIUS,
-        PORTAL_GROUND_Y - PORTAL_FIELD_DROP,
-        Math.cos(angle) * PORTAL_COLONNADE_RADIUS,
-      ],
-      scale: [
-        COLONNADE_PILLAR_RADIUS,
-        COLONNADE_PILLAR_WORLD_HEIGHT / PORTAL_PILLAR_ASPECT,
-        COLONNADE_PILLAR_RADIUS,
-      ],
-      // Капітель має дивитись радіально: випадковий додатковий поворот робив
-      // однакову п'яту арки різною на двох сусідніх колонах.
-      rotationY: Math.atan2(Math.sin(angle), Math.cos(angle)),
-    });
-  }
-  return instances;
-}
-
-/**
- * Арки між **сусідніми** колонами кільця.
- *
- * Це і є те, чого не могла дати попередня розкладка: там колони стояли парами
- * по краях кадру, тож арка між парою перекривала всю його ширину. У кільці
- * сусідки стоять на хорді, і арка над хордою — це проліт аркади, а не
- * перемичка через сцену.
- *
- * Арка ставиться лише там, де стоять **обидві** сусідки: над розривом, що
- * дивиться на глядача, пролягати нічому.
- */
-export function portalArchInstances(
-  frame: PortalCameraFrame,
-  aspect: number,
-): PortalArchInstance[] {
-  const pillars = portalPillarInstances(frame, aspect);
-  const instances: PortalArchInstance[] = [];
-  const step = (Math.PI * 2) / PORTAL_COLONNADE_COUNT;
-  // Сусідні за кільцем, а не за порядком у масиві: пропущені колони розривають
-  // масив, і слідом за ним — аркаду.
-  const spacing = 2 * PORTAL_COLONNADE_RADIUS * Math.sin(step * 0.5);
-  for (let index = 0; index < pillars.length; index += 1) {
-    const left = pillars[index]!;
-    // Замикається: останній проліт іде від крайньої колони до першої, інакше
-    // в замкненому кільці лишався б рівно один порожній прольот.
-    const right = pillars[(index + 1) % pillars.length]!;
-    const dx = right.position[0] - left.position[0];
-    const dz = right.position[2] - left.position[2];
-    const chord = Math.hypot(dx, dz);
-    if (chord > spacing * 1.4) continue;
-    instances.push({
-      position: [
-        (left.position[0] + right.position[0]) * 0.5,
-        left.position[1]
-          + left.scale[1] * PORTAL_PILLAR_ASPECT
-          - ARCH_PILLAR_VERTICAL_OVERLAP,
-        (left.position[2] + right.position[2]) * 0.5,
-      ],
-      scale: [
-        chord * 0.5 + left.scale[0] * ARCH_PILLAR_HORIZONTAL_OVERLAP,
-        ARCH_RISE,
-        left.scale[0],
-      ],
-      // Площина арки мусить стояти вздовж хорди, інакше проліт дивиться
-      // ребром і зникає.
-      rotationY: Math.atan2(dx, dz) + Math.PI / 2,
-    });
-  }
-  return instances;
-}
-
-/**
- * Колона висотою 1 і найбільшим радіусом 1 з цоколем і капітеллю — усе
- * одним buffer'ом, щоб чотири колони пішли одним InstancedMesh.
- * Нормалізація потрібна, щоб `radius` у PORTAL_PILLARS означав саме
- * габарит колони, а не радіус якоїсь її частини.
- */
-export function buildPortalPillarGeometry(): THREE.BufferGeometry {
-  const plinth = new THREE.CylinderGeometry(0.88, 1, 0.06, 8, 1);
-  plinth.translate(0, 0.03, 0);
-  const shaft = new THREE.CylinderGeometry(0.55, 0.67, 0.88, 8, 1);
-  shaft.translate(0, 0.5, 0);
-  const capital = new THREE.CylinderGeometry(0.83, 0.6, 0.06, 8, 1);
-  capital.translate(0, 0.97, 0);
-
-  const merged = mergeGeometries([plinth, shaft, capital]);
-  plinth.dispose();
-  shaft.dispose();
-  capital.dispose();
-  if (merged === null) throw new Error('Portal pillar geometry could not be merged.');
-  merged.computeVertexNormals();
-  return merged;
-}
-
-// ── Підлога храму ───────────────────────────────────────────
-
-/** Де підлога починається і де закінчується, у світових одиницях. */
-const FLOOR_INNER = 0.6;
-const FLOOR_OUTER = 17;
-/**
- * Скільки разів текстура вкладається на один світовий юніт.
- *
- * 0.55 перетворювало великі храмові плити на дрібну сітку: на вузькому
- * телефоні вона зливалася в штрихування й забирала увагу в кристала. 0.14
- * лишає у видимому прольоті кілька великих блоків, як у референсі храму.
- */
-export const PORTAL_FLOOR_TILING = 0.14;
-
-/**
- * Кам'яна підлога навколо подіуму.
- *
- * Кільце, а не диск: усередині стоїть подіум, і плитка під ним — це трикутники,
- * яких ніхто не побачить. Далі сімнадцяти юнітів її з'їдає туман, тож там
- * лишається просте поле.
- *
- * Тут раніше лежала процедурна викладка плит по кільцях — вона робила свою
- * роботу, але власник передав власну плитку, і візерунок, намальований
- * художником, чесніше за будь-яку розкладку, згенеровану з правил. Від
- * попередньої версії лишилась сама ідея кільцевої, а не квадратної розгортки:
- * подіум круглий, друза на його осі, колони розходяться від неї, і квадратна
- * плитка внесла б у сцену другу, чужу вісь.
- *
- * UV — **плоска проєкція згори**, а не полярна. Полярна здавалась логічнішою:
- * плитка гнеться разом із кільцем. На ділі вона зсуває кожну плитку тим
- * сильніше, чим далі від осі — внутрішній край сектора коротший за зовнішній, —
- * і підлога вийшла змазаною в дуги. Плитку кладуть рядами, а не по колу; кільце
- * тут — форма поверхні, а не візерунка на ній.
- */
-export function buildPortalTempleFloorGeometry(): THREE.BufferGeometry {
-  // Кільце пласке — розбиття потрібне лише на кривизну обводу, не на форму.
-  const rings = 6;
-  const sectors = 48;
-  const positions: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
-
-  for (let ring = 0; ring <= rings; ring += 1) {
-    const radius = FLOOR_INNER + (FLOOR_OUTER - FLOOR_INNER) * (ring / rings);
-    for (let sector = 0; sector <= sectors; sector += 1) {
-      const angle = (sector / sectors) * Math.PI * 2;
-      const x = Math.sin(angle) * radius;
-      const z = Math.cos(angle) * radius;
-      positions.push(x, 0, z);
-      uvs.push(x * PORTAL_FLOOR_TILING, z * PORTAL_FLOOR_TILING);
-    }
-  }
-  const stride = sectors + 1;
-  for (let ring = 0; ring < rings; ring += 1) {
-    for (let sector = 0; sector < sectors; sector += 1) {
-      const a = ring * stride + sector;
-      const b = a + 1;
-      const c = a + stride;
-      const d = c + 1;
-      indices.push(a, c, b, b, c, d);
-    }
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  return geometry;
-}
-
-// ── Арки ────────────────────────────────────────────────────
-
-/**
- * Скільки сегментів має половина стрілчастої арки.
- *
- * Вісім. Арка — це силует на тлі неба, а не поверхня, яку розглядають: усе, що
- * від неї видно, — це лінія, де темний камінь межує зі світлим прорізом. Далі
- * восьми сегментів додаються трикутники, яких на цій лінії не відрізнити.
- */
-const ARCH_SEGMENTS = 8;
-
-/**
- * Наскільки центр кола арки зміщений від осі прорізу, у частках півпрольоту.
- *
- * Це і є те, що робить арку **стрілчастою**, а не півкруглою. Стрілчаста арка —
- * два дуги, чиї центри рознесені: кожна починається вертикально від капітелі й
- * сходиться з іншою під кутом угорі. Нуль дав би римський півциркуль, який на
- * референсі якраз не той — там гострий верх, і саме він тягне око вгору.
- */
-const ARCH_POINT = 0.55;
-
-/** Товщина арки вздовж прольоту, у частках півпрольоту. */
-const ARCH_THICKNESS = 0.22;
-/** Наскільки арка глибша за колону, щоб не читалась як пласка накладка. */
-const ARCH_DEPTH = 1.05;
-
-/**
- * Стрілчаста арка одиничного прольоту: півпроліт 1, п'ята на y=0, вістря вгорі.
- *
- * Будується як смуга — два кільця точок, внутрішнє й зовнішнє, — а не як
- * витягнутий профіль: проліт у кожної пари колон свій, і смуга масштабується
- * під нього по x, лишаючи товщину постійною по y. Витягування дало б арку, що
- * товщає разом із прольотом.
- *
- * Одна геометрія на всі арки, як і в колон, щоб вони пішли одним
- * InstancedMesh.
- */
-export function buildPortalArchGeometry(): THREE.BufferGeometry {
-  const positions: number[] = [];
-  const indices: number[] = [];
-
-  // Дуга правої половини: центр зміщено вліво від правої п'яти, тож дуга
-  // виходить із неї вертикально й приходить до осі під кутом.
-  const centerX = -ARCH_POINT;
-  const radius = 1 - centerX;
-  // Кут, під яким дуга перетинає вісь прольоту, — там вона й обривається,
-  // зустрічаючись із дзеркальною половиною.
-  const meetAngle = Math.acos(-centerX / radius);
-
-  const ring = (offset: number): number => {
-    const first = positions.length / 3;
-    for (let step = 0; step <= ARCH_SEGMENTS; step += 1) {
-      const angle = (step / ARCH_SEGMENTS) * meetAngle;
-      positions.push(
-        centerX + Math.cos(angle) * (radius + offset),
-        Math.sin(angle) * (radius + offset),
-        0,
-      );
-    }
-    return first;
-  };
-  const inner = ring(0);
-  const outer = ring(ARCH_THICKNESS);
-  for (let step = 0; step < ARCH_SEGMENTS; step += 1) {
-    const a = inner + step;
-    const b = inner + step + 1;
-    const c = outer + step;
-    const d = outer + step + 1;
-    indices.push(a, c, b, b, c, d);
-  }
-
-  const half = new THREE.BufferGeometry();
-  half.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  half.setIndex(indices);
-
-  // Дзеркало по x дає ліву половину. Віддзеркалення обертає намотку, тож
-  // індекси розвертаються назад — інакше половина арки зникає під відсіканням
-  // задніх граней.
-  const mirrored = half.clone();
-  const mirroredPositions = mirrored.getAttribute('position');
-  for (let index = 0; index < mirroredPositions.count; index += 1) {
-    mirroredPositions.setX(index, -mirroredPositions.getX(index));
-  }
-  const mirroredIndex = Array.from(mirrored.getIndex()!.array);
-  for (let offset = 0; offset < mirroredIndex.length; offset += 3) {
-    const swap = mirroredIndex[offset]!;
-    mirroredIndex[offset] = mirroredIndex[offset + 2]!;
-    mirroredIndex[offset + 2] = swap;
-  }
-  mirrored.setIndex(mirroredIndex);
-
-  const flat = mergeGeometries([half, mirrored]);
-  half.dispose();
-  mirrored.dispose();
-  if (flat === null) throw new Error('Portal arch geometry could not be merged.');
-
-  // Товщина по z. Без неї арка — площина, яка зникає, щойно камера відходить
-  // від осі, а колонада на широкому екрані дивиться на глядача збоку.
-  const solid = mergeGeometries([
-    flat.clone().translate(0, 0, ARCH_DEPTH * 0.5),
-    flat.clone().translate(0, 0, -ARCH_DEPTH * 0.5),
-  ]);
-  flat.dispose();
-  if (solid === null) throw new Error('Portal arch geometry could not be extruded.');
-  solid.computeVertexNormals();
-  return solid;
-}
-
-export interface PortalArchInstance {
-  position: readonly [number, number, number];
-  scale: readonly [number, number, number];
-  rotationY: number;
-}
-
-/**
- * Наскільки торець арки заходить за вісь колони.
- *
- * Половина радіуса центрує вузьку профільовану п'яту на капітелі. Старій
- * прямокутній стіні такий overlap справді створив би наплив; новий архівольт
- * торкається y=0 лише в межах власної кам'яної стрічки.
- */
-const ARCH_PILLAR_HORIZONTAL_OVERLAP = 0.5;
-
-/**
- * Вертикальне перекриття п'яти арки з верхівкою капітелі.
- *
- * Нуль ризикує показати волосяну щілину через похибку матриці; велике
- * значення знову втопить арку в стовпі. Це перекриття менше десятої радіуса
- * колони й існує лише як безпечний шов.
- */
-const ARCH_PILLAR_VERTICAL_OVERLAP = 0.035;
-/**
- * Підйом арки над п'ятою, у світових одиницях.
- *
- * Опущено з 2.4: вістря опинялось під шапкою інтерфейсу, тобто арка була в
- * кадрі, але не на екрані. Портал — це не рендер у вакуумі, і верхня третина
- * його вікна зайнята текстом.
- */
-const ARCH_RISE = 1.6;
-
-// ── Світло на колонах ───────────────────────────────────────
-
-/**
- * Де на колоні стоїть вогонь, як частка її висоти.
- *
- * Не під капітеллю, хоч там йому й місце за архітектурою: капітель передньої
- * пари лежить вище за верхній край кадру, тож вогонь було видно лише тому, хто
- * задере камеру. Джерело світла, якого не видно, — це не джерело світла, а
- * просто світло нізвідки. На цій висоті він у кадрі на кожному аспекті.
- */
-const LAMP_HEIGHT_SHARE = 0.6;
-
-/** Наскільки вогонь винесений усередину, до кристала, від осі колони. */
-const LAMP_INSET = 0.62;
-
-/**
- * Скільки колон несуть справжнє джерело світла.
- *
- * Два, і це не економія на вигляді, а на кадрі: кожен point light додає роботи
- * в кожному фрагменті кожного матеріалу сцени. Вогні горять на **всіх** колонах
- * — це геометрія, вона майже безкоштовна, — але освітлює кристал лише передня
- * пара, бо саме вона стоїть із того боку, з якого на нього дивляться. Задні
- * дали б контровий підсвіт, який тут уже є від directionalLight.
- */
-export const PORTAL_LAMP_LIGHT_COUNT = 2;
-
-export interface PortalLampInstance {
-  position: readonly [number, number, number];
-  /** Чи від цього вогню запалюється справжнє джерело світла. */
-  lit: boolean;
-}
-
-/**
- * Вогні на колонах для конкретного кадру.
- *
- * Порядок той самий, що в `portalPillarInstances`, і це не збіг: вогонь мусить
- * стояти рівно на своїй колоні, а колони їдуть із кадром камери. Виводити їх
- * окремо означало б два джерела правди для однієї позиції.
- */
-export function portalLampInstances(
-  frame: PortalCameraFrame,
-  aspect: number,
-): PortalLampInstance[] {
-  const pillars = portalPillarInstances(frame, aspect);
-  // Горять на всіх, світять двоє — найближчі до глядача за азимутом. Вони
-  // єдині дивляться на кристал із того боку, з якого на нього дивляться;
-  // решта дала б контровий підсвіт, який тут уже є від directionalLight.
-  const towardCamera = pillars.map(
-    (pillar) => Math.abs(Math.atan2(pillar.position[0], pillar.position[2])),
-  );
-  const nearest = [...towardCamera].sort((left, right) => left - right).slice(0, PORTAL_LAMP_LIGHT_COUNT);
-  const litThreshold = nearest[nearest.length - 1] ?? 0;
-  return pillars.map((pillar, index) => {
-    const height = pillar.scale[1] * PORTAL_PILLAR_ASPECT * LAMP_HEIGHT_SHARE;
-    // Усередину кільця, до осі — не «вліво/вправо», що мало сенс лише поки
-    // колони стояли двома рядами.
-    const radius = Math.hypot(pillar.position[0], pillar.position[2]) || 1;
-    const inset = pillar.scale[0] * LAMP_INSET;
-    return {
-      position: [
-        pillar.position[0] * (1 - inset / radius),
-        pillar.position[1] + height,
-        pillar.position[2] * (1 - inset / radius),
-      ] as const,
-      lit: towardCamera[index]! <= litThreshold + 1e-9,
-    };
-  });
-}
-
-/**
- * Чаша вогню: маленька, гранована, з тією ж кількістю сторін, що й колона.
- *
- * Нормалізована так само, як колона, — радіусом 1, — тож масштаб інстансу
- * означає саме габарит вогню.
- */
-export function buildPortalLampGeometry(): THREE.BufferGeometry {
-  const bowl = new THREE.CylinderGeometry(1, 0.5, 0.55, 8, 1);
-  bowl.translate(0, 0.28, 0);
-  // Вузьке й високе. Перший конус був майже такої ж ширини, як чаша, і читався
-  // як шпиль на колоні, а не як вогонь у ній.
-  const flame = new THREE.ConeGeometry(0.62, 1.8, 8, 1);
-  flame.translate(0, 1.4, 0);
-
-  const merged = mergeGeometries([bowl, flame]);
-  bowl.dispose();
-  flame.dispose();
-  if (merged === null) throw new Error('Portal lamp geometry could not be merged.');
-  merged.computeVertexNormals();
-  return merged;
-}
-
-/** Габарит вогню в одиницях сцени. */
-export const PORTAL_LAMP_RADIUS = 0.19;
-
-// ── Зорі ────────────────────────────────────────────────────
-
-export interface PortalStarField {
-  positions: Float32Array;
-  colors: Float32Array;
-  count: number;
-}
-
-const STAR_SHELL_RADIUS = 34;
-
-/**
- * Зорі на сферичній оболонці, лише над горизонтом. Насіння — artifactSeed
- * пари: небо в кожної пари своє, але однакове при кожному відкритті.
- */
-export function buildPortalStarField(seed: number, count: number): PortalStarField {
-  const random = mulberry32(seed ^ 0x5f37);
-  const positions = new Float32Array(count * 3);
-  const colors = new Float32Array(count * 3);
-
-  for (let index = 0; index < count; index += 1) {
-    const azimuth = random() * Math.PI * 2;
-    // Зміщення в бік зеніту: біля горизонту зорі майже не видно крізь
-    // туман, і рівномірний розподіл витратив би на них половину поля.
-    const elevation = Math.asin(0.06 + random() * 0.94);
-    const radius = STAR_SHELL_RADIUS * (0.86 + random() * 0.14);
-    positions[index * 3] = Math.cos(elevation) * Math.cos(azimuth) * radius;
-    positions[index * 3 + 1] = Math.sin(elevation) * radius;
-    positions[index * 3 + 2] = Math.cos(elevation) * Math.sin(azimuth) * radius;
-
-    // Розкид яскравості важливіший за кількість: рівні зорі читаються як
-    // шум, нерівні — як глибина.
-    const brightness = 0.24 + random() * 0.76;
-    const warmth = random();
-    colors[index * 3] = brightness;
-    colors[index * 3 + 1] = brightness * (0.9 + warmth * 0.1);
-    colors[index * 3 + 2] = brightness * (0.94 + (1 - warmth) * 0.06);
-  }
-
-  return { positions, colors, count };
-}
 
 // ── Палітра ─────────────────────────────────────────────────
 
 export interface PortalPalette {
+  /** Імла зали. Не небо: печера — це замкнений простір. */
   fog: string;
-  field: string;
-  dais: string;
-  daisEmissive: string;
-  /** Ритуальна плита — той самий камінь, що подіум, але світліший на зламі. */
-  slab: string;
-  /** Скаляр PBR-карти підлоги: камінь матовий в обох порах доби. */
-  floorRoughness: number;
-  /** Сила мікрорельєфу швів; уночі трохи вища, бо розсіяного світла менше. */
-  floorNormalScale: number;
-  /** Різьблення на кільці плити. */
-  rune: string;
-  runeGlow: string;
-  inlay: string;
-  pillar: string;
-  /** Presentation-only life between the reliquary and the colonnade. */
-  decorRock: string;
-  decorRockAccent: string;
-  decorMoss: string;
-  decorGrass: string;
-  decorPlinth: string;
-  decorBanner: string;
-  decorVine: string;
-  decorVineAccent: string;
-  decorCrystal: string;
-  decorCrystalGlow: string;
-  decorCrystalEmissive: number;
-  celestialArc: string;
-  celestialArcOpacity: number;
-  haze: string;
-  hazeOpacity: number;
-  /** Чаша вогню на колоні. */
-  lamp: string;
-  /** Саме полум'я — і колір джерела світла, що від нього запалюється. */
-  lampGlow: string;
-  lampIntensity: number;
-  starOpacity: number;
-  daisLight: string;
-  daisLightIntensity: number;
-  /* ── Світло сцени ─────────────────────────────────────────
-     Було спільними константами на обидві теми, і поки обидві були ніччю,
-     цього вистачало. Денний храм із нічним ambient — це білий мармур у
-     темряві, тобто та сама ніч, лише перефарбована; денне світло не
-     виводиться з нічного множенням.
-
-     ПОЗИЦІЇ ключа й заливки лишаються спільними (`PORTAL_KEY_LIGHT`,
-     `PORTAL_RIM_LIGHT`): §10 каже, звідки падає ключ, і це композиція
-     сцени, а не властивість пори доби. */
-  ambient: number;
-  hemisphere: number;
-  keyIntensity: number;
-  keyColour: string;
-  rimIntensity: number;
-  rimColour: string;
   /* ── Печера (ADR-0117) ────────────────────────────────────
-     Світом кристала стала кристальна печера замість храму. Камінь,
-     підлога, друза по стінах і розлом у склепінні — чотири ролі, і
-     кожна є в обох порах доби, бо тема міняє світло, а не продукт.
+     Камінь, підлога, друза по стінах і розлом у склепінні. Кожна роль є
+     в обох порах доби, бо тема міняє світло, а не продукт.
 
-     У печері немає полудня, тож світла тема — це не «той самий храм при
+     У печері немає полудня, тож світла тема — не «той самий храм при
      сонці», а та сама печера під ДЕННИМ ПРОМЕНЕМ крізь розлом. Звідси
      дві різниці, які не виводяться множенням нічних чисел: удень
-     світиться розлом, а не друза, і туман удень — кам'яна імла, а не
-     небо. Небесний туман робив залу відкритим простором. */
+     світиться розлом, а не друза, і туман удень — кам'яна імла. */
   /** Камінь стін і склепіння. */
   caveRock: string;
   /** Підлога зали — темніша за стіни: на неї падає найменше з розлому. */
@@ -1397,17 +376,25 @@ export interface PortalPalette {
   oculus: string;
   /** Сила світла, яке падає з розлому вниз. */
   oculusIntensity: number;
-  /** Сила світіння фіолетового скла в кільці реліквіарію. */
-  inlayEmissive: number;
-  /* Металевість реліквіарію.
-     ------------------------------------------------------------
-     Роль, а не константа, з фізичної причини. Метал у three бере колір
-     переважно з відображень, а в сцені немає карти оточення — тож при
-     0.72 бронза не бачить довкола себе нічого й темніє незалежно від
-     власного кольору. Уночі це правильно: реліквіарій має тонути в
-     темряві. Опівдні той самий метал давав каламутний бурий диск на
-     білому мармурі — те, чого при сонці не буває. */
-  daisMetalness: number;
+  /* ── Світло сцени ─────────────────────────────────────────
+     Позиції ключа й заливки спільні на обидві пори доби
+     (`PORTAL_KEY_LIGHT`, `PORTAL_RIM_LIGHT`): §10 каже, звідки падає
+     ключ, і це композиція сцени, а не властивість пори доби. */
+  ambient: number;
+  hemisphere: number;
+  keyIntensity: number;
+  keyColour: string;
+  rimIntensity: number;
+  rimColour: string;
+  /**
+   * Слабке світло від кореня артефакта (§10 брифу).
+   *
+   * Називалось `daisLight`, поки під кристалом стояв подіум. Подіуму
+   * немає (ADR-0117), а світло лишилось — воно й було не про подіум, а
+   * про те, що жила світиться знизу.
+   */
+  rootLight: string;
+  rootLightIntensity: number;
 }
 
 /**
@@ -1432,32 +419,6 @@ export const PORTAL_RIM_LIGHT = {
 };
 
 /**
- * Куди дістає вогонь однієї лампи.
- *
- * Рівно до краю подіуму й не далі, на будь-якому віці стосунків. Було
- * `frame.distance * 1.35` — межа їхала за камерою, а камера відходить разом
- * із кристалом, тож у молодої пари вогонь не діставав навіть до половини
- * відстані, а у двадцятип'ятирічної мив геть усе разом із подіумом і кидав на
- * артефакт 0.15 помаранчевого (#ff8c34). §10 забороняє жовте джерело.
- *
- * Рахується від власної позиції лампи: лампи трохи втоплені всередину відносно
- * колон, тож константа колонади перелетіла б через край подіуму саме на цю
- * різницю.
- */
-export function portalLampReach(
-  lampPosition: readonly [number, number, number],
-  daisScale: number,
-): number {
-  const fromCentre = Math.hypot(lampPosition[0], lampPosition[2]);
-  const daisRadius = PORTAL_DAIS_TOP_RADIUS * Math.max(1, daisScale);
-  // Донизу, а не до найближчого. Округлення до найближчого може перелетіти
-  // край подіуму на кілька мікрон — нешкідливо на око, але тоді гарантія
-  // «не дістає до артефакта» тримається в межах похибки, а не за побудовою,
-  // і перший, хто змінить тут кількість знаків, зламає її мовчки.
-  return Math.max(1, Math.floor((fromCentre - daisRadius) * 10_000) / 10_000);
-}
-
-/**
  * Дві пори доби одного місця.
  *
  * Раніше портал був нічною сценою в обох темах, а світла лише теплішою.
@@ -1474,77 +435,17 @@ export function portalLampReach(
  * Ті самі ролі, що й у --portal-* токенах CSS, тільки для WebGL.
  */
 export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
-  // ── Полудень ──────────────────────────────────────────────
+  // ── Печера під денним променем ────────────────────────────
   light: {
     /*
      * Туман — КАМ'ЯНА ІМЛА, а не небо.
      *
      * Тут стояв `#cfe3f4` із поясненням «удалині храм має танути в небі,
      * і це те, що робить сцену відкритою, а не залою». Відколи сцена
-     * САМЕ ЗАЛА (ADR-0117), небесний туман працює точно навпаки: він
-     * вимиває дальню стіну до кольору неба, і печера читається відкритим
-     * простором із камінням.
+     * САМЕ ЗАЛА, небесний туман працює точно навпаки: він вимиває дальню
+     * стіну до кольору неба, і печера читається відкритим простором.
      */
     fog: '#9d94a8',
-    field: '#e9e3d7',
-    dais: '#e3d6bb',
-    // Емісії вдень немає: подіум, що світиться при сонці, читається як
-    // помилка матеріалу, а не як святиня.
-    daisEmissive: '#000000',
-    slab: '#f0eade',
-    floorRoughness: 1,
-    floorNormalScale: 0.18,
-    rune: '#b3a288',
-    runeGlow: '#a37ce8',
-    inlay: '#8b5fd8',
-    pillar: '#f0e9dc',
-    decorRock: '#aaa7ae',
-    decorRockAccent: '#c5c1c8',
-    decorMoss: '#879676',
-    decorGrass: '#71865f',
-    decorPlinth: '#8d859d',
-    decorBanner: '#66527f',
-    decorVine: '#4f7654',
-    decorVineAccent: '#71926a',
-    decorCrystal: '#bca9e8',
-    decorCrystalGlow: '#9469da',
-    decorCrystalEmissive: 0.32,
-    celestialArc: '#8176b9',
-    celestialArcOpacity: 0.09,
-    haze: '#aebde3',
-    hazeOpacity: 0.075,
-    lamp: '#c9bda6',
-    lampGlow: '#ff9c47',
-    // 11 → 2.4. Вогонь у чаші при сонці майже не читається, і це правда, а
-    // не економія: полум'я на 11 вдень дало б помаранчеві плями на білому
-    // мармурі — те, чого опівдні не буває.
-    lampIntensity: 2.4,
-    // Зорі опівдні не видно. Нуль, а не «майже нуль»: точки на 0.05 усе одно
-    // проступають на рівному небі сіткою.
-    starOpacity: 0,
-    daisLight: '#dfd6ee',
-    // Світло від кореня, а не прожектор перед кристалом. Було 2.6 — виміряно
-    // як найсильніше джерело сцени, сильніше за ключ удвічі-втричі там, де
-    // кристал найширший. Див. розгортку в PortalEnvironment.
-    daisLightIntensity: 0.5,
-    // Денна заливка вчетверо сильніша за нічну — інакше білий мармур
-    // читається сірим. Ключ піднятий разом із нею: §10 вимагає відношення,
-    // а не абсолютного числа, і воно лишається 1.88 у найгіршій точці.
-    ambient: 0.42,
-    hemisphere: 0.55,
-    keyIntensity: 3.4,
-    /** Сонце: тепле біле. Не жовте — §10. */
-    keyColour: '#fff1ec',
-    rimIntensity: 0.3,
-    /** Відбите небо: прохолодне блакитне, навпроти сонця. */
-    rimColour: '#cfe0ff',
-    // Матеріал іде повз тонмапінг (`toneMapped={false}`), тож на 2.15 кільце
-    // світилось однаково і вночі, і опівдні — тобто вдень виглядало
-    // неоновою трубкою на мармурі. Удень скло МАЄ бути темнішим за сонце,
-    // інакше воно не скло, а лампа.
-    // 2.15 → 0.28. Перша спроба на 0.55 усе одно давала фіолетову трубку:
-    // матеріал іде повз тонмапінг, тож «трохи менше» тут не працює —
-    // світіння при сонці має бути на порядок слабшим, а не на третину.
     // Камінь удень видно, але це камінь у печері: сірий із теплим
     // підпалом від променя, а не білий мармур.
     caveRock: '#8a8090',
@@ -1555,43 +456,47 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     caveDruseEmissive: 0.2,
     oculus: '#e8f1fb',
     oculusIntensity: 2.1,
-    inlayEmissive: 0.28,
-    daisMetalness: 0.3,
+    // Денна заливка вчетверо сильніша за нічну. Ключ піднятий разом із
+    // нею: §10 вимагає відношення, а не абсолютного числа.
+    ambient: 0.42,
+    hemisphere: 0.55,
+    keyIntensity: 3.4,
+    /** Сонце: тепле біле. Не жовте — §10. */
+    keyColour: '#fff1ec',
+    rimIntensity: 0.3,
+    /** Відбите небо: прохолодне блакитне, навпроти сонця. */
+    rimColour: '#cfe0ff',
+    rootLight: '#dfd6ee',
+    // Світло від кореня, а не прожектор перед кристалом. Було 2.6 —
+    // виміряно як найсильніше джерело сцени, сильніше за ключ
+    // удвічі-втричі там, де кристал найширший.
+    rootLightIntensity: 0.5,
   },
-  // ── Ніч ───────────────────────────────────────────────────
+  // ── Печера при світлі жеоди ───────────────────────────────
   dark: {
     fog: '#221a33',
-    field: '#1b1428',
-    dais: '#5b362e',
-    daisEmissive: '#10070a',
-    slab: '#494757',
-    floorRoughness: 1,
-    floorNormalScale: 0.26,
-    rune: '#1d1115',
-    runeGlow: '#b96ff2',
-    inlay: '#9747d8',
-    pillar: '#4b4070',
-    decorRock: '#494653',
-    decorRockAccent: '#625c6d',
-    decorMoss: '#344b3f',
-    decorGrass: '#3e5848',
-    decorPlinth: '#373043',
-    decorBanner: '#2d1f43',
-    decorVine: '#29463a',
-    decorVineAccent: '#3d6750',
-    decorCrystal: '#b987f2',
-    decorCrystalGlow: '#a54fe8',
-    decorCrystalEmissive: 2.05,
-    celestialArc: '#846dd1',
-    celestialArcOpacity: 0.16,
-    haze: '#705ab5',
-    hazeOpacity: 0.14,
-    lamp: '#1b1628',
-    lampGlow: '#ff8c34',
-    lampIntensity: 13,
-    starOpacity: 1,
-    daisLight: '#b891dd',
-    daisLightIntensity: 0.42,
+    /*
+     * ЧОМУ КАМІНЬ СВІТЛІШИЙ, НІЖ «ніч у печері».
+     *
+     * Перша пара була `#241d33` / `#1a1526`, і кадр показав чорноту:
+     * базовий колір множиться на яскравість грані (0.4–1.0) і ще раз
+     * гаситься туманом, який на дальній стіні дає близько третини. Три
+     * множники поспіль — і темний камінь стає нулем.
+     */
+    caveRock: '#4b3f6b',
+    caveFloor: '#382f52',
+    caveDruse: '#a670e8',
+    /*
+     * 1.4 → 0.55. Друза світилась як ЛАМПА: при такій емісії кристал на
+     * стіні яскравіший за камінь навколо вчетверо й перестає читатись
+     * мінералом. Уночі в печері має світитись артефакт; друза лише ловить
+     * його світло й трохи тримає власне, щоб не зникнути в тіні.
+     */
+    caveDruseEmissive: 0.55,
+    // Нічне небо в розломі: майже темрява, але не чорнота — інакше
+    // розлом читається дірою в моделі.
+    oculus: '#2a2444',
+    oculusIntensity: 0.32,
     ambient: 0.1,
     hemisphere: 0.24,
     keyIntensity: 1.9,
@@ -1600,34 +505,7 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     rimIntensity: 0.26,
     /** Прохолодний бузковий. */
     rimColour: '#cfc4f5',
-    /*
-     * ЧОМУ КАМІНЬ СВІТЛІШИЙ, НІЖ «ніч у печері».
-     *
-     * Перша пара була `#241d33` / `#1a1526`, і кадр показав чорноту:
-     * базовий колір множиться на яскравість грані (0.4–1.0) і ще раз
-     * гаситься туманом, який на стіні за одинадцять одиниць дає близько
-     * третини. Три множники поспіль — і темний камінь стає нулем.
-     *
-     * Тобто колір тут не «як виглядає камінь», а «що лишиться від нього
-     * після трьох множень».
-     */
-    caveRock: '#4b3f6b',
-    caveFloor: '#382f52',
-    caveDruse: '#a670e8',
-    /*
-     * 1.4 → 0.55. Друза світилась як ЛАМПА: при такій емісії кристал на
-     * стіні яскравіший за камінь навколо вчетверо й перестає читатись
-     * мінералом — світиться сам собою в темряві.
-     *
-     * Уночі в печері справді має світитись артефакт; друза лише ловить
-     * його світло й трохи тримає власне, щоб не зникнути в тіні.
-     */
-    caveDruseEmissive: 0.55,
-    // Нічне небо в розломі: майже темрява, але не чорнота — інакше
-    // розлом читається дірою в моделі.
-    oculus: '#2a2444',
-    oculusIntensity: 0.32,
-    inlayEmissive: 2.45,
-    daisMetalness: 0.72,
+    rootLight: '#b891dd',
+    rootLightIntensity: 0.42,
   },
 };

@@ -1,13 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  PORTAL_DAIS_TOP_RADIUS,
   PORTAL_KEY_LIGHT,
   PORTAL_PALETTES,
   PORTAL_RIM_LIGHT,
-  portalCameraFrame,
-  portalDaisScale,
-  portalLampInstances,
-  portalLampReach,
 } from './portalScene';
 
 /** Обидві пори доби одного місця. §10 має триматись у кожній окремо. */
@@ -92,50 +87,54 @@ describe('світло порталу (§10 брифу кристала)', () =>
     expect(day.ambient).toBeGreaterThan(night.ambient * 2);
     expect(day.hemisphere).toBeGreaterThan(night.hemisphere * 2);
     expect(day.keyIntensity).toBeGreaterThan(night.keyIntensity);
-    // Зорі опівдні не видно, а вогонь у чашах при сонці майже не читається.
-    expect(day.starOpacity).toBe(0);
-    expect(day.lampIntensity).toBeLessThan(night.lampIntensity / 2);
+    /*
+     * У печері день і ніч розрізняє РОЗЛОМ і ДРУЗА, а не зорі й вогонь у
+     * чашах: удень крізь тріщину в склепінні падає промінь, уночі
+     * світиться сам камінь. Тому обидві перевірки перевернуті проти
+     * храмових — сильніше вдень одне, сильніше вночі інше.
+     */
+    expect(day.oculusIntensity).toBeGreaterThan(night.oculusIntensity * 4);
+    expect(night.caveDruseEmissive).toBeGreaterThan(day.caveDruseEmissive * 2);
   });
 
-  it('лишає камінь підлоги матовим і читабельним в обох темах', () => {
+  it('камінь печери — це камінь в обох порах доби, а не два різні місця', () => {
+    /*
+     * Тут стояла перевірка матовості підлоги храму (`floorRoughness`,
+     * `floorNormalScale`) — ролі, яких у печери немає: її камінь
+     * намальований вершинним кольором, а не освітлений PBR-картою.
+     *
+     * Перевіряється те, що лишилось правдою: удень камінь СВІТЛІШИЙ, але
+     * це той самий камінь — стіни ясніші за підлогу в обох темах, бо
+     * світло падає згори.
+     */
+    const luminance = (hex: string): number => {
+      const value = Number.parseInt(hex.slice(1), 16);
+      return ((value >> 16) & 255) * 0.2126
+        + ((value >> 8) & 255) * 0.7152
+        + (value & 255) * 0.0722;
+    };
     const day = PORTAL_PALETTES.light;
     const night = PORTAL_PALETTES.dark;
-    for (const theme of THEMES) {
-      const floor = PORTAL_PALETTES[theme];
-      expect(floor.floorRoughness, theme).toBeGreaterThanOrEqual(0.9);
-      expect(floor.floorNormalScale, theme).toBeGreaterThan(0);
-      expect(floor.floorNormalScale, theme).toBeLessThanOrEqual(0.3);
-    }
-
-    expect(day.slab).not.toBe(night.slab);
-    expect(day.floorNormalScale).toBeLessThan(night.floorNormalScale);
-  });
-
-  it('не має жодного жовтого джерела, що дістає до кристала', () => {
-    // Полум'я в чашах лишається помаранчевим — це декорація сцени, і §10
-    // говорить про світло на артефакті. Перевіряється саме те: скільки його
-    // доходить. Відповідь має бути «нічого», на будь-якому віці стосунків.
+    expect(luminance(day.caveRock)).toBeGreaterThan(luminance(night.caveRock));
     for (const theme of THEMES) {
       const palette = PORTAL_PALETTES[theme];
-      expect(isYellowish(palette.daisLight), `${theme} корінь`).toBe(false);
+      expect(luminance(palette.caveRock), theme)
+        .toBeGreaterThan(luminance(palette.caveFloor));
+    }
+  });
 
-      for (const [radius, height] of [[0.4, 0.9], [1.2, 2.6], [2.4, 5.5]] as const) {
-        const frame = portalCameraFrame(0.46, radius, height);
-        const daisScale = portalDaisScale(radius);
-        const daisRadius = PORTAL_DAIS_TOP_RADIUS * daisScale;
-        for (const lamp of portalLampInstances(frame, 0.46).filter((one) => one.lit)) {
-          const reach = portalLampReach(lamp.position, daisScale);
-          const fromCentre = Math.hypot(lamp.position[0], lamp.position[2]);
-          // Вогонь зупиняється рівно на краю подіуму. Артефакт стоїть на
-          // подіумі, тож далі за край йому нічого не дістається.
-          expect(fromCentre - reach, `${theme} ${radius}`).toBeGreaterThanOrEqual(
-            daisRadius - 1e-6,
-          );
-          // І сама межа не залежить від камери — була `frame.distance * 1.35`,
-          // тобто їхала за нею: 4.3 у молодої пари й 34.6 у двадцятип'ятирічної.
-          expect(reach).toBe(portalLampReach(lamp.position, daisScale));
-        }
-      }
+  it('не має жодного жовтого джерела в сцені', () => {
+    /*
+     * §10 забороняє жовте світло на артефакті. Перевірка була про чаші
+     * вогню на колонах — їх немає разом із колонадою (ADR-0117), — тож
+     * лишається те, що світить сьогодні: корінь, ключ, заливка й розлом.
+     */
+    for (const theme of THEMES) {
+      const palette = PORTAL_PALETTES[theme];
+      expect(isYellowish(palette.rootLight), `${theme} корінь`).toBe(false);
+      expect(isYellowish(palette.keyColour), `${theme} ключ`).toBe(false);
+      expect(isYellowish(palette.rimColour), `${theme} заливка`).toBe(false);
+      expect(isYellowish(palette.oculus), `${theme} розлом`).toBe(false);
     }
   });
 
@@ -156,7 +155,7 @@ describe('світло порталу (§10 брифу кристала)', () =>
       for (const height of [0.9, 2.6, 5.5]) {
         for (let share = 0.02; share <= 0.98; share += 0.08) {
           const toRoot = Math.hypot(0, height * share - 0.35, 0.9);
-          const root = palette.daisLightIntensity * attenuation(toRoot, 6.5);
+          const root = palette.rootLightIntensity * attenuation(toRoot, 6.5);
           const ratio = palette.keyIntensity / (fixedFill + root);
           expect(ratio, `${theme} h=${height} ${share.toFixed(2)}`).toBeGreaterThan(1.3);
         }
@@ -169,7 +168,7 @@ describe('світло порталу (§10 брифу кристала)', () =>
     // На ground+1.15 низ отримував менше за верх (0.43 від нього), тобто
     // світло падало згори; на ground+0.35 низ отримує у 2.4 раза більше.
     for (const theme of THEMES) {
-      const intensity = PORTAL_PALETTES[theme].daisLightIntensity;
+      const intensity = PORTAL_PALETTES[theme].rootLightIntensity;
       const height = 2.6;
       const atFoot = intensity * attenuation(Math.hypot(0, 0.02 * height - 0.35, 0.9), 6.5);
       const atTip = intensity * attenuation(Math.hypot(0, 0.9 * height - 0.35, 0.9), 6.5);
