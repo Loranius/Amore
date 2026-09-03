@@ -16,6 +16,13 @@
 //
 // Тут немає жодного рішення про ріст. Тільки «сходити й принести».
 // ============================================================
+import type { DeclaredCounts, DeclaredKind } from '@/features/onboarding/declaredCounts';
+import {
+  DECLARED_COUNTS_KEY,
+  padSnapshotWithDeclared,
+  parseDeclaredCounts,
+} from '@/features/onboarding/declaredCounts';
+import { relationshipYears } from '@/engine/species/shared/relationshipYear';
 import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
 import { supabase } from '@/lib/supabase';
 import type { EvolutionSourceSnapshot } from '@/engine/evolution/adapters';
@@ -24,13 +31,25 @@ import {
   evolutionWishlistFromPairArchive,
 } from '@/features/home/crystal3d/evolution/sourceSnapshot';
 
+import { COUPLE_TIME_ZONE } from './coupleEngine';
+
 export { COUPLE_TIME_ZONE, ENGINE_VERSION } from './coupleEngine';
 
 export interface PortalSources {
   relationshipStartedAt: string;
   userIds: number[];
   sharedDaysOff: string[];
+  /** Уже З ДОМІШКОЮ сказаних чисел — див. кінець `fetchPortalSources`. */
   snapshot: EvolutionSourceSnapshot;
+  /** Що пара назвала числом, як воно лежить у `settings`. */
+  declared: DeclaredCounts;
+  /**
+   * Скільки з названого ще не має справжнього рядка — по роках і родах.
+   *
+   * Рахується РАЗОМ із домішкою й іншого разу порахуватись не може: у
+   * знімку вище її рядки вже лежать (`PaddedSnapshot.gaps`).
+   */
+  declaredGaps: Record<string, Record<DeclaredKind, number>>;
 }
 
 export function coupleDay(date: Date, timeZone: string): string {
@@ -49,6 +68,7 @@ export function coupleDay(date: Date, timeZone: string): string {
 export async function fetchPortalSources(): Promise<PortalSources> {
   const [
     startDateResult,
+    declaredResult,
     usersResult,
     eventsResult,
     plansResult,
@@ -63,6 +83,11 @@ export async function fetchPortalSources(): Promise<PortalSources> {
       .from('settings')
       .select('value')
       .eq('key', 'relationship_start_date')
+      .maybeSingle(),
+    supabase
+      .from('settings')
+      .select('value')
+      .eq('key', DECLARED_COUNTS_KEY)
       .maybeSingle(),
     supabase.from('users').select('id').order('id', { ascending: true }),
     supabase
@@ -94,6 +119,17 @@ export async function fetchPortalSources(): Promise<PortalSources> {
   ]);
 
   if (startDateResult.error) throw startDateResult.error;
+  /*
+   * Сказані числа НЕ ЗУПИНЯЮТЬ читання порталу.
+   *
+   * Це єдине джерело тут, без якого артефакт лишається правдивим — просто
+   * трохи меншим. Кинути виняток означало б, що зіпсований запис в одному
+   * рядку `settings` гасить пари всю головну; тому помилка мовчки стає
+   * порожнечею, як і нерозбірливе значення (`parseDeclaredCounts`).
+   */
+  const declared = declaredResult.error
+    ? {}
+    : parseDeclaredCounts(declaredResult.data?.value);
   if (usersResult.error) throw usersResult.error;
   if (eventsResult.error) throw eventsResult.error;
   if (plansResult.error) throw plansResult.error;
@@ -180,10 +216,31 @@ export async function fetchPortalSources(): Promise<PortalSources> {
     })),
   };
 
+  /*
+   * ДОМІШКА СКАЗАНОГО — ОСТАННІМ КРОКОМ, ПІСЛЯ ВСЬОГО СПРАВЖНЬОГО.
+   *
+   * Порядок тут змістовний: домішується рівно РІЗНИЦЯ між тим, що пара
+   * назвала числом, і тим, що вже лежить у її модулях (`declaredCounts.ts`).
+   * Порахувати її можна лише тоді, коли справжнє вже зібране.
+   *
+   * Роки беруться тією ж функцією, що й усюди, а не власним поділом на
+   * календарні роки: рік стосунків починається з річниці, і другий поділ
+   * поруч розійшовся б із першим на кілька місяців.
+   */
+  const years = relationshipYears(
+    relationshipStartedAt.slice(0, 10),
+    coupleDay(new Date(), COUPLE_TIME_ZONE),
+    'feb-28',
+  );
+
+  const padded = padSnapshotWithDeclared(snapshot, declared, years);
+
   return {
     relationshipStartedAt,
     userIds,
     sharedDaysOff,
-    snapshot,
+    snapshot: padded.snapshot,
+    declared,
+    declaredGaps: padded.gaps,
   };
 }

@@ -556,3 +556,56 @@ button.sweep-strip-year { cursor: pointer; }
 /* Дії всередині кроку тримаються лівого краю: праворуч стоїть лише
    «До артефакта», і два різні вирівнювання читались би як два рівні. */
 .sweep-actions--start { justify-content: flex-start; }
+
+/* ── Сказане число (ADR-0110) ─────────────────────────────────
+   Чотири лічильники стоять СІТКОЮ по два, а не стовпчиком: разом вони
+   один вибір — «я не пригадую деталей», — і чотири рядки поспіль
+   читались би як чотири окремі питання, тобто рівно тим, чим цей блок не
+   є. На вузькому екрані два стовпчики влазять, бо саме поле коротке:
+   у ньому щонайбільше три цифри. */
+.sweep-counts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sweep-count {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sweep-count-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Стрілки лічильника прибрано: вони крадуть третину ширини поля, а
+   набрати «12» швидше, ніж дванадцять разів торкнутись стрілки. */
+.sweep-count-input {
+  width: 100%;
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.sweep-count-input::-webkit-outer-spin-button,
+.sweep-count-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* Пробіл під полем — це запрошення в модуль, а не помилка, тож він
+   тьмяний, а не червоний.
+
+   Кольору тут немає й у стані «все названо»: акцент у цьому світі рідкісний
+   (DESIGN.md, «Rare Colour»), і витрачати його на підпис під полем означало б
+   зрівняти дрібну підказку з кнопкою «До артефакта». Стани розрізняються
+   СЛОВАМИ — «7 без назви» проти «усі 9 фільмів уже названі», — а не барвою. */
+.sweep-count-gap {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}

@@ -130,6 +130,21 @@ function labSweep(state: LabState): HistorySweep {
     entriesFor: () => entries,
     removeEntry: noop,
     removeAnniversary: noop,
+    /*
+     * СКАЗАНЕ ЧИСЛО показується непорожнім навмисно: порожній стан цього
+     * блоку — чотири однакові поля з рискою, і на такому знімку не видно
+     * ані підпису «7 без назви», ані того, як він читається поруч зі
+     * справжніми списками. Лабораторія існує саме для другого.
+     */
+    declared: step === 'years' && state !== 'empty'
+      ? { [years[0]?.startsAt ?? '']: { photos: 24, movies: 9, places: 3 } }
+      : {},
+    declaredGapFor: () => (
+      state === 'empty'
+        ? { photos: 0, movies: 0, series: 0, places: 0 }
+        : { photos: 24, movies: 7, series: 0, places: 3 }
+    ),
+    setDeclared: noop,
     isSaving: false,
   };
 }

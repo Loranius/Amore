@@ -46,6 +46,10 @@ function sourcesWith(snapshot: Partial<EvolutionSourceSnapshot>): PortalSources 
     userIds: [1, 2],
     sharedDaysOff: [],
     snapshot: { ...emptySnapshot(), ...snapshot },
+    // Сказаних чисел у цих сценаріях немає: тут міряється сама
+    // наповненість року, а домішка живе у своєму файлі.
+    declared: {},
+    declaredGaps: {},
   };
 }
 

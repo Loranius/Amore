@@ -29,6 +29,45 @@ import type { RelationshipYearFill } from './yearFills';
 /** Позначка часу, якою прохід підписує все, що створює. */
 export const SWEEP_STAMP = 'T12:00:00.000Z';
 
+/**
+ * Чи це та сама мить, ЯК БИ ЇЇ НЕ ЗАПИСАЛИ.
+ *
+ * ВАДА, ЧЕРЕЗ ЯКУ ЕКРАН НЕ ДАВАВ ПРИБРАТИ НІЧОГО ЗІ СВОГО Ж (ADR-0110).
+ *
+ * Підпис проходу порівнювався РЯДКАМИ: `completedAt === '2023-06-27T12:00:00.000Z'`.
+ * Портал так його й пише, але назад із бази він приходить у власному
+ * записі PostgREST — `2023-06-27T12:00:00+00:00`. Це та сама мить, і всі
+ * порівняння рядків її не впізнавали.
+ *
+ * Наслідок був рівно той, проти якого цей файл і заводився: кожен рядок,
+ * доданий проходом, повертався з бази ЧУЖИМ — тьмяним, без хрестика, з
+ * приміткою «міняють там, де завели». Пара додавала віху одним дотиком і
+ * не могла її прибрати ніяк, а екран ще й казав їй, що це не її рядок.
+ *
+ * Тому порівнюються МИТІ, а не тексти. `Date.parse` розуміє обидва записи
+ * й обидва зводить до одного числа; недійсна дата дає `NaN`, а `NaN !== NaN`,
+ * тож сміття само собою не збігається ні з чим.
+ */
+export function sameInstant(left: string | null, right: string): boolean {
+  if (typeof left !== 'string' || !ZONED.test(left)) return false;
+  const parsed = Date.parse(left);
+  return Number.isFinite(parsed) && parsed === Date.parse(right);
+}
+
+/**
+ * Позначка часового поясу в кінці рядка — `Z` або `+02:00`.
+ *
+ * БЕЗ НЕЇ `Date.parse` ЧИТАЄ РЯДОК ЯК МІСЦЕВИЙ ЧАС, тобто відповідь
+ * залежала б від того, у якому поясі стоїть телефон: `...T12:00:00` у Києві
+ * це 09:00Z, а на сервері тестів — 12:00Z. Один і той самий рядок бази то
+ * збігався б із підписом проходу, то ні, залежно від того, хто дивиться.
+ *
+ * Рядок без пояса підписом не вважається взагалі: портал такого не пише, а
+ * гадати за нього — це саме та тиха залежність від місця, якої тут не має
+ * бути.
+ */
+const ZONED = /(?:Z|[+-]\d{2}:?\d{2})$/;
+
 export type SweepEntryKind = 'milestone' | 'place' | 'watched';
 
 export interface SweepEntry {
@@ -80,15 +119,15 @@ export function isSweepPlan(
 ): boolean {
   return plan.status === 'done'
     && plan.datePrecision === 'year'
-    && plan.startDate === middle
-    && plan.completedAt === `${middle}${SWEEP_STAMP}`;
+    && (plan.startDate ?? '').slice(0, 10) === middle
+    && sameInstant(plan.completedAt, `${middle}${SWEEP_STAMP}`);
 }
 
 export function isSweepWatched(
   item: SweepEntryRows['watched'][number],
   middle: string,
 ): boolean {
-  return item.finishedAt === `${middle}${SWEEP_STAMP}`;
+  return sameInstant(item.finishedAt, `${middle}${SWEEP_STAMP}`);
 }
 
 /**

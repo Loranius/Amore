@@ -33,6 +33,7 @@ import { CloseIcon } from '@/components/icons/UiIcon';
 import { formatSinceDate } from '@/features/home/homeUtils';
 import { ANNIVERSARY_SUGGESTIONS, type HistorySweep } from './useHistorySweep';
 import { YEAR_MILESTONES, quietestYearIndex } from './sweepModel';
+import { SweepDeclared } from './SweepDeclared';
 import { SweepEntryList } from './SweepEntryList';
 import { SweepPhotos } from './SweepPhotos';
 import { SweepPlaces } from './SweepPlaces';
@@ -318,12 +319,29 @@ export function HistorySweepView({
             onRemove={(entry) => void sweep.removeEntry(entry)}
           />
 
-          {/* Один раз на панель, а не під кожним із трьох списків. */}
+          {/*
+            * Один раз на панель, а не під кожним із трьох списків — і
+            * ОДРАЗУ за ними, до блоку чисел: посунута нижче, вона читалась
+            * би приміткою до полів, яких не стосується взагалі.
+            */}
           {hasForeign && (
             <p className="sweep-hint sweep-foreign-note">
               Тьмяні рядки прийшли з ваших модулів — їх міняють там, де завели.
             </p>
           )}
+
+          {/*
+            * ДРУГИЙ ШЛЯХ КРІЗЬ РІК — наприкінці, а не поруч із кожним
+            * питанням (ADR-0110). Спершу екран питає, ЩО саме було; тільки
+            * коли пара цього не пригадала, він питає скільки.
+            */}
+          <SweepDeclared
+            year={active}
+            counts={sweep.declared[active.startsAt] ?? {}}
+            gaps={sweep.declaredGapFor(active)}
+            isSaving={sweep.isSaving}
+            onSet={(kind, count) => sweep.setDeclared(active, kind, count)}
+          />
         </section>
       )}
 

@@ -33,6 +33,13 @@ import {
   type RelationshipYearFill,
 } from './yearFills';
 import {
+  DECLARED_COUNTS_KEY,
+  serializeDeclaredCounts,
+  withDeclared,
+  type DeclaredCounts,
+  type DeclaredKind,
+} from './declaredCounts';
+import {
   sweepEntriesFor,
   type SweepEntry,
   type SweepEntryKind,
@@ -194,6 +201,18 @@ export interface HistorySweep {
   entriesFor: (year: RelationshipYearFill) => Record<SweepEntryKind, SweepEntry[]>;
   /** Прибрати те, що екран сам поклав. Інше він прибирати не має права. */
   removeEntry: (entry: SweepEntry) => Promise<void>;
+  /*
+   * СКАЗАНЕ ЧИСЛО — другий, лінивий шлях крізь цей екран (ADR-0110).
+   *
+   * Власник: «дати лінивим людям вибір або додавати самі світлини, або
+   * вказати приблизну кількість». Число не створює рядків у модулях пари —
+   * воно домішується до знімка рушія рівно різницею між сказаним і
+   * справжнім (`declaredCounts.ts`).
+   */
+  declared: DeclaredCounts;
+  /** Скільки з названого ще не має справжнього рядка — по родах. */
+  declaredGapFor: (year: RelationshipYearFill) => Record<DeclaredKind, number>;
+  setDeclared: (year: RelationshipYearFill, kind: DeclaredKind, count: number) => Promise<void>;
   removeAnniversary: (id: number) => Promise<void>;
   isSaving: boolean;
 }
@@ -480,6 +499,41 @@ export function useHistorySweep(): HistorySweep {
     [entryRows],
   );
 
+  const declared: DeclaredCounts = sources.data?.declared ?? {};
+
+  const setDeclared = useMutation({
+    mutationFn: async (
+      { year, kind, count }: { year: RelationshipYearFill; kind: DeclaredKind; count: number },
+    ) => {
+      const next = withDeclared(declared, year.startsAt, kind, count);
+      const { error } = await supabase
+        .from('settings')
+        .upsert(
+          { key: DECLARED_COUNTS_KEY, value: serializeDeclaredCounts(next) },
+          { onConflict: 'key' },
+        );
+      if (error) throw error;
+    },
+    onSuccess: refresh,
+  });
+
+  /*
+   * Різниця НЕ РАХУЄТЬСЯ ТУТ, а береться готовою, і це виправлена вада.
+   *
+   * Перша редакція кликала `declaredShortfall` на знімку з `sources` — а
+   * той знімок УЖЕ містить домішку (`fetchPortalSources`). Тобто різниця
+   * виходила нулем завжди, і екран казав би парі «усі 24 знімки вже
+   * названі» рівно тоді, коли не названо жодного. Різниця існує лише в
+   * мить домішування, тож звідти вона й приходить.
+   */
+  const declaredGaps = sources.data?.declaredGaps ?? {};
+  const declaredGapFor = useCallback(
+    (year: RelationshipYearFill): Record<DeclaredKind, number> => (
+      declaredGaps[year.startsAt] ?? { photos: 0, movies: 0, series: 0, places: 0 }
+    ),
+    [declaredGaps],
+  );
+
   const step = sweepStepOf({
     relationshipStartedAt,
     yearlyAnniversaryCount: yearlyAnniversaries.length,
@@ -507,12 +561,18 @@ export function useHistorySweep(): HistorySweep {
     entriesFor,
     removeEntry: async (entry) => { await removeEntry.mutateAsync(entry); },
     removeAnniversary: async (id) => { await removeAnniversary.mutateAsync(id); },
+    declared,
+    declaredGapFor,
+    setDeclared: async (year, kind, count) => {
+      await setDeclared.mutateAsync({ year, kind, count });
+    },
     isSaving: setStartDate.isPending
       || addAnniversary.isPending
       || addMilestone.isPending
       || addPlace.isPending
       || addWatched.isPending
       || removeEntry.isPending
-      || removeAnniversary.isPending,
+      || removeAnniversary.isPending
+      || setDeclared.isPending,
   };
 }

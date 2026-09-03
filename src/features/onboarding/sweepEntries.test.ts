@@ -161,3 +161,65 @@ describe('чим наповнений рік', () => {
     expect(entries).toEqual({ milestone: [], place: [], watched: [] });
   });
 });
+
+describe('запис часу з бази', () => {
+  /*
+   * ВАДА, ЧЕРЕЗ ЯКУ ЕКРАН НЕ ДАВАВ ПРИБРАТИ НІЧОГО ЗІ СВОГО Ж (ADR-0110).
+   *
+   * Портал пише `2023-06-27T12:00:00.000Z`, а PostgREST повертає ту саму
+   * мить як `2023-06-27T12:00:00+00:00`. Порівняння РЯДКАМИ її не
+   * впізнавало, тож кожна щойно додана віха поверталась із бази чужою:
+   * тьмяною, без хрестика, з приміткою «міняють там, де завели».
+   *
+   * Тест іде від того, що ВІДДАЄ БАЗА, а не від того, що пише портал, —
+   * інакше він знову перевірятиме шлях, яким портал не ходить.
+   */
+  const postgrest = (day: string) => `${day}T12:00:00+00:00`;
+
+  it('упізнає свій план, записаний так, як його віддає PostgREST', () => {
+    const entries = sweepEntriesFor(rows({
+      plans: [{
+        id: 7,
+        title: 'Переїзд',
+        status: 'done',
+        startDate: MIDDLE,
+        completedAt: postgrest(MIDDLE),
+        datePrecision: 'year',
+      }],
+    }), YEAR);
+
+    expect(entries.milestone).toHaveLength(1);
+    expect(entries.milestone[0]!.removable).toBe(true);
+  });
+
+  it('упізнає свій фільм, записаний так само', () => {
+    const entries = sweepEntriesFor(rows({
+      watched: [{ id: 3, title: 'Дюна', type: 'movie', finishedAt: postgrest(MIDDLE) }],
+    }), YEAR);
+
+    expect(entries.watched[0]!.removable).toBe(true);
+  });
+
+  it('не вважає своїм рядок пари, що просто трапився того самого дня', () => {
+    // Полудень середини року — підпис; будь-який інший час ним не є.
+    const entries = sweepEntriesFor(rows({
+      watched: [{ id: 4, title: 'Свій фільм', type: 'movie', finishedAt: `${MIDDLE}T20:15:00+00:00` }],
+    }), YEAR);
+
+    expect(entries.watched[0]!.removable).toBe(false);
+  });
+
+  it('рядок БЕЗ ПОЯСА підписом не вважається — інакше відповідь залежала б від телефона', () => {
+    /*
+     * `Date.parse('2023-06-27T12:00:00')` читає рядок як МІСЦЕВИЙ час: у
+     * Києві це 09:00Z, а на сервері тестів 12:00Z. Той самий рядок бази то
+     * збігався б із підписом, то ні — залежно від того, хто дивиться.
+     * Портал таких рядків не пише, тож єдина чесна відповідь — «не наш».
+     */
+    const entries = sweepEntriesFor(rows({
+      watched: [{ id: 5, title: 'Хтозна', type: 'movie', finishedAt: `${MIDDLE}T12:00:00` }],
+    }), YEAR);
+
+    expect(entries.watched[0]!.removable).toBe(false);
+  });
+});
