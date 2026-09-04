@@ -137,3 +137,83 @@ describe('профіль світла — плато й розділення г�
     expect(report.max).toBeLessThan(0.05);
   });
 });
+
+describe('межі граней проти переходів усередині грані', () => {
+  /*
+   * Прилад лагодився ПІСЛЯ того, як показав суперечливі числа: медіана
+   * всіх переходів стрибала 6% → 47% при незмінній формі, бо грань у
+   * 60–85 пікселів має власний перепад ~20% (ADR-0085) і ріжеться на
+   * два-три плато. Більшість «сусідніх пар» тоді — переходи ВСЕРЕДИНІ
+   * грані.
+   */
+  const plateau = (from, to, luminance) => ({ from, to, luminance });
+
+  it('бере стрибок на межі, а не плавний схил усередині грані', () => {
+    // Тло, потім грань, що пливе 0.10 → 0.12 → 0.11, потім СТРИБОК на
+    // 0.30 і знову плавна грань, потім тло.
+    const spread = facetSeparations([
+      plateau(0, 10, 0.01),
+      plateau(10, 30, 0.10),
+      plateau(30, 50, 0.12),
+      plateau(50, 70, 0.11),
+      plateau(70, 90, 0.30),
+      plateau(90, 110, 0.31),
+      plateau(110, 130, 0.29),
+      plateau(130, 140, 0.01),
+    ]);
+    // Медіана всіх переходів міряє схил усередині граней — вона мала.
+    expect(spread.median).toBeLessThan(0.15);
+    // Медіана меж бачить саме стрибок.
+    expect(spread.boundaryMedian).toBeGreaterThan(0.55);
+  });
+
+  it('рівна поверхня не має жодної межі', () => {
+    const spread = facetSeparations([
+      plateau(0, 10, 0.01),
+      plateau(10, 30, 0.20),
+      plateau(30, 50, 0.20),
+      plateau(50, 70, 0.20),
+      plateau(70, 80, 0.01),
+    ]);
+    expect(spread.boundaryMedian).toBe(0);
+  });
+
+  it('одна межа читається, навіть коли вона крайня', () => {
+    // Грань з краю тіла має лише одного сусіда; без окремої умови вона
+    // ніколи не потрапила б у вибірку меж.
+    const spread = facetSeparations([
+      plateau(0, 10, 0.01),
+      plateau(10, 30, 0.10),
+      plateau(30, 50, 0.40),
+      plateau(50, 60, 0.01),
+    ]);
+    expect(spread.boundaryMedian).toBeGreaterThan(0.7);
+  });
+});
+
+describe('порожня вибірка меж — це не нуль', () => {
+  const plateau = (from, to, luminance) => ({ from, to, luminance });
+
+  it('два кроки: межа оголошується лише коли поруч рівний хід', () => {
+    // Стрибок утричі більший за сусідній крок — межа.
+    const clear = facetSeparations([
+      plateau(0, 10, 0.01),
+      plateau(10, 30, 0.10),
+      plateau(30, 50, 0.11),
+      plateau(50, 70, 0.40),
+      plateau(70, 80, 0.01),
+    ]);
+    expect(clear.boundaries).toHaveLength(1);
+    expect(clear.boundaryMedian).toBeGreaterThan(0.7);
+
+    // Два схожі кроки — сказати нічого не можна, вибірка порожня.
+    const murky = facetSeparations([
+      plateau(0, 10, 0.01),
+      plateau(10, 30, 0.10),
+      plateau(30, 50, 0.16),
+      plateau(50, 70, 0.24),
+      plateau(70, 80, 0.01),
+    ]);
+    expect(murky.boundaries).toHaveLength(0);
+  });
+});

@@ -30,6 +30,15 @@ Render the live portal, crop the monarch, scan a horizontal band across it, and 
 luminance profile. A crystal that reads as a crystal has **adjacent facets differing by
 30%+**; under ~10% it will look like a smooth shape no matter what else is right.
 
+**Read `boundaryMedian`, not `median`** (ADR-0122). `median` is the median step between
+adjacent *plateaus*, and one facet is not one plateau: a 60–85 px facet carries its own
+~20% internal gradient, so `findPlateaus` splits it into two or three. Most adjacent
+pairs are therefore *inside* one facet, and that number measures how smooth a facet is,
+not how different two facets are — it swung 6% → 47% between runs on an unchanged
+crystal. `boundaryMedian` takes only the steps that are larger than both neighbouring
+steps, which is what a facet edge is. The lab prints both plus the number of boundaries
+found; a median over one boundary is that boundary, so check the count before concluding.
+
 1. Start Vite on 5199. Log in headless with playwright-core and the Chromium at
    `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, flags
    `--enable-unsafe-swiftshader --use-angle=swiftshader-webgl`. Relay `*.supabase.co`
