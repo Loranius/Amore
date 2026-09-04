@@ -38,6 +38,7 @@ import {
   buildPortalCaveDruseGeometry,
   buildPortalCaveFloorGeometry,
   buildPortalCaveOculusGeometry,
+  buildPortalCaveShaftGeometry,
   buildPortalCaveShellGeometry,
 } from './portalCave';
 
@@ -90,6 +91,7 @@ export function PortalEnvironment({
   const caveShell = useMemo(() => buildPortalCaveShellGeometry(seed), [seed]);
   const caveFloor = useMemo(() => buildPortalCaveFloorGeometry(seed), [seed]);
   const caveOculus = useMemo(() => buildPortalCaveOculusGeometry(seed), [seed]);
+  const caveShaft = useMemo(() => buildPortalCaveShaftGeometry(seed), [seed]);
   /*
    * Друза коштує трикутників, тож її кількість веде профіль якості — і
    * на запасному рендерері її немає взагалі. Це єдина частина печери, яку
@@ -106,8 +108,9 @@ export function PortalEnvironment({
     caveShell.dispose();
     caveFloor.dispose();
     caveOculus.dispose();
+    caveShaft.dispose();
     caveDruse?.dispose();
-  }, [caveShell, caveFloor, caveOculus, caveDruse]);
+  }, [caveShell, caveFloor, caveOculus, caveShaft, caveDruse]);
 
   /*
    * Раніше тут повільно оберталось небо. Печера не обертається: камінь
@@ -174,9 +177,33 @@ export function PortalEnvironment({
         </mesh>
       )}
 
-      {/* Промінь із розлому. Напрямлене світло згори — єдине, що
-          відрізняє день від ночі в печері: удень воно веде сцену, уночі
-          лишається слабким натяком місяця. */}
+      {/* САМ ПРОМІНЬ — тіло, а не світло.
+          ------------------------------------------------------------
+          Напрямлене джерело нижче освітлює кристал і друзу; побачити
+          промінь від нього неможливо — промінь видно тому, що в повітрі
+          пил, а об'ємного розсіювання тут немає й не буде.
+
+          Тому конус: адитивний, без запису глибини, гасне донизу
+          вершинним кольором. Він нічого не освітлює — він і Є те, що
+          видно. Опукла сторона відсічена (`BackSide` не потрібен): конус
+          дивиться назовні, і глядач бачить його дальню стінку крізь
+          ближню саме тому, що глибина не пишеться. */}
+      <mesh geometry={caveShaft} frustumCulled={false} renderOrder={2}>
+        <meshBasicMaterial
+          color={palette.oculus}
+          vertexColors
+          transparent
+          opacity={palette.shaftOpacity}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+          side={THREE.DoubleSide}
+          toneMapped={false}
+          fog={false}
+        />
+      </mesh>
+
+      {/* Напрямлене світло з розлому — єдине, що відрізняє день від ночі
+          в печері: удень воно веде сцену, уночі лишається натяком. */}
       <directionalLight
         position={[0.6, PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT, 0.4]}
         intensity={palette.oculusIntensity}

@@ -100,30 +100,45 @@ const CAVE_FLOOR_RELIEF = 0.02;
  * просто кам'яний мішок, і артефакт у ньому не має родини.
  */
 export const CAVE_DRUSE_CLUSTERS: Record<'high' | 'balanced' | 'low' | 'fallback', number> = {
-  high: 54, balanced: 34, low: 16, fallback: 0,
+  high: 92, balanced: 56, low: 24, fallback: 0,
 };
 
 /** Скільки кристалів у кущі. */
 const DRUSE_MIN = 3;
 const DRUSE_MAX = 6;
+
+/*
+ * ВЕЛИКИХ КРИСТАЛІВ НА СТІНІ НЕМАЄ, І ЦЕ ВИМІРЯНО, А НЕ ЗАБУТО.
+ * ------------------------------------------------------------
+ * Тут стояв другий розмірний клас: кожен дев'ятий кущ ріс на 0.8–2.0
+ * одиниці, тобто 280–700 пікселів, — щоб стіна читалась кристальною, а
+ * не поцяткованою.
+ *
+ * Кадр відкинув це так само ясно, як три попередні спроби. Великі
+ * кристали одного куща перетинаються, їхні опуклі тіла зливаються в
+ * ОДНУ бульбу, а намальована фарба без освітленого ключа не дає їхнім
+ * граням розділення на такому розмірі. На знімку це картопля, а не
+ * кристал.
+ *
+ * Що з цього справді відомо: стіна печери читається гранованим КАМЕНЕМ,
+ * і дрібна друза дає їй кристалічну крупу. Великий кристал на стіні
+ * потребує іншої побудови — не об'єднання опуклих тіл, а гранованої
+ * ділянки самої стіни, — і це окрема робота, а не число.
+ */
 /**
  * Розмір кристала друзи в одиницях сцени.
  *
- * ПОРАХОВАНО, а не підібрано. Стіна стоїть за одинадцять одиниць від
- * камери, поле зору 42°, кадр 1900 px заввишки: на такій відстані одна
- * одиниця сцени займає близько 226 пікселів. Тобто кристал завдовжки 2.6
- * малюється майже на шістсот пікселів — і саме так виглядала друга
- * редакція: три брили в повітрі, дві з яких склались у серце.
+ * ПОРАХОВАНО, а не підібрано. Стіна стоїть за 6.2 одиниці від осі, поле
+ * зору 42°, кадр 1900 px заввишки: на такій відстані одна одиниця сцени
+ * займає близько 350 пікселів. Тобто кристал завдовжки 2.6 малювався б
+ * майже на всю висоту кадру — і саме так виглядала одна з редакцій: три
+ * брили в повітрі, дві з яких склались у серце.
  *
- * 0.10–0.42 дає 23–95 px. Це кристал, який видно як кристал, і якого не
+ * 0.10–0.46 дає 35–160 px. Це кристал, який видно як кристал, і якого не
  * плутають з артефактом.
- *
- * Перша редакція мала майже ті самі числа й теж виглядала сміттям — але
- * причина була інша й уже виправлена: стіна за друзою була НЕВИДИМА
- * через хибну намотку, тож кристали справді висіли ні на чому.
  */
-const DRUSE_MIN_LENGTH = 0.1;
-const DRUSE_MAX_LENGTH = 0.42;
+const DRUSE_MIN_LENGTH = 0.07;
+const DRUSE_MAX_LENGTH = 0.26;
 /** Товщина відносно довжини — та сама стрункість, що в еталона. */
 const DRUSE_ASPECT = 3.4;
 /** Кут головки від горизонталі — решітка кварцу, як в еталоні. */
@@ -162,11 +177,18 @@ function ringNoise(seed: number, label: string, angle: number, points: number): 
 interface Soup {
   readonly positions: number[];
   readonly colors: number[];
+  /**
+   * `shade` — одне число на весь трикутник або три, по одному на кут.
+   *
+   * Одне: грань каменю ловить своє світло цілком, і градієнт усередині
+   * неї був би тим самим, від чого тікає `The Flat Facet Rule`.
+   * Три: промінь із розлому гасне донизу, і це вже не грань, а об'єм.
+   */
   push(
     a: readonly [number, number, number],
     b: readonly [number, number, number],
     c: readonly [number, number, number],
-    shade?: number,
+    shade?: number | readonly [number, number, number],
   ): void;
 }
 
@@ -178,7 +200,8 @@ function soup(): Soup {
     colors,
     push(a, b, c, shade = 1) {
       positions.push(...a, ...b, ...c);
-      for (let corner = 0; corner < 3; corner += 1) colors.push(shade, shade, shade);
+      const corners = typeof shade === 'number' ? [shade, shade, shade] : shade;
+      for (const value of corners) colors.push(value, value, value);
     },
   };
 }
@@ -413,6 +436,52 @@ export function buildPortalCaveOculusGeometry(seed: number): THREE.BufferGeometr
 }
 
 /**
+ * Промінь із розлому — конус світла від склепіння до підлоги.
+ *
+ * ЧОМУ ГЕОМЕТРІЯ, А НЕ СВІТЛО. Напрямлене джерело з розлому вже є
+ * (`oculusIntensity`), і воно робить свою роботу — освітлює тіла. Але
+ * САМОГО ПРОМЕНЯ від нього не видно: промінь видно тому, що в повітрі є
+ * пил, а об'ємного розсіювання тут немає й не буде.
+ *
+ * Тому промінь — це тіло: конус, який розширюється донизу, малюється
+ * адитивно й не пише в буфер глибини. Він нічого не освітлює; він і Є
+ * те, що видно.
+ *
+ * Конус стоїть НА ОСІ, тобто падає рівно на артефакт. Це не випадковість
+ * композиції: у печері з одним отвором світло падає туди, куди падає, а
+ * кристал стоїть під ним — саме тому він там і виріс.
+ */
+export function buildPortalCaveShaftGeometry(seed: number): THREE.BufferGeometry {
+  const mesh = soup();
+  const segments = CAVE_AZIMUTH_SEGMENTS;
+  const top = PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT;
+  const bottom = PORTAL_GROUND_Y;
+  for (let segment = 0; segment < segments; segment += 1) {
+    const next = (segment + 1) % segments;
+    const at = (index: number, y: number, scale: number): [number, number, number] => {
+      const angle = (index / segments) * Math.PI * 2;
+      const radius = wallRadiusAt(seed, angle, 1) * scale;
+      return [Math.cos(angle) * radius, y, Math.sin(angle) * radius];
+    };
+    const a = at(segment, top, 1);
+    const b = at(next, top, 1);
+    const c = at(next, bottom, CAVE_SHAFT_SPREAD);
+    const d = at(segment, bottom, CAVE_SHAFT_SPREAD);
+    /*
+     * Яскравість гасне донизу: біля розлому промінь щільний, біля
+     * підлоги розходиться. Вершинний колір несе саме це — матеріал
+     * адитивний, тож нуль унизу означає «нічого не додає».
+     */
+    mesh.push(a, b, c, [1, 1, 0]);
+    mesh.push(a, c, d, [1, 0, 0]);
+  }
+  return finish(mesh);
+}
+
+/** Наскільки промінь ширший біля підлоги, ніж біля розлому. */
+const CAVE_SHAFT_SPREAD = 2.6;
+
+/**
  * Друза по стінах — кущі кварцу, що ростуть із каменю.
  *
  * Кожен кристал будується тією ж арифметикою, що еталон
@@ -510,6 +579,21 @@ export function buildPortalCaveDruseGeometry(
         ]);
       }
 
+      /*
+       * ДРУЗА ТЕЖ НАМАЛЬОВАНА, і це третє виправлення того самого.
+       *
+       * Доти вона була `meshStandardMaterial` з емісією, тобто ЄДИНЕ
+       * тіло сцени, яке освітлюється, — на намальованій стіні. Кадр
+       * показував наслідок щоразу: кристали яскравіші за камінь навколо
+       * й читаються наліпленими грудками, скільки їх не роби меншими й
+       * скільки не втоплюй у породу.
+       *
+       * Тепер тон береться з того самого діапазону, що й у стіни, і
+       * малюється тим самим `meshBasicMaterial`. Друза стає ФАКТУРОЮ
+       * стіни — гранями, які стоять під іншим кутом, — а не предметами
+       * на ній.
+       */
+      const shade = 0.62 + 0.62 * seededUnit(seed, `${own}:shade`);
       const apex = at(0, 0, length);
       for (let face = 0; face < 6; face += 1) {
         const [ux, uy] = corners[face]!;
@@ -518,9 +602,14 @@ export function buildPortalCaveDruseGeometry(
         const bottomRight = at(vx, vy, 0);
         const topLeft = at(ux, uy, prism);
         const topRight = at(vx, vy, prism);
-        mesh.push(bottomLeft, bottomRight, topRight);
-        mesh.push(bottomLeft, topRight, topLeft);
-        mesh.push(topLeft, topRight, apex);
+        /*
+         * Кожна з трьох граней кристалика бере власний відтінок навколо
+         * власного тону: бічні площини одного кристала ловлять різне
+         * світло так само, як грані артефакта.
+         */
+        mesh.push(bottomLeft, bottomRight, topRight, shade * (0.86 + 0.28 * (face % 3) / 2));
+        mesh.push(bottomLeft, topRight, topLeft, shade * (0.86 + 0.28 * (face % 3) / 2));
+        mesh.push(topLeft, topRight, apex, shade * 1.16);
       }
     }
   }

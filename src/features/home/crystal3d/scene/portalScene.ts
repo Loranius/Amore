@@ -17,6 +17,7 @@ import {
   buildPortalCaveDruseGeometry,
   buildPortalCaveFloorGeometry,
   buildPortalCaveOculusGeometry,
+  buildPortalCaveShaftGeometry,
   buildPortalCaveShellGeometry,
 } from './portalCave';
 
@@ -35,7 +36,7 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * (так само один) + арки + зорі/туманність + чотири декор-проходи: ґрунт,
  * колонада, кристальні маяки та небесні дуги.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 4;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 5;
 
 /**
  * СТЕЛЯ трикутників оточення, а не точне число.
@@ -49,7 +50,7 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 4;
  * якої не буває, замінили на межу, яка буває, — і межа стереже те саме:
  * сцена не має права тихо роздутись.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 6_000;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 9_500;
 
 /**
  * Реальна вартість оточення — джерело правди для стелі вище.
@@ -66,6 +67,7 @@ export function measurePortalEnvironmentTriangles(
     buildPortalCaveShellGeometry(seed),
     buildPortalCaveFloorGeometry(seed),
     buildPortalCaveOculusGeometry(seed),
+    buildPortalCaveShaftGeometry(seed),
     buildPortalCaveDruseGeometry(seed, CAVE_DRUSE_CLUSTERS[quality]),
   ];
   let total = 0;
@@ -376,6 +378,14 @@ export interface PortalPalette {
   oculus: string;
   /** Сила світла, яке падає з розлому вниз. */
   oculusIntensity: number;
+  /**
+   * Наскільки видно САМ промінь — конус із розлому.
+   *
+   * Окремо від сили світла, бо це різні речі: сила освітлює тіла, а це
+   * малює стовп світла в повітрі. Уночі промінь майже прозорий — місяць
+   * крізь тріщину; удень він і є те, що робить сцену денною.
+   */
+  shaftOpacity: number;
   /* ── Світло сцени ─────────────────────────────────────────
      Позиції ключа й заливки спільні на обидві пори доби
      (`PORTAL_KEY_LIGHT`, `PORTAL_RIM_LIGHT`): §10 каже, звідки падає
@@ -456,6 +466,7 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     caveDruseEmissive: 0.2,
     oculus: '#e8f1fb',
     oculusIntensity: 2.1,
+    shaftOpacity: 0.3,
     // Денна заливка вчетверо сильніша за нічну. Ключ піднятий разом із
     // нею: §10 вимагає відношення, а не абсолютного числа.
     ambient: 0.42,
@@ -497,6 +508,7 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     // розлом читається дірою в моделі.
     oculus: '#2a2444',
     oculusIntensity: 0.32,
+    shaftOpacity: 0.16,
     ambient: 0.1,
     hemisphere: 0.24,
     keyIntensity: 1.9,

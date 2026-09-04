@@ -16,6 +16,7 @@ import {
   buildPortalCaveDruseGeometry,
   buildPortalCaveFloorGeometry,
   buildPortalCaveOculusGeometry,
+  buildPortalCaveShaftGeometry,
   buildPortalCaveShellGeometry,
 } from './portalCave';
 import { PORTAL_GROUND_Y } from './portalScene';
@@ -164,6 +165,59 @@ describe('підлога', () => {
   });
 });
 
+describe('промінь із розлому', () => {
+  const positions = points(buildPortalCaveShaftGeometry(SEED));
+
+  it('стоїть на осі й доходить від склепіння до підлоги', () => {
+    /*
+     * Промінь падає рівно на артефакт, і це не випадковість композиції: у
+     * печері з одним отвором світло падає туди, куди падає, а кристал
+     * стоїть під ним — саме тому він там і виріс.
+     */
+    let low = Number.POSITIVE_INFINITY;
+    let high = Number.NEGATIVE_INFINITY;
+    for (let at = 1; at + 1 < positions.length; at += 3) {
+      low = Math.min(low, positions[at]!);
+      high = Math.max(high, positions[at]!);
+    }
+    expect(low).toBeCloseTo(PORTAL_GROUND_Y, 5);
+    expect(high).toBeCloseTo(PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT, 5);
+  });
+
+  it('РОЗХОДИТЬСЯ ДОНИЗУ, а не звужується', () => {
+    // Стовп світла, що звужується донизу, читається прожектором знизу.
+    let topRadius = 0;
+    let bottomRadius = 0;
+    for (let at = 0; at + 2 < positions.length; at += 3) {
+      const radial = Math.hypot(positions[at]!, positions[at + 2]!);
+      const share = (positions[at + 1]! - PORTAL_GROUND_Y) / CAVE_CEILING_HEIGHT;
+      if (share > 0.9) topRadius = Math.max(topRadius, radial);
+      if (share < 0.1) bottomRadius = Math.max(bottomRadius, radial);
+    }
+    expect(bottomRadius).toBeGreaterThan(topRadius * 2);
+  });
+
+  it('гасне донизу: унизу він нічого не додає', () => {
+    /*
+     * Матеріал адитивний, тож нуль у вершинному кольорі означає «нічого
+     * не додає». Без цього стовп мав би різкий край на підлозі — те, чого
+     * в променя не буває.
+     */
+    const geometry = buildPortalCaveShaftGeometry(SEED);
+    const colors = Array.from(geometry.getAttribute('color').array);
+    let lowest = Number.POSITIVE_INFINITY;
+    let highest = 0;
+    for (let index = 0; index < colors.length; index += 3) {
+      const y = positions[index]!;
+      void y;
+      lowest = Math.min(lowest, colors[index]!);
+      highest = Math.max(highest, colors[index]!);
+    }
+    expect(lowest).toBe(0);
+    expect(highest).toBe(1);
+  });
+});
+
 describe('розлом у склепінні', () => {
   it('диск дивиться вниз, у залу', () => {
     const positions = points(buildPortalCaveOculusGeometry(SEED));
@@ -218,9 +272,9 @@ describe('друза по стінах', () => {
      * Межа названа, бо друза — єдина частина печери, кількість якої веде
      * профіль якості, і саме її найлегше роздути «ще трохи».
      */
-    // 54 кущі по 3–6 кристалів, у кожного 18 трикутників: стеля 5 832,
-    // виміряно 4 518. Число тут — межа, а не вимір.
-    expect(positions.length / 9).toBeLessThan(5_000);
+    // 92 кущі по 3–6 кристалів, у кожного 18 трикутників: стеля 9 936.
+    // Число тут — межа, а не вимір.
+    expect(positions.length / 9).toBeLessThan(8_200);
     expect(points(buildPortalCaveDruseGeometry(SEED, CAVE_DRUSE_CLUSTERS.low)).length)
       .toBeLessThan(positions.length);
     expect(points(buildPortalCaveDruseGeometry(SEED, 0)).length).toBe(0);
