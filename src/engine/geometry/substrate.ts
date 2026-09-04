@@ -678,6 +678,23 @@ function veinBearings(bodies: readonly GrowthBody[]): number[] {
 }
 
 /**
+ * Кільце жили звужується від контуру до підошви монарха, і `toward` каже,
+ * де саме воно стоїть: 1 — на контурі, 0 — на підошві монарха, більше за
+ * 1 — зовні контуру, там, де комір.
+ *
+ * Напрямки, у яких контур і так вужчий за підошву монарха, не рухаються
+ * взагалі: інакше кільце вивернулось би назовні там, де жили просто немає.
+ */
+function veinRingRadius(edge: number, inner: number, toward: number): number {
+  return edge <= inner ? edge : inner + (edge - inner) * toward;
+}
+
+/** Підошва монарха — те, до чого стягуються кільця верхньої поверхні. */
+function veinInnerRadius(monarchRadius: number): number {
+  return Math.max(1e-4, monarchRadius * 0.92);
+}
+
+/**
  * Builds the vein as a closed solid: an irregular top face, a wall down to a
  * slightly drawn-in floor, and a floor cap. Returns null when there is nothing
  * to carry.
@@ -866,7 +883,7 @@ export function buildCrystalSubstrateMesh(
     return Math.max(seam, wall);
   };
 
-  const inner = Math.max(1e-4, monarchRadius * 0.92);
+  const inner = veinInnerRadius(monarchRadius);
   /**
    * One ring. `toward` is 1 at the vein's outline and 0 at the monarch's
    * footprint; `y` of null means the ring follows the fissure's own floor.
@@ -879,7 +896,7 @@ export function buildCrystalSubstrateMesh(
     for (let segment = 0; segment < OUTLINE_SEGMENTS; segment += 1) {
       const angle = (segment / OUTLINE_SEGMENTS) * Math.PI * 2;
       const edge = outline[segment]!;
-      const radius = edge <= inner ? edge : inner + (edge - inner) * toward;
+      const radius = veinRingRadius(edge, inner, toward);
       const x = Math.sin(angle) * radius;
       const z = Math.cos(angle) * radius;
       const height = typeof y === 'function' ? y(angle, segment) : y;
@@ -996,6 +1013,39 @@ export function buildCrystalSubstrateMesh(
 export function crystalVeinBearings(meshes: readonly CrystalMeshData[]): readonly number[] {
   const substrate = meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID);
   return substrate?.profile.veinBearings ?? [];
+}
+
+/**
+ * Півширина жили НА ГЛИБИНІ — консервативна межа для всього, що лежить
+ * нижче нуля.
+ *
+ * Навіщо окремо від `crystalVeinRadiusAt`. Той вертає контур верхньої
+ * поверхні, а тіло жили розширюється донизу: кільце коміра стоїть на
+ * гребені (×`GEODE_COLLAR_REACH`), підошва ще ширша (×`FLOOR_FLARE`).
+ * Тобто точка нижче нуля може бути ЗОВНІ контуру й усередині каменю, і
+ * читач, який має лише контур, оголосив би ваду там, де її немає.
+ *
+ * Виміряно рівно це: базові кришки виходять за контур верхньої поверхні
+ * на 0.3–1.5% висоти монарха (шість розмірів колонії), і всі до одної
+ * лежать усередині коміра із запасом 0.9–4.5%. Тобто недобір
+ * `baseCoverOf`, названий у ADR-0125 §7 відкритим, накритий тим, що
+ * ADR-0115 поставив зовні контуру.
+ *
+ * Береться гребінь, а не підошва: гребінь вужчий, тож число лишається
+ * межею, під яку не можна підлізти, а не найкращим випадком.
+ */
+export function crystalVeinBuriedRadiusAt(
+  bodies: readonly GrowthBody[],
+  artifactSeed: number,
+  angle: number,
+): number {
+  if (bodies.length === 0) return 0;
+  const monarchRadius = bodies.reduce((widest, body) => Math.max(widest, body.renderedRadius), 0);
+  return veinRingRadius(
+    crystalVeinRadiusAt(bodies, artifactSeed, angle),
+    veinInnerRadius(monarchRadius),
+    GEODE_COLLAR_REACH,
+  );
 }
 
 /**

@@ -6,6 +6,7 @@ export { buildCrystalProfile, crystalSegments } from './profile';
 export {
   CRYSTAL_SUBSTRATE_BODY_ID,
   crystalVeinBearings,
+  crystalVeinBuriedRadiusAt,
   crystalVeinRadiusAt,
 } from './substrate';
 export { pointInsideCrystalSolid, trimCrystalMesh } from './trim';

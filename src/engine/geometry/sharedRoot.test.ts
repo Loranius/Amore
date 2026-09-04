@@ -6,7 +6,7 @@ import { DEFAULT_CRYSTAL_MATERIAL_CONFIG, buildCrystalMaterialState } from '../m
 import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../species/crystal';
 import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG } from './config';
 import { buildCrystalGeometry } from './engine';
-import { CRYSTAL_SUBSTRATE_BODY_ID } from './substrate';
+import { CRYSTAL_SUBSTRATE_BODY_ID, crystalVeinBuriedRadiusAt } from './substrate';
 import type { CrystalMeshData } from './types';
 
 // The brief's section 4, and the last line of section 3, held as assertions.
@@ -225,6 +225,55 @@ describe('the root the whole colony grows out of (crystal cluster brief §4)', (
         expect(rootSpan.low, `${years}y ${mesh.bodyId} depth`)
           .toBeLessThanOrEqual(verticalSpan(mesh).low);
       }
+    }
+  });
+
+  it('жодна закопана точка не виходить із каменю (ADR-0003, вимір ADR-0126)', () => {
+    /*
+     * Пряме твердження ADR-0003, поміряне на СПРАВЖНІЙ геометрії.
+     *
+     * Два тести вже стережуть накриття, і обидва міряють приблизно.
+     * `covers every crystal footprint` обходить коло радіусом
+     * `renderedRadius` — а це радіус до грані, і готове тіло ширше за
+     * нього до півтора раза (ADR-0125). `reaches past the outermost
+     * daughter` порівнює НАЙБІЛЬШИЙ радіус жили з НАЙБІЛЬШИМ радіусом
+     * тіла, тобто числа з різних висот і різних напрямків: воно
+     * проходить і тоді, коли конкретна кришка звисає з краю збоку.
+     *
+     * Тут беруться всі опубліковані вершини нижче нуля — тобто саме те,
+     * що камінь мусить сховати, — і кожна звіряється зі своїм власним
+     * кутом.
+     *
+     * Межа — кільце коміра, а не контур верхньої поверхні: жила
+     * розширюється донизу, і контур оголосив би ваду там, де її немає.
+     * Виміряно на семи розмірах колонії: за контур кришки виходять на
+     * 0.3–1.5% висоти монарха, і всі до одної лежать усередині коміра
+     * із запасом 0.9–4.5%.
+     */
+    for (const [years, count] of SIZES) {
+      const { geometry, growth } = colony(years, count);
+      let tightest = Number.POSITIVE_INFINITY;
+      let tightestId = '';
+      for (const mesh of geometry.meshes) {
+        if (mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
+        for (let index = 0; index < mesh.positions.length; index += 3) {
+          const x = mesh.positions[index]!;
+          const y = mesh.positions[index + 1]!;
+          const z = mesh.positions[index + 2]!;
+          if (y > 0) continue;
+          const gap = crystalVeinBuriedRadiusAt(
+            growth.bodies,
+            growth.artifactSeed,
+            Math.atan2(x, z),
+          ) - Math.hypot(x, z);
+          if (gap < tightest) {
+            tightest = gap;
+            tightestId = mesh.bodyId;
+          }
+        }
+      }
+      expect(Number.isFinite(tightest), `${years}y має закопані точки`).toBe(true);
+      expect(tightest, `${years}y ${tightestId} стирчить із каменю`).toBeGreaterThan(0);
     }
   });
 
