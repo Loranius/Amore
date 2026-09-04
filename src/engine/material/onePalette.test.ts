@@ -129,8 +129,21 @@ describe('one rose/amethyst palette (crystal cluster brief §6)', () => {
       expect(tint.g, JSON.stringify(tint)).toBe(tint.r);
       expect(tint.b, JSON.stringify(tint)).toBe(tint.r);
     }
+    /*
+     * Золотий список рухався один раз, і ось семантика зміни (ADR-0120).
+     *
+     * Було `[0.73, 1, 1.18, 1.3]` у порядку циклу `1.0 / 0.73 / 1.18 / 1.30`.
+     * Тон роздається за РАНГОМ грані в колі, тож різниця між сусідами — це
+     * крок циклу: 27%, 62%, 10%, 23%. Два світлі тони поспіль давали чверть
+     * усіх сусідніх пар різницю в десять відсотків — саме ту, яку
+     * `amore-crystal-look` називає «читається гладкою формою».
+     *
+     * Стало `1.16 / 0.68 / 1.38 / 0.78`: темний і світлий чергуються, кроки
+     * 41%, 103%, 44%, 49%. Виміряно на живій сцені — медіана розділення
+     * сусідніх плато в тілі 11% → 16%, найбільша 54% → 46%.
+     */
     const values = CRYSTAL_FACET_TINTING.tints.map((tint) => tint.r).sort((a, b) => a - b);
-    expect(values).toEqual([0.73, 1, 1.18, 1.3]);
+    expect(values).toEqual([0.68, 0.78, 1.16, 1.38]);
   });
 
   it('stays opaque, unlit by gold, and inside the brief’s physical bands', () => {

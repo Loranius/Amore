@@ -37,9 +37,23 @@ describe('per-face tone', () => {
         expect(brightness, name).toBeGreaterThan(0.66);
         expect(brightness, name).toBeLessThan(1.5);
       }
-      // One tone must be neutral, or the body's earned colour would be
-      // systematically shifted rather than varied around.
-      expect(tinting.tints.some((tint) => tint.r === 1 && tint.g === 1 && tint.b === 1)).toBe(true);
+      /*
+       * НАБІР МУСИТЬ БУТИ НЕЙТРАЛЬНИМ У СЕРЕДНЬОМУ — ось що тут справді
+       * стережеться: заслужений колір пари (ADR-0004) має ВАРІЮВАТИСЬ
+       * навколо себе, а не зсуватись.
+       *
+       * Стояла інша умова: «один із тонів мусить дорівнювати 1.0». Вона
+       * достатня, але не необхідна, і вона суперечить чергуванню
+       * (ADR-0120): нейтральний тон стоїть між світлим і темним, тобто
+       * власноруч робить один крок циклу слабким. Набір із середнім 1.0
+       * дає те саме, чого вимагав старий припис, і не псує кроків.
+       */
+      const mean = tinting.tints.reduce(
+        (total, tint) => total + (tint.r + tint.g + tint.b) / 3,
+        0,
+      ) / Math.max(1, tinting.tints.length);
+      expect(mean, `${name} середнє`).toBeGreaterThan(0.97);
+      expect(mean, `${name} середнє`).toBeLessThan(1.03);
     }
   });
 

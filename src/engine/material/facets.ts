@@ -22,31 +22,48 @@ import type { CrystalFacetTinting, CrystalRgb } from './types';
  */
 
 /**
- * Four tones: the body's own, a cooler darker one, a lighter lavender, and a
- * rare warm catch.
+ * Чотири тони, і головне в них — ПОРЯДОК, а не значення.
  *
  * **Value only. Not one of them moves the hue.** The set this replaces pulled
  * one tone toward blue (`0.70 / 0.75 / 0.90`), one toward violet and one toward
  * warm pink — so two neighbouring faces of the same crystal were different
  * *colours*, which is what the brief forbids outright. The permitted difference
- * between faces is brightness of the one colour, and these are the brief's own
- * four steps: 0.73 dark, 1.0 neutral, 1.18 light, 1.30 for the rare catch.
+ * between faces is brightness of the one colour.
  *
  * Multipliers over the body's base colour, so the couple's earned tint
  * (ADR-0004) still decides what the crystal *is*; these decide only which of
  * its planes caught more of it.
+ *
+ * ЧОМУ ЦИКЛ ЧЕРГУЄТЬСЯ. Тони роздаються за РАНГОМ грані в колі
+ * (`facetTintForRank`), тобто сусідні грані беруть сусідні позиції цього
+ * масиву. Отже різниця між сусідами — це крок ЦИКЛУ, і слабкий крок
+ * псує стільки ж, скільки збіг.
+ *
+ * Стояло `1.0 / 0.73 / 1.18 / 1.30`: кроки 27%, 62%, 10%, 23%. Два
+ * світлі тони поспіль (1.18 → 1.30) давали чверть усіх сусідніх пар
+ * різницю в десять відсотків — рівно ту, яку `amore-crystal-look`
+ * називає «читається гладкою формою».
+ *
+ * Тепер темний і світлий чергуються, тож жодна пара сусідів не є двома
+ * світлими або двома темними: кроки 30%, 68%, 34%, 29%. Середня
+ * яскравість набору 0.965 — тіло від цього не темнішає.
  */
 const CRYSTAL_FACET_TINTS: readonly CrystalRgb[] = [
-  { r: 1, g: 1, b: 1 },
-  { r: 0.73, g: 0.73, b: 0.73 },
-  { r: 1.18, g: 1.18, b: 1.18 },
-  { r: 1.3, g: 1.3, b: 1.3 },
+  { r: 1.16, g: 1.16, b: 1.16 },
+  { r: 0.68, g: 0.68, b: 0.68 },
+  { r: 1.38, g: 1.38, b: 1.38 },
+  { r: 0.78, g: 0.78, b: 0.78 },
 ];
 
 /**
- * The warm catch is rare on purpose. An even split makes every fourth face
- * pink, which reads as a pattern; at six percent it reads as a flash of light
- * finding one plane.
+ * Ваги для СТАРОГО ключа (`facetTintFor`), який роздає тон за номером
+ * трикутника.
+ *
+ * Тіло кристала ним більше не користується: відколи тон іде за рангом
+ * грані в колі (ADR-0086), ваги не читаються взагалі, і всі чотири тони
+ * трапляються однаково часто. Лишаються, бо ключ ще існує й ним міряють
+ * підкладку, — але «рідкісний теплий блиск на шість відсотків» більше не
+ * описує кристал, і тримати цей опис означало б брехати про поверхню.
  */
 const CRYSTAL_FACET_WEIGHTS: readonly number[] = [0.44, 0.74, 0.94, 1];
 
