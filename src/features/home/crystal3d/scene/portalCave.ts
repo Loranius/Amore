@@ -107,24 +107,26 @@ export const CAVE_DRUSE_CLUSTERS: Record<'high' | 'balanced' | 'low' | 'fallback
 const DRUSE_MIN = 3;
 const DRUSE_MAX = 6;
 
-/*
- * ВЕЛИКИХ КРИСТАЛІВ НА СТІНІ НЕМАЄ, І ЦЕ ВИМІРЯНО, А НЕ ЗАБУТО.
- * ------------------------------------------------------------
- * Тут стояв другий розмірний клас: кожен дев'ятий кущ ріс на 0.8–2.0
- * одиниці, тобто 280–700 пікселів, — щоб стіна читалась кристальною, а
- * не поцяткованою.
+/**
+ * ОДИНАК: кожен восьмий кущ — ОДИН великий кристал, а не купка.
  *
- * Кадр відкинув це так само ясно, як три попередні спроби. Великі
- * кристали одного куща перетинаються, їхні опуклі тіла зливаються в
- * ОДНУ бульбу, а намальована фарба без освітленого ключа не дає їхнім
- * граням розділення на такому розмірі. На знімку це картопля, а не
- * кристал.
+ * П'ята спроба зробити стіну кристальною провалилась, і ADR-0121 записав
+ * причину: великі кристали ОДНОГО КУЩА перетинаються, їхні опуклі тіла
+ * зливаються в одну бульбу, а фарба в діапазоні 0.86–1.0 не давала їхнім
+ * граням розділення. На знімку виходила картопля.
  *
- * Що з цього справді відомо: стіна печери читається гранованим КАМЕНЕМ,
- * і дрібна друза дає їй кристалічну крупу. Великий кристал на стіні
- * потребує іншої побудови — не об'єднання опуклих тіл, а гранованої
- * ділянки самої стіни, — і це окрема робота, а не число.
+ * Це виправляє обидві половини причини, а не додає ще одне число:
+ *
+ *  • великий кристал росте ОДИН, тож перетинатись нема з чим;
+ *  • його грані фарбуються ЧЕРГУВАННЯМ через одну, з розмахом 0.58/1.34
+ *    замість 0.86/1.00 — тим самим прийомом, яким читаються грані самого
+ *    артефакта (ADR-0120).
  */
+const DRUSE_SOLITARY_EVERY = 8;
+const DRUSE_SOLITARY_MIN_LENGTH = 0.9;
+const DRUSE_SOLITARY_MAX_LENGTH = 1.8;
+/** Тони бічних граней одинака — через одну, як у циклі артефакта. */
+const DRUSE_FACE_SHADES: readonly number[] = [1.34, 0.58, 1.16, 0.72, 1.26, 0.64];
 /**
  * Розмір кристала друзи в одиницях сцени.
  *
@@ -508,25 +510,52 @@ export function buildPortalCaveDruseGeometry(
      * усього: контакту з каменем не видно, тіні немає, і купка читалась
      * уламками в небі.
      */
-    const share = 0.01 + seededUnit(seed, `${tag}:height`) * 0.34;
+    /*
+     * Одинак росте від самого підніжжя стіни — там, де вона сходиться з
+     * підлогою, — тобто стоїть, а не висить. Дрібні розсипані вище.
+     */
+    const share = cluster % DRUSE_SOLITARY_EVERY === 0
+      ? 0.004 + seededUnit(seed, `${tag}:height`) * 0.05
+      : 0.01 + seededUnit(seed, `${tag}:height`) * 0.34;
     const wallRadius = wallRadiusAt(seed, angle, share);
     const baseX = Math.cos(angle) * wallRadius;
     const baseZ = Math.sin(angle) * wallRadius;
     const baseY = PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT * share;
 
-    const count = DRUSE_MIN
-      + Math.floor(seededUnit(seed, `${tag}:count`) * (DRUSE_MAX - DRUSE_MIN + 1));
+    const solitary = cluster % DRUSE_SOLITARY_EVERY === 0;
+    const count = solitary
+      ? 1
+      : DRUSE_MIN + Math.floor(seededUnit(seed, `${tag}:count`) * (DRUSE_MAX - DRUSE_MIN + 1));
     for (let index = 0; index < count; index += 1) {
       const own = `${tag}:${index}`;
-      const length = DRUSE_MIN_LENGTH
-        + seededUnit(seed, `${own}:len`) * (DRUSE_MAX_LENGTH - DRUSE_MIN_LENGTH);
+      const length = solitary
+        ? DRUSE_SOLITARY_MIN_LENGTH
+          + seededUnit(seed, `${own}:len`)
+            * (DRUSE_SOLITARY_MAX_LENGTH - DRUSE_SOLITARY_MIN_LENGTH)
+        : DRUSE_MIN_LENGTH
+          + seededUnit(seed, `${own}:len`) * (DRUSE_MAX_LENGTH - DRUSE_MIN_LENGTH);
       const offset = length / DRUSE_ASPECT / 2;
       const prism = length - offset * rise;
       if (prism <= 0) continue;
 
       // Кристал росте ВІД стіни: вісь дивиться до центру зали, з нахилом.
       const lean = (seededUnit(seed, `${own}:lean`) - 0.5) * 0.9;
-      const lift = (seededUnit(seed, `${own}:lift`) - 0.3) * 1.1;
+      /*
+       * ОДИНАК СТОЇТЬ МАЙЖЕ ПРЯМО, і це виправлення шостої спроби.
+       *
+       * Досі всі кристали стіни росли ВІД неї — вісь дивилась до центру
+       * зали. Для дрібних це правда життя, для великого — вирок: той, що
+       * росте з дальньої стіни, дивиться вістрям просто в камеру, і на
+       * кадрі від нього видно шестикутний торець. Саме він і читався
+       * картоплею; ні розмір, ні фарба цього не лікували, бо довжини
+       * кристала не було видно взагалі.
+       *
+       * Тепер підйом переважає над виносом: одинак — це шпиль біля стіни,
+       * нахилений від неї, а не спис, спрямований у глядача.
+       */
+      const lift = solitary
+        ? 1.7 + seededUnit(seed, `${own}:lift`) * 0.9
+        : (seededUnit(seed, `${own}:lift`) - 0.3) * 1.1;
       const axis = new THREE.Vector3(-Math.cos(angle), 0, -Math.sin(angle))
         .applyAxisAngle(new THREE.Vector3(0, 1, 0), lean)
         .add(new THREE.Vector3(0, lift, 0))
@@ -554,7 +583,25 @@ export function buildPortalCaveDruseGeometry(
         baseX + (seededUnit(seed, `${own}:dx`) - 0.5) * spread,
         baseY + (seededUnit(seed, `${own}:dy`) - 0.5) * spread,
         baseZ + (seededUnit(seed, `${own}:dz`) - 0.5) * spread,
-      ).addScaledVector(outward, length * 0.45);
+      );
+      if (solitary) {
+        /*
+         * ОДИНАК ТОНЕ ВНИЗ, А НЕ ВБІК, і це сьома спроба тієї самої речі.
+         *
+         * Дрібна друза росте ВІД стіни, тож і топити її треба в стіну —
+         * назовні по горизонталі. Одинак стоїть майже прямо, і той самий
+         * горизонтальний зсув давав інше: тіло ховалось за оболонкою по
+         * КОСІЙ, тобто виринало серед стіни, а не виходило з підніжжя. На
+         * кадрі це читалось як кристал, що висить.
+         *
+         * Вертикальне тіло ховає підошву так само, як монарх у жеоді, —
+         * вона просто нижча за підлогу.
+         */
+        root.addScaledVector(outward, length * 0.1);
+        root.y -= length * 0.34;
+      } else {
+        root.addScaledVector(outward, length * 0.45);
+      }
 
       const at = (u: number, v: number, along: number): [number, number, number] => {
         const point = root.clone()
@@ -594,6 +641,10 @@ export function buildPortalCaveDruseGeometry(
        * на ній.
        */
       const shade = 0.62 + 0.62 * seededUnit(seed, `${own}:shade`);
+      // Зсув циклу з насіння: два одинаки поруч не повторюють один одного.
+      const shadeShift = Math.floor(
+        seededUnit(seed, `${own}:shade-shift`) * DRUSE_FACE_SHADES.length,
+      );
       const apex = at(0, 0, length);
       for (let face = 0; face < 6; face += 1) {
         const [ux, uy] = corners[face]!;
@@ -603,13 +654,17 @@ export function buildPortalCaveDruseGeometry(
         const topLeft = at(ux, uy, prism);
         const topRight = at(vx, vy, prism);
         /*
-         * Кожна з трьох граней кристалика бере власний відтінок навколо
-         * власного тону: бічні площини одного кристала ловлять різне
-         * світло так само, як грані артефакта.
+         * Бічні площини одного кристала ловлять різне світло так само, як
+         * грані артефакта, — і так само ЧЕРГУЮТЬСЯ. Дрібна друза тримає
+         * вужчий розмах: на двадцяти пікселях сильний контраст читається
+         * не гранями, а сміттям.
          */
-        mesh.push(bottomLeft, bottomRight, topRight, shade * (0.86 + 0.28 * (face % 3) / 2));
-        mesh.push(bottomLeft, topRight, topLeft, shade * (0.86 + 0.28 * (face % 3) / 2));
-        mesh.push(topLeft, topRight, apex, shade * 1.16);
+        const own = solitary
+          ? DRUSE_FACE_SHADES[(face + shadeShift) % DRUSE_FACE_SHADES.length]!
+          : 0.86 + 0.28 * ((face % 3) / 2);
+        mesh.push(bottomLeft, bottomRight, topRight, shade * own);
+        mesh.push(bottomLeft, topRight, topLeft, shade * own);
+        mesh.push(topLeft, topRight, apex, shade * (solitary ? 1.28 : 1.16));
       }
     }
   }
