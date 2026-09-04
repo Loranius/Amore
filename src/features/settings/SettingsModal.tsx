@@ -20,6 +20,7 @@ import {
 import { EmptyState } from '@/components/ui/EmptyState';
 import { useTheme } from '@/providers/ThemeProvider';
 import { usePhotoManager, usePhotoMutations, useUserSizes, useSaveSizes } from './useSettings';
+import { useNotificationPrefs, useSaveNotificationPrefs } from './useNotificationPrefs';
 import type { InsertRow, UserSizesRow } from '@/types';
 
 interface SettingsModalProps {
@@ -99,6 +100,10 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 
         <div className="settings-divider" />
 
+        <QuietDaysOffSection />
+
+        <div className="settings-divider" />
+
         <ThemeSection />
 
         {/*
@@ -140,10 +145,10 @@ function ThemeSection() {
   return (
     <section className="settings-section">
       <div className="settings-section-title">Тема</div>
-      <div className="theme-switch" role="group" aria-label="Тема порталу">
+      <div className="settings-switch" role="group" aria-label="Тема порталу">
         <button
           type="button"
-          className={`theme-switch-btn${theme === 'light' ? ' is-on' : ''}`}
+          className={`settings-switch-btn${theme === 'light' ? ' is-on' : ''}`}
           aria-pressed={theme === 'light'}
           onClick={() => setTheme('light')}
         >
@@ -152,12 +157,67 @@ function ThemeSection() {
         </button>
         <button
           type="button"
-          className={`theme-switch-btn${theme === 'dark' ? ' is-on' : ''}`}
+          className={`settings-switch-btn${theme === 'dark' ? ' is-on' : ''}`}
           aria-pressed={theme === 'dark'}
           onClick={() => setTheme('dark')}
         >
           <MoonIcon size={18} />
           Темна
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Тиша у вихідний.
+ *
+ * Сегмент із двох названих станів, а не тумблер, — з тієї самої причини,
+ * що й у теми: станів рівно два, обидва мають імена, і показати обидва
+ * чесніше, ніж ховати один за положенням перемикача.
+ *
+ * НАЛАШТУВАННЯ ОСОБИСТЕ. Кожен вирішує за себе, і чужий рядок не
+ * редагується — це стоїть у політиці таблиці, а не лише тут.
+ *
+ * Правило виконує база: у день, позначений у «Графіку» як вихідний,
+ * сповіщення не створюються взагалі. Порожня клітинка — не вихідний, а
+ * невідомо, тож поки місяць не заповнений, тиша не вмикається.
+ */
+function QuietDaysOffSection() {
+  const me = useCurrentUser();
+  const { data: prefs, isPending } = useNotificationPrefs(me.id);
+  const save = useSaveNotificationPrefs();
+  const quiet = prefs?.quiet_on_days_off ?? false;
+
+  const choose = (next: boolean) => {
+    if (next === quiet || save.isPending) return;
+    save.mutate({ userId: me.id, quietOnDaysOff: next });
+  };
+
+  return (
+    <section className="settings-section">
+      <div className="settings-section-title">Сповіщення</div>
+      <p className="settings-section-desc">
+        У день, позначений у «Графіку» вихідним, сповіщення не приходять.
+      </p>
+      <div className="settings-switch" role="group" aria-label="Сповіщення у вихідний">
+        <button
+          type="button"
+          className={`settings-switch-btn${!quiet ? ' is-on' : ''}`}
+          aria-pressed={!quiet}
+          disabled={isPending || save.isPending}
+          onClick={() => choose(false)}
+        >
+          Приходять завжди
+        </button>
+        <button
+          type="button"
+          className={`settings-switch-btn${quiet ? ' is-on' : ''}`}
+          aria-pressed={quiet}
+          disabled={isPending || save.isPending}
+          onClick={() => choose(true)}
+        >
+          Тиша у вихідний
         </button>
       </div>
     </section>

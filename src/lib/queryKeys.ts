@@ -32,6 +32,7 @@ export const qk = {
   notifications: () => ['notifications'] as const,
   notificationsFeed: () => ['notifications', 'feed'] as const,
   notificationsUnread: () => ['notifications', 'unread'] as const,
+  notificationPrefs: (userId: number) => ['notifications', 'prefs', userId] as const,
 
   media: (type?: MediaType) =>
     (type === undefined ? (['media'] as const) : (['media', type] as const)),

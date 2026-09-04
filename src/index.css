@@ -3252,7 +3252,7 @@ textarea::placeholder {
    Жолоб зі скла й два сегменти — те саме, що на обох аркушах референсу.
    Активний не просто залитий, а світить: ореол — це те, чим «обрано»
    відрізняється від «пофарбовано». */
-.theme-switch {
+.settings-switch {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 6px;
@@ -3261,7 +3261,7 @@ textarea::placeholder {
   background: var(--glass-1);
   box-shadow: var(--glass-edge);
 }
-.theme-switch-btn {
+.settings-switch-btn {
   appearance: none;
   border: 0;
   display: flex;
@@ -3277,18 +3277,18 @@ textarea::placeholder {
   cursor: pointer;
   transition: color 180ms ease, box-shadow 180ms ease, background-color 180ms ease;
 }
-.theme-switch-btn.is-on {
+.settings-switch-btn.is-on {
   background-color: var(--accent-strong);
   background-image: var(--control-sheen);
   color: #fff;
   box-shadow: var(--control-top), var(--control-lip-press), var(--glow-halo);
 }
-.theme-switch-btn:focus-visible {
+.settings-switch-btn:focus-visible {
   outline: 2px solid color-mix(in srgb, var(--accent) 70%, transparent);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .theme-switch-btn { transition: none; }
+  .settings-switch-btn { transition: none; }
 }
 .settings-section-desc { margin: -4px 0 0; color: var(--muted); font-size: 13px; }
 

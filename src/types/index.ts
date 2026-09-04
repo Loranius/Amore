@@ -315,6 +315,18 @@ export interface SettingsValueMap {
 }
 export type KnownSettingKey = keyof SettingsValueMap;
 
+/**
+ * Особисті налаштування сповіщень.
+ *
+ * Рядок з'являється лише коли людина торкнулась перемикача: відсутність
+ * рядка означає «за замовчуванням», тобто сповіщення приходять завжди.
+ */
+export interface UserNotificationPrefsRow {
+  user_id: number;
+  quiet_on_days_off: boolean;
+  updated_at: string;
+}
+
 export interface UserSizesRow {
   user_id: number;
   height: number | null;
@@ -536,6 +548,7 @@ export interface Database {
       shopping_items:     TableDef<ShoppingItemRow, 'title' | 'category'>;
       settings:           TableDef<SettingsRow, 'key' | 'value'>;
       user_sizes:         TableDef<UserSizesRow, 'user_id'>;
+      user_notification_prefs: TableDef<UserNotificationPrefsRow, 'user_id', 'updated_at'>;
       work_schedule:      TableDef<WorkScheduleRow, 'date' | 'user_id' | 'mark'>;
       photo_calendar:     TableDef<PhotoCalendarRow, 'date' | 'user_id' | 'photo_url'>;
       memories:           TableDef<MemoryRow, 'photo_url' | 'memory_date'>;
