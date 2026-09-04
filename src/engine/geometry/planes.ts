@@ -132,8 +132,8 @@ const DOMINANT_INSET = 0.94;
  * degree, and thinking in degrees here invites a number that closes the crystal
  * into a cone before it reaches its shoulder.
  */
-const PRISM_FLARE_MIN = 0.3;
-const PRISM_FLARE_MAX = 0.46;
+const PRISM_FLARE_MIN = 0.06;
+const PRISM_FLARE_MAX = 0.14;
 
 /**
  * The same taper on a crystal that grew fast: a fifth as strong.

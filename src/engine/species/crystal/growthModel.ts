@@ -416,7 +416,7 @@ export const CHILD_MIN_CLEARANCE = 0.006;
  * Twelve per cent of the two radii covers both bodies' corner excess about
  * three times over, and it costs a fifth of what the old flat standoff did.
  */
-const CHILD_CORNER_ALLOWANCE = 0.055;
+const CHILD_CORNER_ALLOWANCE = 0.13;
 /**
  * Years per ring before a new, wider ring opens.
  *

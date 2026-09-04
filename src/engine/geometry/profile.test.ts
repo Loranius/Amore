@@ -382,8 +382,25 @@ describe('Crystal organic profile phase 3a', () => {
     // the shaft, so the termination is 8% shorter than the 54° it always used
     // to be clamped to, and a shorter termination starts higher. On this body
     // the shoulder moved 0.8195 → 0.8216.
-    expect(rows[widestIndex]!.y / top).toBeGreaterThanOrEqual(0.6);
-    expect(rows[widestIndex]!.y / top).toBeLessThanOrEqual(0.84);
+    /*
+     * ПЛЕЧЕ, А НЕ НАЙШИРШЕ МІСЦЕ.
+     *
+     * Тут міряли найширший рядок, і поки боки призми розширювались угору
+     * (ADR-0019), це справді був злам силуету. Відколи боки паралельні
+     * (ADR-0118), найширший рядок ставить шум: він гуляє по всьому
+     * стовбуру й на цьому тілі впав на 0.385, хоч форма правильна.
+     *
+     * Плече — це НАЙВИЩИЙ рядок, який ще тримає майже повну ширину. Та
+     * сама означеність, що в `crystalSilhouetteProfile` (ADR-0114), і той
+     * самий поріг 0.92: грані нерівні, тож навіть у чистій призмі сусідні
+     * рядки різняться на кілька відсотків.
+     */
+    const shoulderIndex = rows.reduce(
+      (best, row, index) => (row.radiusX >= widest * 0.92 ? index : best),
+      0,
+    );
+    expect(rows[shoulderIndex]!.y / top).toBeGreaterThanOrEqual(0.6);
+    expect(rows[shoulderIndex]!.y / top).toBeLessThanOrEqual(0.9);
 
     const radiusNear = (fraction: number): number => {
       const targetY = top * fraction;
@@ -395,13 +412,16 @@ describe('Crystal organic profile phase 3a', () => {
       ).radiusX;
     };
 
-    // Narrower at the base, but only just: the radius is nearly stable up the
-    // shaft so the sides read as parallel and the shoulder is the only place
-    // the silhouette turns a corner.
-    // ADR-0019 deepened the taper for the gem silhouette: the brief puts the
-    // root at 62–75% of the widest slice, against the 80–95% a quartz rod had.
-    expect(radiusNear(0)).toBeLessThan(widest * 0.85);
-    expect(radiusNear(0)).toBeGreaterThan(widest * 0.6);
+    /*
+     * Боки ПАРАЛЕЛЬНІ, і плече — єдине місце, де силует повертає.
+     *
+     * ADR-0019 поглибив звуження заради гемового силуету: 62–75% від
+     * найширшого зрізу проти 80–95%, які має кварцовий стрижень. ADR-0118
+     * повернув кварцовий: у призми боки паралельні за означенням, а
+     * підошву ховає порода жеоди, а не звуження тіла.
+     */
+    expect(radiusNear(0)).toBeGreaterThan(widest * 0.86);
+    expect(radiusNear(0)).toBeLessThanOrEqual(widest * 1.001);
 
     // And the termination is short and decisive rather than a long fade.
     expect(radiusNear(1)).toBeLessThan(widest * 0.1);
@@ -433,14 +453,19 @@ describe('Crystal organic profile phase 3a', () => {
         (best, row, index) => (row.radiusX > rows[best]!.radiusX ? index : best),
         0,
       );
-      const share = rows[widestIndex]!.y / top;
+      // Плече, а не найширший рядок: боки призми паралельні (ADR-0118),
+      // тож найширший рядок ставить шум. Поріг 0.92 — той самий, що в
+      // `crystalSilhouetteProfile`.
+      const widestRadius = rows[widestIndex]!.radiusX;
+      const shoulderIndex = rows.reduce(
+        (best, row, index) => (row.radiusX >= widestRadius * 0.92 ? index : best),
+        0,
+      );
+      const share = rows[shoulderIndex]!.y / top;
 
-      // Every crystal keeps a real shoulder, high on the body. The ceiling
-      // moved 0.90 → 0.92 with the lattice crown angle, for the same reason as
-      // in the test above: a termination 8% shorter starts 8% further up. The
-      // worst seed of the forty here went 0.8994 → 0.9063.
+      // Every crystal keeps a real shoulder, high on the body.
       expect(share).toBeGreaterThanOrEqual(0.5);
-      expect(share).toBeLessThanOrEqual(0.92);
+      expect(share).toBeLessThanOrEqual(0.95);
       shoulders.add(Math.round(share * 100));
 
       // Below the shoulder the body only widens, above it only narrows. That is
@@ -452,7 +477,18 @@ describe('Crystal organic profile phase 3a', () => {
       // measures the furthest point from the axis, and the crystal leans, so
       // the far side of a narrowing termination can still drift outward by a
       // fraction of a percent. A bullet or a barrel misses by tens of percent.
-      const slack = rows[widestIndex]!.radiusX * 0.02;
+      /*
+       * ОДНОГОРБИЙ силует: тіло росте до одного максимуму й від нього
+       * тільки вужчає. Талія на стовбурі або друге розширення над плечем
+       * — це вже не кристал.
+       *
+       * Міряється навколо НАЙШИРШОГО рядка, а не навколо плеча, і це
+       * навмисно: зрізи плеча починаються нижче за рядок 0.92, тож
+       * «монотонно до плеча» перестало б бути правдою саме там, де форма
+       * правильна. Виміряно на prismatic 2: пік на 0.67, зрізи вже на
+       * 0.68.
+       */
+      const slack = widestRadius * 0.02;
       for (let index = 1; index <= widestIndex; index += 1) {
         expect(rows[index]!.radiusX).toBeGreaterThanOrEqual(rows[index - 1]!.radiusX - slack);
       }
@@ -1278,13 +1314,29 @@ describe('crystal faceting — the shaft is interrupted', () => {
         polytopeTolerance(body.renderedRadius),
       )!;
       const top = Math.max(...polytope.vertices.map((vertex) => vertex.y));
-      const widest = polytope.vertices.reduce(
-        (best, vertex) => (
-          Math.hypot(vertex.x, vertex.z) > Math.hypot(best.x, best.z) ? vertex : best
-        ),
-        polytope.vertices[0]!,
+      const widestRadius = polytope.vertices.reduce(
+        (best, vertex) => Math.max(best, Math.hypot(vertex.x, vertex.z)),
+        0,
       );
-      expect(widest.y / top).toBeGreaterThan(0.6);
+      /*
+       * ПЛЕЧЕ, а не найширша вершина. Поки боки розширювались угору,
+       * найширша вершина й була плечем; у паралельної призми (ADR-0118)
+       * вона гуляє по стовбуру, і на цих сорока зернах впала до 0.461 при
+       * незмінно правильній формі.
+       *
+       * Питання, яке тест ставить, лишається тим самим: чи зріз плеча
+       * стоїть у ВЕРХНІЙ частині тіла, чи він з'їхав на середину й зробив
+       * із кристала бочку.
+       */
+      const shoulder = polytope.vertices.reduce(
+        (best, vertex) => (
+          Math.hypot(vertex.x, vertex.z) >= widestRadius * 0.92
+            ? Math.max(best, vertex.y)
+            : best
+        ),
+        0,
+      );
+      expect(shoulder / top).toBeGreaterThan(0.6);
     }
   });
 

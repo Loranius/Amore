@@ -180,13 +180,22 @@ describe('наш кристал проти еталона — розрив за�
 
   it('форма розходиться з еталоном, і розрив не росте', () => {
     /*
-     * Виміряно 2026-09-03: 0.106 / 0.148 / 0.249 на 1, 11 і 40 роках.
-     * Розрив росте з віком — тіло з роками стає кремезнішим, а еталон
-     * лишається призмою.
+     * Було 0.106 / 0.148 / 0.249 на 1, 11 і 40 роках. Стало після
+     * ADR-0118 — 0.098 / 0.175 / 0.281, тобто на одинадцяти роках
+     * ГІРШЕ, і це не регрес, а видимість.
+     *
+     * Доти наші смуги йшли від 0.148 угору до 0.174: нижня половина
+     * стовбура випадково лежала близько до еталонних 0.147, і середня
+     * різниця виходила меншою. Відколи боки паралельні, весь стовбур
+     * стоїть на 0.174 — і мірка каже те, що є насправді: наш кристал
+     * ТОВСТИЙ. Стрункість 2.89 проти еталонних 3.39.
+     *
+     * Тобто розхил приховував обхват. Наступний крок — обхват; ця межа
+     * не дає йому вирости, поки його не візьмуть.
      */
-    expect(crystalProfileDistance(reference, ours(1).crystal)).toBeLessThan(0.12);
-    expect(crystalProfileDistance(reference, ours(11).crystal)).toBeLessThan(0.16);
-    expect(crystalProfileDistance(reference, ours(40).crystal)).toBeLessThan(0.26);
+    expect(crystalProfileDistance(reference, ours(1).crystal)).toBeLessThan(0.11);
+    expect(crystalProfileDistance(reference, ours(11).crystal)).toBeLessThan(0.19);
+    expect(crystalProfileDistance(reference, ours(40).crystal)).toBeLessThan(0.29);
   });
 
   it('З ВІКОМ КРИСТАЛ КРЕМЕЗНІШАЄ — і нижче цього вже не опускається', () => {
@@ -200,18 +209,35 @@ describe('наш кристал проти еталона — розрив за�
     expect(ours(40).crystal.aspect).toBeGreaterThan(2.55);
   });
 
-  it('НАША ПРИЗМА РОЗШИРЮЄТЬСЯ ВГОРУ — записано, поки не виправлено', () => {
+  it('ПРИЗМА СТАЛА ПРИЗМОЮ: боки паралельні, як в еталона', () => {
     /*
-     * Вада, якої не було видно оком і яку назвав перший же вимір: від
-     * підошви до плеча радіус росте на 18%. Тобто бокова поверхня —
-     * конус, а не призма, і саме тому тіло читається виточеною формою.
-     * Еталон на тій самій ділянці дає 1.00.
+     * Перший вимір (2026-09-03) назвав ваду, якої не було видно оком: від
+     * підошви до плеча радіус ріс на 18%, тобто бокова поверхня була
+     * конусом. Це наслідок гемового розхилу ADR-0019, і ADR-0118 його
+     * прибрав.
+     *
+     * Виміряно на 1 / 11 / 40 роках: 1.094 / 0.945 / 0.990 при
+     * еталонних 1.00. Смуга свідомо двобічна — призма, що ВУЖЧАЄ вгору,
+     * така ж неправда, як призма, що ширшає.
      */
-    const profile = ours(11).crystal;
-    const shoulderBand = Math.floor(profile.shoulderAt * profile.bands.length) - 1;
-    const flare = profile.bands[shoulderBand]! / profile.bands[0]!;
-    expect(flare).toBeGreaterThan(1.0);
-    expect(flare).toBeLessThan(1.20);
+    for (const years of [1, 11, 40]) {
+      const profile = ours(years).crystal;
+      const shoulderBand = Math.floor(profile.shoulderAt * profile.bands.length) - 1;
+      const flare = profile.bands[shoulderBand]! / profile.bands[0]!;
+      expect(flare, `${years}р`).toBeGreaterThan(0.9);
+      expect(flare, `${years}р`).toBeLessThan(1.12);
+    }
+  });
+
+  it('КРИСТАЛ ТОВСТИЙ — межа названа, поки обхват не взяли', () => {
+    /*
+     * Те, що показав розхил, коли його прибрали. Еталон дає стрункість
+     * 3.39 хай якого віку; наш іде 3.25 → 2.89 → 2.62 на 1, 11 і 40
+     * роках. Тобто монарх на чверть товщий за кварц, і з віком товщає.
+     */
+    expect(ours(1).crystal.aspect).toBeGreaterThan(3.2);
+    expect(ours(11).crystal.aspect).toBeGreaterThan(2.85);
+    expect(ours(40).crystal.aspect).toBeGreaterThan(2.6);
   });
 
   it('порода встала коміром — і назад уже не ляже', () => {

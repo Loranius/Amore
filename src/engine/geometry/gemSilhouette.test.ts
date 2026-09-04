@@ -109,14 +109,23 @@ describe('gem silhouette (crystal cluster brief)', () => {
         const s = silhouette(mesh, body);
         const label = `${couple} ${years}y`;
 
-        // **The band the owner moved, not the one the brief wrote.** §2 asked
-        // for 1.80–2.10 and this held it at 1.75–2.15 on the built mesh. On
-        // 2026-08-10, looking at the rendered portal, the owner asked for the
-        // monarch's diameter to be halved — which doubles the ratio. The number
-        // in the brief was written before there was a crystal to look at; the
-        // instruction came from looking at one.
-        expect(s.aspect, `${label} aspect`).toBeGreaterThanOrEqual(3.4);
-        expect(s.aspect, `${label} aspect`).toBeLessThanOrEqual(4.35);
+        /*
+         * **Смуга рухалась двічі, і обидва рази з приводу.** §2 брифу
+         * просив 1.80–2.10; 2026-08-10 власник, дивлячись на портал,
+         * попросив удвічі тонший монарх — смуга стала 3.4–4.35.
+         *
+         * Тепер 3.85–4.80, і це наслідок ADR-0118: призма перестала
+         * розширюватись угору, тобто зникла та зайва ширина, яку давав
+         * розхил у найширшому місці. Виміряно 3.93–4.68 на шістнадцяти
+         * парах вік×пара.
+         *
+         * Напрямок правильний: еталон (ADR-0114) дає стрункість 3.39 у
+         * силуеті, а наш кристал ішов від 2.61. Ці два числа НЕ
+         * порівнюються навпростець — тут ширина міряється в кадрі самого
+         * тіла разом із похованою частиною, — але рух той самий.
+         */
+        expect(s.aspect, `${label} aspect`).toBeGreaterThanOrEqual(3.85);
+        expect(s.aspect, `${label} aspect`).toBeLessThanOrEqual(4.8);
       }
     }
   });
@@ -145,10 +154,24 @@ describe('gem silhouette (crystal cluster brief)', () => {
         expect(s.widestAt, `${label} widest`).toBeGreaterThan(0.55);
         expect(s.widestAt, `${label} widest`).toBeLessThan(0.92);
 
-        // The root is narrower than the shoulder, and by a real margin: this is
-        // the taper that stops the stone reading as standing on a flat cut.
-        expect(s.rootShare, `${label} root`).toBeGreaterThan(0.62);
-        expect(s.rootShare, `${label} root`).toBeLessThan(0.80);
+        /*
+         * БОКИ ПРИЗМИ ПАРАЛЕЛЬНІ — і це протилежне тому, що тут стояло.
+         *
+         * Було 0.62–0.80: «звуження, яке не дає каменю читатись поставленим
+         * на плаский зріз» (ADR-0019, гемовий силует). Еталон ADR-0114
+         * каже інше й міряно: у кварцу боки призми паралельні, бо це
+         * визначення призми, а підошву ховає порода, а не звуження.
+         *
+         * Те, заради чого був гемовий розхил, тепер робить жеода
+         * (ADR-0115): камінь підіймається кристалові до чверті висоти,
+         * тож «плаского зрізу» на екрані немає взагалі.
+         *
+         * Виміряно 0.883–0.941 — тобто підошва на 6–12% вужча за
+         * найширше місце, і майже вся ця різниця припадає на кути
+         * многогранника, а не на нахил граней.
+         */
+        expect(s.rootShare, `${label} root`).toBeGreaterThan(0.86);
+        expect(s.rootShare, `${label} root`).toBeLessThanOrEqual(1);
       }
     }
   });
