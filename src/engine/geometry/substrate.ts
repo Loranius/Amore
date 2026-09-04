@@ -966,7 +966,11 @@ export function buildCrystalSubstrateMesh(
      * що жеоди немає.
      */
     profile: {
-      ...profile, seamTriangleCount, seamRimHeight: height, geodeWallHeight: collarTop,
+      ...profile,
+      seamTriangleCount,
+      seamRimHeight: height,
+      geodeWallHeight: collarTop,
+      seamOutlineRadius: round6(widest),
     },
     positions,
     normals: [],

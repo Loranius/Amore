@@ -331,6 +331,8 @@ describe('child crystals', () => {
       for (const ringIndex of [0, 1, 2]) {
         const child = childDimensions(monarchAxial, yearFill(1, 1));
         const distance = childDistance({
+          monarchArchetype: 'prismatic',
+          childArchetype: 'prismatic',
           monarchRadialScale: monarchRadial,
           childRadialScale: child.radialScale,
           widestChildRadialScale: child.radialScale,
@@ -394,13 +396,20 @@ describe('child crystals', () => {
     // fixed, and it is as close as the geometry allows.
     const base = {
       monarchRadialScale: 0.15,
+      monarchArchetype: 'prismatic',
+      childArchetype: 'prismatic',
       childRadialScale: 0.08,
       widestChildRadialScale: 0.08,
       ringOccupancy: 1,
     };
 
+    /*
+     * Обидва радіуси йдуть у формулу помножені на СПРАВЖНЮ півширину
+     * свого габітусу (ADR-0125): опублікований радіус — не півширина, і
+     * призматичне тіло малюється в 1.27 раза ширшим за нього.
+     */
     expect(childDistance({ ...base, ringIndex: 0 }))
-      .toBeCloseTo(0.15 + 0.08 + childClearance(0.15, 0.08), 6);
+      .toBeCloseTo(0.15 * 1.27 + 0.08 * 1.27 + childClearance(0.15, 0.08), 6);
     // And the floor is genuinely tight: the air between the two surfaces is a
     // fraction of the child's own width, not a multiple of it. At 0.055 it was
     // 0.080 against a child 0.040 across — two of its own widths of nothing.
@@ -441,10 +450,14 @@ describe('child crystals', () => {
     expect(childRingIndex(CHILD_RING_CAPACITY * 2)).toBe(2);
 
     const inner = childDistance({
+      monarchArchetype: 'prismatic',
+      childArchetype: 'prismatic',
       monarchRadialScale: 0.15, childRadialScale: 0.08, widestChildRadialScale: 0.08,
       ringIndex: 0, ringOccupancy: 8,
     });
     const outer = childDistance({
+      monarchArchetype: 'prismatic',
+      childArchetype: 'prismatic',
       monarchRadialScale: 0.15, childRadialScale: 0.08, widestChildRadialScale: 0.08,
       ringIndex: 1, ringOccupancy: 8,
     });

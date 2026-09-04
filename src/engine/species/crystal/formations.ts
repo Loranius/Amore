@@ -284,6 +284,12 @@ export function buildAnnualFormations(
   );
   // Один тон на всю колонію — див. монарха.
   const colonyTint = coupleTint(artifact.relationshipStartedAt);
+  /*
+   * Габітус монарха потрібен тут не для форми, а для ПОСАДКИ: наскільки
+   * він ширший за свій оголошений радіус, залежить від габітусу, і кільце
+   * років обходить саме справжню ширину (`monarchFootWidth`).
+   */
+  const monarchHabit = coupleCrystalHabit(artifact.relationshipStartedAt);
   const monarchRadialNow = monarchRadialScale(
     monarchNow,
     occurredEvents(artifact, asOf).length,
@@ -386,6 +392,8 @@ export function buildAnnualFormations(
         attachmentDepth: 0.2,
         ringDistance: childDistance({
           monarchRadialScale: monarchRadialNow,
+          monarchArchetype: monarchHabit,
+          childArchetype: chooseArchetype('remembrance', seed, id),
           childRadialScale: size.radialScale,
           widestChildRadialScale,
           ringIndex,
