@@ -218,6 +218,55 @@ describe('пагони лідера', () => {
     }
   });
 
+  it('СТОЯТЬ НА ПОВНОМУ КОЛІ, а не на одній дузі', () => {
+    /*
+     * Вада, яку цей тест закриває, жила в арифметиці наміру, а не в
+     * намірі. Азимут рахувався як `(count + index) / (count + LEADER_SHOOTS)`
+     * — щоб пагони «продовжували коло скелетних гілок» і жоден не став
+     * точно за гілкою. Але при семи гілках і восьми пагонах частки йдуть
+     * від 7/15 до 14/15, тобто всі вісім лягають у дугу 168°.
+     *
+     * Верх крони був односторонній ЗА ПОБУДОВОЮ. Виміряно на власній
+     * сітці рушія (8 секторів × 4 шари): верхній шар займав 4–6 секторів
+     * із восьми на активному профілі, 7 після правки.
+     *
+     * Міряється НАЙБІЛЬШИЙ РОЗРИВ між сусідніми азимутами, а не розмах:
+     * розмах не побачив би восьми пагонів, збитих у пів кола з одним
+     * відлетілим. Межа — півтора номінальних кроки: дрижання дозволене
+     * (±півкроку), злипання — ні.
+     */
+    for (const years of [8, 20, 40]) {
+      const grown = addTreeScaffoldBranches(trunkSkeleton(), years * DAYS_PER_YEAR, 11);
+      const byBranch = new Map<string, number>();
+      for (const node of shootsOf(grown)) {
+        // Азимут гілки беремо з найдальшого від осі вузла: біля стовбура
+        // напрямок ще не розділився, і всі пагони дивились би в один бік.
+        const radial = Math.hypot(node.position.x, node.position.z);
+        const previous = byBranch.get(`${node.branchId}:r`) ?? 0;
+        if (radial > previous) {
+          byBranch.set(`${node.branchId}:r`, radial);
+          byBranch.set(node.branchId, Math.atan2(node.position.z, node.position.x));
+        }
+      }
+      const azimuths = [...byBranch.entries()]
+        .filter(([key]) => !key.endsWith(':r'))
+        .map(([, angle]) => (angle + Math.PI * 2) % (Math.PI * 2))
+        .sort((left, right) => left - right);
+      expect(azimuths, `${years}р пагонів`).toHaveLength(LEADER_SHOOTS);
+
+      let widestGap = 0;
+      for (let index = 0; index < azimuths.length; index += 1) {
+        const next = azimuths[(index + 1) % azimuths.length]!;
+        const gap = index + 1 === azimuths.length
+          ? next + Math.PI * 2 - azimuths[index]!
+          : next - azimuths[index]!;
+        widestGap = Math.max(widestGap, gap);
+      }
+      const step = (Math.PI * 2) / LEADER_SHOOTS;
+      expect(widestGap, `${years}р найбільший розрив`).toBeLessThan(step * 1.5);
+    }
+  });
+
   it('коротшають догори, бо огинальна там вужча', () => {
     const grown = addTreeScaffoldBranches(trunkSkeleton(), 20 * DAYS_PER_YEAR, 11);
     const byBranch = new Map<string, number>();
