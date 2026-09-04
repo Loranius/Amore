@@ -137,13 +137,18 @@ describe('monarch girth', () => {
     // Activity must never turn the spire into a block, nor a quiet couple's
     // crystal into a needle.
     // Tolerance covers the round6 quantisation of the published radius.
-    // ADR-0019: the band is the gem's, not the rod's. Nominal rather than
-    // measured — the finished silhouette comes out at about 0.84× this once the
-    // flare, the elliptical section and the burial are applied, and
-    // `gemSilhouette.test.ts` is what holds the shape a ruler would find.
-    // Doubled with the halving (2026-08-10, owner's instruction).
-    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(4.28 - 1e-4);
-    expect(axial / (2 * quiet)).toBeLessThanOrEqual(5 + 1e-3);
+    /*
+     * Смуга — КВАРЦОВА, а не гемова (ADR-0119). ADR-0019 брав її з
+     * гранованого самоцвіту; еталон ADR-0114 міряє справжній кварц, і
+     * виміряний силует має зійтися на 3.39.
+     *
+     * Числа тут НОМІНАЛЬНІ: між ними й тим, що покаже лінійка на готовому
+     * тілі, стоять еліптичний переріз, поховання й кути многогранника —
+     * разом близько 0.68×. За форму, яку знайде лінійка, відповідає
+     * `gemSilhouette.test.ts` і мірка еталона.
+     */
+    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(5 - 1e-4);
+    expect(axial / (2 * quiet)).toBeLessThanOrEqual(5.85 + 1e-3);
   });
 
   it('lands a typical couple near the silhouette the owner already accepted', () => {
@@ -153,12 +158,14 @@ describe('monarch girth', () => {
     // counting photos.
     const axial = monarchAxialScale(3.6 * YEAR);
     const aspect = axial / (2 * monarchRadialScale(axial, 47));
-    // A typical couple lands mid-band. Doubled on 2026-08-10 when the owner,
-    // looking at the rendered portal, asked for the monarch's diameter to be
-    // halved — `radius = axial / (2·aspect)`, so halving the one doubles the
-    // other. About 4.6 nominal now, and about 3.9 on the built mesh.
-    expect(aspect).toBeGreaterThan(4.3);
-    expect(aspect).toBeLessThan(4.9);
+    /*
+     * Типова пара стоїть у середині смуги. Число рухалось двічі:
+     * 2026-08-10 власник попросив удвічі тонший монарх (4.6 номінально),
+     * а ADR-0119 підтягнув смугу до еталона — 5.4 номінально, що дає
+     * виміряний силует 3.38 при еталонних 3.39.
+     */
+    expect(aspect).toBeGreaterThan(5.0);
+    expect(aspect).toBeLessThan(5.6);
   });
 
   it('lets a longer relationship carry more girth at the same activity', () => {
