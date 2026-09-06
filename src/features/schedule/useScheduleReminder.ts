@@ -5,8 +5,7 @@ import { useToast } from '@/providers/ToastProvider';
 export type ScheduleReminderResult =
   | 'sent'
   | 'already_sent'
-  | 'already_complete'
-  | 'recipient_off_duty';
+  | 'already_complete';
 
 interface ScheduleReminderInput {
   recipientId: number;
@@ -20,17 +19,18 @@ type RpcCaller = (fn: string, args?: Record<string, unknown>) => RpcResponse;
 const rpc = supabase.rpc.bind(supabase) as unknown as RpcCaller;
 
 const RESULTS: readonly ScheduleReminderResult[] = [
-  'sent', 'already_sent', 'already_complete', 'recipient_off_duty',
+  'sent', 'already_sent', 'already_complete',
 ];
 
 /**
  * Відповідь RPC → результат, або виняток.
  *
- * Виділено з мутації, щоб бути перевіреним: список станів росте (останнім
- * додався `recipient_off_duty`), і незнайоме значення мусить ЛАМАТИСЬ, а
- * не проходити мовчки. Мовчазне проходження тут коштувало б рівно того,
- * заради чого стан і додавали: портал сказав би «нагадування надіслано»
- * там, де база його не створила.
+ * Виділено з мутації, щоб бути перевіреним: список станів може змінитись
+ * разом із базою (стан `recipient_off_duty` тут був і пішов разом із
+ * «тишею у вихідний»), і незнайоме значення мусить ЛАМАТИСЬ, а не
+ * проходити мовчки. Мовчазне проходження коштувало б рівно того, заради
+ * чого перевірка й існує: портал сказав би «нагадування надіслано» там,
+ * де база його не створила.
  */
 export function parseScheduleReminderResult(data: unknown): ScheduleReminderResult {
   if (RESULTS.includes(data as ScheduleReminderResult)) return data as ScheduleReminderResult;
@@ -60,13 +60,6 @@ export function useScheduleReminder() {
       }
       if (result === 'already_sent') {
         toast.show('Сьогодні нагадування вже надсилалось.', 'warn');
-        return;
-      }
-      // Окремий випадок, а не «вже надсилалось»: партнер попросив тишу у
-      // вихідний, і сьогодні в нього вихідний. Сказати тут неправду
-      // означало б, що відправник чекатиме відповіді, якої не буде.
-      if (result === 'recipient_off_duty') {
-        toast.show('Сьогодні в партнера вихідний — нагадування не пішло.', 'warn');
         return;
       }
       toast.show('Графік партнера на цей місяць уже заповнений.', 'success');

@@ -21,7 +21,7 @@
 // Сторінка НЕ входить у збірку продукту: вона є лише на dev-сервері,
 // тобто пара її не бачить і не платить за неї жодним байтом.
 // ============================================================
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas } from '@react-three/fiber';
 import { crystalVeinBearings } from '@/engine/geometry';
@@ -32,7 +32,9 @@ import {
   crystalSubstrateSceneRadius,
 } from '@/engine/renderer/three';
 import type { CrystalMaterialQuality, CrystalMaterialState } from '@/engine/material';
+import { PORTAL_PALETTES } from '@/features/home/crystal3d/scene/portalScene';
 import { PortalStage } from '@/features/home/crystal3d/scene/PortalStage';
+import '@/features/home/portalBackdrop.css';
 import { EvolutionCrystalObject } from '@/features/home/crystal3d/evolution/EvolutionCrystalObject';
 import { EvolutionRuntimeProbe } from '@/features/home/crystal3d/evolution/EvolutionRuntimeProbe';
 import { buildCrystalPipelineStates } from '@/features/home/crystal3d/evolution/crystalPipeline';
@@ -153,6 +155,18 @@ function CrystalLab() {
   const years = Math.max(1, Math.min(50, Number(params.get('years') ?? 4) || 4));
   const quality = (params.get('quality') ?? 'high') as CrystalMaterialQuality;
   const theme = params.get('theme') === 'light' ? 'light' : 'dark';
+  /*
+   * ТЕМА СТАВИТЬСЯ Й НА КОРІНЬ ДОКУМЕНТА, а не лише передається сцені.
+   *
+   * `crystal-lab.html` має прибитий `data-theme="dark"`, і поки сценою
+   * була печера, це не мало значення: камінь заповнював кадр, і жоден
+   * CSS-токен у знімок не потрапляв. Відколи над островом є НЕБО, воно
+   * малюється токенами теми — і `--theme=light` давав нічну смугу вгорі
+   * над денним горизонтом. Тобто знімок показував ваду, якої в продукті
+   * немає: восьма пастка оснастки, знайдена рівно так само, як сім
+   * попередніх.
+   */
+  if (typeof document !== 'undefined') document.documentElement.dataset.theme = theme;
   const off = useMemo(() => (params.get('off') ?? '').split(',').filter(Boolean), [params]);
   /*
    * Контрольний кадр: сцена без кристала.
@@ -217,11 +231,31 @@ function CrystalLab() {
 
   return (
     <div
-      className="lab-stage"
+      className="lab-stage artifact-world"
       data-evolution-preview="ready"
       data-lab-expected-triangles={expectedTriangles}
       data-lab-drawn-triangles={drawn}
     >
+      {/*
+        НЕБО ТУТ НЕ ОЗДОБА, А ВІДСУТНІСТЬ БРЕХНІ.
+        ------------------------------------------------------------
+        Поки сценою була печера, вона заповнювала кадр цілком, і те, що
+        під полотном, не мало значення: лабораторія показувала чорне тло й
+        не помилялась ані на піксель.
+
+        Відколи сцена — літаючий острів (ADR-0141), полотно прозоре над
+        половиною кадру, і саме там пара бачить НЕБО теми. Лабораторія без
+        нього показувала б острів на чорному — тобто восьму пастку до тих
+        семи, що вже описані в `scripts/live/README.md`: знімок, на якому
+        все на місці, і жодного разу не той кадр, який відкриє пара.
+      */}
+      <div
+        className="portal-backdrop"
+        aria-hidden="true"
+        style={{ '--portal-sky-horizon': PORTAL_PALETTES[theme].fog } as CSSProperties}
+      >
+        <div className="portal-backdrop__sky" />
+      </div>
       <Canvas
         dpr={[1, crystalRenderScale(quality, window.devicePixelRatio)]}
         camera={{ position: [0, 0.685, 7.1], fov: 42 }}

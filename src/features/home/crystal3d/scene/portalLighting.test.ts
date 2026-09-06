@@ -88,24 +88,22 @@ describe('світло порталу (§10 брифу кристала)', () =>
     expect(day.hemisphere).toBeGreaterThan(night.hemisphere * 2);
     expect(day.keyIntensity).toBeGreaterThan(night.keyIntensity);
     /*
-     * У печері день і ніч розрізняє РОЗЛОМ і ДРУЗА, а не зорі й вогонь у
-     * чашах: удень крізь тріщину в склепінні падає промінь, уночі
-     * світиться сам камінь. Тому обидві перевірки перевернуті проти
-     * храмових — сильніше вдень одне, сильніше вночі інше.
+     * На острові день і ніч розрізняє НЕБО: удень воно веде сцену, уночі
+     * лишається натяком, а єдиним сильним світлом стає сам артефакт.
+     * Хмари при цьому вдень щільніші — уночі море хмар читається димом,
+     * а не підлогою світу.
      */
-    expect(day.oculusIntensity).toBeGreaterThan(night.oculusIntensity * 4);
-    expect(night.caveDruseEmissive).toBeGreaterThan(day.caveDruseEmissive * 2);
+    expect(day.skyIntensity).toBeGreaterThan(night.skyIntensity * 4);
+    expect(day.cloudOpacity).toBeGreaterThan(night.cloudOpacity);
   });
 
-  it('камінь печери — це камінь в обох порах доби, а не два різні місця', () => {
+  it('камінь острова — це камінь в обох порах доби, а не два різні місця', () => {
     /*
-     * Тут стояла перевірка матовості підлоги храму (`floorRoughness`,
-     * `floorNormalScale`) — ролі, яких у печери немає: її камінь
-     * намальований вершинним кольором, а не освітлений PBR-картою.
-     *
-     * Перевіряється те, що лишилось правдою: удень камінь СВІТЛІШИЙ, але
-     * це той самий камінь — стіни ясніші за підлогу в обох темах, бо
-     * світло падає згори.
+     * Перевіряється те, що лишається правдою при будь-якій зміні світу:
+     * удень камінь СВІТЛІШИЙ, але це той самий камінь, і тесаний камінь
+     * храму світліший за злам породи під ним в обох порах доби. Друге —
+     * не смак: різниця тону і є те, чим око відрізняє зроблене руками від
+     * того, що просто лежить, ще до того, як розбере колони.
      */
     const luminance = (hex: string): number => {
       const value = Number.parseInt(hex.slice(1), 16);
@@ -115,26 +113,31 @@ describe('світло порталу (§10 брифу кристала)', () =>
     };
     const day = PORTAL_PALETTES.light;
     const night = PORTAL_PALETTES.dark;
-    expect(luminance(day.caveRock)).toBeGreaterThan(luminance(night.caveRock));
+    expect(luminance(day.islandRock)).toBeGreaterThan(luminance(night.islandRock));
     for (const theme of THEMES) {
       const palette = PORTAL_PALETTES[theme];
-      expect(luminance(palette.caveRock), theme)
-        .toBeGreaterThan(luminance(palette.caveFloor));
+      expect(luminance(palette.templeStone), theme)
+        .toBeGreaterThan(luminance(palette.islandRock));
+      // Брили вдалині тьмяніші за плато: інакше вони читаються ближчими,
+      // ніж є, і глибина, заради якої вони існують, зникає.
+      expect(luminance(palette.driftRock), theme)
+        .toBeLessThan(luminance(palette.islandRock));
     }
   });
 
   it('не має жодного жовтого джерела в сцені', () => {
     /*
-     * §10 забороняє жовте світло на артефакті. Перевірка була про чаші
-     * вогню на колонах — їх немає разом із колонадою (ADR-0117), — тож
-     * лишається те, що світить сьогодні: корінь, ключ, заливка й розлом.
+     * §10 забороняє жовте світло на артефакті. Світить тут корінь, ключ,
+     * заливка й небо; сонце над островом теж не має права бути жовтим —
+     * жовтий ключ на бузковому кристалі дає брудний відтінок, і саме це
+     * §10 і забороняє.
      */
     for (const theme of THEMES) {
       const palette = PORTAL_PALETTES[theme];
       expect(isYellowish(palette.rootLight), `${theme} корінь`).toBe(false);
       expect(isYellowish(palette.keyColour), `${theme} ключ`).toBe(false);
       expect(isYellowish(palette.rimColour), `${theme} заливка`).toBe(false);
-      expect(isYellowish(palette.oculus), `${theme} розлом`).toBe(false);
+      expect(isYellowish(palette.skyLight), `${theme} небо`).toBe(false);
     }
   });
 

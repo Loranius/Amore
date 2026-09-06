@@ -9,12 +9,14 @@
 // Тут усе стоїть на одній площині (PORTAL_GROUND_Y) і дивиться однією
 // камерою. Небо лишається в CSS: градієнт — це не геометрія, а сфера
 // на 60 одиниць коштувала б draw call і виняток із туману заради
-// пікселів, які й так однакові.
+// пікселів, які й так однакові. Відколи сцена — літаючий острів
+// (ADR-0141), це вже не компроміс, а сама будова кадру: полотно
+// прозоре, і небо теми ВИДНО за краєм острова.
 // ============================================================
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
-import { caveRockTexture } from './caveRockTexture';
+import { rockGrainTexture } from './rockGrainTexture';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -34,17 +36,18 @@ import {
   type PortalCameraFrame,
 } from './portalScene';
 import {
-  CAVE_CEILING_HEIGHT,
-  CAVE_DRUSE_CLUSTERS,
-  buildPortalCaveDruseGeometry,
-  buildPortalCaveFloorGeometry,
-  buildPortalCaveOculusGeometry,
-  buildPortalCaveShaftGeometry,
-  buildPortalCaveShellGeometry,
-} from './portalCave';
+  PORTAL_CLOUD_BANKS,
+  PORTAL_DRIFT_ROCKS,
+  PORTAL_ISLAND_RUBBLE,
+  buildPortalCloudGeometry,
+  buildPortalDriftGeometry,
+  buildPortalIslandGeometry,
+  buildPortalTempleGeometry,
+  portalIslandScale,
+} from './portalIsland';
 
 export interface PortalEnvironmentProps {
-  /** Насіння артефакта: печера в кожної пари своя й незмінна. */
+  /** Насіння артефакта: острів у кожної пари свій і незмінний. */
   seed: number;
   theme: 'light' | 'dark';
   /** Профіль якості з пайплайну кристала — сцена не має права коштувати
@@ -89,166 +92,142 @@ export function PortalEnvironment({
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
 
-  const caveShell = useMemo(() => buildPortalCaveShellGeometry(seed), [seed]);
-  const caveFloor = useMemo(() => buildPortalCaveFloorGeometry(seed), [seed]);
-  const caveOculus = useMemo(() => buildPortalCaveOculusGeometry(seed), [seed]);
-  const caveShaft = useMemo(() => buildPortalCaveShaftGeometry(seed), [seed]);
-  /*
-   * Друза коштує трикутників, тож її кількість веде профіль якості — і
-   * на запасному рендерері її немає взагалі. Це єдина частина печери, яку
-   * можна не малювати: стіни без друзи лишаються печерою, друза без стін
-   * висить у порожнечі.
-   */
+  const island = useMemo(
+    () => buildPortalIslandGeometry(seed, PORTAL_ISLAND_RUBBLE[quality]),
+    [seed, quality],
+  );
+  const temple = useMemo(() => buildPortalTempleGeometry(seed), [seed]);
+  const drift = useMemo(
+    () => buildPortalDriftGeometry(seed, PORTAL_DRIFT_ROCKS[quality]),
+    [seed, quality],
+  );
+  const clouds = useMemo(
+    () => buildPortalCloudGeometry(seed, PORTAL_CLOUD_BANKS[quality]),
+    [seed, quality],
+  );
+
   /*
    * Одне полотно на весь застосунок — і на обидві теми: воно несе лише
    * яскравість, а тон дає палітра. `useMemo` без залежностей тримає його
    * від перебудови; сама функція теж кешує, тож двох полотен не буде й
    * при двох порталах.
    */
-  const rockGrain = useMemo(() => caveRockTexture(), []);
-
-  const druseClusters = CAVE_DRUSE_CLUSTERS[quality];
-  const caveDruse = useMemo(
-    () => (druseClusters > 0 ? buildPortalCaveDruseGeometry(seed, druseClusters) : null),
-    [seed, druseClusters],
-  );
-
-  useEffect(() => () => {
-    caveShell.dispose();
-    caveFloor.dispose();
-    caveOculus.dispose();
-    caveShaft.dispose();
-    caveDruse?.dispose();
-  }, [caveShell, caveFloor, caveOculus, caveShaft, caveDruse]);
+  const rockGrain = useMemo(() => rockGrainTexture(), []);
 
   /*
-   * Раніше тут повільно оберталось небо. Печера не обертається: камінь
-   * стоїть, і рухається в цьому кадрі тільки сам артефакт.
+   * ОДИН МАСШТАБ НА ВСЮ СЦЕНУ, І ВІН ІДЕ ЗА КАДРОМ.
+   *
+   * Острів будується в одиницях острова — радіус 1, верх плато на нулі, —
+   * а світові координати дістає тут. Причина в тому, що кадр порталу
+   * підганяється під артефакт: чим старша пара, тим далі камера. Сцена
+   * сталого розміру означала б два різні світи — у молодої пари рівнина
+   * за обидва краї кадру, у старої камінець під кристалом.
+   *
+   * Оскільки масштаб іде за відстанню, екранний розмір острова сталий, і
+   * вся арифметика цієї сцени рахувалась один раз.
    */
+  const scale = portalIslandScale(frame.distance);
+
+  useEffect(() => () => {
+    island.dispose();
+    temple.dispose();
+    drift.dispose();
+    clouds.dispose();
+  }, [island, temple, drift, clouds]);
 
   return (
     <>
+      {/*
+        ТУМАН НЕ ДІСТАЄ ДО ХМАР, І ЦЕ НАВМИСНО.
+        ------------------------------------------------------------
+        `fogFar` = відстань камери + 26, тобто близько тридцяти одиниць.
+        Море хмар стоїть на 56–130, бо ближче воно ховається за самим
+        островом (арифметика в `portalIsland.ts`). Отже під туманом воно
+        було б рівно кольору туману — тобто нічим. Хмари беруть `fog`
+        вимкненим і малюються власним тоном.
+      */}
       <fog attach="fog" args={[palette.fog, frame.fogNear, frame.fogFar]} />
 
       {/*
-        ПЕЧЕРА ЗАМІСТЬ ХРАМУ (ADR-0117).
+        ЛІТАЮЧИЙ ОСТРІВ ЗАМІСТЬ ПЕЧЕРИ (ADR-0141).
         ------------------------------------------------------------
-        Тут стояла авторська руїна `amore_ruin.glb` — мармуровий подіум,
-        обеліски, золоте кільце, — а до неї храм, зібраний кодом із
-        вісімнадцяти колон, арок і світильників.
+        Тут стояла кристальна печера: зала, розлом у склепінні, промінь і
+        друза по стінах. Власник скасував її прямо — «прибираємо печеру,
+        робимо древній маленький храм, який знаходиться на літаючому
+        острові».
 
-        Власник скасував цей світ разом із `PRODUCT.md` і `DESIGN.md`. І
-        причина не в тому, що руїна погана: `amore-crystal-look` каже
-        прямо, що гладка суцільна поверхня під кристалом читається
-        п'єдесталом, хай як її формувати. Жеода, яку ADR-0115 підняв
-        коміром, стояла на мармуровій плиті — тобто порода лежала на
-        підставці.
-
-        Підлога печери лягає рівно на `PORTAL_GROUND_Y`, як і верх
-        п'єдесталу руїни до неї. Про заміну сцени не дізнається жоден
-        інший файл.
+        Що НЕ змінилось: верх острова лежить рівно на `PORTAL_GROUND_Y`,
+        тій самій площині, на якій рушій ставить кристали, і про заміну
+        сцени не дізнається жоден інший файл.
       */}
       {/*
         Камінь НАМАЛЬОВАНИЙ, а не освітлений — `meshBasicMaterial` із
-        вершинним кольором. Причина виміряна й записана в `portalCave.ts`:
-        світло, якого досить, щоб побачити стіну за десять одиниць,
-        залило б кристал за три, а різниця яскравості сусідніх граней і є
-        те, що робить кристал кристалом. Жодне джерело сцени печери не
-        торкається, тож ця різниця лишається такою, як її виміряли.
-      */}
-      {/*
+        вершинним кольором. Причина виміряна й не залежить від того, який
+        тут світ: світло, якого досить, щоб побачити камінь за десять
+        одиниць, залило б кристал за три, а різниця яскравості сусідніх
+        граней і є те, що робить кристал кристалом.
+
         ЗЕРНО — ЄДИНА КАРТА В ЦІЙ СЦЕНІ, І ВОНА ТІЛЬКИ НА КАМЕНІ.
-        ------------------------------------------------------------
         `amore-crystal-look` проводить межу прямо: карта на вирощеній
         грані перебігає через ребро й каже оку, що дві площини — одна
-        поверхня, тому з кристала карти зняли. Битий камінь — випадок
-        протилежний, у нього вирощених граней немає, і зерно є більшою
+        поверхня. Битий камінь — випадок протилежний, і зерно є більшою
         частиною того, що відрізняє камінь від пластику.
-
-        Сіра: карта множить колір, тож кольорова пофарбувала б печеру
-        своїм тоном і стерла палітру теми.
       */}
-      <mesh geometry={caveShell} frustumCulled={false}>
-        <meshBasicMaterial color={palette.caveRock} vertexColors map={rockGrain} />
-      </mesh>
-      <mesh geometry={caveFloor} frustumCulled={false}>
-        <meshBasicMaterial color={palette.caveFloor} vertexColors map={rockGrain} />
-      </mesh>
-
-      {/* Розлом у склепінні. Він не отвір, а диск: справжня дірка лишила б
-          оболонку відкритою, і туман зали витікав би крізь неї у фон. */}
-      <mesh geometry={caveOculus} frustumCulled={false}>
-        <meshBasicMaterial color={palette.oculus} toneMapped={false} fog={false} />
-      </mesh>
-
-      {/* ДРУЗА НАМАЛЬОВАНА, ЯК І ВЕСЬ КАМІНЬ.
-          ------------------------------------------------------------
-          Тут стояв `meshStandardMaterial` з емісією — тобто друза була
-          ЄДИНИМ освітленим тілом на намальованій стіні, і кадр показував
-          наслідок: кристали яскравіші за камінь навколо, наліплені на
-          нього грудками.
-
-          Так вирішили ще ADR-0121 (спроба 4, «намальовані, як камінь») і
-          ADR-0123 («друза стіни намальована й жодного світла не
-          забирає»), і `portalCave.ts` писав про це у своєму коментарі —
-          але сам матеріал лишився старим. Рішення було записане й не
-          застосоване; тепер застосоване.
-
-          `vertexColors` тут не прикраса: `DRUSE_FACE_SHADES` дає кожній
-          грані свій відтінок (1.34 / 0.58 / 1.16 / 0.72 / 1.26 / 0.64) —
-          рівно ту різницю сусідніх площин, якою `amore-crystal-look`
-          міряє, чи читається кристал кристалом. Без цього прапорця все
-          воно відкидалось, і настінні кристали малювались пласкою
-          бузковою плямою. */}
-      {caveDruse !== null && (
-        <mesh geometry={caveDruse} frustumCulled={false}>
-          <meshBasicMaterial color={palette.caveDruse} vertexColors />
+      <group position={[0, PORTAL_GROUND_Y, 0]} scale={scale}>
+        <mesh geometry={island} frustumCulled={false}>
+          <meshBasicMaterial color={palette.islandRock} vertexColors map={rockGrain} />
         </mesh>
-      )}
 
-      {/* САМ ПРОМІНЬ — тіло, а не світло.
-          ------------------------------------------------------------
-          Напрямлене джерело нижче освітлює кристал і друзу; побачити
-          промінь від нього неможливо — промінь видно тому, що в повітрі
-          пил, а об'ємного розсіювання тут немає й не буде.
+      {/*
+        Храм СВІТЛІШИЙ за плато й БЕЗ зерна.
+        ------------------------------------------------------------
+        Зерно тут працювало б проти змісту: воно каже «злам породи», а
+        храм — камінь тесаний. Різниця тону плюс відсутність зерна і є те,
+        чим око відрізняє зроблене руками від того, що просто лежить.
+      */}
+        <mesh geometry={temple} frustumCulled={false}>
+          <meshBasicMaterial color={palette.templeStone} vertexColors />
+        </mesh>
 
-          Тому конус: адитивний, без запису глибини, гасне донизу
-          вершинним кольором. Він нічого не освітлює — він і Є те, що
-          видно. Опукла сторона відсічена (`BackSide` не потрібен): конус
-          дивиться назовні, і глядач бачить його дальню стінку крізь
-          ближню саме тому, що глибина не пишеться. */}
-      <mesh geometry={caveShaft} frustumCulled={false} renderOrder={2}>
-        <meshBasicMaterial
-          color={palette.oculus}
-          vertexColors
-          transparent
-          opacity={palette.shaftOpacity}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-          side={THREE.DoubleSide}
-          /*
-           * ПРОМІНЬ ІДЕ ЧЕРЕЗ ТОНМАПІНГ, і це виправлення виміряне.
-           *
-           * Стояло `toneMapped={false}` — скопійоване з диска розлому, у
-           * якого свій привід. Наслідок бачила світла тема: додавання
-           * майже білого кольору повз криву ACES вибивало верхню половину
-           * кадру в чисті 255,255,255. Виміряно пікселем: з променем
-           * 255/255/255, без нього 161/155/144.
-           *
-           * Промінь — це світло сцени, тож він мусить котитись тією самою
-           * кривою, що й усе інше. Інакше «денна печера» перетворюється
-           * на білу пляму рівно там, де мала бути найсвітлішою.
-           */
-          fog={false}
-        />
-      </mesh>
+      {/*
+        Брили в небі — те, що НЕСЕ слово «літаючий». Камера дивиться на
+        острів згори й не бачить його обриву; про порожнечу під ногами
+        каже камінь, який висить поруч без опори.
+      */}
+        <mesh geometry={drift} frustumCulled={false}>
+          <meshBasicMaterial color={palette.driftRock} vertexColors map={rockGrain} />
+        </mesh>
 
-      {/* Напрямлене світло з розлому — єдине, що відрізняє день від ночі
-          в печері: удень воно веде сцену, уночі лишається натяком. */}
+      {/*
+        Море хмар — друга половина тієї самої фрази. Прозоре трохи, щоб
+        читалось повітрям, і без запису глибини: хмари стоять найдалі за
+        все в сцені, тож нічого й не мають перекривати.
+      */}
+        <mesh geometry={clouds} frustumCulled={false} renderOrder={-1}>
+          <meshBasicMaterial
+            color={palette.cloudSea}
+            vertexColors
+            transparent
+            opacity={palette.cloudOpacity}
+            depthWrite={false}
+            fog={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </group>
+
+      {/* Небо над островом — єдине, що відрізняє день від ночі: удень
+          воно веде сцену, уночі лишається натяком.
+
+          Висота ФІКСОВАНА, а не масштабована разом з островом: у
+          напрямленого світла позиція задає лише НАПРЯМОК, тож масштаб
+          сцени робив би сонце то вищим, то нижчим залежно від віку пари.
+          А кут падіння — це різниця яскравості сусідніх граней, тобто
+          рівно те, чим кристал і читається кристалом. */}
       <directionalLight
-        position={[0.6, PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT, 0.4]}
-        intensity={palette.oculusIntensity}
-        color={palette.oculus}
+        position={[0.6, PORTAL_GROUND_Y + 5.2, 0.4]}
+        intensity={palette.skyIntensity}
+        color={palette.skyLight}
       />
 
       <pointLight

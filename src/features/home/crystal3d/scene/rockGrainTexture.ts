@@ -86,7 +86,7 @@ let cached: THREE.CanvasTexture | null = null;
  * віддати нічого, ніж підсунути заглушку. Тести перевіряють саму функцію
  * зерна, а не її завантаження.
  */
-export function caveRockTexture(): THREE.CanvasTexture | null {
+export function rockGrainTexture(): THREE.CanvasTexture | null {
   if (typeof document === 'undefined') return null;
   if (cached !== null) return cached;
 
@@ -107,7 +107,7 @@ export function caveRockTexture(): THREE.CanvasTexture | null {
        * бути більшим за грань. Середня — тріщинуватість. Дрібна — зерно,
        * яке й відрізняє камінь від пластику.
        */
-      const value = caveGrainAt(u, v);
+      const value = rockGrainAt(u, v);
       const level = Math.round(value * 255);
       const index = (y * SIZE + x) * 4;
       image.data[index] = level;
@@ -164,7 +164,7 @@ export function caveRockTexture(): THREE.CanvasTexture | null {
  * Саме зерно, у частках яскравості — окремо від полотна, щоб його можна
  * було перевірити там, де браузера немає.
  */
-export function caveGrainAt(u: number, v: number): number {
+export function rockGrainAt(u: number, v: number): number {
   const blotch = tileNoise(u, v, 4, 3);
   const crack = tileNoise(u, v, 13, 11);
   const grit = tileNoise(u, v, 37, 19);

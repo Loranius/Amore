@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { caveGrainAt } from './caveRockTexture';
+import { rockGrainAt } from './rockGrainTexture';
 
 /*
  * Зерно каменю печери. Полотно — ресурс браузера, і його тут немає; але
@@ -20,8 +20,8 @@ describe('зерно каменю печери', () => {
      */
     for (let step = 0; step <= 16; step += 1) {
       const t = step / 16;
-      expect(caveGrainAt(0, t), `v=${t}`).toBeCloseTo(caveGrainAt(1, t), 10);
-      expect(caveGrainAt(t, 0), `u=${t}`).toBeCloseTo(caveGrainAt(t, 1), 10);
+      expect(rockGrainAt(0, t), `v=${t}`).toBeCloseTo(rockGrainAt(1, t), 10);
+      expect(rockGrainAt(t, 0), `u=${t}`).toBeCloseTo(rockGrainAt(t, 1), 10);
     }
   });
 
@@ -31,7 +31,7 @@ describe('зерно каменю печери', () => {
     // ту ціну.
     for (let y = 0; y < 32; y += 1) {
       for (let x = 0; x < 32; x += 1) {
-        const value = caveGrainAt(x / 32, y / 32);
+        const value = rockGrainAt(x / 32, y / 32);
         expect(value).toBeGreaterThanOrEqual(0.62);
         expect(value).toBeLessThanOrEqual(1);
       }
@@ -50,7 +50,7 @@ describe('зерно каменю печери', () => {
     let count = 0;
     for (let y = 0; y < 64; y += 1) {
       for (let x = 0; x < 64; x += 1) {
-        const value = caveGrainAt(x / 64, y / 64);
+        const value = rockGrainAt(x / 64, y / 64);
         low = Math.min(low, value);
         high = Math.max(high, value);
         sum += value;
@@ -66,6 +66,6 @@ describe('зерно каменю печери', () => {
   });
 
   it('детермінований: та сама точка дає те саме число', () => {
-    expect(caveGrainAt(0.37, 0.61)).toBe(caveGrainAt(0.37, 0.61));
+    expect(rockGrainAt(0.37, 0.61)).toBe(rockGrainAt(0.37, 0.61));
   });
 });
