@@ -437,6 +437,11 @@ export function createThreeCrystalRenderBundle(
   content.name = 'Amore Evolution Crystal fitted content';
   group.add(content);
 
+  /**
+   * Після іскор (`renderOrder = 10` в `innerSparks.ts`), і саме тому це
+   * число, а не будь-яке більше нуля.
+   */
+  const SUBSTRATE_RENDER_ORDER = 11;
   const batches = groupByMaterial(geometryState, materialState)
     .map((source) => buildBatch(source, geometryState.artifactSeed));
   const meshes = new Map<string, THREE.BatchedMesh>();
@@ -444,6 +449,28 @@ export function createThreeCrystalRenderBundle(
 
   for (const batch of batches) {
     content.add(batch.mesh);
+    /*
+     * ПІДКЛАДКА МАЛЮЄТЬСЯ ПІСЛЯ ІСКОР, і без цього камінь просвічувався.
+     *
+     * Іскри всередині кристала стоять на `depthTest: false` — навмисно:
+     * оболонка непрозора, і з перевіркою глибини їх не було б видно
+     * взагалі (див. `innerSparks.ts`). Поки під кристалом не було нічого,
+     * ціна цього дорівнювала нулю.
+     *
+     * Відколи жеода повернулась на екран (ADR-0135), вона стоїть ПЕРЕД
+     * основою монарха — і додаткові іскри лягали просто на камінь.
+     * Власник назвав це точно: «видно блискітки основного кристала, він
+     * просвічується».
+     *
+     * Прозорості в підкладки немає (`transparent: false`, `opacity: 1`) —
+     * справа була не в матеріалі, а в порядку. Іскри мають
+     * `renderOrder = 10`; підкладка малюється після них, з увімкненою
+     * глибиною, тож там, де камінь ближчий, він їх накриває, а де
+     * дальший — його ж і не видно за оболонкою.
+     */
+    if (batch.bodyIds.includes(CRYSTAL_SUBSTRATE_BODY_ID)) {
+      batch.mesh.renderOrder = SUBSTRATE_RENDER_ORDER;
+    }
     for (const bodyId of batch.bodyIds) {
       meshes.set(bodyId, batch.mesh);
       materials.set(bodyId, batch.material);

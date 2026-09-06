@@ -808,6 +808,8 @@ function buildSubstrateMaterial(
   // of the floor. Measured against both failures: at three times the stone the
   // vein rendered as a white splash brighter than everything but the monarch,
   // and at under twice it stopped being distinguishable from a shadow.
+  /** Наскільки підкладка знебарвлена проти кристала. Див. нижче. */
+  const GEODE_DESATURATION = 0.86;
   const rootValue = 0.2553 + grey * 0.066;
   // **The crystals' own colour, at a fraction of their value.** The brief's §4
   // asks for a root that is darker in the same hue, and the three constants
@@ -824,7 +826,31 @@ function buildSubstrateMaterial(
   // above measured survives untouched and the single thing that changes is hue.
   const shell = bodyColor(materialPalette, 'focal', colonyTintOf(input));
   const shellValue = (shell.r + shell.g + shell.b) / 3;
-  const baseColor = scaleRgb(shell, rootValue / Math.max(1e-6, shellValue));
+  /*
+   * КАМІНЬ, А НЕ КРИСТАЛ ТЕМНІШЕ — і це рішення власника, а не вимір.
+   *
+   * Правило вище лишається правдою про те, ЧОМУ три сталі константи були
+   * гірші: похідний колір не може розійтися з палітрою. Але сам напрямок
+   * власник змінив, побачивши жеоду на екрані (ADR-0135):
+   *
+   *   «зміни його колір на більш сірий, якийсь камінний, бо він зараз
+   *    виглядає тупо забором навколо кристала».
+   *
+   * Тобто підкладка більше не «ложе того самого мінералу», а ПОРОДА, з
+   * якої мінерал росте — і в породи власного бузку немає.
+   *
+   * Знебарвлення 0.86, а не 1.0: слід тону пари лишається, бо зовсім
+   * нейтральний сірий у теплій сцені читається як діра, а не як камінь.
+   * Яскравість не чіпається — вона виміряна проти підлоги двома
+   * невдачами, описаними вище, і ця зміна її не переглядає.
+   */
+  const shellGrey = (shell.r + shell.g + shell.b) / 3;
+  const stone = {
+    r: shell.r + (shellGrey - shell.r) * GEODE_DESATURATION,
+    g: shell.g + (shellGrey - shell.g) * GEODE_DESATURATION,
+    b: shell.b + (shellGrey - shell.b) * GEODE_DESATURATION,
+  };
+  const baseColor = scaleRgb(stone, rootValue / Math.max(1e-6, shellValue));
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
     bodyId: CRYSTAL_SUBSTRATE_BODY_ID,

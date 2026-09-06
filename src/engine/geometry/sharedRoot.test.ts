@@ -390,25 +390,56 @@ describe('the root the whole colony grows out of (crystal cluster brief §4)', (
     }
   });
 
-  it('is the crystals’ own colour, darker — not a colour of its own', () => {
-    // The defect this replaces: the root was built from three hand-set
-    // constants (0.245 / 0.238 / 0.283, blue highest) chosen when it only had
-    // to read as "not the slab". Measured against a real colony that put its
-    // red-to-blue ratio at 0.885 against the monarch's 1.267 — darker, but 43%
-    // bluer, which is a different colour rather than a deeper one.
+  it('КАМІНЬ, а не кристал темніше — але камінь саме цієї пари', () => {
+    /*
+     * ПРАВИЛО ЗМІНЕНЕ ВЛАСНИКОМ (ADR-0136), і попереднє записано тут же,
+     * бо воно було правильним для свого часу.
+     *
+     * Було: «той самий тон, менша яскравість». Це замінило три сталі
+     * константи (0.245 / 0.238 / 0.283), які давали підкладці власний
+     * лавандовий тон і мовчки розходились із палітрою — виміряно, її
+     * червоно-синє відношення 0.885 проти монархових 1.267, тобто на 43%
+     * синіше. Похідний колір цю ваду закрив і закриває далі.
+     *
+     * Стало: підкладка — це ПОРОДА, з якої кристал росте, а не ложе того
+     * самого мінералу. Власник, побачивши жеоду на екрані: «зміни його
+     * колір на більш сірий, якийсь камінний, бо він зараз виглядає тупо
+     * забором навколо кристала».
+     *
+     * Що лишилось незмінним і чому це головне: колір і далі ПОХІДНИЙ від
+     * оболонки. Знебарвлення — це крок від неї, а не заміна її сталою;
+     * рівно та вада, від якої тікав попередній запис, повернутись не
+     * може.
+     */
     for (const [years, count] of SIZES) {
       const { material } = colony(years, count);
       const root = material.bodies.find((body) => body.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
       const monarch = material.bodies.find((body) => body.bodyId === MONARCH_ID)!;
 
-      const hue = (color: { r: number; g: number; b: number }) => color.r / Math.max(1e-6, color.b);
       const value = (color: { r: number; g: number; b: number }) => (color.r + color.g + color.b) / 3;
+      const saturation = (color: { r: number; g: number; b: number }) => {
+        const high = Math.max(color.r, color.g, color.b);
+        const low = Math.min(color.r, color.g, color.b);
+        return high > 1e-6 ? (high - low) / high : 0;
+      };
 
-      // Same hue, measured as a ratio so a change of *value* — which is the one
-      // difference the root is allowed — cannot register as a change of colour.
-      expect(hue(root.baseColor) / hue(monarch.baseColor), `${years}y hue`).toBeCloseTo(1, 3);
-      // And darker: enough that the crystals read against it, never so dark
-      // that the root becomes a shadow.
+      // КАМІНЬ: насиченість підкладки — мала частка кристалової. Це і є
+      // те, що власник назвав «сірим, якимось камінним».
+      const bleach = saturation(root.baseColor) / Math.max(1e-6, saturation(monarch.baseColor));
+      expect(bleach, `${years}y знебарвлення`).toBeLessThan(0.2);
+
+      // САМЕ ЦІЄЇ ПАРИ: слід тону лишається й дивиться в той самий бік.
+      // Нуль тут означав би, що колір перестав бути похідним — тобто
+      // повернення до сталої, від якої тікали.
+      expect(saturation(root.baseColor), `${years}y слід тону`).toBeGreaterThan(0);
+      const lean = (color: { r: number; g: number; b: number }) => color.r / Math.max(1e-6, color.b);
+      expect(
+        (lean(root.baseColor) - 1) * (lean(monarch.baseColor) - 1),
+        `${years}y бік тону`,
+      ).toBeGreaterThan(0);
+
+      // Яскравість не переглядалась: вона виміряна проти підлоги двома
+      // невдачами (втричі — біла пляма, менш ніж удвічі — тінь).
       const darkness = value(root.baseColor) / value(monarch.baseColor);
       expect(darkness, `${years}y value`).toBeGreaterThan(0.4);
       expect(darkness, `${years}y value`).toBeLessThan(0.7);
