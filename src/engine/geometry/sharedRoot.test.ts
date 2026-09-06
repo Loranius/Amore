@@ -7,6 +7,7 @@ import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../speci
 import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG } from './config';
 import { buildCrystalGeometry } from './engine';
 import { CRYSTAL_SUBSTRATE_BODY_ID, crystalVeinBuriedRadiusAt } from './substrate';
+import { childFootWidth, monarchFootWidth } from '../species/crystal/growthModel';
 import type { CrystalMeshData } from './types';
 
 // The brief's section 4, and the last line of section 3, held as assertions.
@@ -329,6 +330,77 @@ describe('the root the whole colony grows out of (crystal cluster brief §4)', (
         root.bounds.max.y / tallestChild,
         `${years}y жеода ховає найсильніший рік`,
       ).toBeLessThan(0.5);
+    }
+  });
+
+  it('БРИЛИ Є, і жодна не лізе в кристал (ADR-0138)', () => {
+    /*
+     * Записане правило, і воно записане саме так, бо протилежне вже
+     * пробували: «обрізай брилу до щілини, а не відкидай її за те, що
+     * вона в щілині. Відкидання за близькістю викидало п'ять із шести й
+     * лишало два камені на голому шві».
+     *
+     * Отже гарантія стоїть над РОЗМІРОМ, а не над місцем: камінь може
+     * лежати впритул до кристала, але жодна його вершина не має бути
+     * всередині тіла. Мала каменюка біля підошви — рівно те, що показує
+     * еталон; велика там — порушення.
+     *
+     * Брили лежать ПІСЛЯ шва, тож `seamTriangleCount` знову означає те,
+     * що каже, і тест бере саме хвіст.
+     */
+    for (const [years, count] of SIZES) {
+      const { geometry, growth } = colony(years, count);
+      const root = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+      const seam = root.profile.seamTriangleCount!;
+      const total = root.indices.length / 3;
+      expect(total - seam, `${years}y насип є`).toBeGreaterThan(0);
+
+      let worst = Number.POSITIVE_INFINITY;
+      for (let slot = seam * 3; slot < root.indices.length; slot += 1) {
+        const index = root.indices[slot]!;
+        const x = root.positions[index * 3]!;
+        const z = root.positions[index * 3 + 2]!;
+        for (const body of growth.bodies) {
+          /*
+           * Півширина підошви, а не оголошений радіус: той менший за
+           * справжнє тіло до півтора раза (ADR-0125), і гарантія, взята
+           * від нього, була б гарантією на папері.
+           */
+          const foot = body.renderedRadius * (body.kind === 'crystal:mother'
+            ? monarchFootWidth(String(body.attributes.archetype ?? 'prismatic'))
+            : childFootWidth(String(body.attributes.archetype ?? 'prismatic')));
+          worst = Math.min(
+            worst,
+            Math.hypot(x - body.anchor.x, z - body.anchor.z) - foot,
+          );
+        }
+      }
+      expect(worst, `${years}y брила залізла в кристал`).toBeGreaterThan(0);
+    }
+  });
+
+  it('насип не підіймає купу вище за її ж гребінь', () => {
+    /*
+     * Те, що знайшов тест `жеода не ховає кільце років`, і що коштувало
+     * двох відкочених спроб. Брила, посаджена НА гребінь, підіймала
+     * найвищу точку меша — на першому році до 0.64 при межі 0.5.
+     *
+     * Правило, яке з цього вийшло: камінь ЛЕЖИТЬ на купі, а не стоїть
+     * над нею. Тут воно й перевіряється прямо, щоб наступна правка
+     * посадки не поверталась до тієї межі через ADR-0058.
+     */
+    for (const [years, count] of SIZES) {
+      const { geometry } = colony(years, count);
+      const root = geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID)!;
+      const seam = root.profile.seamTriangleCount!;
+      let seamTop = Number.NEGATIVE_INFINITY;
+      let rubbleTop = Number.NEGATIVE_INFINITY;
+      for (let slot = 0; slot < root.indices.length; slot += 1) {
+        const y = root.positions[root.indices[slot]! * 3 + 1]!;
+        if (slot < seam * 3) seamTop = Math.max(seamTop, y);
+        else rubbleTop = Math.max(rubbleTop, y);
+      }
+      expect(rubbleTop, `${years}y насип вище за шов`).toBeLessThanOrEqual(seamTop + 1e-6);
     }
   });
 

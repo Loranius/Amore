@@ -1,8 +1,11 @@
 import { round6, seededUnit } from '../growth/math';
+import { childFootWidth, monarchFootWidth } from '../species/crystal/growthModel';
 import type { GrowthBody } from '../growth';
 import { rebuildCrystalMeshNormals } from './mesh';
+import { intersectHalfSpaces, polytopeTolerance, type CrystalPolytope } from './polytope';
 import type {
   CrystalBodyProfile,
+  CrystalFacePlane,
   CrystalMeshBounds,
   CrystalMeshData,
   CrystalProfileRow,
@@ -734,6 +737,103 @@ function veinInnerRadius(monarchRadius: number): number {
   return Math.max(1e-4, monarchRadius * 0.92);
 }
 
+/*
+ * БРИЛИ — ОКРЕМІ ТІЛА, А НЕ ФОРМА ТОКАРНОГО ВЕРСТАТА.
+ * ------------------------------------------------------------
+ * ADR-0137 зробив комір блоковим квантуванням, і це допомогло — але
+ * назвало власну межу: тіло обертання дає радіальні грані ЗА ПОБУДОВОЮ.
+ * Скільки не квантуй виліт і висоту, кожна грань лишається клином від осі.
+ *
+ * `amore-crystal-look` каже, як це робиться правильно, і каже давно:
+ * «брили — той самий перетин півпросторів, що й кристали; вони різняться
+ * лише тим, що площини дивляться куди завгодно, а не тримають шестигранний
+ * габітус. Не тягнись до зашумленої сфери: камінь ламається пласко, і саме
+ * пласкі грані ловлять світло по-різному».
+ *
+ * Брили в рушії вже були — сорок чотири многогранники, насипані на шов, —
+ * і пішли з ADR-0061/0063 разом із роллю, яку тоді віддали руїні: «битий
+ * камінь у сцені тепер дає сама руїна». Руїни немає з ADR-0116. Роль
+ * повертається туди, звідки її забрали.
+ *
+ * НАСИПАНІ НА ШОВ, А НЕ ЗАМІСТЬ НЬОГО. Шов і далі несе ADR-0003 — він те,
+ * що досить широке й глибоке, щоб жодна базова кришка не була видна знизу.
+ * Камінь, накиданий на гарантію, її не послаблює, і `seamTriangleCount`
+ * тепер знову означає те, що каже: де кінчається шов і починається насип.
+ */
+
+/** Скільки брил насипається на комір. */
+const GEODE_BOULDER_COUNT = 22;
+/** Скільки площин ріже одну брилу. Менше — тетраедр, більше — галька. */
+const GEODE_BOULDER_PLANES_MIN = 7;
+const GEODE_BOULDER_PLANES_MAX = 9;
+/**
+ * Найбільша брила, у частках радіуса монарха.
+ *
+ * Розмір задає ЗАЗОР до найближчого кристала (див. нижче), а це — стеля
+ * для тих місць, де зазор великий: брила, більша за монархову підошву,
+ * читалась би валуном, у який кристал уперся, а не купою, з якої він росте.
+ */
+const GEODE_BOULDER_MAX = 0.9;
+/**
+ * Найменша брила, яку варто малювати.
+ *
+ * Дрібніша коштує двадцять трикутників і на екрані не читається каменем —
+ * вона читається сміттям. Такі місця лишаються порожніми: у справжній купі
+ * теж не кожна щілина забита.
+ */
+const GEODE_BOULDER_MIN = 0.18;
+/** Яку частку зазору до кристала займає брила. Решта — повітря. */
+const GEODE_BOULDER_GAP_SHARE = 0.72;
+/** На яку частку свого розміру брила втоплена в комір. */
+const GEODE_BOULDER_SINK = 0.42;
+/**
+ * Найбільша брила як частка зросту НАЙКОРОТШОГО тіла колонії.
+ *
+ * Зазор міряється по горизонталі, а ховає кристал висота — див.
+ * `buildCrystalSubstrateMesh`.
+ */
+const GEODE_BOULDER_NEIGHBOUR_SHARE = 0.5;
+
+/**
+ * Одна брила: опуклий многогранник із площин, що дивляться куди завгодно.
+ *
+ * Напрямки беруться зі спіралі Фібоначчі з насіненим зсувом, а не з
+ * випадкових векторів: випадкові збиваються в купки, і тоді половина
+ * площин ріже одну й ту саму сторону, а протилежна лишається відкритою —
+ * многогранник виходить необмеженим і `intersectHalfSpaces` вертає null.
+ */
+function boulderPolytope(
+  artifactSeed: number,
+  tag: string,
+  radius: number,
+): CrystalPolytope | null {
+  const count = GEODE_BOULDER_PLANES_MIN + Math.floor(
+    seededUnit(artifactSeed, `${tag}:planes`)
+    * (GEODE_BOULDER_PLANES_MAX - GEODE_BOULDER_PLANES_MIN + 1),
+  );
+  const planes: CrystalFacePlane[] = [];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const spin = seededUnit(artifactSeed, `${tag}:spin`) * Math.PI * 2;
+  for (let index = 0; index < count; index += 1) {
+    const y = 1 - ((index + 0.5) / count) * 2;
+    const ring = Math.sqrt(Math.max(0, 1 - y * y));
+    const angle = spin + index * golden
+      + (seededUnit(artifactSeed, `${tag}:jitter:${index}`) - 0.5) * 0.7;
+    /*
+     * Зсув грані — від 0.58 до 1.0 радіуса. Саме НЕРІВНІ зсуви роблять
+     * камінь каменем: рівні дали б правильний многогранник, тобто
+     * гранований м'ячик.
+     */
+    const offset = radius * (0.58 + seededUnit(artifactSeed, `${tag}:offset:${index}`) * 0.42);
+    planes.push({
+      normal: { x: round6(Math.cos(angle) * ring), y: round6(y), z: round6(Math.sin(angle) * ring) },
+      offset: round6(offset),
+      kind: 'prism',
+    });
+  }
+  return intersectHalfSpaces(planes, polytopeTolerance(radius));
+}
+
 /**
  * Builds the vein as a closed solid: an irregular top face, a wall down to a
  * slightly drawn-in floor, and a floor cap. Returns null when there is nothing
@@ -1060,6 +1160,127 @@ export function buildCrystalSubstrateMesh(
   // gives every triangle its own copies — vertex indices do not survive it,
   // while triangle order does, one for one.
   const seamTriangleCount = indices.length / 3;
+
+  /*
+   * НАСИП — ПІСЛЯ ШВА, і саме тому `seamTriangleCount` рахується вище.
+   *
+   * Брили кладуться на комір: азимут із насіненим кроком, виліт між
+   * гребенем і підошвою укосу, висота — сам гребінь у цьому напрямку.
+   *
+   * РОЗМІР ЗАДАЄ ЗАЗОР, а не константа, і це записане правило: «обрізай
+   * брилу до щілини, а не відкидай її за те, що вона в щілині. Відкидання
+   * за близькістю викидало п'ять із шести й лишало два камені на голому
+   * шві». Мала каменюка біля підошви кристала — рівно те, що показує
+   * еталон; велика там — порушення.
+   */
+  const shortestBody = bodies.reduce(
+    (least, body) => Math.min(least, body.renderedLength),
+    Number.POSITIVE_INFINITY,
+  );
+  for (let index = 0; index < GEODE_BOULDER_COUNT; index += 1) {
+    const tag = `geode:boulder:${index}`;
+    const angle = ((index + seededUnit(artifactSeed, `${tag}:spread`) * 0.8)
+      / GEODE_BOULDER_COUNT) * Math.PI * 2;
+    const edge = veinRadiusAt(angle, capsules, nodeRadius);
+    const reach = veinRingRadius(edge, inner, GEODE_COLLAR_REACH);
+    const spread = veinRingRadius(edge, inner, GEODE_SKIRT_REACH) - reach;
+    const at = reach + spread * seededUnit(artifactSeed, `${tag}:out`);
+    const x = Math.sin(angle) * at;
+    const z = Math.cos(angle) * at;
+
+    /*
+     * Зазор — до ПОВЕРХНІ найближчого тіла, а не до його осі. Півширину
+     * підошви бере той самий контракт, що й посадка колонії (ADR-0125);
+     * інакше брила сідала б на кристал рівно там, де його оголошений
+     * радіус менший за справжній.
+     */
+    /*
+     * Зазор — до ПІВШИРИНИ ПІДОШВИ, і це той самий контракт, яким
+     * колонія розставляє себе (ADR-0125).
+     *
+     * Перша редакція міряла від `baseCoverOf` — накриття базової кришки.
+     * Числа близькі, але це різні речі: кришка це еліпс під нахиленим
+     * тілом, а півширина — саме тіло. Тест гарантії впіймав різницю
+     * одразу: брила залазила в кристал на 0.0012.
+     *
+     * Береться БІЛЬШЕ з двох: накриття кришки теж має лишатись вільним,
+     * інакше камінь ляже на те, що ховає кришку.
+     */
+    let gap = Number.POSITIVE_INFINITY;
+    for (const body of bodies) {
+      const away = Math.hypot(x - body.anchor.x, z - body.anchor.z);
+      const archetype = typeof body.attributes.archetype === 'string'
+        ? body.attributes.archetype
+        : 'prismatic';
+      const foot = body.renderedRadius * (body.id === bodies[0]!.id
+        ? monarchFootWidth(archetype)
+        : childFootWidth(archetype));
+      gap = Math.min(gap, away - Math.max(foot, baseCoverOf(body)));
+    }
+    if (!Number.isFinite(gap)) continue;
+    /*
+     * ТРЕТЯ МЕЖА — ЗРІСТ СУСІДА, і її знайшов тест, а не око.
+     *
+     * Зазору й стелі мало: зазор міряється по горизонталі, а ховає
+     * кристал ВИСОТА. На першому році тіла дрібні, і брила, що чесно
+     * вкладалась у щілину, накривала 64% річного кристала при межі 50%
+     * (`жеода не ховає кільце років`, ADR-0058: рік має читатись
+     * літописом).
+     *
+     * Мірка — НАЙКОРОТШЕ тіло колонії, а не найближче. Найближчим до
+     * брили часто виявляється монарх, і тоді камінь біля її підошви
+     * виростав їй до зросту — а ховав при цьому дітей на іншому боці
+     * купи. Купа не має ховати найменше, що біля неї стоїть, і саме це
+     * число тут і стоїть.
+     */
+    const size = Math.min(
+      monarchRadius * GEODE_BOULDER_MAX,
+      gap * GEODE_BOULDER_GAP_SHARE,
+      shortestBody * GEODE_BOULDER_NEIGHBOUR_SHARE,
+    );
+    if (size < monarchRadius * GEODE_BOULDER_MIN) continue;
+
+    const stone = boulderPolytope(artifactSeed, tag, size);
+    if (stone === null) continue;
+
+    /*
+     * БРИЛА ЛЕЖИТЬ НА КУПІ, А НЕ СТОЇТЬ НАД НЕЮ.
+     *
+     * Перша редакція садила камінь на гребінь і топила його на частку
+     * розміру — тобто верх каменю виходив ВИЩЕ гребеня. Тест
+     * `жеода не ховає кільце років` упіймав наслідок одразу: він міряє
+     * найвищу точку всього меша проти найвищої дитини, і на першому році
+     * вона стрибнула до 0.64 при межі 0.5.
+     *
+     * Обмежувати розмір марно — я спробував двома способами (зростом
+     * найближчого тіла, потім найкоротшого), і обидва рази верх усе одно
+     * підіймався: справа не в тому, ЯКА брила, а в тому, що вона стоїть
+     * ПОВЕРХ.
+     *
+     * Тепер кожен камінь ставиться так, щоб його найвища точка лягла
+     * рівно на гребінь у своєму напрямку (з насіненим просіданням). Тобто
+     * брили не додаються до купи згори — вони і Є її поверхня. Висота
+     * підкладки лишається тим, чим була, а профіль ADR-0058 не зачеплений.
+     */
+    let stoneTop = Number.NEGATIVE_INFINITY;
+    for (const vertex of stone.vertices) stoneTop = Math.max(stoneTop, vertex.y);
+    const top = geodeCollarAt(angle, crest, artifactSeed);
+    const base = top - stoneTop - size * GEODE_BOULDER_SINK
+      * seededUnit(artifactSeed, `${tag}:settle`);
+    const first = positions.length / 3;
+    for (const vertex of stone.vertices) {
+      positions.push(round6(x + vertex.x), round6(base + vertex.y), round6(z + vertex.z));
+    }
+    for (const face of stone.faces) {
+      for (let corner = 1; corner + 1 < face.loop.length; corner += 1) {
+        indices.push(
+          first + face.loop[0]!,
+          first + face.loop[corner]!,
+          first + face.loop[corner + 1]!,
+        );
+      }
+    }
+  }
 
   const triangleCount = indices.length / 3;
   return rebuildCrystalMeshNormals({
