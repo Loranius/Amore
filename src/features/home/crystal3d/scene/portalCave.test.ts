@@ -19,14 +19,81 @@ import {
   buildPortalCaveShaftGeometry,
   buildPortalCaveShellGeometry,
 } from './portalCave';
-import { PORTAL_GROUND_Y } from './portalScene';
+import { PORTAL_GROUND_Y, portalCameraFrame } from './portalScene';
 
 const SEED = 20221226;
+
+/** Ширина телефона пари в CSS px і аспект полотна головної (ADR-0021). */
+const PHONE_WIDTH = 412;
+const PHONE_ASPECT = 0.46;
+
+function colours(geometry: {
+  getAttribute(name: string): { array: ArrayLike<number> };
+}): number[] {
+  return Array.from(geometry.getAttribute('color').array);
+}
+
+/**
+ * Один кристал друзи — 18 трикутників поспіль: шість граней по три.
+ * Будівник кладе їх саме так, і це єдиний спосіб розрізати суп назад.
+ */
+function crystals(positions: readonly number[]): number[][] {
+  const stride = 18 * 3 * 3;
+  const out: number[][] = [];
+  for (let at = 0; at + stride <= positions.length; at += stride) {
+    out.push(positions.slice(at, at + stride));
+  }
+  return out;
+}
+
+/** Тон ТІЛА кожної бічної грані кристала — третій кут першого трикутника. */
+function faceShades(colors: readonly number[]): number[][] {
+  const stride = 18 * 3 * 3;
+  const out: number[][] = [];
+  for (let at = 0; at + stride <= colors.length; at += stride) {
+    const shades: number[] = [];
+    for (let face = 0; face < 6; face += 1) shades.push(colors[at + face * 27 + 6]!);
+    out.push(shades);
+  }
+  return out;
+}
+
+/** Тон підошви й тіла першої бічної грані кожного кристала. */
+function footAndBody(colors: readonly number[]): { foot: number; body: number }[] {
+  const stride = 18 * 3 * 3;
+  const out: { foot: number; body: number }[] = [];
+  for (let at = 0; at + stride <= colors.length; at += stride) {
+    out.push({ foot: colors[at]!, body: colors[at + 6]! });
+  }
+  return out;
+}
+
 
 function points(geometry: {
   getAttribute(name: string): { array: ArrayLike<number> };
 }): number[] {
   return Array.from(geometry.getAttribute('position').array);
+}
+
+
+/**
+ * Висота поверхні підлоги під точкою (x, z) — барицентрично, по тому
+ * трикутнику меша, який цю точку накриває.
+ */
+function floorSurfaceAt(floor: readonly number[], x: number, z: number): number | null {
+  for (let at = 0; at + 8 < floor.length; at += 9) {
+    const ax = floor[at]!; const az = floor[at + 2]!;
+    const bx = floor[at + 3]!; const bz = floor[at + 5]!;
+    const cx = floor[at + 6]!; const cz = floor[at + 8]!;
+    const area = (bz - cz) * (ax - cx) + (cx - bx) * (az - cz);
+    if (Math.abs(area) < 1e-9) continue;
+    const first = ((bz - cz) * (x - cx) + (cx - bx) * (z - cz)) / area;
+    const second = ((cz - az) * (x - cx) + (ax - cx) * (z - cz)) / area;
+    const third = 1 - first - second;
+    if (first < -1e-6 || second < -1e-6 || third < -1e-6) continue;
+    return first * floor[at + 1]! + second * floor[at + 4]! + third * floor[at + 7]!;
+  }
+  return null;
 }
 
 /** Нормаль трикутника за трьома вершинами, за правилом правої руки. */
@@ -287,6 +354,108 @@ describe('друза по стінах', () => {
       top = Math.max(top, positions[at]!);
     }
     expect(top - PORTAL_GROUND_Y).toBeLessThan(CAVE_CEILING_HEIGHT * 0.55);
+  });
+
+  it('КАМІНЕЦЬ, ЯКИЙ ВИДНО: найменший кристал друзи не менший за 14 CSS px', () => {
+    /*
+     * Вада, яку це закриває, приїхала знімком із телефона власника:
+     * «камінці зверху прозорі без текстури». Прозорими вони не були —
+     * вони були ВІСІМ CSS-пікселів завширшки, а на восьми пікселях
+     * шестигранна призма не показує жодної грані. Виміряно на тому
+     * знімку: 5% розмаху яскравості всередині плями при 30%, які цей
+     * проєкт вважає межею «читається кристалом».
+     *
+     * Число над константами розміру при цьому обіцяло 35–160 px. Воно
+     * було пораховане для стіни за 6.2 одиниці, кадру в ПІКСЕЛЯХ
+     * ПРИСТРОЮ і констант 0.10–0.46 — жодного з трьох уже не існувало.
+     *
+     * Тому тут міряється не константа, а те, що бачить око: довжина
+     * кристала, поділена на його відстань до камери кадру, який пара
+     * справді відкриває. Змінюється зала, кадр або розмір — змінюється й
+     * число, і межа ловить це замість людини.
+     */
+    const frame = portalCameraFrame(PHONE_ASPECT, 0.9, 1.6);
+    const viewportHeight = PHONE_WIDTH / PHONE_ASPECT;
+    const halfTan = Math.tan((frame.fov * Math.PI) / 360);
+    let smallest = Number.POSITIVE_INFINITY;
+    for (const crystal of crystals(positions)) {
+      let low: [number, number, number] | null = null;
+      let high: [number, number, number] | null = null;
+      for (let at = 0; at < crystal.length; at += 3) {
+        const point: [number, number, number] = [crystal[at]!, crystal[at + 1]!, crystal[at + 2]!];
+        if (low === null || point[1] < low[1]) low = point;
+        if (high === null || point[1] > high[1]) high = point;
+      }
+      const length = Math.hypot(high![0] - low![0], high![1] - low![1], high![2] - low![2]);
+      const depth = Math.hypot(
+        (high![0] + low![0]) / 2 - frame.position[0],
+        (high![1] + low![1]) / 2 - frame.position[1],
+        (high![2] + low![2]) / 2 - frame.position[2],
+      );
+      smallest = Math.min(smallest, (length / depth) * (viewportHeight / 2) / halfTan);
+    }
+    // 14 px — це три видимі грані по чотири-п'ять пікселів. Менше не
+    // кристал, а цятка; старе значення давало 8.
+    expect(smallest).toBeGreaterThan(14);
+  });
+
+  it('ГРАНІ ЧЕРГУЮТЬСЯ НА ВСІЙ ДРУЗІ, а не лише на одинаках', () => {
+    /*
+     * Дрібна друза фарбувалась розмахом 0.86/1.00/1.14 — чотирнадцять
+     * відсотків між сусідніми гранями. Заувага над тим числом була
+     * записана чесно («на двадцяти пікселях сильний контраст читається
+     * сміттям»), але двадцяти пікселів не було: було вісім, і вужчий
+     * розмах не рятував від сміття, а робив сміття рівним.
+     */
+    let weakest = Number.POSITIVE_INFINITY;
+    for (const shades of faceShades(colours(buildPortalCaveDruseGeometry(SEED, clusters)))) {
+      for (let face = 0; face < shades.length; face += 1) {
+        const next = shades[(face + 1) % shades.length]!;
+        const here = shades[face]!;
+        weakest = Math.min(weakest, Math.max(here, next) / Math.min(here, next));
+      }
+    }
+    expect(weakest).toBeGreaterThan(1.3);
+  });
+
+  it('ПІДОШВА ТЕМНІША ЗА ТІЛО: власна тінь замість освітлення', () => {
+    /*
+     * Печера намальована, а не освітлена, тож тіні під кристалом не
+     * покладе жодне джерело — а без плями під підошвою око читає світлу
+     * грудку на рівному камені як предмет ПЕРЕД стіною. Десять спроб
+     * лікували грудку; тінь малюється вершинним кольором і коштує нуль.
+     */
+    for (const shades of footAndBody(colours(buildPortalCaveDruseGeometry(SEED, clusters)))) {
+      expect(shades.foot).toBeLessThan(shades.body * 0.6);
+    }
+  });
+
+  it('ДРІБНА ДРУЗА СТОЇТЬ НА ПІДЛОЗІ, а не висить над обідом', () => {
+    /*
+     * Підлога зали — чаша, і з ока на висоті кадру її дальній обід ХОВАЄ
+     * підніжжя стіни. Кущ, посаджений на стіну, був чесно в неї вритий —
+     * і все одно читався таким, що висить, бо точки дотику не було
+     * ВИДНО. Тому кущі переїхали на саму підлогу, а перевіряється це не
+     * тією ж функцією висоти, якою вони садились, а справжнім мешем
+     * підлоги: інакше тест підтверджував би сам себе.
+     */
+    const floor = points(buildPortalCaveFloorGeometry(SEED));
+    for (const crystal of crystals(positions)) {
+      let low: [number, number, number] | null = null;
+      for (let at = 0; at < crystal.length; at += 3) {
+        const point: [number, number, number] = [crystal[at]!, crystal[at + 1]!, crystal[at + 2]!];
+        if (low === null || point[1] < low[1]) low = point;
+      }
+      // Одинаки ростуть зі стіни, і їхня підошва законно за нею.
+      if (Math.hypot(low![0], low![2]) > CAVE_CHAMBER_RADIUS * 0.95) continue;
+      // Сама ПОВЕРХНЯ підлоги під підошвою, а не найближча її вершина:
+      // підлога гранована з кроком близько 0.77, тож найближча вершина
+      // може лежати на дециметр нижче за камінь, який справді під
+      // кристалом, і тест міряв би дискретизацію меша.
+      const ground = floorSurfaceAt(floor, low![0], low![2]);
+      if (ground === null) continue;
+      expect(low![1]).toBeLessThanOrEqual(ground);
+    }
   });
 
   it('коштує стільки, скільки сцена може собі дозволити', () => {
