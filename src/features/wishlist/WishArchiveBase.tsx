@@ -1,6 +1,7 @@
 // ============================================================
 // WishArchive — подаровані та спільно виконані мрії
 // ============================================================
+import { Photo } from '@/components/ui/Photo';
 import {
   useCallback,
   useEffect,
@@ -189,7 +190,9 @@ function ArchiveBubble({ item, seed, index, isFocused, onOpen }: ArchiveBubblePr
       >
         {image ? (
           <span className="wl-cloud-bubble-media wl-archive-cloud-bubble-media">
-            <img src={image} alt="" loading="lazy" decoding="async" />
+            {/* Бульбашка архіву — близько 90–180 CSS px; сирий `<img>`
+                тягнув сюди оригінал зі сховища. */}
+            <Photo src={image} cssWidth={192} alt="" loading="lazy" />
           </span>
         ) : (
           <span className="wl-cloud-bubble-placeholder wl-archive-cloud-bubble-placeholder" aria-hidden="true">

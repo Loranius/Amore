@@ -159,7 +159,44 @@ export interface CompressResult {
   contentType: string;
 }
 
-export function compress(file: File, maxSide = 1280, quality = 0.78): Promise<CompressResult> {
+/**
+ * ОДНЕ ЧИСЛО ЯКОСТІ НА ДВА ФОРМАТИ — ЦЕ ДВІ РІЗНІ ЯКОСТІ.
+ *
+ * `compress` віддає WebP там, де полотно вміє його кодувати, і JPEG там,
+ * де не вміє. Це не наш вибір: `canvas.toDataURL('image/webp')` є в
+ * Chrome (андроїд, віндовс) і довго не було в Safari — тобто формат
+ * майстер-файла вирішує ТЕЛЕФОН, з якого пара додала знімок.
+ *
+ * Поки число було спільним, 0.78 означало помітно різну картинку: WebP
+ * на 0.78 приблизно відповідає JPEG на 0.88, а JPEG на 0.78 уже дає
+ * блоки на градієнтах — на небі, на шкірі, на розмитому тлі. Той самий
+ * кадр, доданий з айфона й з андроїда, зберігався по-різному, і різницю
+ * було видно на ВСІХ платформах, бо майстер-файл один на всіх.
+ *
+ * Тому число, яке передає місце виклику, тепер означає якість У ШКАЛІ
+ * WEBP, а JPEG дістає свій відповідник. Кожне місце й далі каже, чого
+ * вартий саме його знімок («обкладинка — 0.84»), і каже це один раз.
+ *
+ * ЧИСЛО ТУТ НЕ ВИМІРЯНЕ. Виміряти чужий кодувальник у пісочниці без
+ * браузера нічим; +0.10 узято з відомого співвідношення форматів і
+ * записано як припущення, а не як вимір.
+ */
+const WEBP_QUALITY = 0.78;
+const JPEG_OVER_WEBP = 0.1;
+const JPEG_CEILING = 0.95;
+
+/** Якість JPEG, приблизно рівноцінна заданій якості WebP. */
+export function jpegEquivalent(webpQuality: number): number {
+  const safe = Number.isFinite(webpQuality) ? Math.min(1, Math.max(0, webpQuality)) : WEBP_QUALITY;
+  return Math.min(JPEG_CEILING, safe + JPEG_OVER_WEBP);
+}
+
+export function compress(
+  file: File,
+  maxSide = 1280,
+  /** Якість у шкалі WebP; для JPEG перекладається `jpegEquivalent`. */
+  quality = WEBP_QUALITY,
+): Promise<CompressResult> {
   return normalize(file).then(
     (normalized) =>
       new Promise<CompressResult>((resolve, reject) => {
@@ -191,13 +228,14 @@ export function compress(file: File, maxSide = 1280, quality = 0.78): Promise<Co
             const useWebp = supportsWebp();
             const type = useWebp ? 'image/webp' : 'image/jpeg';
             const ext = useWebp ? 'webp' : 'jpg';
+            const chosen = useWebp ? quality : jpegEquivalent(quality);
             canvas.toBlob(
               (blob) =>
                 blob
                   ? resolve({ blob, ext, contentType: type })
                   : reject(new Error('toBlob failed')),
               type,
-              quality,
+              chosen,
             );
           };
           img.src = e.target?.result as string;

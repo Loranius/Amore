@@ -1,3 +1,4 @@
+import { Photo } from '@/components/ui/Photo';
 import { useEffect, useRef, useState } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
@@ -165,7 +166,9 @@ export function GiftCompletionModal({
         </div>
 
         <div className="gift-memory-wish">
-          {item.image_url ? <img src={item.image_url} alt="" /> : <span aria-hidden="true"><HeartIcon size={26} /></span>}
+          {item.image_url
+            ? <Photo src={item.image_url} cssWidth={128} alt="" />
+            : <span aria-hidden="true"><HeartIcon size={26} /></span>}
           <div>
             <strong>{item.title}</strong>
             <small>Фото, відео й коментар необов’язкові.</small>

@@ -1,3 +1,4 @@
+import { Photo } from '@/components/ui/Photo';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { WishCard } from './WishCard';
 import { buildWishSphereField, type WishSpherePlacement } from './wishSphereField';
@@ -146,12 +147,12 @@ function WishSphere({
         {photo === null ? (
           <span className="wl-sphere__seed" />
         ) : (
-          <img
+          <Photo
             className="wl-sphere__image"
             src={photo}
+            cssWidth={192}
             alt=""
             loading="lazy"
-            decoding="async"
             // Ключ за адресою: без нього браузер лишає збите зображення й
             // події про наступного кандидата не буде.
             key={photo}

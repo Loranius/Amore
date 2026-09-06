@@ -56,6 +56,20 @@ async function rescueOversizedOriginal(url: string, targetPx: number): Promise<B
     resizeWidth: targetPx,
     resizeHeight: targetPx,
     resizeQuality: 'medium',
+    /*
+     * ОРІЄНТАЦІЯ ЗАДАЄТЬСЯ ЯВНО, і це не педантизм.
+     *
+     * `<img>` повертає знімок за EXIF сам (`image-orientation: from-image`
+     * — типове значення), а `createImageBitmap` довгий час цього не
+     * робив: у першій редакції специфікації типовим було `none`, і
+     * браузери переходили на `from-image` у різні роки. Отже рятівний
+     * шлях міг покласти на екран знімок, повернутий на 90°, — і саме там,
+     * де інші шляхи його повертають правильно, тобто по-різному на різних
+     * платформах.
+     *
+     * Один рядок прибирає залежність від версії браузера.
+     */
+    imageOrientation: 'from-image',
   });
   try {
     const canvas = document.createElement('canvas');
@@ -99,7 +113,7 @@ export function Photo({ src, cssWidth, quality, ...rest }: PhotoProps) {
     if (!failed || !original) return undefined;
     let cancelled = false;
     let createdUrl: string | null = null;
-    const targetPx = Math.max(1, Math.round(cssWidth * pixelRatio()));
+    const targetPx = Math.max(1, Math.round(cssWidth * pixelRatio(cssWidth)));
     void rescueOversizedOriginal(original, targetPx)
       .then((blob) => {
         if (cancelled) return;
@@ -131,6 +145,17 @@ export function Photo({ src, cssWidth, quality, ...rest }: PhotoProps) {
 
   return (
     <img
+      /*
+       * `decoding="async"` ТИПОВЕ, а не за проханням кожного місця.
+       *
+       * Синхронне декодування тримає головний потік рівно тоді, коли
+       * картка в'їжджає у в'юпорт: виміряно 554 мс на одному великому
+       * знімку. Місця, які пам'ятали передати прапорець, від цього не
+       * страждали; місця, які забули, — страждали мовчки. Типове значення
+       * прибирає цілий клас забутих рядків, і будь-яке місце може його
+       * перевизначити, бо `rest` іде після.
+       */
+      decoding="async"
       {...rest}
       src={wanted}
       onError={(event) => {

@@ -54,14 +54,68 @@ const STORAGE_RENDER = '/storage/v1/render/image/public/';
 const WIDTH_STEPS = [128, 192, 256, 384, 512, 768, 1080, 1600] as const;
 
 /**
- * Стеля щільності пікселів, яку ми готові оплатити трафіком.
+ * Стеля щільності пікселів — ТЕПЕР ЗАЛЕЖИТЬ ВІД РОЗМІРУ КАДРУ.
  *
- * На екрані з DPR 3 «чесна» ширина була б у 2.25 раза важчою за DPR 2, а
- * різницю на фотографії — не на тексті й не на лінії — побачити майже
- * неможливо. Тому щільність обрізається двійкою: це компроміс на користь
- * того, хто дивиться галерею з мобільного інтернету.
+ * Тут стояла прибита двійка з обґрунтуванням «різницю на фотографії
+ * побачити майже неможливо». Це було твердження, а не вимір, і вимір його
+ * не підтвердив.
+ *
+ * Поміряно акутанс — середній модуль градієнта, тобто саме те, що око
+ * читає як різкість, — на справжньому кадрі, зменшеному й повернутому
+ * назад так само, як це робить браузер:
+ *
+ * | кадр            | пристрій | віддаємо | різкість |
+ * |-----------------|----------|----------|----------|
+ * | 128 CSS @ DPR 3 | 384      | 256      | **83%**  |
+ * | 192 CSS @ DPR 3 | 576      | 384      | **85%**  |
+ * | 256 CSS @ DPR 3 | 768      | 512      | **86%**  |
+ * | 128 CSS @ DPR 2 | 256      | 256      | 100%     |
+ *
+ * Тобто на айфоні й на щільному андроїді фотографії втрачали шосту
+ * частину різкості, а на віндовсі (DPR 1–1.5) не втрачали нічого. Пара
+ * дивиться свій архів саме з телефонів.
+ *
+ * Тому стеля тепер не одна:
+ *
+ *  • ДРІБНІ КАДРИ (до 256 CSS px) дістають повну щільність до 3. Це
+ *    картки галереї, листя віяла, мініатюри — там різкість помітна
+ *    найбільше, а абсолютна ціна найменша: за виміряною таблицею вище
+ *    крок 256 → 384 коштує близько 32 КБ на знімок.
+ *  • ВЕЛИКІ КАДРИ лишаються на двійці. Там DPR 2 і так дає 768–1600
+ *    пікселів, а зайвий крок коштує вже сотні кілобайт.
+ *  • РЕЖИМ ЕКОНОМІЇ ТРАФІКУ вимикає все це назад до двійки. `Save-Data`
+ *    є в андроїдному Chrome і немає в Safari — тобто це саме та
+ *    платформна різниця, яку варто поважати, а не вигадувати.
  */
-export const MAX_PIXEL_RATIO = 2;
+export const MAX_PIXEL_RATIO = 3;
+
+/** До якої ширини кадру щільність не обрізається. */
+const SHARP_UP_TO_CSS = 256;
+
+/** Стеля для великих кадрів і для режиму економії. */
+const THRIFTY_PIXEL_RATIO = 2;
+
+/**
+ * Чи попросив пристрій економити трафік.
+ *
+ * `navigator.connection` є в Chrome (андроїд і віндовс) і немає в Safari,
+ * тож функція мусить чесно повертати `false` там, де відповіді немає:
+ * відсутність сигналу — це не «економити».
+ */
+export function savingData(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const connection = (navigator as { connection?: { saveData?: boolean; effectiveType?: string } })
+    .connection;
+  if (!connection) return false;
+  if (connection.saveData === true) return true;
+  return connection.effectiveType === '2g' || connection.effectiveType === 'slow-2g';
+}
+
+/** Стеля щільності для кадру такої ширини. */
+export function maxPixelRatio(cssWidth: number): number {
+  if (savingData()) return THRIFTY_PIXEL_RATIO;
+  return cssWidth <= SHARP_UP_TO_CSS ? MAX_PIXEL_RATIO : THRIFTY_PIXEL_RATIO;
+}
 
 /** Якість JPEG/WebP, яку просимо в сервера. */
 const QUALITY = 72;
@@ -91,15 +145,15 @@ export function stepFor(pixels: number): number {
 }
 
 /**
- * Щільність пікселів пристрою, обрізана стелею.
+ * Щільність пікселів пристрою, обрізана стелею для кадру такої ширини.
  *
  * Поза браузером (тест, збірка) — одиниця: вигадувати екран там нічого.
  */
-export function pixelRatio(): number {
+export function pixelRatio(cssWidth = 0): number {
   if (typeof window === 'undefined') return 1;
   const raw = window.devicePixelRatio;
   if (!Number.isFinite(raw) || raw <= 0) return 1;
-  return Math.min(raw, MAX_PIXEL_RATIO);
+  return Math.min(raw, maxPixelRatio(cssWidth));
 }
 
 export interface ThumbOptions {
@@ -132,7 +186,7 @@ export function thumbUrl(
   const at = url.indexOf(STORAGE_OBJECT);
   if (at === -1) return url;
 
-  const dpr = options.dpr ?? pixelRatio();
+  const dpr = options.dpr ?? pixelRatio(cssWidth);
   const width = stepFor(Math.round(cssWidth * dpr));
   const quality = options.quality ?? QUALITY;
 

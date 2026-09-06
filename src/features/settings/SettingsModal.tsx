@@ -9,6 +9,7 @@
 // ============================================================
 import { useEffect, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
+import { Photo } from '@/components/ui/Photo';
 import { ModalClose } from '@/components/ui/ModalClose';
 import { useAuth, useCurrentUser } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
@@ -591,7 +592,13 @@ function PhotosSection() {
               key={p.name}
               className={`photo-manager-thumb${deletingName === p.name ? ' deleting' : ''}`}
             >
-              <img src={p.url} alt="" loading="lazy" />
+              {/*
+                * Сітка `auto-fill, minmax(84px, 1fr)` — тобто картка
+                * близько 84–110 CSS px. Сирий `<img src={p.url}>` тягнув
+                * сюди ОРИГІНАЛ: у пари це в середньому 416 КБ на знімок
+                * при 21 КБ, яких вистачає на цей розмір.
+                */}
+              <Photo src={p.url} cssWidth={110} alt="" loading="lazy" />
               <button
                 type="button"
                 className="photo-manager-del"

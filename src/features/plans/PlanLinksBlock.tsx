@@ -5,6 +5,7 @@
 // viewport. Це прибирає запити до вішлиста, карти й архіву при звичайному
 // відкритті сторінки плану.
 // ============================================================
+import { Photo } from '@/components/ui/Photo';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -295,11 +296,14 @@ function LinkPreviewMedia({ imageUrl, Icon }: {
     <span className="plan-link-media" aria-hidden="true">
       <span className="plan-link-media-fallback"><Icon size={30} /></span>
       {imageUrl && (
-        <img
+        // `imageUrl` тут — `wish.image_url`, `pin.photo_url` або
+        // `memory.photo_url`, тобто знімок пари зі сховища. Плитка
+        // посилання дрібна, а сирий `<img>` тягнув сюди оригінал.
+        <Photo
           src={imageUrl}
+          cssWidth={128}
           alt=""
           loading="lazy"
-          decoding="async"
           onError={(event) => { event.currentTarget.hidden = true; }}
         />
       )}

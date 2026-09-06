@@ -5,6 +5,7 @@
 // закриває. Керується батьком через src|null.
 // ============================================================
 import { CloseIcon } from '@/components/icons/UiIcon';
+import { thumbUrl } from '@/lib/imageCdn';
 import { useEffect, useRef } from 'react';
 
 interface LightboxProps {
@@ -46,7 +47,20 @@ export function Lightbox({ src, onClose }: LightboxProps) {
       <button type="button" className="wl-lb-close" aria-label="Закрити" onClick={onClose}>
         <CloseIcon size={18} />
       </button>
-      <img className="wl-lb-img" src={src} alt="" />
+      {/*
+        НА ВЕСЬ ЕКРАН — ЦЕ НЕ «ОРИГІНАЛ».
+        ------------------------------------------------------------
+        Тут стояв сирий `src`, тобто повний файл зі сховища: в архіві пари
+        є знімок 6144×8160 на 11.4 МБ, і саме він приїжджав, щоб лягти на
+        екран завширшки 412 CSS px. Просимо ширину екрана — сходинка
+        (1080 або 1600) покриває навіть DPR 2 на планшеті.
+      */}
+      <img
+        className="wl-lb-img"
+        src={thumbUrl(src, typeof window === 'undefined' ? 512 : window.innerWidth)}
+        alt=""
+        decoding="async"
+      />
     </div>
   );
 }

@@ -5,6 +5,7 @@
 // завантажує лише ID, URL, дату й підпис фотографій поточного плану.
 // Відв'язування не видаляє знімок із загального архіву.
 // ============================================================
+import { Photo } from '@/components/ui/Photo';
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CameraIcon } from '@/components/icons/NavIcon';
@@ -20,11 +21,21 @@ import {
 } from './usePlanLinks';
 import type { PlanRow } from '@/types';
 
+
 function memoryDateForPlan(plan: PlanRow): string {
   return plan.completed_at?.slice(0, 10)
     ?? plan.start_date
     ?? new Date().toISOString().slice(0, 10);
 }
+
+/**
+ * Ширина картки спогада в плані, у CSS-пікселях.
+ *
+ * Сітка блока кладе три-чотири картки в рядок телефона, тобто близько
+ * 110 px. Число тут, а не в CSS, бо його читає `<Photo>`, щоб попросити
+ * у сховища рівно цей розмір.
+ */
+const PLAN_MEMORY_CSS_WIDTH = 128;
 
 export function PlanMemoriesBlock({
   plan,
@@ -73,11 +84,16 @@ export function PlanMemoriesBlock({
           {memories.map((memory) => (
             <article key={memory.id} className="plan-memory-card">
               <Link className="plan-memory-open" to="/memories" aria-label="Відкрити архів спогадів" />
-              <img
+              {/*
+                * Через `<Photo>`, а не сирим `<img>`: картка тут дрібна, а
+                * `photo_url` — оригінал зі сховища, тобто в пари в
+                * середньому 416 КБ на знімок.
+                */}
+              <Photo
                 src={memory.photo_url}
+                cssWidth={PLAN_MEMORY_CSS_WIDTH}
                 alt={memory.caption ?? ''}
                 loading="lazy"
-                decoding="async"
                 fetchPriority="low"
               />
               <div className="plan-memory-caption">
