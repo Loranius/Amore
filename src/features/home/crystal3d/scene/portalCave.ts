@@ -47,10 +47,10 @@ import { PORTAL_GROUND_Y } from './portalScene';
  * ними менше трьох одиниць, стіна читається каменем, а кристал на ній
  * лишається кристалом і не сперечається з артефактом.
  */
-export const CAVE_CHAMBER_RADIUS = 6.2;
+export const CAVE_CHAMBER_RADIUS = 5.4;
 
 /** Висота склепіння над підлогою. */
-export const CAVE_CEILING_HEIGHT = 5;
+export const CAVE_CEILING_HEIGHT = 4.4;
 
 /**
  * Скільки граней має стіна по колу.
@@ -59,7 +59,7 @@ export const CAVE_CEILING_HEIGHT = 5;
  * багатокутником. Менше — і зала стає гранчастою вазою; більше — і скеля
  * знову округла, бо сусідні грані вже не відрізняються.
  */
-export const CAVE_AZIMUTH_SEGMENTS = 40;
+export const CAVE_AZIMUTH_SEGMENTS = 64;
 
 /**
  * Профіль зали: (частка висоти, множник радіуса).
@@ -89,9 +89,17 @@ const CAVE_NOISE_POINTS = 17;
  * у третину зали, і на кадрі підлога читалась ПРОМЕНЯМИ від артефакта —
  * рівно тим візерунком, якого в камені не буває.
  */
-const CAVE_FLOOR_RINGS: readonly number[] = [0.14, 0.30, 0.46, 0.63, 0.82];
+const CAVE_FLOOR_RINGS: readonly number[] = [0.11, 0.22, 0.34, 0.47, 0.61, 0.76, 0.9];
 /** Розкид висоти підлоги — частка радіуса зали. Камінь нерівний. */
-const CAVE_FLOOR_RELIEF = 0.02;
+const CAVE_FLOOR_RELIEF = 0.045;
+
+/**
+ * Частка радіуса зали, всередині якої підлога РІВНА.
+ *
+ * Там стоїть артефакт, і рушій ставить його на `PORTAL_GROUND_Y`, нічого
+ * не знаючи про печеру. 0.16 при вікні тесту 0.12 — запас навмисний.
+ */
+const CAVE_FLOOR_FLAT = 0.16;
 
 /**
  * Скільки кущів друзи росте по стінах на кожному рівні якості.
@@ -293,8 +301,25 @@ const CAVE_TEXTURE_TILES_AROUND = 6;
 /** Одиниць світу на плитку по висоті й по підлозі. */
 const CAVE_TEXTURE_UNITS = 2.6;
 
-/** Основа яскравості грані ПІДЛОГИ — своя, див. `floorShade`. */
-const CAVE_FLOOR_FACET_MIN = 0.82;
+
+/**
+ * Кут сегмента — з НЕРІВНИМ кроком.
+ *
+ * Кільце з рівним кроком дає правильний многокутник, і жодна кількість
+ * сегментів цього не ховає: грані виходять однакової ширини, а однакова
+ * ширина читається токарним верстатом, а не зламом породи. Це та сама
+ * думка, яку власник висловив про кристал — «не роби поверхні кривими й
+ * шумними, зроби пласкі грані НЕРІВНИМИ», — і для каменю вона та сама.
+ *
+ * Зсув насінений і обмежений третиною кроку: більше — і сусідні сегменти
+ * міняються місцями, менше — і нерівності не видно.
+ */
+function segmentAngle(seed: number, segment: number, segments: number): number {
+  const step = (Math.PI * 2) / segments;
+  const jitter = (seededUnit(seed, `cave:azimuth:${((segment % segments) + segments) % segments}`) - 0.5)
+    * 0.66 * step;
+  return segment * step + jitter;
+}
 
 /** Радіус стіни в напрямку `angle` на частці висоти `share`. */
 function wallRadiusAt(seed: number, angle: number, share: number): number {
@@ -324,11 +349,26 @@ function floorHeightAt(seed: number, angle: number, radius: number): number {
   const relief = (ringNoise(seed, 'cave:floor', angle * 1.7 + radius, CAVE_NOISE_POINTS) - 0.5)
     * 2 * CAVE_FLOOR_RELIEF * CAVE_CHAMBER_RADIUS;
   /*
-   * Біля осі рельєфу немає взагалі: там стоїть жеода, і горб під нею
-   * підняв би породу вище за власну губу. Ріст рельєфу від центру —
-   * квадратичний, тобто перші дві одиниці лишаються практично рівними.
+   * Біля осі рельєфу немає ВЗАГАЛІ, і тепер це сказано числом, а не
+   * покладено на те, що квадрат малий.
+   *
+   * Там стоїть жеода, і горб під нею підняв би породу вище за власну
+   * губу. Тест `ПЛОЩИНА АРТЕФАКТА НЕ ЗРУШИЛА` міряє це прямо: всередині
+   * 12% радіуса зали підлога мусить лежати рівно на `PORTAL_GROUND_Y`.
+   *
+   * Перша редакція мала лише квадратичний ріст від нуля — на слабкому
+   * рельєфі (0.02) і першому кільці на 0.14 це проходило випадково.
+   * Щойно рельєф став сильнішим (0.045), а кілець більше, найближче
+   * кільце опинилось у вікні тесту й дало −0.0094. Тобто інваріант
+   * тримався не правилом, а збігом двох чисел.
+   *
+   * `CAVE_FLOOR_FLAT` навмисно ширший за вікно тесту: межа має стояти за
+   * тим, що вона боронить, а не впритул до нього.
    */
-  const grow = Math.min(1, radius / (CAVE_CHAMBER_RADIUS * 0.55)) ** 2;
+  const grow = Math.min(1, Math.max(
+    0,
+    radius / CAVE_CHAMBER_RADIUS - CAVE_FLOOR_FLAT,
+  ) / Math.max(1e-6, 0.55 - CAVE_FLOOR_FLAT)) ** 2;
   return PORTAL_GROUND_Y + relief * grow;
 }
 
@@ -343,7 +383,7 @@ function floorHeightAt(seed: number, angle: number, radius: number): number {
 export function buildPortalCaveFloorGeometry(seed: number): THREE.BufferGeometry {
   const mesh = soup();
   const segments = CAVE_AZIMUTH_SEGMENTS;
-  const angleOf = (segment: number): number => (segment / segments) * Math.PI * 2;
+  const angleOf = (segment: number): number => segmentAngle(seed, segment, segments);
   const floorPoint = (segment: number, share: number): [number, number, number] => {
     const angle = angleOf(segment);
     const radius = wallRadiusAt(seed, angle, 0) * share;
@@ -358,35 +398,27 @@ export function buildPortalCaveFloorGeometry(seed: number): THREE.BufferGeometry
    * Підлога світліша під артефактом і темніє до стін: єдине світло, яке
    * тут справді є, — сам кристал, і воно падає йому під ноги.
    */
-  const floorShade = (segment: number, share: number, ring: number): number => {
+  const floorShade = (share: number): number => {
     const near = 1 - Math.min(1, share / 0.55);
     /*
-     * Розкид яскравості на підлозі ВТРИЧІ менший, ніж на стіні, і це не
-     * непослідовність. Стіна дивиться на глядача ребром до ребра — там
-     * різниця граней читається каменем. Підлога дивиться пласко, і той
-     * самий розкид на віялі від центру дав промені, що розходяться від
-     * артефакта.
-     */
-    /*
-     * Підлога має ВЛАСНУ основу грані, а не занижену стінну.
+     * ВИПАДКОВОСТІ ПО КЛИНАХ БІЛЬШЕ НЕМАЄ, і зняли її не за смаком.
      *
-     * Спершу вона брала `CAVE_FACET_SHADE_MIN`, і коли той опустився
-     * заради розкиду на стіні, підлога просто потемніла: розкид у неї
-     * навмисно втричі менший (див. нижче), тож від нижчої основи вона
-     * дістала збиток без прибутку.
-     */
-    const facet = CAVE_FLOOR_FACET_MIN
-      + CAVE_FACET_SHADE_SPAN * 0.34 * seededUnit(seed, `cave:floor:${segment}:${ring}`);
-    /*
-     * 0.42 → 0.66 у дальньому кінці, і причина виміряна. Дальня підлога
-     * малювалась у 18–28 з 255: там не було ні граней, ні каменю —
-     * чорнота, на якій кристал стояв ні на чому. Розкид граней там БУВ,
-     * але дев'ять відсотків від 18 це півтора рівня.
+     * Тут стояв власний відтінок на кожен клин, утричі слабший за
+     * стінний — із коментарем, що сильніший «дав промені, що
+     * розходяться від артефакта». Поки клинів було сорок, слабкого
+     * вистачало. На шістдесяти чотирьох ті самі промені повернулись:
+     * на світлій темі однорічної пари підлога читалась віялом.
      *
-     * Ближній кінець не піднятий: під кристалом і так світло. Піднято
-     * саме ДАЛЬНІЙ, тобто зменшено падіння, а не додано яскравості.
+     * Причина в самій формі: клин — це промінь, і будь-яка різниця між
+     * сусідніми клинами лягає радіально. Ховати її множником — це
+     * лікувати симптом.
+     *
+     * Тепер деталь підлоги несе ЗЕРНО (ADR-0132), а воно накладається
+     * площинно з `xz` і радіальних смуг не має за побудовою. Клин же
+     * несе тільки те, що й мусив: падіння яскравості від артефакта до
+     * стін.
      */
-    return (0.66 + 0.34 * near ** 1.6) * facet;
+    return 0.66 + 0.34 * near ** 1.6;
   };
 
   /** Розгортка підлоги — площинна з `xz`: вона й лежить у цій площині. */
@@ -403,13 +435,13 @@ export function buildPortalCaveFloorGeometry(seed: number): THREE.BufferGeometry
     const centreB = floorPoint(segment, first);
     mesh.push(
       centre, centreA, centreB,
-      floorShade(segment, first * 0.5, 0),
+      floorShade(first * 0.5),
       [floorUv(centre), floorUv(centreA), floorUv(centreB)],
     );
     for (let ring = 0; ring < CAVE_FLOOR_RINGS.length - 1; ring += 1) {
       const inner = CAVE_FLOOR_RINGS[ring]!;
       const outer = CAVE_FLOOR_RINGS[ring + 1]!;
-      const shade = floorShade(segment, (inner + outer) * 0.5, ring + 1);
+      const shade = floorShade((inner + outer) * 0.5);
       const si = floorPoint(segment, inner);
       const ni = floorPoint(next, inner);
       const no = floorPoint(next, outer);
@@ -418,7 +450,7 @@ export function buildPortalCaveFloorGeometry(seed: number): THREE.BufferGeometry
       mesh.push(si, no, so, shade, [floorUv(si), floorUv(no), floorUv(so)]);
     }
     const last = CAVE_FLOOR_RINGS[CAVE_FLOOR_RINGS.length - 1]!;
-    const edge = floorShade(segment, (last + 1) * 0.5, CAVE_FLOOR_RINGS.length);
+    const edge = floorShade((last + 1) * 0.5);
     const sl = floorPoint(segment, last);
     const nl = floorPoint(next, last);
     const ne = floorPoint(next, 1);
@@ -441,7 +473,7 @@ export function buildPortalCaveFloorGeometry(seed: number): THREE.BufferGeometry
 export function buildPortalCaveShellGeometry(seed: number): THREE.BufferGeometry {
   const mesh = soup();
   const segments = CAVE_AZIMUTH_SEGMENTS;
-  const angleOf = (segment: number): number => (segment / segments) * Math.PI * 2;
+  const angleOf = (segment: number): number => segmentAngle(seed, segment, segments);
   const wallPoint = (segment: number, share: number): [number, number, number] => {
     const angle = angleOf(segment);
     const radius = wallRadiusAt(seed, angle, share);
@@ -540,7 +572,7 @@ export function buildPortalCaveOculusGeometry(seed: number): THREE.BufferGeometr
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
     const point = (index: number): [number, number, number] => {
-      const angle = (index / segments) * Math.PI * 2;
+      const angle = segmentAngle(seed, index, segments);
       const radius = wallRadiusAt(seed, angle, 1);
       return [Math.cos(angle) * radius, y, Math.sin(angle) * radius];
     };
@@ -574,7 +606,7 @@ export function buildPortalCaveShaftGeometry(seed: number): THREE.BufferGeometry
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
     const at = (index: number, y: number, scale: number): [number, number, number] => {
-      const angle = (index / segments) * Math.PI * 2;
+      const angle = segmentAngle(seed, index, segments);
       const radius = wallRadiusAt(seed, angle, 1) * scale;
       return [Math.cos(angle) * radius, y, Math.sin(angle) * radius];
     };

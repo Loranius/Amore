@@ -248,7 +248,7 @@ function CrystalLab() {
               geometry={states.geometry}
               material={material}
               life={states.life}
-              substrateVisible={false}
+              substrateVisible
             />
           )}
           {/*

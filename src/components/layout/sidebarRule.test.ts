@@ -56,7 +56,7 @@ describe('бічна панель десктопу', () => {
     const rule = desktopSidebar();
     expect(rule, 'правило .sidebar у медіа-запиті десктопу').not.toBeNull();
     const props = new Set<string>();
-    rule!.walkDecls((decl: Declaration) => props.add(decl.prop));
+    rule!.walkDecls((decl: Declaration) => { props.add(decl.prop); });
 
     // `display` — те, що перекриває `.sidebar { display: none }` мобільного.
     // Без нього панелі немає ВЗАГАЛІ, і саме це й сталось.
