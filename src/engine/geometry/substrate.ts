@@ -164,6 +164,10 @@ const GEODE_COLLAR_REACH = 1.22;
  * каменю. Крутіше — знову стінка, положистіше — розповзається в млинець.
  */
 const GEODE_SKIRT_REACH = 1.62;
+/** Скільки точок має хвиля підошви. Просте й ІНШЕ, ніж у гребеня. */
+const GEODE_SKIRT_POINTS = 7;
+/** Наскільки підошва може підбиратись назад до гребеня. */
+const GEODE_SKIRT_RAGGED = 0.55;
 /**
  * Висота гребеня коміра, частка довжини монарха.
  *
@@ -184,6 +188,12 @@ const GEODE_COLLAR_HEIGHT = 0.2;
 const GEODE_COLLAR_RAGGED = 0.32;
 /** Скільки контрольних точок має рваність. Просте число, як і в контуру. */
 const GEODE_COLLAR_POINTS = 11;
+/**
+ * На скільки рівнів квантується гребінь коміра.
+ *
+ * Це і є різниця між купою брил і хвилястим коміром. Див. `geodeCollarAt`.
+ */
+const GEODE_COLLAR_LEVELS = 5;
 
 /**
  * Стеля гребеня, виміряна НАЙВИЩОЮ ДИТИНОЮ, а не монархом.
@@ -613,7 +623,26 @@ function geodeCollarAt(angle: number, crest: number, seed: number): number {
   // виміряється: інакше гребінь подекуди вилазив би вище названого.
   const ragged = 1 - GEODE_COLLAR_RAGGED
     * smoothRing(seed, 'geode:collar', angle, GEODE_COLLAR_POINTS);
-  return crest * ragged * (1 - GEODE_BREAK_DEPTH * openness);
+  /*
+   * ВЕРХ КУПИ — СХОДИНКАМИ, А НЕ ХВИЛЕЮ.
+   *
+   * `smoothRing` дає плавну криву, і на укосі (ADR-0136) вона читалась
+   * зіркою з плит: там, де гребінь високий, схил довгий, де низький —
+   * короткий, і одинадцять точок хвилі перетворюються на одинадцять
+   * трикутних променів. Власник назвав це так само — «радіальні плити».
+   *
+   * У битого каменю верх плаский на кожній брилі й стрибає між ними.
+   * Квантування робить рівно це: сусідні сегменти, що потрапили в один
+   * рівень, дають ПЛОСКИЙ верх, а перехід між рівнями — сходинку в один
+   * сегмент (3.75° при 96 сегментах, тобто майже прямовисно).
+   *
+   * Рівнів п'ять, а не більше: на восьми плато вужчають до одного-двох
+   * сегментів і сходинки знову зливаються в хвилю. Хвиля має одинадцять
+   * точок — число просте, тож плато виходять різної ширини, а не
+   * однаковими скибками.
+   */
+  const stepped = Math.round(ragged * GEODE_COLLAR_LEVELS) / GEODE_COLLAR_LEVELS;
+  return crest * stepped * (1 - GEODE_BREAK_DEPTH * openness);
 }
 
 /**
@@ -900,14 +929,15 @@ export function buildCrystalSubstrateMesh(
    * footprint; `y` of null means the ring follows the fissure's own floor.
    */
   const pushRing = (
-    toward: number,
+    toward: number | ((segment: number) => number),
     y: number | ((angle: number, segment: number) => number) | null,
   ): void => {
     ringStarts.push(positions.length / 3);
     for (let segment = 0; segment < OUTLINE_SEGMENTS; segment += 1) {
       const angle = (segment / OUTLINE_SEGMENTS) * Math.PI * 2;
       const edge = outline[segment]!;
-      const radius = veinRingRadius(edge, inner, toward);
+      const reach = typeof toward === 'function' ? toward(segment) : toward;
+      const radius = veinRingRadius(edge, inner, reach);
       const x = Math.sin(angle) * radius;
       const z = Math.cos(angle) * radius;
       const height = typeof y === 'function' ? y(angle, segment) : y;
@@ -953,10 +983,34 @@ export function buildCrystalSubstrateMesh(
    * найширше кільце, далі укіс до гребеня. Об'єм той самий, габарит —
    * менший.
    */
+  /*
+   * ПІДОШВА КУПИ НЕРІВНА Й ПО КОЛУ, а не тільки по висоті.
+   *
+   * Квантований гребінь зробив верх сходинками, і це допомогло — але
+   * плити все одно розходились променями. Причина не в числах: тіло
+   * обертання дає радіальні грані ЗА ПОБУДОВОЮ, і рівний круглий контур
+   * підошви лишав кожну грань клином від центру.
+   *
+   * Тепер виліт підошви теж квантований і теж по своїй хвилі: одні брили
+   * виступають далі, інші тонуть у сусідах. У плані контур стає рваним, і
+   * грань перестає бути клином на всю висоту.
+   *
+   * Хвилі різні (`geode:skirt` проти `geode:collar`) і числа точок теж —
+   * 7 проти 11, обидва прості. Однакова хвиля дала б брилу, у якої верх і
+   * виліт ростуть разом, тобто конус із зубцями замість купи.
+   */
+  const skirtReach = (segment: number): number => {
+    const angle = (segment / OUTLINE_SEGMENTS) * Math.PI * 2;
+    const wave = smoothRing(artifactSeed, 'geode:skirt', angle, GEODE_SKIRT_POINTS);
+    const stepped = Math.round(wave * GEODE_COLLAR_LEVELS) / GEODE_COLLAR_LEVELS;
+    return GEODE_COLLAR_REACH
+      + (GEODE_SKIRT_REACH - GEODE_COLLAR_REACH) * (1 - GEODE_SKIRT_RAGGED * stepped);
+  };
+
   pushRing(GEODE_COLLAR_REACH * FLOOR_FLARE, -depth);
-  pushRing(GEODE_SKIRT_REACH, () => 0);
+  pushRing(skirtReach, () => 0);
   pushRing(
-    GEODE_COLLAR_REACH + (GEODE_SKIRT_REACH - GEODE_COLLAR_REACH) * 0.45,
+    (segment) => GEODE_COLLAR_REACH + (skirtReach(segment) - GEODE_COLLAR_REACH) * 0.45,
     (_angle, segment) => collarHeights[segment]! * 0.5,
   );
   pushRing(GEODE_COLLAR_REACH, (_angle, segment) => collarHeights[segment]!);
