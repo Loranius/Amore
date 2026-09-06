@@ -927,17 +927,28 @@ function buildSubstrateMaterial(
       // The lip's own height is the yardstick: the fissure runs a couple of
       // those below it, and both scale with the druse.
       auroraDepth: round6(Math.max(1e-4, substrateLip(input) * 2.2)),
-      // The vein wears the same mineral as the crystals it grew, at a much
-      // coarser grain. Two reasons, and they compound: it is massive quartz
-      // rather than a grown face, so its domains are larger to begin with, and
-      // it spans an order of magnitude more of them than any single body does.
-      // The fraction is that small for exactly that reason: at anything near
-      // the crystals' density the pattern repeated some twenty-five times
-      // across the seam, and a cellular map repeated that often on dark stone
-      // stops reading as mineral and reads as snakeskin. Here it comes to a
-      // handful of broad domains, which is what massive quartz looks like.
+      /*
+       * 0.08 → 0.55, І СТАРЕ ЧИСЛО ПЕРЕЖИЛО ГЕОМЕТРІЮ, ЯКУ ОПИСУВАЛО.
+       *
+       * Обґрунтування було правильне для свого часу: «при густині,
+       * близькій до кристалової, візерунок повторювався разів двадцять
+       * п'ять упоперек шва, а комірчаста карта, повторена так часто на
+       * темному камені, читається зміїною шкірою». Але той шов був
+       * широкою жилою в 1.58 раза ширшою за колонію й займав нижню
+       * третину екрана (ADR-0061).
+       *
+       * Сьогоднішня жеода — 0.43 одиниці в радіусі. Виміряно, що з нього
+       * виходило: **0.71 плитки впоперек усього каменю**, тобто менш ніж
+       * одна комірка на всю підкладку. Карта була прикладена й не робила
+       * нічого — камінь малювався рівною плямою, і власник назвав це
+       * тричі поспіль «паркан».
+       *
+       * 0.55 дає близько п'яти плиток упоперек: зерно видно, до
+       * двадцяти п'яти повторень далеко. Число тепер міряється тим
+       * каменем, який є, а не тим, що був.
+       */
       surfaceTextureScale: round6(
-        textureTier(SURFACE_CELLS_PER_UNIT * 0.08, CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality]),
+        textureTier(SURFACE_CELLS_PER_UNIT * 0.55, CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality]),
       ),
       surfaceReliefStrength: round6(
         // Weaker than the crystals', not stronger. The vein is lit almost
