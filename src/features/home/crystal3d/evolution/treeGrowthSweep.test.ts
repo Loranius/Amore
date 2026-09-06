@@ -155,6 +155,39 @@ function buildShot(years: number, profile: keyof typeof PROFILES) {
     leaves: build.leaves.instances.length,
     violations: build.productionAcceptance.violations.length,
     /**
+     * Найдальший ГОЛИЙ КІНЧИК серед гілок, які листя таки несуть, у частках
+     * висоти дерева.
+     *
+     * Гілки без жодного згустка сюди не входять навмисно: гілка, що вся
+     * лежить у чистому стовбурі, не придатна до листя (ADR-0109), і назвати
+     * її голою означало б записати виправлення у ваду. Міряються саме ті, у
+     * яких листя Є, — там голий кінчик це вада розкладки, а не задум.
+     */
+    worstFoliatedTipGap: (() => {
+      const nodes = build.skeleton.nodes;
+      const high = nodes.reduce((most, node) => Math.max(most, node.position.y), Number.NEGATIVE_INFINITY);
+      const low = nodes.reduce((least, node) => Math.min(least, node.position.y), Number.POSITIVE_INFINITY);
+      const span = high - low;
+      if (!(span > 1e-6)) return 0;
+      const foliated = new Set(build.foliage.clusters.map((cluster) => cluster.branchId));
+      const leaves = build.leaves.instances;
+      let worst = 0;
+      for (const node of nodes) {
+        if (!node.terminal || !foliated.has(node.branchId)) continue;
+        let nearest = Number.POSITIVE_INFINITY;
+        for (const leaf of leaves) {
+          const gap = Math.hypot(
+            node.position.x - leaf.position.x,
+            node.position.y - leaf.position.y,
+            node.position.z - leaf.position.z,
+          );
+          if (gap < nearest) nearest = gap;
+        }
+        if (Number.isFinite(nearest)) worst = Math.max(worst, nearest / span);
+      }
+      return worst;
+    })(),
+    /**
      * Частка висоти дерева, до якої дотягується стовбур.
      *
      * Береться зі СКЕЛЕТА, а не з меша: меш містить кору, листя й корені,
@@ -246,6 +279,35 @@ describe('дерево від 0 до 40 років', () => {
        * Сусідній тест `leaves no eligible branch bare` це стеріг, але тільки
        * на фікстурі віком два з половиною роки, де гілок удесятеро менше.
        */
+      it('ЖОДНА ГІЛКА З ЛИСТЯМ НЕ КІНЧАЄТЬСЯ ГОЛОЮ ПАЛИЦЕЮ', () => {
+        /*
+         * ADR-0131. Листя роздавалось гілка за гілкою: гілка з вісьмома
+         * слотами забирала всі вісім раніше, ніж наступна діставала другий.
+         * Поки бюджет листя не кінчався, це нічого не значило — а кінчається
+         * він на всіх зрілих деревах.
+         *
+         * Виміряно: коли бюджет вичерпано, обрізаються рівно 10 згустків, і
+         * всі десять — пагонів лідера; кожен лишався з ОДНИМ жмутком біля
+         * основи, тягнучись на всю півширину крони. Тобто будова, яку
+         * ADR-0112 додав саме щоб наповнити верх крони, першою й голодувала.
+         *
+         * Тепер роздача колова й починається з КІНЧИКА: перший згусток
+         * кожної гілки сідає на її вершечок, і лише потім роздаються
+         * внутрішні. Після цього найгірший голий кінчик серед гілок із
+         * листям: 0.031 / 0.096 / 0.032 / 0.060 на дванадцяти й сорока
+         * роках — тобто ЖОДНОЇ гілки з листям і голим кінцем не лишилось,
+         * усе, що далі 6%, це гілки без листя за задумом.
+         *
+         * Межа 0.10, а не 0.06: на дванадцяти роках лабораторного профілю
+         * виміряно 0.0965, і це гілка, у якої кінчик стирчить з крони
+         * природно. Засувка стереже ПОРЯДОК РОЗДАЧІ, а не цю окрему гілку.
+         */
+        for (const years of AGES) {
+          expect({ years, bare: shoot(years, profile).worstFoliatedTipGap > 0.1 })
+            .toEqual({ years, bare: false });
+        }
+      }, 300_000);
+
       it('ПРОВІДНИК ДОТЯГУЄТЬСЯ ДО ВЕРХУ на кожному віці', () => {
         /*
          * Закон породи, а не наслідок симуляції (ADR-0130). Дерево цього
