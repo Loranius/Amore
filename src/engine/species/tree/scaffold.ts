@@ -325,6 +325,166 @@ function round6(value: number): number {
   return Math.round(value * 1e6) / 1e6;
 }
 
+/*
+ * ЛІДЕР ДОТЯГУЄТЬСЯ ДО ВЕРХУ ДЕРЕВА.
+ *
+ * Це закон породи, а не наслідок симуляції, і підстава та сама, з якої
+ * законом стала висота (ADR-0092: «розмір — закон часу, форма —
+ * симуляція»). Дерево цього виду має ОДИН провідник — на цьому стоять і
+ * ADR-0111, і ADR-0112, — а провідник, який кінчається на п'ятій частині
+ * зросту, це не провідник.
+ *
+ * ВИМІРЯНО, і вада виявилась загальною, а не крайовим випадком порожньої
+ * пари. Частка висоти, до якої дотягувався стовбур:
+ *
+ *   профіль        8р     12р     20р     30р     40р
+ *   порожня      0.556   0.442   0.304   0.229   0.194
+ *   лабораторна  1.000   0.885   0.684   0.552   0.490
+ *   лише фото    1.000   1.000   0.937   0.777   0.564
+ *   активна      0.926   0.869   0.714   0.539   0.717
+ *   середня      1.000   1.000   1.000   0.756   1.000
+ *
+ * Три речі в цих числах, і кожна сама по собі є вадою:
+ *
+ *   1. Стовбур КОРОТШАЄ в абсолюті з роками — у порожньої пари 1.655 на
+ *      восьми роках і 1.003 на сорока, поки саме дерево росте 2.978 →
+ *      5.167. Дерево росте, стовбур меншає.
+ *   2. Наскільки — вирішує АКТИВНІСТЬ. Догма §6 каже прямо: час — валюта,
+ *      активність — добриво; будова дерева не має приходити з активності.
+ *   3. Число стрибає рік у рік (активна: 0.539 на тридцяти, 0.717 на
+ *      сорока), тобто це ще й мутація в сенсі розгортки.
+ *
+ * На екрані сорокарічне дерево пари, що не записала нічого, читалось
+ * ПРУТОМ: голе стебло з двома купками листя. І воно ж пояснює, чому в неї
+ * на 30 і 40 роках зникали пагони лідера: вони чіпляються на 0.72–0.94
+ * зросту, кріплення сідало на 0.194, а огинальна крони починається з
+ * 0.27 — тобто виліт виходив нульовим і всі вісім пагонів відкидались.
+ *
+ * Чому саме ДОРОЩУВАННЯ, а не полагоджена симуляція: симуляція володіє
+ * ФОРМОЮ, і на розрідженому полі бічний пагін законно переростає лідера —
+ * так і буває в дерева, що росте в затінку. Але цей вид — не той вид.
+ * `addTreeScaffoldBranches` уже додає те, чого симуляція не знає (крону,
+ * пагони, бічні прутики); провідник із того ж роду.
+ */
+
+/** Частка висоти, до якої лідер мусить дотягтись. */
+const LEADER_REACH_SHARE = 0.97;
+
+/**
+ * Наскільки лідер випрямляється, доростаючи.
+ *
+ * Нахил останнього сегмента згасає догори: провідник тягнеться до світла,
+ * а не повторює те, як його вигнуло внизу. Виміряний зсув вершини від
+ * основи стовбура на сорока роках, у частках висоти:
+ *
+ *   випрямлення   порожня   лише фото   лабораторна   активна
+ *          0.0     0.041      0.058        0.054       0.018
+ *          0.7     0.024      0.039        0.035       0.016
+ *          1.0     0.017      0.032        0.027       0.017
+ *
+ * Тобто нуль коштує вдвічі більшого зсуву, а різниця між 0.7 і одиницею
+ * мала. Стик при цьому лишається гладким за будь-якого значення: нахил
+ * згасає ПОСТУПОВО (`along` починається з першого кроку), тож зламу в
+ * місці доточування немає й при одиниці.
+ *
+ * Обрано 0.7, і це судження, а не вимір: одиниця робить вершину строго
+ * прямовисною, а живий провідник трохи веде вбік. Числа вище кажуть лише
+ * те, що ціна цього судження — 0.007–0.008 висоти.
+ */
+const LEADER_STRAIGHTEN = 0.7;
+
+/**
+ * Дотягує стовбур до верхівки дерева, якщо симуляція його не довела.
+ *
+ * Викликається ПІСЛЯ масштабування за віком і ПЕРЕД скелетними гілками:
+ * гілки й пагони лідера чіпляються за частками зросту, тож стовбур на той
+ * момент має вже бути повним.
+ *
+ * Висоти дерева не міняє: доточене кінчається на верхівці, яку задав
+ * закон віку, і жодного вузла вище неї не з'являється.
+ */
+export function extendTreeLeaderToTop(skeleton: OrganicSkeletonState): OrganicSkeletonState {
+  const trunk = skeleton.nodes.filter((node) => node.branchId === ORGANIC_TRUNK_BRANCH_ID);
+  if (trunk.length < 2) return skeleton;
+
+  let top = Number.NEGATIVE_INFINITY;
+  let bottom = Number.POSITIVE_INFINITY;
+  for (const node of skeleton.nodes) {
+    if (node.position.y > top) top = node.position.y;
+    if (node.position.y < bottom) bottom = node.position.y;
+  }
+  const height = top - bottom;
+  if (!Number.isFinite(height) || height <= 1e-6) return skeleton;
+
+  const tip = trunk.reduce((highest, node) => (
+    node.position.y > highest.position.y ? node : highest
+  ), trunk[0]!);
+  const target = bottom + height * LEADER_REACH_SHARE;
+  const missing = target - tip.position.y;
+  if (missing <= height * 1e-3) return skeleton;
+
+  /*
+   * Крок береться з САМОГО стовбура, а не з константи: доточена частина
+   * має ту саму щільність вузлів, що й вирощена, інакше на стику
+   * міняється товщина кривої й з'являється шов.
+   */
+  const rises = trunk
+    .map((node) => node.position.y)
+    .sort((left, right) => left - right)
+    .map((value, index, all) => (index === 0 ? 0 : value - all[index - 1]!))
+    .filter((value) => value > 1e-6);
+  const step = rises.length > 0
+    ? rises.reduce((sum, value) => sum + value, 0) / rises.length
+    : height / 20;
+  const count = Math.max(1, Math.round(missing / Math.max(1e-6, step)));
+
+  const lastDirection = tip.direction;
+  const added: OrganicSkeletonNode[] = [];
+  let parentId = tip.id;
+  let sequence = skeleton.nodes.reduce((max, node) => Math.max(max, node.sequence), 0);
+  let position = tip.position;
+  for (let index = 1; index <= count; index += 1) {
+    const along = index / count;
+    // Нахил згасає догори: провідник тягнеться до світла, а не повторює
+    // те, як його вигнуло внизу.
+    const bend = 1 - LEADER_STRAIGHTEN * along;
+    const rise = missing / count;
+    const direction = {
+      x: round6(lastDirection.x * bend),
+      y: round6(Math.max(1e-6, lastDirection.y)),
+      z: round6(lastDirection.z * bend),
+    };
+    const scale = direction.y > 1e-6 ? rise / direction.y : rise;
+    position = {
+      x: round6(position.x + direction.x * scale),
+      y: round6(position.y + rise),
+      z: round6(position.z + direction.z * scale),
+    };
+    sequence += 1;
+    added.push({
+      id: `${ORGANIC_TRUNK_BRANCH_ID}:leader:${index}`,
+      branchId: ORGANIC_TRUNK_BRANCH_ID,
+      parentId,
+      attractorId: null,
+      sequence,
+      generation: tip.generation,
+      position,
+      direction,
+      radius: round6(Math.max(1e-4, tip.radius * (1 - (1 - TIP_SHARE) * along))),
+      terminal: index === count,
+    });
+    parentId = added[added.length - 1]!.id;
+  }
+
+  return {
+    ...skeleton,
+    nodes: [
+      ...skeleton.nodes.map((node) => (node.id === tip.id ? { ...node, terminal: false } : node)),
+      ...added,
+    ],
+  };
+}
+
 /**
  * Скільки скелетних гілок має дерево цього віку.
  *

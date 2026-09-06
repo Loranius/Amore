@@ -33,6 +33,7 @@ import { describe, expect, it } from 'vitest';
 import { buildArtifactFromSnapshot } from '@/engine/evolution/adapters';
 import { applyEvolutionSandboxSources } from '@/features/home/evolutionSandbox';
 import { fitThreeTree, measureThreeTreeReach } from '@/engine/renderer/three';
+import { ORGANIC_TRUNK_BRANCH_ID } from '@/engine/labs/organic';
 import { buildTreeLabPreviewFromArtifact } from '../treeLab/buildTreeLabPreview';
 
 const START = '2022-12-26';
@@ -153,6 +154,22 @@ function buildShot(years: number, profile: keyof typeof PROFILES) {
     baseRadius,
     leaves: build.leaves.instances.length,
     violations: build.productionAcceptance.violations.length,
+    /**
+     * Частка висоти дерева, до якої дотягується стовбур.
+     *
+     * Береться зі СКЕЛЕТА, а не з меша: меш містить кору, листя й корені,
+     * і його межі не кажуть, докуди дійшов провідник.
+     */
+    leaderShare: (() => {
+      const nodes = build.skeleton.nodes;
+      const trunkTop = nodes
+        .filter((node) => node.branchId === ORGANIC_TRUNK_BRANCH_ID)
+        .reduce((most, node) => Math.max(most, node.position.y), Number.NEGATIVE_INFINITY);
+      const high = nodes.reduce((most, node) => Math.max(most, node.position.y), Number.NEGATIVE_INFINITY);
+      const low = nodes.reduce((least, node) => Math.min(least, node.position.y), Number.POSITIVE_INFINITY);
+      const span = high - low;
+      return span > 1e-6 ? (trunkTop - low) / span : 0;
+    })(),
   };
 }
 
@@ -229,6 +246,36 @@ describe('дерево від 0 до 40 років', () => {
        * Сусідній тест `leaves no eligible branch bare` це стеріг, але тільки
        * на фікстурі віком два з половиною роки, де гілок удесятеро менше.
        */
+      it('ПРОВІДНИК ДОТЯГУЄТЬСЯ ДО ВЕРХУ на кожному віці', () => {
+        /*
+         * Закон породи, а не наслідок симуляції (ADR-0130). Дерево цього
+         * виду має один провідник — на цьому стоять ADR-0111 і ADR-0112, —
+         * а провідник, який кінчається на п'ятій частині зросту, це не
+         * провідник.
+         *
+         * Вимір до правки, частка висоти, до якої дотягувався стовбур:
+         *
+         *   профіль        8р     12р     20р     30р     40р
+         *   порожня      0.556   0.442   0.304   0.229   0.194
+         *   лабораторна  1.000   0.885   0.684   0.552   0.490
+         *   лише фото    1.000   1.000   0.937   0.777   0.564
+         *   активна      0.926   0.869   0.714   0.539   0.717
+         *
+         * Три вади в одному числі: стовбур коротшав в АБСОЛЮТІ з роками
+         * (порожня: 1.655 на восьми, 1.003 на сорока, поки дерево росло
+         * 2.978 → 5.167); наскільки — вирішувала АКТИВНІСТЬ, чого догма
+         * §6 не дозволяє; і число стрибало рік у рік, тобто це ще й
+         * мутація.
+         *
+         * Межа 0.95, а не 0.97: закон тягне рівно до 0.97, і поріг
+         * упритул до нього ловив би заокруглення замість вади.
+         */
+        for (const years of AGES) {
+          expect({ years, share: shoot(years, profile).leaderShare >= 0.95 })
+            .toEqual({ years, share: true });
+        }
+      }, 300_000);
+
       it('не лишає жодної гілки без листя на жодному віці', () => {
         for (const years of AGES) {
           const { bareBranches, emptyClusters } = shoot(years, profile);

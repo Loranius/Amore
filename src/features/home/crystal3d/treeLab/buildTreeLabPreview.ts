@@ -87,6 +87,7 @@ import {
 import {
   addTreeScaffoldBranches,
   applyTreeRootFlare,
+  extendTreeLeaderToTop,
   buildTreeSpeciesBlueprint,
   pruneThinTwigsForScaffolds,
   scaleFoliageConfigToAge,
@@ -314,7 +315,13 @@ export function buildTreeLabPreviewFromArtifact({
    */
   const skeleton = applyTreeCrownEnvelope(
     addTreeScaffoldBranches(
-      applyTreeRootFlare(grown.skeleton),
+      /*
+       * Лідер дотягується до верху ПЕРЕД скелетними гілками: і вони, і
+       * пагони лідера чіпляються за частками зросту, тож стовбур на цей
+       * момент має бути повним. Інакше кріплення сідає туди, куди дістала
+       * симуляція, а не туди, куди просить крона.
+       */
+      extendTreeLeaderToTop(applyTreeRootFlare(grown.skeleton)),
       daysTogether,
       artifact.deterministicSeed,
     ),
