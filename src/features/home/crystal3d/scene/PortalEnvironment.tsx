@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { caveRockTexture } from './caveRockTexture';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -98,6 +99,14 @@ export function PortalEnvironment({
    * можна не малювати: стіни без друзи лишаються печерою, друза без стін
    * висить у порожнечі.
    */
+  /*
+   * Одне полотно на весь застосунок — і на обидві теми: воно несе лише
+   * яскравість, а тон дає палітра. `useMemo` без залежностей тримає його
+   * від перебудови; сама функція теж кешує, тож двох полотен не буде й
+   * при двох порталах.
+   */
+  const rockGrain = useMemo(() => caveRockTexture(), []);
+
   const druseClusters = CAVE_DRUSE_CLUSTERS[quality];
   const caveDruse = useMemo(
     () => (druseClusters > 0 ? buildPortalCaveDruseGeometry(seed, druseClusters) : null),
@@ -147,11 +156,23 @@ export function PortalEnvironment({
         те, що робить кристал кристалом. Жодне джерело сцени печери не
         торкається, тож ця різниця лишається такою, як її виміряли.
       */}
+      {/*
+        ЗЕРНО — ЄДИНА КАРТА В ЦІЙ СЦЕНІ, І ВОНА ТІЛЬКИ НА КАМЕНІ.
+        ------------------------------------------------------------
+        `amore-crystal-look` проводить межу прямо: карта на вирощеній
+        грані перебігає через ребро й каже оку, що дві площини — одна
+        поверхня, тому з кристала карти зняли. Битий камінь — випадок
+        протилежний, у нього вирощених граней немає, і зерно є більшою
+        частиною того, що відрізняє камінь від пластику.
+
+        Сіра: карта множить колір, тож кольорова пофарбувала б печеру
+        своїм тоном і стерла палітру теми.
+      */}
       <mesh geometry={caveShell} frustumCulled={false}>
-        <meshBasicMaterial color={palette.caveRock} vertexColors />
+        <meshBasicMaterial color={palette.caveRock} vertexColors map={rockGrain} />
       </mesh>
       <mesh geometry={caveFloor} frustumCulled={false}>
-        <meshBasicMaterial color={palette.caveFloor} vertexColors />
+        <meshBasicMaterial color={palette.caveFloor} vertexColors map={rockGrain} />
       </mesh>
 
       {/* Розлом у склепінні. Він не отвір, а диск: справжня дірка лишила б
@@ -160,20 +181,28 @@ export function PortalEnvironment({
         <meshBasicMaterial color={palette.oculus} toneMapped={false} fog={false} />
       </mesh>
 
-      {/* Друза по стінах — те, що робить печеру КРИСТАЛЬНОЮ. Уночі вона
-          світиться сама й є другим джерелом світла після артефакта; удень
-          не світиться взагалі: при денному промені світний кристал на стіні
-          читається лампою, а не мінералом. */}
+      {/* ДРУЗА НАМАЛЬОВАНА, ЯК І ВЕСЬ КАМІНЬ.
+          ------------------------------------------------------------
+          Тут стояв `meshStandardMaterial` з емісією — тобто друза була
+          ЄДИНИМ освітленим тілом на намальованій стіні, і кадр показував
+          наслідок: кристали яскравіші за камінь навколо, наліплені на
+          нього грудками.
+
+          Так вирішили ще ADR-0121 (спроба 4, «намальовані, як камінь») і
+          ADR-0123 («друза стіни намальована й жодного світла не
+          забирає»), і `portalCave.ts` писав про це у своєму коментарі —
+          але сам матеріал лишився старим. Рішення було записане й не
+          застосоване; тепер застосоване.
+
+          `vertexColors` тут не прикраса: `DRUSE_FACE_SHADES` дає кожній
+          грані свій відтінок (1.34 / 0.58 / 1.16 / 0.72 / 1.26 / 0.64) —
+          рівно ту різницю сусідніх площин, якою `amore-crystal-look`
+          міряє, чи читається кристал кристалом. Без цього прапорця все
+          воно відкидалось, і настінні кристали малювались пласкою
+          бузковою плямою. */}
       {caveDruse !== null && (
         <mesh geometry={caveDruse} frustumCulled={false}>
-          <meshStandardMaterial
-            color={palette.caveDruse}
-            emissive={palette.caveDruse}
-            emissiveIntensity={palette.caveDruseEmissive}
-            roughness={0.32}
-            metalness={0}
-            flatShading
-          />
+          <meshBasicMaterial color={palette.caveDruse} vertexColors />
         </mesh>
       )}
 

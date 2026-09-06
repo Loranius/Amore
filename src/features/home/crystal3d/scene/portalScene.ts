@@ -458,8 +458,8 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     fog: '#9d94a8',
     // Камінь удень видно, але це камінь у печері: сірий із теплим
     // підпалом від променя, а не білий мармур.
-    caveRock: '#8a8090',
-    caveFloor: '#736a7e',
+    caveRock: '#a99cb3',
+    caveFloor: '#8b8098',
     caveDruse: '#c2a9e6',
     // Удень друза не світиться: при денному промені світний кристал на
     // стіні читається лампою, а не мінералом.
@@ -506,8 +506,8 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
      * гаситься туманом, який на дальній стіні дає близько третини. Три
      * множники поспіль — і темний камінь стає нулем.
      */
-    caveRock: '#4b3f6b',
-    caveFloor: '#382f52',
+    caveRock: '#6b5b99',
+    caveFloor: '#56487e',
     caveDruse: '#a670e8',
     /*
      * 1.4 → 0.55. Друза світилась як ЛАМПА: при такій емісії кристал на

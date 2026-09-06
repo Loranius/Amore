@@ -179,6 +179,7 @@ function ringNoise(seed: number, label: string, angle: number, points: number): 
 interface Soup {
   readonly positions: number[];
   readonly colors: number[];
+  readonly uvs: number[];
   /**
    * `shade` — одне число на весь трикутник або три, по одному на кут.
    *
@@ -191,19 +192,37 @@ interface Soup {
     b: readonly [number, number, number],
     c: readonly [number, number, number],
     shade?: number | readonly [number, number, number],
+    uv?: readonly [readonly [number, number], readonly [number, number], readonly [number, number]],
   ): void;
 }
 
 function soup(): Soup {
   const positions: number[] = [];
   const colors: number[] = [];
+  const uvs: number[] = [];
   return {
     positions,
     colors,
-    push(a, b, c, shade = 1) {
+    uvs,
+    push(a, b, c, shade = 1, uv) {
       positions.push(...a, ...b, ...c);
       const corners = typeof shade === 'number' ? [shade, shade, shade] : shade;
       for (const value of corners) colors.push(value, value, value);
+      /*
+       * КООРДИНАТИ КЛАДЕ БУДІВНИК, А НЕ `finish`.
+       *
+       * Вивести їх із позиції вершини — спокуса, і вона ламається рівно в
+       * одному місці: `atan2` вертає кут у смузі (−π, π], тож трикутник,
+       * що лежить на стику розгортки, дістав би на одному кінці 0.999, а
+       * на другому 0.001 — і плитка розтяглась би через усю ланку однією
+       * вертикальною смугою. Будівник знає НОМЕР сегмента, а номер
+       * продовжується за 39 у 40 без стрибка.
+       */
+      if (uv === undefined) {
+        for (let corner = 0; corner < 3; corner += 1) uvs.push(0, 0);
+        return;
+      }
+      for (const [u, v] of uv) uvs.push(u, v);
     },
   };
 }
@@ -212,6 +231,7 @@ function finish(mesh: Soup): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(mesh.positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(mesh.colors, 3));
+  geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs, 2));
   // Нормалі рахуються ПІСЛЯ супу, тож кожна грань дістає власну.
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
@@ -246,8 +266,35 @@ function finish(mesh: Soup): THREE.BufferGeometry {
  * Жодне джерело сцени печери не торкається (`meshBasicMaterial`), тож
  * різниця граней кристала лишається такою, якою її виміряли.
  */
-const CAVE_FACET_SHADE_MIN = 0.78;
-const CAVE_FACET_SHADE_SPAN = 0.44;
+/*
+ * РОЗКИД ГРАНЕЙ РОЗШИРЕНО ВНИЗ, а не вгору.
+ *
+ * Було 0.78–1.22, і виміряний кадр показав, у що це виливається: уся
+ * стіна вкладалась у 39–61 з 255, тобто дев'ять відсотків шкали. Грані
+ * там були, але різниця між ними — двадцять рівнів, і на такому тлі це
+ * читається одним аркушем.
+ *
+ * Піднімати світлий кінець не можна: стіна почала б змагатися з
+ * кристалом, а вся печера темна саме для того, щоб він читався. Тому
+ * розширено ТЕМНИЙ кінець — 0.58–1.22. Середнє падає, розкид росте
+ * удвічі, кристал лишається найяскравішим у кадрі.
+ */
+const CAVE_FACET_SHADE_MIN = 0.58;
+const CAVE_FACET_SHADE_SPAN = 0.64;
+
+/**
+ * Скільки плиток зерна лягає навколо зали й на одиницю висоти.
+ *
+ * Навколо — ціле число, і це не охайність: розгортка замикається на
+ * повному оберті, тож дробове число дало б на стику пів плитки й
+ * вертикальний шов.
+ */
+const CAVE_TEXTURE_TILES_AROUND = 6;
+/** Одиниць світу на плитку по висоті й по підлозі. */
+const CAVE_TEXTURE_UNITS = 2.6;
+
+/** Основа яскравості грані ПІДЛОГИ — своя, див. `floorShade`. */
+const CAVE_FLOOR_FACET_MIN = 0.82;
 
 /** Радіус стіни в напрямку `angle` на частці висоти `share`. */
 function wallRadiusAt(seed: number, angle: number, share: number): number {
@@ -320,34 +367,64 @@ export function buildPortalCaveFloorGeometry(seed: number): THREE.BufferGeometry
      * самий розкид на віялі від центру дав промені, що розходяться від
      * артефакта.
      */
-    const facet = CAVE_FACET_SHADE_MIN
+    /*
+     * Підлога має ВЛАСНУ основу грані, а не занижену стінну.
+     *
+     * Спершу вона брала `CAVE_FACET_SHADE_MIN`, і коли той опустився
+     * заради розкиду на стіні, підлога просто потемніла: розкид у неї
+     * навмисно втричі менший (див. нижче), тож від нижчої основи вона
+     * дістала збиток без прибутку.
+     */
+    const facet = CAVE_FLOOR_FACET_MIN
       + CAVE_FACET_SHADE_SPAN * 0.34 * seededUnit(seed, `cave:floor:${segment}:${ring}`);
-    return (0.42 + 0.58 * near ** 1.6) * facet;
+    /*
+     * 0.42 → 0.66 у дальньому кінці, і причина виміряна. Дальня підлога
+     * малювалась у 18–28 з 255: там не було ні граней, ні каменю —
+     * чорнота, на якій кристал стояв ні на чому. Розкид граней там БУВ,
+     * але дев'ять відсотків від 18 це півтора рівня.
+     *
+     * Ближній кінець не піднятий: під кристалом і так світло. Піднято
+     * саме ДАЛЬНІЙ, тобто зменшено падіння, а не додано яскравості.
+     */
+    return (0.66 + 0.34 * near ** 1.6) * facet;
   };
+
+  /** Розгортка підлоги — площинна з `xz`: вона й лежить у цій площині. */
+  const floorUv = (point: readonly [number, number, number]): readonly [number, number] => [
+    point[0] / CAVE_TEXTURE_UNITS,
+    point[2] / CAVE_TEXTURE_UNITS,
+  ];
 
   const centre: [number, number, number] = [0, PORTAL_GROUND_Y, 0];
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
     const first = CAVE_FLOOR_RINGS[0]!;
+    const centreA = floorPoint(next, first);
+    const centreB = floorPoint(segment, first);
     mesh.push(
-      centre, floorPoint(next, first), floorPoint(segment, first),
+      centre, centreA, centreB,
       floorShade(segment, first * 0.5, 0),
+      [floorUv(centre), floorUv(centreA), floorUv(centreB)],
     );
     for (let ring = 0; ring < CAVE_FLOOR_RINGS.length - 1; ring += 1) {
       const inner = CAVE_FLOOR_RINGS[ring]!;
       const outer = CAVE_FLOOR_RINGS[ring + 1]!;
       const shade = floorShade(segment, (inner + outer) * 0.5, ring + 1);
-      mesh.push(
-        floorPoint(segment, inner), floorPoint(next, inner), floorPoint(next, outer), shade,
-      );
-      mesh.push(
-        floorPoint(segment, inner), floorPoint(next, outer), floorPoint(segment, outer), shade,
-      );
+      const si = floorPoint(segment, inner);
+      const ni = floorPoint(next, inner);
+      const no = floorPoint(next, outer);
+      const so = floorPoint(segment, outer);
+      mesh.push(si, ni, no, shade, [floorUv(si), floorUv(ni), floorUv(no)]);
+      mesh.push(si, no, so, shade, [floorUv(si), floorUv(no), floorUv(so)]);
     }
     const last = CAVE_FLOOR_RINGS[CAVE_FLOOR_RINGS.length - 1]!;
     const edge = floorShade(segment, (last + 1) * 0.5, CAVE_FLOOR_RINGS.length);
-    mesh.push(floorPoint(segment, last), floorPoint(next, last), floorPoint(next, 1), edge);
-    mesh.push(floorPoint(segment, last), floorPoint(next, 1), floorPoint(segment, 1), edge);
+    const sl = floorPoint(segment, last);
+    const nl = floorPoint(next, last);
+    const ne = floorPoint(next, 1);
+    const se = floorPoint(segment, 1);
+    mesh.push(sl, nl, ne, edge, [floorUv(sl), floorUv(nl), floorUv(ne)]);
+    mesh.push(sl, ne, se, edge, [floorUv(sl), floorUv(ne), floorUv(se)]);
   }
   return finish(mesh);
 }
@@ -368,9 +445,35 @@ export function buildPortalCaveShellGeometry(seed: number): THREE.BufferGeometry
   const wallPoint = (segment: number, share: number): [number, number, number] => {
     const angle = angleOf(segment);
     const radius = wallRadiusAt(seed, angle, share);
+    /*
+     * НИЖНЄ КІЛЬЦЕ СТІНИ СІДАЄ НА РЕЛЬЄФ ПІДЛОГИ, а не на рівний нуль.
+     *
+     * Було `PORTAL_GROUND_Y` для всіх сегментів — тобто стіна стояла на
+     * ідеальній площині, а підлога під нею горбилась на ±2% радіуса
+     * зали. Там, де рельєф падав, між ними відкривалась щілина, і крізь
+     * неї видно було фон: на знімку це читалось чорною смугою вздовж
+     * підніжжя стіни, а настінні кристали над нею — висячими.
+     *
+     * Обидва краї беруть одну функцію на однакових кутах і радіусах, тож
+     * тепер вони збігаються точка в точку, а не приблизно.
+     */
+    /*
+     * Рельєф ЗГАСАЄ ДОГОРИ, і це не косметика — це вимога стику вгорі.
+     *
+     * Перша редакція цієї правки додавала рельєф на всю висоту, і тест
+     * `зала тримає оголошений радіус і висоту` впіймав наслідок одразу:
+     * склепіння піднялось разом із підніжжям (3.6965 при оголошених
+     * 3.685). Диск розлому будується рівно на `PORTAL_GROUND_Y +
+     * CAVE_CEILING_HEIGHT`, тож нерівне склепіння відкрило б щілину саме
+     * там, де ми щойно закрили нижню.
+     *
+     * Отже рельєф повний біля підлоги й нульовий біля розлому: низ
+     * сідає на камінь, верх лишається площиною.
+     */
+    const relief = (floorHeightAt(seed, angle, radius) - PORTAL_GROUND_Y) * (1 - share);
     return [
       Math.cos(angle) * radius,
-      PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT * share,
+      PORTAL_GROUND_Y + relief + CAVE_CEILING_HEIGHT * share,
       Math.sin(angle) * radius,
     ];
   };
@@ -403,8 +506,18 @@ export function buildPortalCaveShellGeometry(seed: number): THREE.BufferGeometry
        * випадково — її віяло намотане в інший бік, — тож вада виглядала
        * як «камінь замалий», а не як «стіни немає».
        */
-      mesh.push(a, b, c, lift * one);
-      mesh.push(a, c, d, lift * two);
+      /*
+       * `segment + 1`, а не `next`: на стику розгортки номер має
+       * продовжуватись у 40, інакше плитка розтягнеться назад через усю
+       * ланку. Плиток навколо ціле число, тож 40 і 0 дають однакову
+       * точку текстури.
+       */
+      const uLow = (segment / segments) * CAVE_TEXTURE_TILES_AROUND;
+      const uHigh = ((segment + 1) / segments) * CAVE_TEXTURE_TILES_AROUND;
+      const vLow = (PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT * low) / CAVE_TEXTURE_UNITS;
+      const vHigh = (PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT * high) / CAVE_TEXTURE_UNITS;
+      mesh.push(a, b, c, lift * one, [[uLow, vLow], [uHigh, vLow], [uHigh, vHigh]]);
+      mesh.push(a, c, d, lift * two, [[uLow, vLow], [uHigh, vHigh], [uLow, vHigh]]);
     }
   }
 
@@ -520,7 +633,13 @@ export function buildPortalCaveDruseGeometry(
     const wallRadius = wallRadiusAt(seed, angle, share);
     const baseX = Math.cos(angle) * wallRadius;
     const baseZ = Math.sin(angle) * wallRadius;
-    const baseY = PORTAL_GROUND_Y + CAVE_CEILING_HEIGHT * share;
+    /*
+     * Основа береться від РЕЛЬЄФУ підлоги на тому самому куті, як і
+     * підніжжя стіни. Раніше стояв рівний `PORTAL_GROUND_Y`, і поки
+     * стіна теж стояла на ньому, це збігалось; відколи обидві сідають на
+     * рельєф, друза лишилась би висіти над ним на ±0.12 одиниці.
+     */
+    const baseY = floorHeightAt(seed, angle, wallRadius) + CAVE_CEILING_HEIGHT * share;
 
     const solitary = cluster % DRUSE_SOLITARY_EVERY === 0;
     const count = solitary
