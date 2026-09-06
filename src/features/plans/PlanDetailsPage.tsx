@@ -13,7 +13,15 @@
 // клікабельний, і кожен веде в те саме, що було в його згортці.
 //
 // Нитки — не декор: від назви ростуть дві гілки, ліва про підготовку (дата →
-// кроки → пов'язане), права про забезпечення (бюджет → місця → стан).
+// кроки), права про забезпечення (бюджет → пов'язане), і обидві сходяться на
+// стані плану. Сходяться навмисно: стан — це те, чим обидві гілки разом
+// кінчаються, а не третій пункт правої.
+//
+// БЛОКІВ БУЛО СІМ, СТАЛО ШІСТЬ (ADR-0133). «Місця» й «Пов'язане» були одним
+// блоком, розділеним надвоє: обидва відкривали ТОЙ САМИЙ аркуш, а
+// «Пов'язане» вже містило рядок «Місця N» — те саме число, що показував
+// сусідній блок. Карта витрачала на одну річ два з семи блоків при запасі
+// висоти 12 px із 739.
 // ============================================================
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
@@ -43,6 +51,7 @@ import {
   daysUntilStart,
   hasPreciseDate,
   isClosed,
+  nextActiveStatus,
   planDateLabel,
   readiness,
 } from './planModel';
@@ -79,8 +88,8 @@ const CLOSED_STATUSES = PLAN_STATUS_ORDER.filter((key) => PLAN_STATUSES[key].clo
  */
 const PLAN_THREADS: readonly ThreadPair[] = [
   ['hero', 'when'], ['hero', 'money'],
-  ['when', 'tasks'], ['money', 'place'],
-  ['tasks', 'links'], ['place', 'status'],
+  ['when', 'tasks'], ['money', 'links'],
+  ['tasks', 'status'], ['links', 'status'],
 ];
 
 const STATUS_HELP: Record<PlanStatus, string> = {
@@ -157,6 +166,7 @@ export function PlanDetailsPage() {
   const visible = capped(orderedTasks, VISIBLE_TASKS);
 
   const statusStep = ACTIVE_STATUSES.indexOf(plan.status);
+  const next = nextActiveStatus(plan.status);
 
   const remove = async () => {
     if (await confirmDialog(`Видалити план «${plan.title}» разом із завданнями?`)) {
@@ -262,7 +272,11 @@ export function PlanDetailsPage() {
           </MapBlock>
         </div>
 
-        <div className="pmap-row" style={{ '--pmap-split': '1.18fr 0.82fr', '--pmap-drop': '12px' } as CSSProperties}>
+        {/* Підготовка займає ряд ЦІЛКОМ. Це та частина карти, з якою
+            справді працюють — крок перемикається просто тут, — і вона ж
+            єдина, чий вміст обрізається стелею. Сусід, який ділив із нею
+            ряд, був другим входом у той самий аркуш. */}
+        <div className="pmap-row" style={{ '--pmap-split': '1fr', '--pmap-drop': '12px' } as CSSProperties}>
           {done ? (
             <MapBlock
               id="tasks"
@@ -322,32 +336,6 @@ export function PlanDetailsPage() {
               </button>
             </article>
           )}
-
-          <MapBlock
-            id="place"
-            title="Місця"
-            icon={<MapPinIcon size={18} />}
-            drift="-3.5s"
-            onOpen={() => setSheet('links')}
-            label="Відкрити місця плану"
-          >
-            {plan.location_name ? (
-              <>
-                <span className="pmap-value" style={{ fontSize: 14 }}>{plan.location_name}</span>
-                {placeCount > 0 && <span className="pmap-note">і ще {placeCount} з карти</span>}
-              </>
-            ) : placeCount > 0 ? (
-              <>
-                <span className="pmap-value">{placeCount}</span>
-                <span className="pmap-note">точок із вашої карти</span>
-              </>
-            ) : (
-              <span className="pmap-ghost pmap-ghost--box">
-                <MapPinIcon size={20} />
-                Додати місце
-              </span>
-            )}
-          </MapBlock>
         </div>
 
         <div className="pmap-row" style={{ '--pmap-split': '0.96fr 1.04fr', '--pmap-drop': '-8px' } as CSSProperties}>
@@ -358,8 +346,19 @@ export function PlanDetailsPage() {
             drift="-0.7s"
             count={planLinks.length > 0 ? String(planLinks.length) : undefined}
             onOpen={() => setSheet('links')}
-            label="Відкрити пов’язане"
+            label="Відкрити місця й пов’язане"
           >
+            {/*
+              * НАЗВА МІСЦЯ СТОЇТЬ ПЕРШОЮ, і доти її тут не було взагалі.
+              *
+              * Вона жила в окремому блоці «Місця», який відкривав цей самий
+              * аркуш; у цьому блоці був лише РАХУНОК місць. Тобто карта
+              * тримала два блоки, і найконкретніший факт плану — куди саме
+              * ви йдете — стояв у тому, який менше нічого більше не робив.
+              */}
+            {plan.location_name && (
+              <span className="pmap-value pmap-place">{plan.location_name}</span>
+            )}
             <div className="pmap-list">
               <span className="pmap-line">
                 <GiftIcon size={14} /> <span>Бажання</span> <em>{wishCount || '—'}</em>
@@ -387,10 +386,20 @@ export function PlanDetailsPage() {
                 <span key={key} data-on={!closed && index <= statusStep} />
               ))}
             </span>
+            {/*
+              * РЯДОК КАЗАВ ТЕ САМЕ, ЩО КРАПКИ НАД НИМ.
+              *
+              * Було «N з M до готовності» — тобто третій спосіб сказати
+              * один стан після підпису й після крапок-кроків. Тепер він
+              * називає НАСТУПНИЙ стан: це те, чого з крапок не видно, і
+              * рівно те, по що сюди тапають.
+              */}
             <span className="pmap-note">
               {closed
                 ? STATUS_HELP[plan.status]
-                : `${statusStep + 1} з ${ACTIVE_STATUSES.length} до готовності`}
+                : next === null
+                  ? STATUS_HELP[plan.status]
+                  : `далі: ${PLAN_STATUSES[next].label}`}
             </span>
           </MapBlock>
         </div>

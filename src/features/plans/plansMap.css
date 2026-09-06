@@ -383,6 +383,16 @@
   color: var(--world-danger, #e2707f);
 }
 
+/* Назва місця в блоці «Пов'язане». Один рядок і крапки: карта не має куди
+   рости, а довга назва кафе інакше зайняла б два рядки з трьох. */
+.plan-map .pmap-place {
+  font-size: 14px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .plan-map .pmap-list {
   display: flex;
   flex-direction: column;

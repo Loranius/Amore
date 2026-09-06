@@ -8,8 +8,8 @@
 // ============================================================
 import { localDateFromISO } from '@/lib/utils';
 import { MONTHS_UA_GENITIVE } from '@/features/_shared/month';
-import { PLAN_STATUSES } from './planConstants';
-import type { PlanRow, PlanTaskRow } from '@/types';
+import { PLAN_STATUSES, PLAN_STATUS_ORDER } from './planConstants';
+import type { PlanRow, PlanStatus, PlanTaskRow } from '@/types';
 
 /** Чи план уже не в роботі (виконаний, відкладений або скасований). */
 export function isClosed(plan: PlanRow): boolean {
@@ -139,6 +139,23 @@ function seasonOf(month: number): string {
  * читається шістьма різними способами — і саме це робить неточні дати
  * сортовними нарівні з точними.
  */
+/**
+ * Наступний робочий стан плану, або null у кінці шляху.
+ *
+ * Тут, а не в сторінці, бо це правило порядку станів, а не показу — і
+ * тому його можна перевірити без React.
+ *
+ * Закриті стани (виконано, скасовано) наступного не мають: вони не
+ * «далі» по шляху, а вихід із нього.
+ */
+export function nextActiveStatus(status: PlanStatus): PlanStatus | null {
+  if (PLAN_STATUSES[status].closed) return null;
+  const active = PLAN_STATUS_ORDER.filter((key) => !PLAN_STATUSES[key].closed);
+  const index = active.indexOf(status);
+  if (index < 0 || index + 1 >= active.length) return null;
+  return active[index + 1]!;
+}
+
 export function planDateLabel(plan: PlanRow): string | null {
   if (!plan.start_date) return null;
   const d = localDateFromISO(plan.start_date);
