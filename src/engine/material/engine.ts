@@ -205,7 +205,34 @@ function acrossBand(band: { readonly min: number; readonly max: number }, t: num
  * factor, so the colour the couple earned (ADR-0004) is the colour that shows.
  * Only its value moves.
  */
-const SHELL_ALBEDO_LUMA = 0.46;
+/**
+ * Наскільки притлумлене світло ВСЕРЕДИНІ каменю проти того, яким воно
+ * було до фото-еталона.
+ *
+ * ЦЕ ЗНАЙШОВ ВИМІР, І ЦЕ НЕ ТЕ, ЩО ЧІПАЮТЬ ПЕРШИМ. Власник надіслав знімок
+ * аметистової друзи: «більш оптичним». Перевірено по одному — альбедо,
+ * денне світло, ключ, небо, дзеркало, свічення: кожен окремо рухає
+ * медіану яскравості тіла на 0.01–0.04, тобто ні на що. Тіло фарбує
+ * `coreStrength`: з ним 0.77, без нього 0.56, і насиченість росте разом
+ * із тим, як він гасне.
+ *
+ * Він же й перевертає світло вздовж тіла. У знімку вістря на 0.43
+ * СВІТЛІШЕ за підніжжя; у нас було навпаки, бо ядро сидить унизу, біля
+ * жеоди, і світиться саме підніжжя.
+ *
+ * Не нуль: це світло ЗАРОБЛЕНЕ (ADR-0007) — його стільки, скільки пара
+ * подарувала одне одному, і забрати його зовсім означало б стерти
+ * значення. Множник лишає пропорцію недоторканою.
+ */
+/** Наскільки внутрішнє світло збирається до вістря. Підібрано виміром. */
+const TIP_GATHER = 0.8;
+
+const CORE_OPTICAL_SCALE = 0.35;
+
+/** Яскравість породи часткою яскравості оболонки. Середина смуги 0.4–0.7. */
+const GEODE_VALUE_SHARE = 0.55;
+
+const SHELL_ALBEDO_LUMA = 0.3;
 
 function capShellValue(color: CrystalRgb): CrystalRgb {
   const luma = 0.2126 * color.r + 0.7152 * color.g + 0.0722 * color.b;
@@ -409,7 +436,7 @@ function shaderRecipe(
       ? 0
       : (0.1 + pressures.luminosity * 0.16 + state.luminosity * 0.08)
         * (emphasized ? 1.35 : focal ? 1 : 0.72)
-        * (1 + wishDepth(tint) * CORE_WISH_GAIN)),
+        * (1 + wishDepth(tint) * CORE_WISH_GAIN) * CORE_OPTICAL_SCALE),
     coreColor: coreTintColor(emissiveColor, tint),
     // A refined, unfractured couple's crystal is nearer glass; a clouded one is
     // nearer stone. Kept off the smallest bodies, where the effect is a few
@@ -466,6 +493,13 @@ function shaderRecipe(
     // Pass 6 ablation measured this term at 0.50 of 255 on average, so what it
     // was contributing was almost entirely the split.
     axialTintStrength: 0,
+    /*
+     * Світло збирається до вістря — те, чим оптичний кристал
+     * відрізняється від фарбованого (див. `tipGather` у типах).
+     * Найдрібніші тіла без нього: у кристалика на кілька пікселів
+     * градієнт уздовж осі — це один піксель.
+     */
+    tipGather: round6(micro ? 0 : TIP_GATHER),
     footColor: coreTintColor(emissiveColor, tint),
     // The monarch only. `focal` is the composition role exactly one body ever
     // holds (`roleFor`: the king tier and nothing else), so this is the same
@@ -799,8 +833,6 @@ function buildSubstrateMaterial(
   // Tinted toward the couple's own palette so the vein never looks imported
   // from a different artifact — but only just, because milky quartz that takes
   // a strong hue stops being quartz.
-  const tint = materialPalette.secondary;
-  const grey = (tint.r + tint.g + tint.b) / 3;
   const aurora = auroraColors(input);
   // Linear values, and the whole design of this material is in them. The dais
   // slab sits near 0.10–0.14 linear; this is a little over twice that — enough
@@ -810,7 +842,11 @@ function buildSubstrateMaterial(
   // and at under twice it stopped being distinguishable from a shadow.
   /** Наскільки підкладка знебарвлена проти кристала. Див. нижче. */
   const GEODE_DESATURATION = 0.86;
-  const rootValue = 0.2553 + grey * 0.066;
+  /*
+   * Абсолютна ціль 0.2553 + grey·0.066 стояла тут і пішла разом із тим,
+   * як оболонка перестала бути сталою: тепер яскравість породи — частка
+   * оболонки (`GEODE_VALUE_SHARE`), див. нижче.
+   */
   // **The crystals' own colour, at a fraction of their value.** The brief's §4
   // asks for a root that is darker in the same hue, and the three constants
   // this replaces — 0.245 / 0.238 / 0.283 — were a lavender grey with blue
@@ -825,7 +861,6 @@ function buildSubstrateMaterial(
   // produced, so the brightness relationship with the dais that the paragraph
   // above measured survives untouched and the single thing that changes is hue.
   const shell = bodyColor(materialPalette, 'focal', colonyTintOf(input));
-  const shellValue = (shell.r + shell.g + shell.b) / 3;
   /*
    * КАМІНЬ, А НЕ КРИСТАЛ ТЕМНІШЕ — і це рішення власника, а не вимір.
    *
@@ -850,7 +885,23 @@ function buildSubstrateMaterial(
     g: shell.g + (shellGrey - shell.g) * GEODE_DESATURATION,
     b: shell.b + (shellGrey - shell.b) * GEODE_DESATURATION,
   };
-  const baseColor = scaleRgb(stone, rootValue / Math.max(1e-6, shellValue));
+  /*
+   * ЯСКРАВІСТЬ ПОРОДИ — ЧАСТКА ОБОЛОНКИ, А НЕ ВЛАСНЕ ЧИСЛО.
+   *
+   * `rootValue` вище — абсолютна ціль, виведена зі старих сталих. Поки
+   * оболонка стояла на місці, різниці не було; щойно камінь кристала
+   * потемнів під фото-еталон (`SHELL_ALBEDO_LUMA`), порода лишилась на
+   * місці й стала відносно СВІТЛІШОЮ за нього — тобто «камінь темніший за
+   * кристал» перестало виконуватись, і власний тест це впіймав.
+   *
+   * Це та сама вада, від якої тікав абзац вище, лише в іншому вимірі: там
+   * розійшовся ВІДТІНОК, тут розійшлась ЯСКРАВІСТЬ. Тепер похідні обидва,
+   * і смуга 0.4–0.7 тримається за побудовою, хай куди рушить оболонка.
+   *
+   * Частка 0.55 — середина тієї смуги, а не нове число зі стелі: обидва її
+   * краї виміряні невдачами (втричі — біла пляма, менш ніж удвічі — тінь).
+   */
+  const baseColor = scaleRgb(stone, GEODE_VALUE_SHARE);
   const bodyWithoutSignature: Omit<CrystalBodyMaterial, 'signature'> = {
     materialVersion: 1,
     bodyId: CRYSTAL_SUBSTRATE_BODY_ID,
@@ -904,6 +955,7 @@ function buildSubstrateMaterial(
       // dark at the silhouette — the opposite of a uniform emissive, and an
       // order of magnitude below what any crystal carries.
       coreStrength: 0.02,
+      tipGather: 0,
       coreColor: rgb(round6(0.46), round6(0.44), round6(0.55)),
       // The vein is not glass. It is opaque quartz sitting in stone, and an
       // edge that lit up would make the seam read as a pane set into the floor.

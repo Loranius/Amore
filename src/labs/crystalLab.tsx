@@ -206,7 +206,15 @@ function CrystalLab() {
       enabled: true,
       values: valuesFrom(params, years),
       asOf: AS_OF,
-      relationshipStartedAt: '2015-06-10',
+      /*
+       * ДАТА ПАРИ, А НЕ ВИГАДАНА. Тут стояло 2015-06-10, і це була ще одна
+       * тиха брехня оснастки: колір кристала береться з дати початку
+       * стосунків, тож лабораторія показувала кристал НЕ ТІЄЇ пари —
+       * трояндовий 340° замість фіолетового 312°. Вік задає `years`
+       * (через `relationshipDays`), а не ця дата, тож підміняти її не було
+       * ані потреби, ані права.
+       */
+      relationshipStartedAt: '2022-12-26',
       snapshot: {
         calendarEvents: [], plans: [], wishlistItems: [],
         mapPlaces: [], memories: [], memoryLinks: [], media: [],

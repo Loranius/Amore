@@ -38,6 +38,7 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.axialTintStrength.toFixed(6),
     rgbKey(recipe.footColor),
     recipe.innerFlowStrength.toFixed(6),
+    recipe.tipGather.toFixed(6),
     recipe.innerFlowTurns.toFixed(6),
     rgbKey(recipe.innerFlowColor),
     rgbKey(recipe.innerFlowSecondColor),
@@ -114,6 +115,7 @@ uniform float uEvolutionFacetEdgeWidth;
 uniform float uEvolutionAxialTintStrength;
 uniform vec3 uEvolutionFootColor;
 uniform float uEvolutionInnerFlowStrength;
+uniform float uEvolutionTipGather;
 uniform float uEvolutionInnerFlowTurns;
 uniform float uEvolutionInnerFlowPhase;
 uniform vec3 uEvolutionInnerFlowColor;
@@ -408,9 +410,17 @@ const FRAGMENT_BODY = /* glsl */ `
     + evolutionInclusion
     + ( evolutionCloud - 0.5 ) * uEvolutionVeilStrength * 0.9;
 
+  // Світло збирається до вістря: в кристалі воно йде вздовж осі й виходить
+  // головкою, тому підніжжя темніше за неї. Множник стоїть на ВНУТРІШНЬОМУ
+  // світлі, а не на всьому вихідному — інакше він забирає й різницю між
+  // сусідніми гранями (виміряно: читаність граней 45% → нижче 30%).
+  float evolutionTip = 1.0
+    + uEvolutionTipGather * ( clamp( vEvolutionAxial, 0.0, 1.0 ) * 2.0 - 1.0 );
+
   outgoingLight += uEvolutionCoreColor
     * uEvolutionCoreStrength
     * evolutionInner
+    * max( 0.0, evolutionTip )
     * max( 0.0, evolutionZoning );
 
   // ── Energy turning inside the monarch ─────────────────────
@@ -524,6 +534,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     && recipe.facetEdgeStrength <= 0
     && recipe.axialTintStrength <= 0
     && recipe.innerFlowStrength <= 0
+    && recipe.tipGather <= 0
   ) return;
 
   material.onBeforeCompile = (shader) => {
@@ -551,6 +562,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionAxialTintStrength'] = { value: recipe.axialTintStrength };
     shader.uniforms['uEvolutionFootColor'] = { value: toColor(recipe.footColor) };
     shader.uniforms['uEvolutionInnerFlowStrength'] = { value: recipe.innerFlowStrength };
+    shader.uniforms['uEvolutionTipGather'] = { value: recipe.tipGather };
     shader.uniforms['uEvolutionInnerFlowTurns'] = { value: recipe.innerFlowTurns };
     shader.uniforms['uEvolutionInnerFlowPhase'] = { value: 0 };
     shader.uniforms['uEvolutionInnerFlowColor'] = { value: toColor(recipe.innerFlowColor) };
