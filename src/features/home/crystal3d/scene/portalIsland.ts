@@ -118,6 +118,36 @@ const ISLAND_FLAT = 0.44;
 /** Розмах рельєфу верху, у частках радіуса. */
 const ISLAND_RELIEF = 0.055;
 
+/**
+ * ДРУГИЙ, ДРІБНИЙ ОКТАВ РЕЛЬЄФУ — і без нього плато було горбом.
+ *
+ * Виміряно проти еталона з Blender, у якому камінь ламали зміщенням і
+ * пласким спрощенням (ADR-0147). Мірка — двогранний кут між сусідніми
+ * гранями, узятий лише на гранях, ПОВЕРНУТИХ УГОРУ, тобто на тій
+ * поверхні, на яку пара й дивиться згори:
+ *
+ *   еталон  медіана 13.7°, середнє 19.9°
+ *   плато   медіана  5.5°, середнє 11.9°
+ *
+ * Тобто наша поверхня була вдвічі з половиною гладшою за биту породу.
+ * Один великий октав дає пагорби, а не злам: між сусідніми вершинами
+ * висота майже не міняється, і кожна грань виходить майже в площині
+ * сусідньої. Другий октав із частотою всемеро вищою і є те, що ламає.
+ */
+const ISLAND_GRIT = 0.04;
+
+/**
+ * Розбіг вершин ПО РАДІУСУ, у частках щілини до найближчого сусіднього
+ * кільця.
+ *
+ * Друга половина тієї ж вади, і міряє її розкид площ граней: 0.52 в нас
+ * проти 1.08 в еталона. Причина суто в будові — кільцева сітка дає
+ * трикутники однакового розміру в межах кільця, а однаковий розмір
+ * читається токарним верстатом, хай яким рваним буде рельєф по висоті.
+ * Зсув кожної вершини вздовж її ж радіуса ламає саму ґратку.
+ */
+const ISLAND_LATTICE = 0.62;
+
 /** Скільки контрольних точок у кільцевому шумі. Просте число — навмисно. */
 const ISLAND_NOISE_POINTS = 19;
 
@@ -393,9 +423,12 @@ function islandRadiusAt(seed: number, angle: number): number {
 export function portalIslandHeightAt(seed: number, angle: number, share: number): number {
   const relief = (ringNoise(seed, 'island:relief', angle * 1.7 + share * 4.1, ISLAND_NOISE_POINTS) - 0.5)
     * 2 * ISLAND_RELIEF * PORTAL_ISLAND_RADIUS;
+  // Дрібний октав — усемеро частіший. Саме він дає злам замість пагорбів.
+  const grit = (ringNoise(seed, 'island:grit', angle * 11.9 + share * 27.3, ISLAND_NOISE_POINTS) - 0.5)
+    * 2 * ISLAND_GRIT * PORTAL_ISLAND_RADIUS;
   const grow = Math.min(1, Math.max(0, share - ISLAND_FLAT) / Math.max(1e-6, 0.55 - ISLAND_FLAT)) ** 2;
   const edge = Math.min(1, Math.max(0, share - ISLAND_EDGE_FROM) / (1 - ISLAND_EDGE_FROM)) ** 1.6;
-  return relief * grow - ISLAND_EDGE_DROP * edge;
+  return (relief + grit) * grow - ISLAND_EDGE_DROP * edge;
 }
 
 /**
@@ -410,12 +443,42 @@ function crownShade(share: number): number {
   return 0.62 + 0.38 * near ** 1.6;
 }
 
-function crownPoint(seed: number, segment: number, share: number): Point {
+/**
+ * Вершина плато на перетині клина `segment` і кільця `ring`.
+ *
+ * КІЛЬЦЕ ПРИХОДИТЬ НОМЕРОМ, А НЕ ЧАСТКОЮ, і це не стиль. Зсув вершини
+ * обмежується ВІДСТАННЮ ДО СУСІДНІХ КІЛЕЦЬ, а її без номера не дізнатись.
+ */
+function crownPoint(seed: number, segment: number, ring: number): Point {
   const angle = segmentAngle(seed, segment, PORTAL_ISLAND_SEGMENTS);
-  const radius = islandRadiusAt(seed, angle) * share;
+  const share = ISLAND_TOP_RINGS[ring]!;
+  /*
+   * Кожна вершина зсунута ВЗДОВЖ ВЛАСНОГО РАДІУСА, і це ламає ґратку, а
+   * не поверхню. Кільцева сітка дає трикутники однакового розміру в межах
+   * кільця; однаковий розмір читається токарним верстатом, хай яким
+   * рваним буде рельєф по висоті.
+   *
+   * ЗСУВ МІРЯЄТЬСЯ ЩІЛИНОЮ ДО СУСІДІВ, а не часткою радіуса, і цю межу
+   * знайшов тест. Кільця стоять нерівномірно — найтісніші 0.94 і 1.0, між
+   * ними 0.06, — і зсув у 11.5% радіуса перекидав вершину ЗА сусіднє
+   * кільце: трикутники вивертались, і `ВЕРХ ДИВИТЬСЯ ВГОРУ` впав. На
+   * екрані це дірка, крізь яку видно небо.
+   */
+  const below = ring > 0 ? share - ISLAND_TOP_RINGS[ring - 1]! : share;
+  const above = ring + 1 < ISLAND_TOP_RINGS.length
+    ? ISLAND_TOP_RINGS[ring + 1]! - share
+    : share * 0.1;
+  const room = Math.min(below, above) * ISLAND_LATTICE;
+  const moved = share + (seededUnit(seed, `island:lattice:${segment}:${ring}`) - 0.5) * 2 * room;
+  const radius = islandRadiusAt(seed, angle) * moved;
   return [
     Math.cos(angle) * radius,
-    portalIslandHeightAt(seed, angle, share),
+    /*
+     * Висота береться від ЗСУНУТОЇ частки, а не від початкової: інакше
+     * вершина стояла б на висоті чужого місця, і рельєф розмазало б
+     * поперек власного зсуву.
+     */
+    portalIslandHeightAt(seed, angle, moved),
     Math.sin(angle) * radius,
   ];
 }
@@ -454,9 +517,8 @@ export function buildPortalIslandGeometry(seed: number, rubble: number): THREE.B
   const centre: Point = [0, 0, 0];
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
-    const first = ISLAND_TOP_RINGS[0]!;
-    const a = crownPoint(seed, segment, first);
-    const b = crownPoint(seed, next, first);
+    const a = crownPoint(seed, segment, 0);
+    const b = crownPoint(seed, next, 0);
     mesh.push(centre, b, a, crownShade(0), [crownUv(centre), crownUv(b), crownUv(a)]);
   }
   for (let ring = 0; ring + 1 < ISLAND_TOP_RINGS.length; ring += 1) {
@@ -464,10 +526,10 @@ export function buildPortalIslandGeometry(seed: number, rubble: number): THREE.B
     const outer = ISLAND_TOP_RINGS[ring + 1]!;
     for (let segment = 0; segment < segments; segment += 1) {
       const next = (segment + 1) % segments;
-      const a = crownPoint(seed, segment, inner);
-      const b = crownPoint(seed, next, inner);
-      const c = crownPoint(seed, next, outer);
-      const d = crownPoint(seed, segment, outer);
+      const a = crownPoint(seed, segment, ring);
+      const b = crownPoint(seed, next, ring);
+      const c = crownPoint(seed, next, ring + 1);
+      const d = crownPoint(seed, segment, ring + 1);
       const shade = crownShade((inner + outer) / 2);
       mesh.push(a, b, c, shade, [crownUv(a), crownUv(b), crownUv(c)]);
       mesh.push(a, c, d, shade, [crownUv(a), crownUv(c), crownUv(d)]);
@@ -487,8 +549,9 @@ export function buildPortalIslandGeometry(seed: number, rubble: number): THREE.B
   const levels = ISLAND_ROOT_LEVELS.length;
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
-    let aboveA = crownPoint(seed, segment, 1);
-    let aboveB = crownPoint(seed, next, 1);
+    const rim = ISLAND_TOP_RINGS.length - 1;
+    let aboveA = crownPoint(seed, segment, rim);
+    let aboveB = crownPoint(seed, next, rim);
     for (let level = 0; level < levels; level += 1) {
       const belowA = rootPoint(seed, segment, level);
       const belowB = rootPoint(seed, next, level);
@@ -545,8 +608,28 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
   const tag = `island:rubble:${index}`;
   const segment = Math.floor(seededUnit(seed, `${tag}:segment`) * PORTAL_ISLAND_SEGMENTS);
   const ring = 1 + Math.floor(seededUnit(seed, `${tag}:ring`) * 5);
-  const share = ISLAND_TOP_RINGS[Math.min(ISLAND_TOP_RINGS.length - 1, ring)]!;
-  const seat = crownPoint(seed, segment, share);
+  /*
+   * Сідає на НАЙНИЖЧУ з чотирьох вершин своєї клітинки, а не на одну.
+   *
+   * Того самого правила тримається храм, і причина спільна: клітинка
+   * плато — це два трикутники між чотирма вершинами, і уламок лежить на
+   * ній усією підошвою. Поки він сідав на одну вершину, вистачало, щоб
+   * сусідня була нижча, — і кут уламка зависав над каменем. Виміряно
+   * тестом одразу після того, як плато стало по-справжньому битим:
+   * гладка поверхня цю неточність приховувала.
+   */
+  const level = Math.min(ISLAND_TOP_RINGS.length - 1, ring);
+  const cell = [
+    crownPoint(seed, segment, level),
+    crownPoint(seed, (segment + 1) % PORTAL_ISLAND_SEGMENTS, level),
+    crownPoint(seed, segment, Math.max(0, level - 1)),
+    crownPoint(seed, (segment + 1) % PORTAL_ISLAND_SEGMENTS, Math.max(0, level - 1)),
+  ];
+  const seat: Point = [
+    cell[0]![0],
+    Math.min(...cell.map((point) => point[1])),
+    cell[0]![2],
+  ];
   /*
    * РОЗМІР — У ЧАСТКАХ ОСТРОВА, і перша редакція носила тут світові
    * числа з часів, коли острів мав радіус 3.3. На радіусі 1 ті самі
@@ -558,7 +641,7 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
   const spin = seededUnit(seed, `${tag}:spin`) * Math.PI * 2;
   // Втоплений на третину: уламок, що лежить НА поверхні всією підошвою,
   // читається наліпленим, а не впалим.
-  const base = seat[1] - size * 0.34;
+  const base = seat[1] - size * 0.45;
 
   if (drum) {
     // Барабан колони, що впав на бік: шестигранник з віссю по горизонталі.
@@ -725,7 +808,7 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
    */
   let ground = Number.POSITIVE_INFINITY;
   for (let segment = 0; segment < PORTAL_ISLAND_SEGMENTS; segment += 1) {
-    for (const ring of ISLAND_TOP_RINGS) {
+    for (let ring = 0; ring < ISLAND_TOP_RINGS.length; ring += 1) {
       const point = crownPoint(seed, segment, ring);
       if (Math.hypot(point[0] - ox, point[2] - oz) > footprint) continue;
       ground = Math.min(ground, point[1]);

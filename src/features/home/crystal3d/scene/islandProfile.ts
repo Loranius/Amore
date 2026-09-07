@@ -236,3 +236,92 @@ export function templeFrontProfile(
     pedimentSlopeDeg,
   };
 }
+
+/** Характер породи — битий камінь чи згладжений горб. */
+export interface RockFacetProfile {
+  /** Скільки пар сусідніх граней узято до виміру. */
+  pairs: number;
+  /** Середній кут між сусідніми гранями, градуси. */
+  dihedralMean: number;
+  /** Медіанний кут між сусідніми гранями, градуси. */
+  dihedralMedian: number;
+  /** Розкид площ граней: відхилення на середнє. Однакові грані — нуль. */
+  areaSpread: number;
+}
+
+/**
+ * Двогранний кут між сусідніми гранями — і розкид їхніх площ.
+ *
+ * ЦЕ МІРКА «БИТИЙ КАМІНЬ ЧИ ГОРБ», і потрібні саме обидва числа. Кут каже,
+ * чи ламається поверхня: у згладженого горба сусідні грані майже в одній
+ * площині. Розкид площ каже друге — чи грані однакові: `DESIGN.md`
+ * повторює це правило прозою («однакова ширина читається токарним
+ * верстатом»), а тут воно стає числом.
+ *
+ * БЕРУТЬСЯ ЛИШЕ ГРАНІ, ПОВЕРНУТІ ВГОРУ. Інакше в число потрапляють обрив і
+ * корінь, у яких злам різкий за побудовою, — і плато, на яке пара
+ * дивиться згори, ховається за ними. Перший вимір саме так і збрехав:
+ * усе тіло дало 30.6° при плато в 11.9°.
+ *
+ * Суп трикутників не має спільних вершин, тож сусідство шукається за
+ * ЗБІГОМ КООРДИНАТ, округлених до п'ятого знака.
+ */
+export function rockFacetProfile(
+  positions: readonly number[],
+  upAtLeast = 0.3,
+): RockFacetProfile {
+  const normals: [number, number, number][] = [];
+  const corners: string[][] = [];
+  const areas: number[] = [];
+  for (let at = 0; at + 8 < positions.length; at += 9) {
+    const ax = positions[at]!; const ay = positions[at + 1]!; const az = positions[at + 2]!;
+    const bx = positions[at + 3]!; const by = positions[at + 4]!; const bz = positions[at + 5]!;
+    const cx = positions[at + 6]!; const cy = positions[at + 7]!; const cz = positions[at + 8]!;
+    const ux = bx - ax; const uy = by - ay; const uz = bz - az;
+    const vx = cx - ax; const vy = cy - ay; const vz = cz - az;
+    const nx = uy * vz - uz * vy;
+    const ny = uz * vx - ux * vz;
+    const nz = ux * vy - uy * vx;
+    const length = Math.hypot(nx, ny, nz);
+    if (length === 0) continue;
+    if (ny / length <= upAtLeast) continue;
+    normals.push([nx / length, ny / length, nz / length]);
+    areas.push(length / 2);
+    const key = (x: number, y: number, z: number) => `${x.toFixed(5)},${y.toFixed(5)},${z.toFixed(5)}`;
+    corners.push([key(ax, ay, az), key(bx, by, bz), key(cx, cy, cz)]);
+  }
+
+  const edges = new Map<string, number[]>();
+  corners.forEach((triangle, index) => {
+    for (let side = 0; side < 3; side += 1) {
+      const first = triangle[side]!;
+      const second = triangle[(side + 1) % 3]!;
+      const key = first < second ? `${first}|${second}` : `${second}|${first}`;
+      const bucket = edges.get(key);
+      if (bucket) bucket.push(index);
+      else edges.set(key, [index]);
+    }
+  });
+
+  const angles: number[] = [];
+  for (const bucket of edges.values()) {
+    if (bucket.length !== 2) continue;
+    const [first, second] = bucket as [number, number];
+    const a = normals[first]!;
+    const b = normals[second]!;
+    const dot = Math.max(-1, Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2]));
+    angles.push((Math.acos(dot) * 180) / Math.PI);
+  }
+  angles.sort((first, second) => first - second);
+  const mean = angles.reduce((sum, value) => sum + value, 0) / Math.max(1, angles.length);
+  const areaMean = areas.reduce((sum, value) => sum + value, 0) / Math.max(1, areas.length);
+  const areaVariance = areas.reduce((sum, value) => sum + (value - areaMean) ** 2, 0)
+    / Math.max(1, areas.length);
+
+  return {
+    pairs: angles.length,
+    dihedralMean: mean,
+    dihedralMedian: angles.length === 0 ? 0 : angles[Math.floor((angles.length - 1) / 2)]!,
+    areaSpread: Math.sqrt(areaVariance) / (areaMean || 1),
+  };
+}

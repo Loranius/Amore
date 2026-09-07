@@ -86,6 +86,37 @@ RIM_RAGGED = 0.09
 ROOT_SEGMENTS = 64
 CROWN_RINGS = 7
 
+# ── ЧИСТО BLENDER: З КІЛЕЦЬ РОБИТЬСЯ БИТИЙ КАМІНЬ ────────────
+# Кільцевий каркас вище — це ФОРМА, і на цьому вона й закінчувалась:
+# гладка баня з гладким шумом по колу. Виміряно двогранним кутом між
+# сусідніми гранями: плато 11.9° середнього при 5.5° медіани, тобто горб,
+# а не порода.
+#
+# Далі працює те, чого процедурний код у сцені зробити не може й не
+# мусить: зміщення за об'ємною текстурою і ПЛОСКЕ спрощення. Перше ламає
+# поверхню, друге зливає майже-компланарні трикутники в СПРАВЖНІ пласкі
+# грані різного розміру — рівно те, чим злам породи відрізняється від
+# тріангульованої сфери.
+
+ROCK_DISPLACE = 0.085
+"""Розмах зміщення поверхні, у радіусах острова."""
+
+ROCK_GRAIN = 0.42
+"""
+Розмір зерна текстури зміщення, у радіусах острова.
+
+Дрібніше — і скеля стає наждаком: на екрані порталу таке зерно менше за
+піксель і читається шумом. Більше — і лишаються ті самі кілька горбів.
+"""
+
+FACET_ANGLE_DEG = 11.0
+"""
+Кут, нижче за який сусідні грані зливаються в одну.
+
+Це і є «пласка грань» у числі: нуль лишив би тріангульовану кулю, а
+тридцять з'їв би всю форму разом із карнизом.
+"""
+
 # ── ЧИСЛА ЕТАЛОНА: ХРАМ ──────────────────────────────────────
 # Дорика, бо саме її силует упізнають як «древній храм». Усі числа —
 # у НИЖНІХ ДІАМЕТРАХ КОЛОНИ, як їх і писали античні майстри.
@@ -287,14 +318,67 @@ def build_temple(bm):
         bm.faces.new((a, b, c, e))
 
 
-def emit(name, bm):
+def emit(name, bm, rock=False):
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
     bm.free()
     obj = bpy.data.objects.new(name, mesh)
     bpy.context.scene.collection.objects.link(obj)
+    if rock:
+        break_stone(obj)
+    mesh = obj.data
     mesh.calc_loop_triangles()
     return mesh
+
+
+def break_stone(obj):
+    """
+    Кільцевий каркас → битий камінь.
+
+    Три модифікатори поспіль, і порядок серед них єдино можливий:
+
+      1. `SUBSURF` простим поділом — зміщенню потрібні вершини, яких у
+         каркасі з восьми кілець просто немає. Без цього кроку зміщення
+         рухає кільця цілком, і форма лишається тією самою, тільки
+         кривішою.
+      2. `DISPLACE` за об'ємною текстурою — сам злам.
+      3. `DECIMATE` у ПЛАСКОМУ режимі — зливає майже-компланарні грані в
+         одну справжню пласку. Саме цей крок робить грані різного розміру,
+         а різний розмір і є те, чим порода відрізняється від виточеного:
+         однакова ширина граней читається токарним верстатом.
+    """
+    texture = bpy.data.textures.new('RockGrain', type='CLOUDS')
+    texture.noise_scale = ROCK_GRAIN
+    texture.noise_depth = 3
+    texture.noise_basis = 'BLENDER_ORIGINAL'
+
+    sub = obj.modifiers.new('Dense', 'SUBSURF')
+    sub.subdivision_type = 'SIMPLE'
+    sub.levels = 2
+    sub.render_levels = 2
+
+    push = obj.modifiers.new('Break', 'DISPLACE')
+    push.texture = texture
+    push.strength = ROCK_DISPLACE * 2
+    push.mid_level = 0.5
+    push.texture_coords = 'LOCAL'
+
+    flat = obj.modifiers.new('Facets', 'DECIMATE')
+    flat.decimate_type = 'DISSOLVE'
+    flat.angle_limit = math.radians(FACET_ANGLE_DEG)
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    baked = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
+    original = obj.data
+    obj.modifiers.clear()
+    obj.data = baked
+    # ІМ'Я МУСИТЬ ЛИШИТИСЬ ТИМ САМИМ. `new_from_object` створює новий
+    # датаблок, і Blender дає йому «…001», бо старе ім'я ще зайняте. Мірка
+    # шукає меш за іменем, тож без цих трьох рядків вона падає з «у GLB
+    # немає меша ReferenceIsland» — саме так це й знайшлось.
+    name = original.name
+    bpy.data.meshes.remove(original)
+    baked.name = name
 
 
 def build():
@@ -303,7 +387,7 @@ def build():
 
     rock = bmesh.new()
     build_island(rock, rng)
-    island_mesh = emit('ReferenceIsland', rock)
+    island_mesh = emit('ReferenceIsland', rock, rock=True)
 
     stone = bmesh.new()
     build_temple(stone)
@@ -325,6 +409,8 @@ if __name__ == '__main__':
     print(f'острів       баня {CROWN_RISE:.2f} радіуса, корінь {ROOT_DEPTH:.2f} радіуса')
     print(f'карниз       найширше {WIDEST_OVER_TOP:.2f} радіуса, '
           f'на {OVERHANG_DROP:.2f} нижче за кромку')
+    print(f'порода       зміщення {ROCK_DISPLACE:.3f}, зерно {ROCK_GRAIN:.2f}, '
+          f'грань від {FACET_ANGLE_DEG:.0f}°')
     print(f'храм         стрункість {COLUMN_SLENDER:.1f}, просвіт {INTERCOLUMN:.2f}, '
           f'фронтон {PEDIMENT_SLOPE_DEG:.1f}°')
     print(f'трикутників  {total}')
