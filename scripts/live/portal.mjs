@@ -89,28 +89,128 @@ export function resolveChromium() {
  * Ті самі змінні, що й у приймальному тесті (`VISUAL_USER_NAME` /
  * `VISUAL_USER_PIN`) — одна домовленість про облікові дані, а не дві. Локально
  * їх можна тримати в `.env.live`, який не потрапляє в git.
+ *
+ * ДРУГИЙ ШЛЯХ — БЕЗ PIN. `VISUAL_USER_EMAIL` + `VISUAL_USER_PIN_HASH`
+ * заходять повз екран входу: пароль у Supabase Auth — це і є `sha256(pin)`,
+ * той самий рядок, що лежить у `users.pin_hash` (див. `auth-pin`). Тобто
+ * знати хеш = знати пароль, і саме тому цей шлях існує лише для того, у кого
+ * вже є службовий доступ до бази, а PIN у чат чи в історію команд не
+ * потрапляє жодного разу.
+ *
+ * Що це коштує, названо вголос: рядок у `.env.live` дорівнює паролю. Файл у
+ * `.gitignore`, живе стільки, скільки контейнер, і нічого, крім входу, не
+ * відмикає — RLS однакова для обох шляхів.
  */
 export function readCredentials(cwd = process.cwd()) {
-  const env = { ...process.env };
-  const file = join(cwd, '.env.live');
-  if (existsSync(file)) {
-    for (const line of readFileSync(file, 'utf8').split('\n')) {
-      const match = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
-      if (match === null) continue;
-      const [, key, value] = match;
-      if (env[key] === undefined) env[key] = value.replace(/^['"]|['"]$/g, '');
-    }
-  }
+  const env = readEnvFile(join(cwd, '.env.live'), { ...process.env });
   const name = env.VISUAL_USER_NAME?.trim();
   const pin = env.VISUAL_USER_PIN?.trim();
-  if (!name || !pin) {
+  const email = env.VISUAL_USER_EMAIL?.trim();
+  const hash = env.VISUAL_USER_PIN_HASH?.trim();
+  if (!name) {
     throw new Error(
-      'Немає облікових даних. Додай VISUAL_USER_NAME і VISUAL_USER_PIN у середовище '
-      + 'або у файл .env.live (він у .gitignore).',
+      'Немає VISUAL_USER_NAME. Додай його в середовище або у файл .env.live '
+      + '(він у .gitignore).',
+    );
+  }
+  if (hash) {
+    if (!/^[0-9a-f]{64}$/.test(hash)) {
+      throw new Error('VISUAL_USER_PIN_HASH має бути 64 шістнадцяткові символи (sha256).');
+    }
+    if (!email) throw new Error('До VISUAL_USER_PIN_HASH потрібен VISUAL_USER_EMAIL.');
+    return { name, email, hash };
+  }
+  if (!pin) {
+    throw new Error(
+      'Немає ні VISUAL_USER_PIN, ні VISUAL_USER_PIN_HASH. Додай одне з двох у '
+      + 'середовище або у файл .env.live (він у .gitignore).',
     );
   }
   if (!/^\d+$/.test(pin)) throw new Error('VISUAL_USER_PIN має складатись лише з цифр.');
   return { name, pin };
+}
+
+/** Значення з `KEY=value`-файла, які ще не задані в середовищі. */
+function readEnvFile(file, env) {
+  if (!existsSync(file)) return env;
+  for (const line of readFileSync(file, 'utf8').split('\n')) {
+    const match = /^\s*([A-Z_][A-Z0-9_]*)\s*=\s*(.*)\s*$/.exec(line);
+    if (match === null) continue;
+    const [, key, value] = match;
+    if (env[key] === undefined) env[key] = value.replace(/^['"]|['"]$/g, '');
+  }
+  return env;
+}
+
+/**
+ * Адреса Supabase і публічний ключ — звідти ж, звідки їх бере сама збірка.
+ *
+ * Читається `.env.local`, бо саме його читає Vite: якщо оснастка візьме
+ * адресу з іншого місця, вона зможе увійти в один проєкт, а показати другий,
+ * і кадр буде чесним знімком не тієї бази.
+ */
+function readSupabaseEnv(cwd = process.cwd()) {
+  const env = readEnvFile(join(cwd, '.env.local'), { ...process.env });
+  const url = env.VITE_SUPABASE_URL?.trim();
+  const key = env.VITE_SUPABASE_ANON_KEY?.trim();
+  if (!url || !key) {
+    throw new Error(
+      'Немає VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY — вхід за хешем без них '
+      + 'неможливий. Постав їх у середовище або в .env.local.',
+    );
+  }
+  return { url: url.replace(/\/$/, ''), key };
+}
+
+/**
+ * Сесія Supabase, покладена в сховище ДО того, як застосунок прокинувся.
+ *
+ * `AuthProvider` при старті питає дві речі: чи є в `localStorage`
+ * `portal_session_user_id` і чи жива сесія Supabase. Обидві кладемо самі —
+ * перша з таблиці `users` (анонімний ключ її бачить, інакше екран входу не
+ * знав би імен), друга з `/auth/v1/token`.
+ *
+ * Ключ сховища — `amore-auth`, і він НЕ типовий: клієнт задає свій
+ * (`src/lib/supabase.ts`). Якщо колись зміниться там, зміниться й тут, а
+ * оснастка мовчки лишиться на екрані входу — тому нижче стоїть перевірка,
+ * що вхід справді стався.
+ */
+async function seedSupabaseSession(page, credentials) {
+  const { url, key } = readSupabaseEnv();
+  const token = await fetch(`${url}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: key, 'content-type': 'application/json' },
+    body: JSON.stringify({ email: credentials.email, password: credentials.hash }),
+  });
+  if (!token.ok) {
+    throw new Error(
+      `Supabase не дав сесію (${token.status}). Перевір VISUAL_USER_EMAIL і `
+      + 'VISUAL_USER_PIN_HASH — хеш мусить бути тим самим рядком, що в users.pin_hash.',
+    );
+  }
+  const session = await token.json();
+
+  const who = await fetch(
+    `${url}/rest/v1/users?select=id,name&name=eq.${encodeURIComponent(credentials.name)}`,
+    { headers: { apikey: key, Authorization: `Bearer ${session.access_token}` } },
+  );
+  const rows = who.ok ? await who.json() : [];
+  const userId = Array.isArray(rows) && rows.length > 0 ? rows[0].id : null;
+  if (userId === null) {
+    throw new Error(`У таблиці users немає «${credentials.name}» — увійти нема ким.`);
+  }
+
+  await page.addInitScript(({ storageKey, payload, sessionKey, id }) => {
+    try {
+      window.localStorage.setItem(storageKey, payload);
+      window.localStorage.setItem(sessionKey, String(id));
+    } catch { /* приватний режим */ }
+  }, {
+    storageKey: 'amore-auth',
+    sessionKey: 'portal_session_user_id',
+    payload: JSON.stringify(session),
+    id: userId,
+  });
 }
 
 async function serverAnswers(url) {
@@ -314,6 +414,34 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
   }
 
   const credentials = readCredentials();
+
+  /*
+   * ВХІД ЗА ХЕШЕМ ІДЕ ПОВЗ ЕКРАН, і це не оптимізація: у пісочниці PIN
+   * узяти нізвідки — він зберігається як `sha256`, тож із бази його не
+   * дістати. Зате пароль Supabase Auth — це і є той самий хеш, і тому
+   * сесію можна отримати чесним `/auth/v1/token`, а не підробкою.
+   *
+   * Перевірка після переходу обов'язкова: якщо ключ сховища в клієнті
+   * колись зміниться, застосунок просто лишиться на екрані входу — і без
+   * цієї перевірки оснастка знімала б його як «портал».
+   */
+  if (credentials.hash) {
+    await seedSupabaseSession(page, credentials);
+    await page.goto(baseUrl, { waitUntil: 'load', timeout: 60_000 });
+    await page.waitForURL((url) => !url.hash.startsWith('#/login'), { timeout: 30_000 })
+      .catch(() => {
+        throw new Error(
+          'Вхід за хешем не спрацював: сторінка лишилась на #/login. Найімовірніше '
+          + 'змінився ключ сховища сесії в src/lib/supabase.ts (був «amore-auth»).',
+        );
+      });
+    return {
+      page,
+      logs,
+      close: async () => { await browser.close(); },
+    };
+  }
+
   await page.goto(`${baseUrl}#/login`, { waitUntil: 'load', timeout: 60_000 });
   const who = page.getByRole('button', { name: credentials.name, exact: true }).first();
   await who.waitFor({ timeout: 30_000 });
