@@ -174,8 +174,8 @@ export function veteranGirth(daysTogether: number): number {
  * monarch's radius, so without a change there it would have halved too and
  * dropped out of the brief's §4 band. See `VEIN_PROUD`.
  */
-const MONARCH_STOUTEST_ASPECT = 3.72;
-const MONARCH_SLIMMEST_ASPECT = 4.35;
+const MONARCH_STOUTEST_ASPECT = 3.47;
+const MONARCH_SLIMMEST_ASPECT = 4.06;
 
 /**
  * Скільки спогадів годують обхват, поки він не стає на місце.

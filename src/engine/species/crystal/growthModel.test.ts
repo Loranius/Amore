@@ -155,8 +155,15 @@ describe('monarch girth', () => {
      * за ним: 5–5.85 → 3.72–4.35. Виміряний силует монарха на
      * одинадцяти роках — 2.50 при еталонних 2.51.
      */
-    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(3.72 - 1e-4);
-    expect(axial / (2 * quiet)).toBeLessThanOrEqual(4.35 + 1e-3);
+    /*
+     * 3.72–4.35 → 3.47–4.06 (ADR-0154). Тупий габітус доростав лише до
+     * 93% оголошеної висоти; коли зріз верхівки зняли на вказівку
+     * власника («гострокінечний, а не моноліт»), тіло стало на 7% вищим,
+     * тобто стрункішим — 2.51 → 2.69 при еталонних 2.51. Смуга стиснута
+     * рівно на ті 7%, і виміряний силует повернувся на еталон.
+     */
+    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(3.47 - 1e-4);
+    expect(axial / (2 * quiet)).toBeLessThanOrEqual(4.06 + 1e-3);
   });
 
   it('lands a typical couple near the silhouette the owner already accepted', () => {
@@ -173,8 +180,8 @@ describe('monarch girth', () => {
      * монарха в кластер — 4.0 номінально, що дає виміряний силует 2.50
      * при еталонних 2.51.
      */
-    expect(aspect).toBeGreaterThan(3.75);
-    expect(aspect).toBeLessThan(4.2);
+    expect(aspect).toBeGreaterThan(3.5);
+    expect(aspect).toBeLessThan(3.95);
   });
 
   it('lets a longer relationship carry more girth at the same activity', () => {
