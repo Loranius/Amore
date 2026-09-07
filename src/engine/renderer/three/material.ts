@@ -38,7 +38,6 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.axialTintStrength.toFixed(6),
     rgbKey(recipe.footColor),
     recipe.innerFlowStrength.toFixed(6),
-    recipe.tipGather.toFixed(6),
     recipe.innerFlowTurns.toFixed(6),
     rgbKey(recipe.innerFlowColor),
     rgbKey(recipe.innerFlowSecondColor),
@@ -115,7 +114,6 @@ uniform float uEvolutionFacetEdgeWidth;
 uniform float uEvolutionAxialTintStrength;
 uniform vec3 uEvolutionFootColor;
 uniform float uEvolutionInnerFlowStrength;
-uniform float uEvolutionTipGather;
 uniform float uEvolutionInnerFlowTurns;
 uniform float uEvolutionInnerFlowPhase;
 uniform vec3 uEvolutionInnerFlowColor;
@@ -299,28 +297,6 @@ const FRAGMENT_BODY = /* glsl */ `
   // the same term arriving as reflection rather than as opacity.
   outgoingLight += uEvolutionRimColor * evolutionFresnel * uEvolutionGlassStrength * 0.55;
 
-  // ── Foot to tip ───────────────────────────────────────────
-  // Every stylized reference crystal changes colour along its length: one hue
-  // where it left the rock, another at the point. It is a real habit — a
-  // phantom, or a change in what the fluid carried while the crystal grew — and
-  // it is a large part of why a reference gem reads as grown rather than
-  // moulded. A body of one flat colour reads as moulded however well it is lit.
-  //
-  // Both ends come from the couple. The foot takes the deepened core colour,
-  // which is what the granted wishes made (ADR-0004); the tip keeps the shell's
-  // own. So the gradient is the earned colour changing depth along the crystal,
-  // never a second colour introduced from outside it.
-  if ( uEvolutionAxialTintStrength > 0.0001 ) {
-    // Weighted toward the foot: a phantom sits low and fades out, it does not
-    // meet the tip halfway.
-    float evolutionFoot = pow( 1.0 - clamp( vEvolutionAxial, 0.0, 1.0 ), 1.8 );
-    outgoingLight = mix(
-      outgoingLight,
-      outgoingLight * uEvolutionFootColor,
-      evolutionFoot * uEvolutionAxialTintStrength
-    );
-  }
-
   // ── The facet's own rim ───────────────────────────────────
   // Drawn, not lit, and that is the whole point. Three stylized gem assets the
   // owner supplied all outline every facet in the surface itself — in albedo,
@@ -410,17 +386,9 @@ const FRAGMENT_BODY = /* glsl */ `
     + evolutionInclusion
     + ( evolutionCloud - 0.5 ) * uEvolutionVeilStrength * 0.9;
 
-  // Світло збирається до вістря: в кристалі воно йде вздовж осі й виходить
-  // головкою, тому підніжжя темніше за неї. Множник стоїть на ВНУТРІШНЬОМУ
-  // світлі, а не на всьому вихідному — інакше він забирає й різницю між
-  // сусідніми гранями (виміряно: читаність граней 45% → нижче 30%).
-  float evolutionTip = 1.0
-    + uEvolutionTipGather * ( clamp( vEvolutionAxial, 0.0, 1.0 ) * 2.0 - 1.0 );
-
   outgoingLight += uEvolutionCoreColor
     * uEvolutionCoreStrength
     * evolutionInner
-    * max( 0.0, evolutionTip )
     * max( 0.0, evolutionZoning );
 
   // ── Energy turning inside the monarch ─────────────────────
@@ -520,6 +488,36 @@ const FRAGMENT_BODY = /* glsl */ `
    * порядку геометрія їх не пронумерувала.
    */
   outgoingLight *= mix( 1.0, vEvolutionFacetTone, uEvolutionFacetPaintStrength );
+
+  /*
+   * ПІДОШВА ↔ ВІСТРЯ — ТЕЖ ОСТАННІМ РЯДКОМ, і це та сама помилка, що
+   * ADR-0086 уже одного разу знайшов на фарбі грані.
+   *
+   * Терм стояв ВИЩЕ за адитивні: множив те, що набралось до нього, а
+   * потім згори лягало світло ядра — найяскравіший терм кристала, — і
+   * множник його не бачив узагалі. Виміряно тим самим фото-еталоном:
+   * при відношенні підошви до вістря 1:7 підйом рухався з −0.18 лише до
+   * −0.07, і кожен наступний крок коштував розмаху яскравості.
+   *
+   * Симетричний множник, а не додавання: підошва темніша, вістря
+   * світліше, і жоден піксель не береться ззовні. Додавання (спроба зі
+   * свіченням головки) підіймало разом із вістрям і темні грані навколо
+   * нього — розмах падав з 0.51 до 0.34 заради підйому +0.08.
+   */
+  if ( uEvolutionAxialTintStrength > 0.0001 ) {
+    float evolutionAxis = clamp( vEvolutionAxial, 0.0, 1.0 );
+    float evolutionRamp = mix(
+      uEvolutionFootColor.r,
+      2.0 - uEvolutionFootColor.r,
+      evolutionAxis
+    );
+    outgoingLight = mix(
+      outgoingLight,
+      outgoingLight * evolutionRamp,
+      uEvolutionAxialTintStrength
+    );
+  }
+
 `;
 
 function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: CrystalBodyMaterial['shader']): void {
@@ -534,7 +532,6 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     && recipe.facetEdgeStrength <= 0
     && recipe.axialTintStrength <= 0
     && recipe.innerFlowStrength <= 0
-    && recipe.tipGather <= 0
   ) return;
 
   material.onBeforeCompile = (shader) => {
@@ -562,7 +559,6 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionAxialTintStrength'] = { value: recipe.axialTintStrength };
     shader.uniforms['uEvolutionFootColor'] = { value: toColor(recipe.footColor) };
     shader.uniforms['uEvolutionInnerFlowStrength'] = { value: recipe.innerFlowStrength };
-    shader.uniforms['uEvolutionTipGather'] = { value: recipe.tipGather };
     shader.uniforms['uEvolutionInnerFlowTurns'] = { value: recipe.innerFlowTurns };
     shader.uniforms['uEvolutionInnerFlowPhase'] = { value: 0 };
     shader.uniforms['uEvolutionInnerFlowColor'] = { value: toColor(recipe.innerFlowColor) };

@@ -78,10 +78,28 @@ export function stoneProfile(image, win) {
     hy += Math.sin(pixel.h * Math.PI * 2);
   }
   const hue = ((Math.atan2(hy, hx) / (Math.PI * 2)) % 1 + 1) % 1;
-  const quarter = (win.y1 - win.y0) * 0.25;
-  const mean = (list) => (list.length ? list.reduce((s, p) => s + p.v, 0) / list.length : 0);
-  const tip = mean(pixels.filter((pixel) => pixel.y < win.y0 + quarter));
-  const foot = mean(pixels.filter((pixel) => pixel.y > win.y1 - quarter));
+  /*
+   * ПІДЙОМ МІРЯЄТЬСЯ ПО ВСІЙ ШИРИНІ ТІЛА, А НЕ В КОЛОНЦІ.
+   *
+   * Перша редакція брала середнє у вузькому стовпчику. На знімку, де
+   * кристал рівний, це те саме; на нашому кадрі — ні: монарх має ОДНУ
+   * велику затінену грань, і стовпчик угорі проходив крізь неї, а внизу
+   * — повз. Тобто число казало «верх темніший», а міряло «стовпчик
+   * потрапив на темну грань».
+   *
+   * Тепер кожен РЯДОК вікна усереднюється цілком, а вже потім верхня
+   * чверть рядків порівнюється з нижньою. Яка грань де стоїть, у це
+   * число більше не входить.
+   */
+  const rows = [];
+  for (let y = win.y0; y < win.y1; y += 1) {
+    const row = pixels.filter((pixel) => pixel.y === y);
+    if (row.length > 0) rows.push(row.reduce((sum, pixel) => sum + pixel.v, 0) / row.length);
+  }
+  const quarter = Math.max(1, Math.round(rows.length * 0.25));
+  const mean = (list) => (list.length ? list.reduce((sum, value) => sum + value, 0) / list.length : 0);
+  const tip = mean(rows.slice(0, quarter));
+  const foot = mean(rows.slice(-quarter));
 
   const middle = Math.round((win.y0 + win.y1) / 2);
   const spread = facetSeparations(findPlateaus(

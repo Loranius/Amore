@@ -224,8 +224,24 @@ function acrossBand(band: { readonly min: number; readonly max: number }, t: num
  * подарувала одне одному, і забрати його зовсім означало б стерти
  * значення. Множник лишає пропорцію недоторканою.
  */
-/** Наскільки внутрішнє світло збирається до вістря. Підібрано виміром. */
-const TIP_GATHER = 0.8;
+/**
+ * Наскільки сильно світло розкладається вздовж осі: підошва темніша,
+ * вістря світліше.
+ *
+ * Виміряно фото-еталоном по всій ширині тіла (`photoProfile.mjs`):
+ * без пандуса підйом −0.24, з ним −0.11, а розмах яскравості платить
+ * 0.51 → 0.44. Еталон дає +0.43 — решта розриву не в матеріалі
+ * (див. ADR-0153).
+ */
+const AXIAL_FOOT_STRENGTH = 1;
+/**
+ * Множник світла біля підошви; вістря дістає дзеркальне `2 − значення`.
+ *
+ * Симетрично навколо одиниці навмисно: так тіло не стає ані темнішим, ані
+ * світлішим у цілому — світло лише ПЕРЕРОЗПОДІЛЯЄТЬСЯ знизу вгору, як у
+ * кристалі, де воно йде вздовж осі й виходить головкою.
+ */
+const AXIAL_FOOT_VALUE = 0.25;
 
 const CORE_OPTICAL_SCALE = 0.35;
 
@@ -492,15 +508,8 @@ function shaderRecipe(
     // *within* a facet instead of splitting the body across its length. The
     // Pass 6 ablation measured this term at 0.50 of 255 on average, so what it
     // was contributing was almost entirely the split.
-    axialTintStrength: 0,
-    /*
-     * Світло збирається до вістря — те, чим оптичний кристал
-     * відрізняється від фарбованого (див. `tipGather` у типах).
-     * Найдрібніші тіла без нього: у кристалика на кілька пікселів
-     * градієнт уздовж осі — це один піксель.
-     */
-    tipGather: round6(micro ? 0 : TIP_GATHER),
-    footColor: coreTintColor(emissiveColor, tint),
+    axialTintStrength: round6(micro ? 0 : AXIAL_FOOT_STRENGTH),
+    footColor: rgb(AXIAL_FOOT_VALUE, AXIAL_FOOT_VALUE, AXIAL_FOOT_VALUE),
     // The monarch only. `focal` is the composition role exactly one body ever
     // holds (`roleFor`: the king tier and nothing else), so this is the same
     // "one body per artifact" the composition already guarantees rather than a
@@ -955,7 +964,6 @@ function buildSubstrateMaterial(
       // dark at the silhouette — the opposite of a uniform emissive, and an
       // order of magnitude below what any crystal carries.
       coreStrength: 0.02,
-      tipGather: 0,
       coreColor: rgb(round6(0.46), round6(0.44), round6(0.55)),
       // The vein is not glass. It is opaque quartz sitting in stone, and an
       // edge that lit up would make the seam read as a pane set into the floor.
