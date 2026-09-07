@@ -223,3 +223,86 @@ no matter how good it looks on a flat sample.
 
 Broken rock is the opposite case and keeps its map: it has no grown faces to keep
 clean, and grain is most of what separates stone from plastic.
+
+## The crystal was right and still looked wrong: measure the cluster, not the body
+
+2026-09-07, the owner: *«просто стовп рожевого кольору, який стирчить із землі»*.
+Every existing measurement said the monarch was correct — `crystalProfileDistance`
+to the Blender reference was **0.036** against a ratchet of 0.05. It was not a
+defect in the build. It was a faithful reproduction of a reference nobody wanted
+any more: a single quartz prism at 3.2:1 with a short termination **is** a column.
+
+**When every single-body number agrees and the frame still looks wrong, the thing
+you have not measured is the arrangement.** `crystalClusterProfile` (in
+`engine/species/crystal/crystalProfile.ts`) answers it:
+
+- `secondShare` — the runner-up's height over the leader's. **This is the number
+  that separates a cluster from a monolith with pebbles.** Reference 0.552, ours
+  was 0.271.
+- `sizeSpread` — are the satellites all one size? A prism repeated fifteen times
+  is one crystal, not a cluster.
+- `leanMeanDeg`, `reachMean` — does the druse fan, and how far out does it sit.
+
+It takes **one triangle soup and finds the bodies itself** by shared vertices,
+because the reference arrives as one mesh and our scene as many. Two different
+splits would give two numbers you cannot put side by side — the same mistake this
+project has already paid for twice.
+
+The median told the real story: ours was 0.244 against the reference's 0.270 —
+**the small crystals were already right**. What was missing was a rival.
+
+Two changes that only work together, and knowing why matters more than the
+numbers:
+
+- monarch nominal aspect 5–5.85 → 3.72–4.35 (measured silhouette 3.383 → 2.505);
+- tallest child's share of the monarch 0.4 → 0.5.
+
+The child share had been *lowered* to 0.4 a month earlier because half read as
+"almost the same crystal". That was true **beside a slim monarch**. A stout
+monarch outweighs a tall child by volume, so the same child reads as a member of
+a cluster. Neither change alone gives what the owner asked for, and reverting
+either one alone will bring the column back.
+
+Two things this cost, both measured rather than discovered later:
+
+- the apex cut is a *fraction of the radius*, so a body a third wider pays a
+  third more tax: the 30→40-year height drift went 0.154% → 0.208%;
+- a wider colony makes the camera back off. At a child share of 0.55 the
+  fourteen-year crystal filled *less* of the screen than the ten-year one —
+  `portalCameraAge` caught it. 0.50 is the value that passes, and that is why it
+  is 0.50 and not the reference's 0.552.
+
+## Colour from three sources without mud or citrine
+
+The owner's rule: her wishes granted by him → red, his by her → blue, shared →
+green, and it moves the **whole** tone. Three ways to do that, two of them wrong,
+and both wrong ones look obviously right until measured:
+
+- **Average the colours in RGB.** Red, green and blue in equal parts are *grey*.
+  A couple who give evenly got a stone with no colour at all (`#bba9aa` at 2/2/8).
+- **Circular mean of the hues.** Never grey — at balance the mean vector has zero
+  length, so there is nothing to pull toward. But the mean of red and green is
+  **yellow**, and 3/0/5 turned the crystal yellow. Yellow quartz is citrine; §6 of
+  the brief forbids it in its own line.
+- **What works: the largest channel pulls, and the strength is its lead over the
+  runner-up.** The target is always exactly one of the three named colours, so
+  neither grey nor yellow is reachable by construction. It is continuous where the
+  leader changes, because at a tie the lead is zero and the colour is the couple's
+  own.
+
+Two more things that only the frame could decide:
+
+- **A pull of 0.8 was not enough.** The all-red crystal still read as "a slightly
+  different pink" — the very pink the owner complained about. At 1.0 a one-sided
+  history reaches the colour itself (`#ff5656`), and identity survives because
+  reaching it requires *every* wish in one channel.
+- **The road to green runs through blue.** The couple's family sits at 270°–340°,
+  nearly opposite green. A couple whose shared wishes merely lead sees a *blue*
+  stone. That is the hue circle, not a bug; the alternatives are grey and yellow.
+  Red is unwrapped to 360° rather than 0° precisely so no arc crosses the yellow
+  quadrant.
+
+**The lab cannot show any of this by default.** The sandbox makes every wish
+shared and anonymous, so a screenshot shows one state out of four — the one with
+no colour. `crystalLab` takes `?gifts=hers|his|shared|mix` and `scripts/lab` takes
+`--gifts=`; use them or you are looking at a frame that cannot disagree with you.
