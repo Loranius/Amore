@@ -69,6 +69,14 @@ const quality = arg('quality', 'high');
 const lod = arg('lod', '');
 /* Профіль заповнення модулів: найгірші просідання живуть не в лабораторній парі. */
 const fill = arg('fill', '');
+/*
+ * Чиї бажання виконувались: `hers`, `his`, `shared`, `mix`.
+ *
+ * Колір кристала йде за подарунками (ADR-0151), а пісочниця робить усі
+ * бажання спільними й безіменними — тобто без цієї ручки знімок показує
+ * рівно один стан із чотирьох, і саме той, у якому кольору немає.
+ */
+const gifts = arg('gifts', '');
 const theme = arg('theme', 'dark');
 /*
  * Смуга за замовчуванням — РІЗНА для двох видів, і це не примха.
@@ -96,6 +104,7 @@ try {
   const url = `${server.url}${species}-lab.html?years=${years}&quality=${quality}&theme=${theme}`
     + (lod ? `&lod=${lod}` : '')
     + (fill ? `&fill=${encodeURIComponent(fill)}` : '')
+    + (gifts ? `&gifts=${encodeURIComponent(gifts)}` : '')
     + (off === '' ? '' : `&off=${off}`);
   await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
   await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
@@ -108,7 +117,7 @@ try {
 
   mkdirSync(OUT, { recursive: true });
   const tag = off === '' ? 'base' : `off-${off.replace(/,/g, '+')}`;
-  const file = join(OUT, `${species}-lab-${years}y-${quality}${lod ? `-${lod}` : ''}${fill ? `-${fill}` : ''}-${theme}-${tag}.png`);
+  const file = join(OUT, `${species}-lab-${years}y-${quality}${lod ? `-${lod}` : ''}${fill ? `-${fill}` : ''}${gifts ? `-${gifts}` : ''}-${theme}-${tag}.png`);
   writeFileSync(file, await portal.page.screenshot());
 
   /*

@@ -12,9 +12,26 @@ import type { CrystalMaterialQuality, CrystalRgb } from './types';
 
 // The brief's section 6, held as assertions rather than as a paragraph.
 //
-// The whole crystal stays in one rose/amethyst family from any angle. The only
-// permitted difference between two faces is the brightness of that one colour:
-// no yellow back faces, no gold, no thin-film, no per-face hue drift.
+// The whole crystal stays in one family from any angle. The only permitted
+// difference between two faces is the brightness of that one colour: no yellow
+// back faces, no gold, no thin-film, no per-face hue drift.
+//
+// **ЩО ЗМІНИЛОСЬ 2026-09-07 (ADR-0151), і чого цей файл більше не
+// стверджує.** Родина була названа «трояндово-аметистовою»: відтінок брався
+// з дати початку стосунків і не рухався ніколи. Тепер його ТЯГНУТЬ виконані
+// бажання — червоним, блакитним або зеленим, — тож кристал пари, яка дарує
+// однобоко, свідомо виходить за межі трояндової дуги.
+//
+// Що лишилось незмінним і що цей файл далі стереже:
+//
+//   • ОДИН ТОН НА ВСЮ КОЛОНІЮ. Різного кольору в різних частинах одного
+//     кристала немає — саме це «одна родина з будь-якого кута» й означає.
+//   • ЖОДНОГО ДРЕЙФУ ЗА ТИСКОМ. Пара, яка багато мандрує, не отримує
+//     бірюзовий кристал: канали тиску кольору не чіпають. Історії нижче
+//     будуються БЕЗ атрибуції бажань, тож вони міряють саме це.
+//   • ЖОДНОГО ЖОВТОГО. Заборона пережила зміну джерела: `wishGifts.test.ts`
+//     перебирає всі поєднання подарунків і не пускає кристал у жовтий кут
+//     кола.
 
 /** A couple whose history is dominated by one pressure channel. */
 function events(channel: EvolutionChannel): EvolutionEventInput[] {

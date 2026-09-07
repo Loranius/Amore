@@ -29,6 +29,8 @@ import {
   yearActivity,
   yearFill,
   yearTogetherness,
+  NO_WISH_GIFTS,
+  type CrystalWishGifts,
 } from './growthModel';
 import { coupleCrystalHabit } from './habit';
 import type {
@@ -83,10 +85,23 @@ export function eventModule(source: string): string {
  * the number of anniversaries passed when the event occurred — so the facet
  * accumulator needs no date arithmetic of its own.
  */
-function photoYearsOf(events: readonly NormalizedEvolutionEvent[]): number[] {
+/**
+ * Роки стосунків на момент кожного ВИКОНАНОГО ПЛАНУ.
+ *
+ * Було по спогадах (ADR-0004), стало по планах (ADR-0151): власник
+ * назвав правило прямо — «кількість виконаних планів додає грані», а
+ * спогади пішли на ширину. Три виміри монарха знову незалежні: висота —
+ * час, ширина — спогади, грані — плани.
+ */
+function planYearsOf(events: readonly NormalizedEvolutionEvent[]): number[] {
   return events
-    .filter((event) => eventModule(event.source) === 'memories')
+    .filter((event) => eventModule(event.source) === 'plans')
     .map((event) => event.epochIndex);
+}
+
+/** Скільки спогадів пара зберегла. Ширина монарха йде саме звідси. */
+function memoryCount(events: readonly NormalizedEvolutionEvent[]): number {
+  return events.filter((event) => eventModule(event.source) === 'memories').length;
 }
 
 /** Facts that had already happened at `at`. A later record may not reach back. */
@@ -99,36 +114,45 @@ function occurredEvents(
   return artifact.events.filter((event) => event.occurredAtEpochMs <= epoch);
 }
 
-/**
- * Modules that record something the couple decided to do, as opposed to
- * something they kept or bought.
- *
- * The monarch's girth used to count every event, which on real data made it
- * almost entirely a photo count — 56 of 104 — and photos already earn her
- * facets. One module was deciding two of her three dimensions while the rest
- * were noise. Counting deliberate acts instead makes the three genuinely
- * independent: height is time, girth is what they did, facets are what they
- * kept.
- *
- * Photos and finished media are both out for the same reason: keeping a
- * photograph and finishing a series are things that happened *to* the couple's
- * shared life rather than decisions about it. Photos already earn facets, and
- * media already carries the year's breadth and its cultural pressure.
- */
-const DELIBERATE_MODULES: ReadonlySet<string> = new Set([
-  'plans',
-  'wishlist',
-  'map',
-  'calendar',
-]);
 
-function deliberateActCount(events: readonly NormalizedEvolutionEvent[]): number {
-  return events.filter((event) => DELIBERATE_MODULES.has(eventModule(event.source))).length;
+/**
+ * Скільки бажань одне одному виконала пара, за трьома каналами.
+ *
+ * Бажання рахується партнерові лише тоді, коли його виконав ІНШИЙ. Колір
+ * тут про те, що вони дали одне одному, тож виконане власне бажання
+ * лишає кристал таким, яким він був — це те саме правило, що стояло в
+ * ADR-0004, і воно повертається разом із самим кольором.
+ *
+ * Спільне бажання йде в третій канал і тоді, коли в ньому проставлений
+ * виконавець: «спільне» — це властивість бажання, а не того, хто натиснув
+ * кнопку.
+ */
+function wishGiftsOf(
+  events: readonly NormalizedEvolutionEvent[],
+  partners: { first: number | null; second: number | null } | undefined,
+): CrystalWishGifts {
+  if (!partners) return NO_WISH_GIFTS;
+  const { first, second } = partners;
+  let toFirst = 0;
+  let toSecond = 0;
+  let shared = 0;
+  for (const event of events) {
+    if (eventModule(event.source) !== 'wishlist') continue;
+    const attribution = event.attribution;
+    if (!attribution) continue;
+    if (attribution.shared) { shared += 1; continue; }
+    const { subjectId, actorId } = attribution;
+    if (subjectId === null || actorId === null || subjectId === actorId) continue;
+    if (first !== null && subjectId === first && actorId === second) toFirst += 1;
+    else if (second !== null && subjectId === second && actorId === first) toSecond += 1;
+  }
+  return { toFirst, toSecond, shared };
 }
 
 export function buildMotherInstruction(
   artifact: ArtifactBlueprint,
   asOf: string,
+  context: CrystalColonyContext = EMPTY_COLONY_CONTEXT,
 ): CrystalGrowthInstruction {
   const seed = stableSeed(artifact.deterministicSeed, CRYSTAL_MONARCH_BODY_ID);
 
@@ -154,13 +178,16 @@ export function buildMotherInstruction(
   // because no single module drives more than one of them.
   const daysTogether = daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0;
   const occurred = occurredEvents(artifact, asOf);
-  const colonyTint = coupleTint(artifact.relationshipStartedAt);
+  const colonyTint = coupleTint(
+    artifact.relationshipStartedAt,
+    wishGiftsOf(occurred, context.colorPartners),
+  );
   const axialScale = monarchAxialScale(daysTogether);
   // Past the full term the height stops and the couple's history goes into
   // width instead — the owner's rule, and the reason the height curve can stop
   // at all without the artifact going still.
   const radialScale = round6(
-    monarchRadialScale(axialScale, deliberateActCount(occurred)) * veteranGirth(daysTogether),
+    monarchRadialScale(axialScale, memoryCount(occurred)) * veteranGirth(daysTogether),
   );
 
   return {
@@ -180,7 +207,7 @@ export function buildMotherInstruction(
     maturity: relationshipMaturityAt(artifact.relationshipStartedAt, asOf),
     axialScale,
     radialScale,
-    facetCount: monarchFacetCount(photoYearsOf(occurred), daysTogether),
+    facetCount: monarchFacetCount(planYearsOf(occurred), daysTogether),
     azimuthRad: round6(seededUnit(seed, 'azimuth') * Math.PI * 2),
     elevation: 1,
     radialBias: 0,
@@ -253,6 +280,14 @@ function eventsWithin(
 export interface CrystalColonyContext {
   /** `YYYY-MM-DD` days both partners had off. See `CrystalSpeciesConfig`. */
   sharedDaysOff: readonly string[];
+  /**
+   * Кому який канал кольору належить (`CrystalSpeciesConfig.colorPartners`).
+   *
+   * Без нього подарунки не мають кольору й камінь лишається тим, який дала
+   * дата: рушій не знає ні статі, ні імен, і вигадувати, хто з двох
+   * ідентифікаторів «перший», він не має права.
+   */
+  colorPartners?: { first: number | null; second: number | null } | undefined;
 }
 
 export const EMPTY_COLONY_CONTEXT: CrystalColonyContext = {
@@ -283,7 +318,10 @@ export function buildAnnualFormations(
     daysBetweenExplicit(artifact.relationshipStartedAt, asOf) ?? 0,
   );
   // Один тон на всю колонію — див. монарха.
-  const colonyTint = coupleTint(artifact.relationshipStartedAt);
+  const colonyTint = coupleTint(
+    artifact.relationshipStartedAt,
+    wishGiftsOf(occurredEvents(artifact, asOf), context.colorPartners),
+  );
   /*
    * Габітус монарха потрібен тут не для форми, а для ПОСАДКИ: наскільки
    * він ширший за свій оголошений радіус, залежить від габітусу, і кільце

@@ -178,14 +178,20 @@ const MONARCH_STOUTEST_ASPECT = 3.72;
 const MONARCH_SLIMMEST_ASPECT = 4.35;
 
 /**
- * Deliberate acts beyond which more of them stop thickening the monarch.
+ * Скільки спогадів годують обхват, поки він не стає на місце.
  *
- * Rescaled when girth stopped counting every event and started counting only
- * things the couple decided to do — plans, gifts, places, milestones. Those
- * are roughly 45% of a real couple's total, so the old ceiling of 400 would
- * have left the whole range unused and every crystal slender.
+ * Число переставлялось двічі, і обидва рази разом із джерелом. Спершу
+ * обхват рахував УСІ події (стеля 400); потім лише зумисні дії — плани,
+ * подарунки, місця, віхи, — і стеля стала 150, бо таких дій приблизно
+ * 45% від усього. Тепер обхват веде **кількість спогадів** (ADR-0151):
+ * власник назвав правило прямо, і спогади — найоб'ємніший модуль пари
+ * (56 подій зі 104 у справжній історії).
+ *
+ * 110, а не 150: на лабораторному профілі це близько дев'яти років, і
+ * саме воно повертає одинадцятирічний кристал на еталон — відстань
+ * профілів 0.056 проти 0.063 при 150.
  */
-const MONARCH_ACTIVITY_SATURATION = 150;
+const MONARCH_ACTIVITY_SATURATION = 110;
 
 /**
  * Girth of the monarch from the deliberate acts behind her.
@@ -221,14 +227,30 @@ export const MONARCH_MIN_FACETS = 6;
 export const MONARCH_MAX_FACETS = 24;
 
 /**
- * How many photos one new facet costs, by how long the couple had been
- * together when that photo was taken.
+ * Скільки виконаних планів коштує одна нова грань, залежно від того,
+ * скільки пара була разом на момент того плану.
+ *
+ * **ГРАНІ ТЕПЕР ВІД ПЛАНІВ, А НЕ ВІД ФОТО (ADR-0151).** Власник назвав
+ * правило прямо: «кількість виконаних планів додає грані», а спогади
+ * пішли на ширину. Пороги перераховано, бо планів у рази менше за фото:
+ * у лабораторного профілю 4 плани на рік проти 12 спогадів, тож старі
+ * 5/10/15/20 лишили б одинадцятирічну пару з десятьма гранями замість
+ * вісімнадцяти — тобто зміна джерела тихо забрала б у неї вісім граней.
+ *
+ * Виміряно на лабораторному профілі (4 плани, 12 спогадів на рік):
+ *
+ *   фото зі старими порогами   11 років → 18 граней
+ *   плани зі старими порогами  11 років → 10
+ *   плани з порогами нижче     11 років → 18
+ *
+ * Форма правила лишається тією ж: поріг фіксується НА МОМЕНТ події, тож
+ * зароблена грань не зникає від того, що минув час.
  */
 export function facetThresholdForYears(completedYears: number): number {
-  if (completedYears < 1) return 5;
-  if (completedYears < 5) return 10;
-  if (completedYears < 10) return 15;
-  return 20;
+  if (completedYears < 1) return 2;
+  if (completedYears < 5) return 3;
+  if (completedYears < 10) return 5;
+  return 7;
 }
 
 /**
@@ -252,15 +274,15 @@ export function facetThresholdForYears(completedYears: number): number {
  * It can only add, so ADR-0004's hardest guarantee survives intact: a facet
  * earned is never lost to the passage of time.
  *
- * @param photoYears completed relationship years at each photo's date.
+ * @param planYears completed relationship years at each finished plan's date.
  * @param daysTogether days the couple has been together, for the veteran term.
  */
 export function monarchFacetCount(
-  photoYears: readonly number[],
+  planYears: readonly number[],
   daysTogether = 0,
 ): number {
   let earned = 0;
-  for (const years of photoYears) {
+  for (const years of planYears) {
     if (!Number.isFinite(years)) continue;
     earned += 1 / facetThresholdForYears(Math.max(0, Math.floor(years)));
   }
@@ -916,7 +938,124 @@ const WHITE: CrystalTint = { rgb: [1, 1, 1], iridescence: 0 };
  * `wishTint`, і те саме калібрування: найтемніший канал сідає близько
  * 0.35, як у трьох мінеральних тонів, які там стояли.
  */
-export function coupleTint(relationshipStartedAt: string): CrystalTint {
+/**
+ * Виконані бажання, розкладені на три канали кольору.
+ *
+ * Бажання рахується партнерові лише тоді, коли його виконав ІНШИЙ: колір
+ * тут про те, що вони дали одне одному, тож виконане власне бажання
+ * лишає кристал таким, яким він був.
+ */
+export interface CrystalWishGifts {
+  /** Бажань ПЕРШОГО партнера, які виконав другий. */
+  toFirst: number;
+  /** Дзеркально: бажань другого, які виконав перший. */
+  toSecond: number;
+  /** Спільних бажань, виконаних разом. */
+  shared: number;
+}
+
+export const NO_WISH_GIFTS: CrystalWishGifts = { toFirst: 0, toSecond: 0, shared: 0 };
+
+/**
+ * Куди тягне кожен канал, у частках кола.
+ *
+ * Власник назвав кольори прямо (2026-09-07): «якщо дівчина виконує
+ * бажання, додається червоний; якщо хлопець — блакитний; якщо спільне —
+ * зелений». У рушії немає ані статі, ані імен: є `first` і `second`, а
+ * хто з них хто, вирішує застосунок (`colorPartners`). Тому тут не
+ * «її» й «його», а перший і другий, і саме тому цю відповідність можна
+ * буде перенести в профіль, не чіпаючи рушія.
+ */
+const GIFT_HUE_TURNS = { toFirst: 0, toSecond: 2 / 3, shared: 1 / 3 } as const;
+
+/**
+ * Наскільки далеко подарунки можуть відтягти відтінок пари.
+ *
+ * ОДИНИЦЯ, І ЦЕ ВИРІШИВ КАДР. При 0.8 кристал пари, у якої всі бажання
+ * виконувала вона, лишався трояндовим — тобто рівно тим рожевим, на який
+ * власник і скаржився. Різниця з кольором пари була, але оком читалась
+ * як «трохи інший рожевий», а не як «додався червоний».
+ *
+ * Ідентичність пари при цьому не зникає: щоб дійти до чистого кольору,
+ * треба, щоб УСІ бажання були одного каналу. Будь-яка суміш лишає
+ * відтінок пари в собі, бо довжина кругового середнього менша за
+ * одиницю.
+ */
+const GIFT_PULL = 1;
+
+/**
+ * Куди тягнуть подарунки й наскільки впевнено.
+ *
+ * ТЯГНЕ НАЙБІЛЬШИЙ КАНАЛ, А СИЛА — ЦЕ ЙОГО ВІДРИВ ВІД ДРУГОГО. Дві інші
+ * редакції цієї функції виміряні й відкинуті, і обидві з тієї самої
+ * причини: вони робили колір, якого ніхто не дарував.
+ *
+ *   • СЕРЕДНІЙ КОЛІР у RGB. Червоний, зелений і синій у рівних частках
+ *     дають СІРИЙ, а троянда із зеленню на 2/2/8 давала `#bba9aa` —
+ *     камінь без кольору взагалі.
+ *   • КРУГОВЕ СЕРЕДНЄ по відтінках. Сірого не дає ніколи, але середнє
+ *     між червоним і зеленим — це ЖОВТИЙ, і на 3/0/5 кристал ставав
+ *     жовтим. §6 брифу забороняє жовтий окремим рядком, і не дарма:
+ *     жовтий кварц — це цитрин, тобто інший камінь.
+ *
+ * Відрив від другого не має ні тієї, ні тієї вади: ціль завжди рівно
+ * один із трьох названих кольорів. Розрив при зміні лідера теж
+ * неможливий — у точці рівності відрив нульовий, тобто колір там
+ * дорівнює кольору пари з обох боків.
+ */
+function giftPull(gifts: CrystalWishGifts): { turn: number; strength: number } {
+  const counts = [
+    [Math.max(0, gifts.toFirst), GIFT_HUE_TURNS.toFirst],
+    [Math.max(0, gifts.toSecond), GIFT_HUE_TURNS.toSecond],
+    [Math.max(0, gifts.shared), GIFT_HUE_TURNS.shared],
+  ] as const;
+  const total = counts.reduce((sum, [count]) => sum + count, 0);
+  if (total <= 0) return { turn: 0, strength: 0 };
+  const ranked = [...counts].sort((left, right) => right[0] - left[0]);
+  const lead = ranked[0]![0] - ranked[1]![0];
+  if (lead <= 0) return { turn: 0, strength: 0 };
+  return { turn: ranked[0]![1], strength: clamp01(lead / total) };
+}
+
+/**
+ * Наскільки насиченішим стає камінь від однобокості подарунків.
+ *
+ * Рівні частки лишають насиченість пари; чистий один колір додає 0.14 —
+ * саме це робить «додається червоний» помітним і тоді, коли відтінок
+ * відійшов недалеко.
+ */
+const GIFT_SATURATION_GAIN = 0.14;
+
+/**
+ * Шлях від відтінку пари до відтінку подарунків — ДОВКОЛА ХОЛОДНОГО БОКУ.
+ *
+ * Найкоротша дуга тут не годиться, і це показав перший же вимір. Родина
+ * пари лежить між 270° і 340° (фіолет → троянда). До зеленого (120°)
+ * коротший шлях іде ВГОРУ — через червоний і помаранчевий, — тож пара з
+ * купою спільних бажань діставала помаранчевий камінь на пів дороги й
+ * жовто-зелений у кінці (`#b5ff56`).
+ *
+ * Тому червоний розгортається як 360°, а не 0°: тоді всі три цілі
+ * (360°, 240°, 120°) лежать по один бік від родини, і рух до кожної йде
+ * природним для мінералу боком — до червоного через троянду, до синього
+ * й зеленого через фіолет і блакить. Жодна дуга більше не перетинає
+ * жовтий кут кола.
+ *
+ * ЧОМУ НЕ ЗМІШУВАННЯ КОЛЬОРІВ. Спробувано й виміряно: зелений — це
+ * протилежність трояндової родини, тож пряма суміш «троянда + зелень»
+ * дає СІРЕ. Пара з переважно спільними бажаннями (2/2/8) отримувала
+ * `#bba9aa`, тобто камінь без кольору взагалі. Прокручування натомість
+ * сірого не дає ніколи: у нього просто довший шлях до зеленого, і на пів
+ * дороги камінь бірюзовий. Це геометрія кола відтінків, а не вада.
+ */
+function giftHueTarget(turn: number): number {
+  return turn < 0.25 ? turn + 1 : turn;
+}
+
+export function coupleTint(
+  relationshipStartedAt: string,
+  gifts: CrystalWishGifts = NO_WISH_GIFTS,
+): CrystalTint {
   const source = typeof relationshipStartedAt === 'string' ? relationshipStartedAt.trim() : '';
   // Порожня дата — білий кристал, тобто той самий стан, у якому кожне тіло
   // народжується. Вигадати колір із нічого гірше, ніж не мати його.
@@ -963,8 +1102,26 @@ export function coupleTint(relationshipStartedAt: string): CrystalTint {
     COUPLE_HUE_STEPS - 1,
     Math.floor(seededUnit(seed, 'couple:hue') * COUPLE_HUE_STEPS),
   );
-  const turn = COUPLE_HUE_ARC_START + (step / (COUPLE_HUE_STEPS - 1)) * COUPLE_HUE_ARC_SPAN;
-  const rgb = hueToLinearRgb(turn, COUPLE_TINT_SATURATION);
+  const own = COUPLE_HUE_ARC_START + (step / (COUPLE_HUE_STEPS - 1)) * COUPLE_HUE_ARC_SPAN;
+  /*
+   * ПОДАРУНКИ ТЯГНУТЬ ВІДТІНОК, А ДАТА ЙОГО ТРИМАЄ (ADR-0151).
+   *
+   * Власник 2026-09-07: «якщо дівчина виконує бажання, додається
+   * червоний колір; якщо хлопець — блакитний; якщо спільне — зелений»,
+   * і на питання, куди саме йде колір, обрав «увесь тон кристала».
+   *
+   * Це скасовує «один тон, узятий з дати» (ADR-0059) наполовину: тон і
+   * далі ОДИН на всю колонію — різного кольору в різних частинах одного
+   * кристала немає, — але сам він більше не сталий. Що лишається від
+   * дати: відтінок, з якого все починається, і той, до якого кристал
+   * повертається, коли подарунки врівноважились.
+   */
+  const pull = giftPull(gifts);
+  const turn = own + (giftHueTarget(pull.turn) - own) * GIFT_PULL * pull.strength;
+  const rgb = hueToLinearRgb(
+    turn,
+    clamp01(COUPLE_TINT_SATURATION + GIFT_SATURATION_GAIN * pull.strength),
+  );
 
   return {
     rgb: [

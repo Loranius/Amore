@@ -184,14 +184,22 @@ describe('monarch girth', () => {
   });
 });
 
-describe('facets from photos', () => {
-  it('charges each photo the threshold in force when it was taken', () => {
-    expect(facetThresholdForYears(0)).toBe(5);
-    expect(facetThresholdForYears(1)).toBe(10);
-    expect(facetThresholdForYears(4)).toBe(10);
-    expect(facetThresholdForYears(5)).toBe(15);
-    expect(facetThresholdForYears(10)).toBe(20);
-    expect(facetThresholdForYears(40)).toBe(20);
+describe('facets from finished plans', () => {
+  /*
+   * ДЖЕРЕЛО ГРАНЕЙ — ПЛАНИ, А НЕ ФОТО (ADR-0151), на вказівку власника:
+   * «кількість виконаних планів додає грані». Пороги перераховано, бо
+   * планів у рази менше за фото: на лабораторному профілі 4 плани на рік
+   * проти 12 спогадів, тож старі 5/10/15/20 лишили б одинадцятирічну
+   * пару з десятьма гранями замість вісімнадцяти — зміна джерела тихо
+   * забрала б у неї вісім граней.
+   */
+  it('charges each finished plan the threshold in force when it was made', () => {
+    expect(facetThresholdForYears(0)).toBe(2);
+    expect(facetThresholdForYears(1)).toBe(3);
+    expect(facetThresholdForYears(4)).toBe(3);
+    expect(facetThresholdForYears(5)).toBe(5);
+    expect(facetThresholdForYears(10)).toBe(7);
+    expect(facetThresholdForYears(40)).toBe(7);
   });
 
   it('never loses a facet when the couple crosses a threshold', () => {
@@ -220,12 +228,12 @@ describe('facets from photos', () => {
   });
 
   it('matches the owner-stated cost per tier', () => {
-    // Five photos in year one buy exactly one facet; four do not.
-    expect(monarchFacetCount(new Array<number>(4).fill(0))).toBe(MONARCH_MIN_FACETS);
-    expect(monarchFacetCount(new Array<number>(5).fill(0))).toBe(MONARCH_MIN_FACETS + 1);
-    // Ten photos in year three buy one; in year six they do not.
-    expect(monarchFacetCount(new Array<number>(10).fill(3))).toBe(MONARCH_MIN_FACETS + 1);
-    expect(monarchFacetCount(new Array<number>(10).fill(6))).toBe(MONARCH_MIN_FACETS);
+    // Два виконані плани першого року купують рівно одну грань, один — ні.
+    expect(monarchFacetCount(new Array<number>(1).fill(0))).toBe(MONARCH_MIN_FACETS);
+    expect(monarchFacetCount(new Array<number>(2).fill(0))).toBe(MONARCH_MIN_FACETS + 1);
+    // Три плани на третьому році купують одну; на шостому — ще ні.
+    expect(monarchFacetCount(new Array<number>(3).fill(3))).toBe(MONARCH_MIN_FACETS + 1);
+    expect(monarchFacetCount(new Array<number>(3).fill(6))).toBe(MONARCH_MIN_FACETS);
   });
 });
 

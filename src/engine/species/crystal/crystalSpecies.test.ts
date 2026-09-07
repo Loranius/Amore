@@ -263,6 +263,16 @@ describe('Crystal Species monarch dimensions are independent', () => {
       portalActivity: 0.1,
     }));
 
+  const donePlans = (count: number): EvolutionEventInput[] =>
+    Array.from({ length: count }, (_unused, index) => ({
+      id: `plan:${index}`,
+      occurredAt: `2025-0${(index % 9) + 1}-2${index % 8}`,
+      source: 'plans@1',
+      evidence: 'verified' as const,
+      channels: { remembrance: 0.5, stability: 0.25 },
+      portalActivity: 0.2,
+    }));
+
   const trips = (count: number): EvolutionEventInput[] =>
     Array.from({ length: count }, (_unused, index) => ({
       id: `trip:${index}`,
@@ -273,22 +283,43 @@ describe('Crystal Species monarch dimensions are independent', () => {
       portalActivity: 0.2,
     }));
 
-  it('does not let photos thicken the monarch — they earn facets instead', () => {
-    // The double count this removes: girth used to be a total event count, of
-    // which 56 of 104 were photos on real data, and photos already drive
-    // facets. One module was deciding two of three dimensions.
+  /*
+   * ДЖЕРЕЛА ПОМІНЯЛИСЬ МІСЦЯМИ (ADR-0151), і три виміри лишились
+   * незалежними.
+   *
+   * Власник назвав правила прямо: «кількість виконаних планів додає
+   * грані», «спогади формують ширину». Було навпаки — грані від фото,
+   * ширина від зумисних дій (плани, подарунки, місця, віхи).
+   *
+   * Головне, що НЕ змінилось: жоден модуль не вирішує двох вимірів
+   * одразу. Саме цю ваду ADR-0004 і прибирав, коли обхват рахував усі
+   * події й на 56 фото зі 104 виходило, що фото вирішують і ширину, і
+   * грані.
+   */
+  it('does not let plans thicken the monarch — they earn facets instead', () => {
+    const bare = monarchFor([]);
+    const withPlans = monarchFor(donePlans(40));
+
+    expect(withPlans.radialScale).toBe(bare.radialScale);
+    expect(withPlans.facetCount).toBeGreaterThan(bare.facetCount);
+  });
+
+  it('lets memories thicken her without touching her facets', () => {
     const bare = monarchFor([]);
     const withPhotos = monarchFor(photos(40));
 
-    expect(withPhotos.radialScale).toBe(bare.radialScale);
-    expect(withPhotos.facetCount).toBeGreaterThan(bare.facetCount);
+    expect(withPhotos.radialScale).toBeGreaterThan(bare.radialScale);
+    expect(withPhotos.facetCount).toBe(bare.facetCount);
   });
 
-  it('lets deliberate acts thicken her without touching her facets', () => {
+  it('лишає решту модулів осторонь обох вимірів', () => {
+    // Місця (як і подарунки з віхами) годують тиск, кільце років і
+    // ґрунт — але не обхват і не грані монарха. Інакше «спогади
+    // формують ширину» було б неправдою наполовину.
     const bare = monarchFor([]);
     const withTrips = monarchFor(trips(20));
 
-    expect(withTrips.radialScale).toBeGreaterThan(bare.radialScale);
+    expect(withTrips.radialScale).toBe(bare.radialScale);
     expect(withTrips.facetCount).toBe(bare.facetCount);
   });
 
@@ -296,6 +327,7 @@ describe('Crystal Species monarch dimensions are independent', () => {
     // Neither kind of activity may make her taller.
     const bare = monarchFor([]);
     expect(monarchFor(photos(40)).axialScale).toBe(bare.axialScale);
+    expect(monarchFor(donePlans(40)).axialScale).toBe(bare.axialScale);
     expect(monarchFor(trips(20)).axialScale).toBe(bare.axialScale);
   });
 });

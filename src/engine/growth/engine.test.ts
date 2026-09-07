@@ -237,13 +237,19 @@ describe('Universal Growth Engine', () => {
     const earlierBlueprint = growthBlueprint(BASE_EVENTS);
     const laterBlueprint = growthBlueprint([
       ...BASE_EVENTS,
+      /*
+       * СПОГАД, А НЕ ПОДАРУНОК, і це не байдужа заміна. Обхват монарха
+       * веде кількість спогадів (ADR-0151), а не зумисних дій, тож
+       * подія вішліста більше не має права товщити її — і тест, який
+       * цього вимагає, перевіряв би сьогодні неправду.
+       */
       {
-        id: 'fulfilled-dream',
+        id: 'one-more-photo',
         occurredAt: '2026-05-20T12:00:00Z',
-        source: 'wishlist@1',
+        source: 'memories@1',
         evidence: 'verified',
-        channels: { achievement: 0.92, significance: 0.58 },
-        portalActivity: 0.28,
+        channels: { remembrance: 0.5 },
+        portalActivity: 0.1,
       },
     ]);
     const earlier = buildGrowthState({

@@ -178,6 +178,19 @@ function CrystalLab() {
    */
   const withoutCrystal = params.get('crystal') === 'off';
 
+  /*
+   * ЧИЇ БАЖАННЯ ВИКОНУВАЛИСЬ — щоб колір від подарунків (ADR-0151) можна
+   * було ПОБАЧИТИ, а не лише порахувати. Пісочниця робить усі бажання
+   * спільними й безіменними, тож без цієї ручки лабораторія показувала б
+   * рівно один стан із чотирьох.
+   *
+   *   ?gifts=hers    усі бажання першого виконав другий  → червоний
+   *   ?gifts=his     дзеркально                          → блакитний
+   *   ?gifts=shared  усі спільні                         → зелений
+   *   ?gifts=mix     порівну                             → колір пари
+   */
+  const gifts = params.get('gifts') ?? '';
+
   const states = useMemo(() => {
     const sources = applyEvolutionSandboxSources({
       enabled: true,
@@ -189,16 +202,29 @@ function CrystalLab() {
         mapPlaces: [], memories: [], memoryLinks: [], media: [],
       },
     });
+    const wishlistItems = gifts === ''
+      ? sources.snapshot.wishlistItems
+      : sources.snapshot.wishlistItems.map((item, index) => {
+        if (gifts === 'shared') return { ...item, isShared: true, ownerId: 1, fulfilledById: 2 };
+        if (gifts === 'hers') return { ...item, isShared: false, ownerId: 1, fulfilledById: 2 };
+        if (gifts === 'his') return { ...item, isShared: false, ownerId: 2, fulfilledById: 1 };
+        // mix: по третині на канал.
+        const slot = index % 3;
+        if (slot === 0) return { ...item, isShared: false, ownerId: 1, fulfilledById: 2 };
+        if (slot === 1) return { ...item, isShared: false, ownerId: 2, fulfilledById: 1 };
+        return { ...item, isShared: true, ownerId: 1, fulfilledById: 2 };
+      });
     return buildCrystalPipelineStates({
       coupleId: 'amore-couple:lab',
       asOf: AS_OF,
       relationshipStartedAt: sources.relationshipStartedAt,
-      snapshot: sources.snapshot,
+      snapshot: { ...sources.snapshot, wishlistItems },
       sharedDaysOff: sources.sharedDaysOff,
       quality,
       reducedMotion: false,
+      ...(gifts === '' ? {} : { colorPartners: { first: 1, second: 2 } }),
     });
-  }, [params, years, quality]);
+  }, [params, years, quality, gifts]);
 
   const material = useMemo(
     () => withTermsOff(states.material, off),

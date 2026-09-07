@@ -43,15 +43,22 @@ export function buildCrystalSpeciesBlueprint(
   const pressures = buildCrystalPressures(currentArtifact);
   const ageDays = relationshipAgeDays(currentArtifact, asOf);
   const state = buildCrystalState(currentArtifact, ageDays, pressures, asOf);
-  // Колір колонії тепер від дати початку стосунків, тож монархові вже не
-  // треба знати, хто кому що подарував (ADR-0059).
-  const mother = buildMotherInstruction(currentArtifact, asOf);
+  /*
+   * Колір колонії — від дати початку стосунків, ВІДТЯГНУТИЙ подарунками
+   * (ADR-0059 + ADR-0151). Монарх і кільце років беруть один і той самий
+   * тон, тож обидва мусять бачити той самий контекст: інакше монарх і
+   * діти розійшлись би в кольорі, а це рівно та вада, від якої ADR-0059
+   * і позбувся річних кольорів.
+   */
+  const colonyContext = {
+    sharedDaysOff: input.config.sharedDaysOff ?? [],
+    ...(input.config.colorPartners ? { colorPartners: input.config.colorPartners } : {}),
+  };
+  const mother = buildMotherInstruction(currentArtifact, asOf, colonyContext);
   // The full artifact, not the filtered one: the formation builders bound
   // themselves by asOf, and diagnostics must still be able to name the facts
   // that lie in the future.
-  const { formations, diagnostics } = buildCrystalFormations(input.artifact, asOf, {
-    sharedDaysOff: input.config.sharedDaysOff ?? [],
-  });
+  const { formations, diagnostics } = buildCrystalFormations(input.artifact, asOf, colonyContext);
   const colonies = buildColonies(currentArtifact.deterministicSeed, formations);
 
   return {
