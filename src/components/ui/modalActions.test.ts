@@ -297,7 +297,7 @@ describe('хрестик модалки', () => {
         const name = match[1]!;
         // Хрестики поза модалками — це інші речі: закрити повноекранну
         // карту, згорнути панель шляху, вийти з меню «Ще».
-        if (['modal-close', 'wt-embed-close', 'jn-details-close', 'more-menu-close', 'wl-lb-close'].includes(name)) continue;
+        if (['modal-close', 'wt-embed-close', 'jn-details-close', 'more-menu-close'].includes(name)) continue;
         offenders.push(`${rel(file)} — .${name}`);
       }
     }

@@ -145,14 +145,37 @@ const ISLAND_EDGE_FROM = 0.7;
  * кілька вістер, а не в одну голку — злам породи не буває конусом.
  */
 const ISLAND_ROOT_LEVELS: readonly (readonly [number, number])[] = [
-  [0.93, 0.1],
-  [0.74, 0.34],
-  [0.47, 0.68],
-  [0.2, 1],
+  /*
+   * КАРНИЗ — ПЕРШИЙ РІВЕНЬ, І ВІН ШИРШИЙ ЗА КРОМКУ.
+   *
+   * Знайдено виміром проти еталона з Blender (ADR-0145). Верх острова НЕ
+   * має бути його найширшим місцем: під кромкою скеля нависає, бо м'яку
+   * породу вимило, а тверда лишилась карнизом. Якщо найширше збігається з
+   * верхом, тіло — усічений конус, тобто плита.
+   *
+   * Формально карниз у нас БУВ — але на 0.022 радіуса нижче за кромку
+   * проти 0.211 в еталона, тобто вдесятеро мілкіший, та ще й зроблений
+   * шумом, а не будовою: найширшою точкою виявлявся випадковий виступ
+   * першого кільця кореня. На силуеті це читалось як фаска, а не як
+   * карниз.
+   */
+  [1.13, 0.26],
+  [0.86, 0.52],
+  [0.62, 0.86],
+  [0.28, 1.2],
 ];
 
+/**
+ * Рівень карниза шумить утричі слабше за решту кореня.
+ *
+ * Карниз — це те, що видно на силуеті збоку, і рваний карниз перестає
+ * бути карнизом: найширша точка знову стає випадковою, а вимір —
+ * випадковим разом із нею. Нижче обрив може ламатись як завгодно.
+ */
+const ISLAND_CORNICE_CALM = 0.34;
+
 /** Наскільки глибоко сходяться вістря кореня. */
-const ISLAND_ROOT_TIP = 1.35;
+const ISLAND_ROOT_TIP = 1.6;
 
 /** Розмах шуму кореня, у частках його радіуса на цьому рівні. */
 const ISLAND_ROOT_NOISE = 0.22;
@@ -405,9 +428,11 @@ function crownUv(point: Point): Uv {
 function rootPoint(seed: number, segment: number, level: number): Point {
   const angle = segmentAngle(seed, segment, PORTAL_ISLAND_SEGMENTS);
   const [share, drop] = ISLAND_ROOT_LEVELS[level]!;
-  const noise = (seededUnit(seed, `island:root:${segment}:${level}`) - 0.5) * 2 * ISLAND_ROOT_NOISE;
+  const calm = level === 0 ? ISLAND_CORNICE_CALM : 1;
+  const noise = (seededUnit(seed, `island:root:${segment}:${level}`) - 0.5)
+    * 2 * ISLAND_ROOT_NOISE * calm;
   const radius = islandRadiusAt(seed, angle) * share * (1 + noise);
-  const sag = (seededUnit(seed, `island:sag:${segment}:${level}`) - 0.5) * 0.34;
+  const sag = (seededUnit(seed, `island:sag:${segment}:${level}`) - 0.5) * 0.34 * calm;
   return [
     Math.cos(angle) * radius,
     portalIslandHeightAt(seed, angle, 1) - drop + sag,
@@ -608,24 +633,60 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
 const TEMPLE_AT: readonly [number, number] = [0.34, -0.7];
 
 /**
- * Розміри храму. «Маленький» — це число, а не епітет.
+ * Храм міряється НИЖНІМ ДІАМЕТРОМ КОЛОНИ, як його й міряли ті, хто це
+ * будував.
  *
- * 0.62 завширшки на глибині 8.05 від камери дає 90 CSS-пікселів — менше
- * за чверть ширини екрана телефона, і це саме та частка, на якій храм
- * читається спорудою вдалині, а не предметом на столі. Перша редакція
- * мала 0.86 на глибині 7.07: 142 пікселі, і храм виходив за правий край
- * кадру, бо стояв ще й ближче до осі.
+ * Перша редакція носила п'ять незалежних чисел — ширину, глибину,
+ * сходинку, висоту колони, її радіус, — і вони не складались у жодну
+ * відому пропорцію. Вимір проти еталона з Blender (ADR-0145) показав, що
+ * саме розійшлось: колони стояли на 2.02 діаметра одна від одної при
+ * дорійських 1.2–1.5, а фронтон мав 21° при грецьких 12.5–16°. Стрункість
+ * при цьому випадково була правильною — 5.7 при 5.6, — і саме тому вада
+ * не була видна оком: одна вірна пропорція з трьох рятує силует рівно
+ * настільки, щоб він не читався поламаним.
+ *
+ * 0.0415 радіуса острова — єдине розмірне число храму. Воно каже, який він
+ * МАЛИЙ, а не яких він пропорцій: ширина при чотирьох колонах виходить
+ * 0.376, тобто на глибині 8 від камери близько 90 CSS-пікселів — менше за
+ * чверть екрана телефона.
  */
-const TEMPLE_WIDTH = 0.376;
-const TEMPLE_DEPTH = 0.28;
-const TEMPLE_STEP = 0.023;
-const TEMPLE_COLUMN_HEIGHT = 0.194;
-const TEMPLE_COLUMN_RADIUS = 0.017;
-const TEMPLE_BEAM = 0.025;
+const TEMPLE_COLUMN_DIAMETER = 0.0415;
+
+/** Висота колони на її нижній діаметр. Дорика тримається 4–6.5. */
+const TEMPLE_COLUMN_SLENDER = 5.6;
+
+/** Просвіт між колонами на діаметр. Класична дорика — 1.2–1.5. */
+const TEMPLE_INTERCOLUMN = 1.35;
+
+/** Нахил фронтону від горизонталі. Грецькі — 12.5–16°. */
+const TEMPLE_PEDIMENT_DEG = 14;
+
+/** Висота антаблемента в діаметрах. */
+const TEMPLE_ENTABLATURE = 1.6;
+
+/** Висота однієї сходинки стилобата в діаметрах. */
+const TEMPLE_STEP_SHARE = 0.42;
+
+const TEMPLE_COLUMN_RADIUS = TEMPLE_COLUMN_DIAMETER / 2;
+const TEMPLE_COLUMN_HEIGHT = TEMPLE_COLUMN_DIAMETER * TEMPLE_COLUMN_SLENDER;
+const TEMPLE_BAY = TEMPLE_COLUMN_DIAMETER * (1 + TEMPLE_INTERCOLUMN);
+const TEMPLE_STEP = TEMPLE_COLUMN_DIAMETER * TEMPLE_STEP_SHARE;
+const TEMPLE_BEAM = TEMPLE_COLUMN_DIAMETER * TEMPLE_ENTABLATURE;
 
 /** Скільки колон уздовж фасаду й уздовж боку. */
 const TEMPLE_FRONT_COLUMNS = 4;
 const TEMPLE_SIDE_COLUMNS = 3;
+
+/*
+ * Ширина й глибина — НАСЛІДОК кроку колон, а не окремі числа.
+ *
+ * Будівник розставляє осі по `ширина − 2 діаметри`, тож щоб крок вийшов
+ * рівно `діаметр × (1 + просвіт)`, ширина мусить бути саме такою. Поки
+ * ширина була власним числом, крок виходив який вийде — і вийшов 2.02
+ * діаметра замість 1.35.
+ */
+const TEMPLE_WIDTH = TEMPLE_BAY * (TEMPLE_FRONT_COLUMNS - 1) + TEMPLE_COLUMN_DIAMETER * 2;
+const TEMPLE_DEPTH = TEMPLE_BAY * (TEMPLE_SIDE_COLUMNS - 1) + TEMPLE_COLUMN_DIAMETER * 2;
 
 /**
  * Які колони зламані, і чому це список, а не випадковість.
@@ -767,7 +828,14 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
 
   // ── Уламок фронтону над фасадом ───────────────────────────
   const gableY = beamY + TEMPLE_BEAM / 2;
-  const peak: Point = [ox - halfW * 0.15, gableY + 0.073, oz + halfD];
+  // Нахил фронтону — оголошений, а не «щоб гарно»: 14° усередині
+  // грецьких 12.5–16°. Перша редакція мала прибиту висоту 0.073, тобто
+  // 21°, і це вже читалось двосхилим дахом хати.
+  const peak: Point = [
+    ox - halfW * 0.15,
+    gableY + (halfW + TEMPLE_COLUMN_RADIUS) * Math.tan((TEMPLE_PEDIMENT_DEG * Math.PI) / 180),
+    oz + halfD,
+  ];
   const left: Point = [ox - halfW - TEMPLE_COLUMN_RADIUS, gableY, oz + halfD];
   const right: Point = [ox + halfW * 0.45, gableY, oz + halfD];
   const depth = TEMPLE_COLUMN_RADIUS * 1.2;
