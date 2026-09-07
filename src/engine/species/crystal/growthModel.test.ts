@@ -147,8 +147,16 @@ describe('monarch girth', () => {
      * разом близько 0.68×. За форму, яку знайде лінійка, відповідає
      * `gemSilhouette.test.ts` і мірка еталона.
      */
-    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(5 - 1e-4);
-    expect(axial / (2 * quiet)).toBeLessThanOrEqual(5.85 + 1e-3);
+    /*
+     * СМУГА СТАЛА КЛАСТЕРНОЮ (ADR-0150). Власник, дивлячись на портал
+     * 2026-09-07: «просто стовп рожевого кольору, який стирчить із
+     * землі», — і обрав «кластер із нижчим монархом». Еталон став
+     * кремезнішим (`PRISM_ASPECT` 3.2 → 2.2), і номінальна смуга пішла
+     * за ним: 5–5.85 → 3.72–4.35. Виміряний силует монарха на
+     * одинадцяти роках — 2.50 при еталонних 2.51.
+     */
+    expect(axial / (2 * extreme)).toBeGreaterThanOrEqual(3.72 - 1e-4);
+    expect(axial / (2 * quiet)).toBeLessThanOrEqual(4.35 + 1e-3);
   });
 
   it('lands a typical couple near the silhouette the owner already accepted', () => {
@@ -159,13 +167,14 @@ describe('monarch girth', () => {
     const axial = monarchAxialScale(3.6 * YEAR);
     const aspect = axial / (2 * monarchRadialScale(axial, 47));
     /*
-     * Типова пара стоїть у середині смуги. Число рухалось двічі:
+     * Типова пара стоїть у середині смуги. Число рухалось тричі:
      * 2026-08-10 власник попросив удвічі тонший монарх (4.6 номінально),
-     * а ADR-0119 підтягнув смугу до еталона — 5.4 номінально, що дає
-     * виміряний силует 3.38 при еталонних 3.39.
+     * ADR-0119 підтягнув смугу до еталона (5.4), а ADR-0150 повернув
+     * монарха в кластер — 4.0 номінально, що дає виміряний силует 2.50
+     * при еталонних 2.51.
      */
-    expect(aspect).toBeGreaterThan(5.0);
-    expect(aspect).toBeLessThan(5.6);
+    expect(aspect).toBeGreaterThan(3.75);
+    expect(aspect).toBeLessThan(4.2);
   });
 
   it('lets a longer relationship carry more girth at the same activity', () => {

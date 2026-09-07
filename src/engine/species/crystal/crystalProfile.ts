@@ -362,3 +362,202 @@ export function crystalProfileDistance(
   }
   return total / bands / reference.radius;
 }
+
+/**
+ * Скупчення числами: не одне тіло, а те, ЯК ЇХ БАГАТО.
+ * ------------------------------------------------------------
+ * `crystalSilhouetteProfile` міряє форму ОДНОГО кристала й на питання
+ * власника «чому це просто стовп» відповісти не може: наш монарх зійшовся
+ * з еталоном на 0.036, тобто був вірним відтворенням еталонного кварцу.
+ * Стовпом його робив не силует, а те, що навколо: п'ятнадцять однакових
+ * камінців нижче за чверть його висоти.
+ *
+ * Тому міряється те, чого досі не міряв ніхто:
+ *
+ *   • чи є в лідера СУПЕРНИК (`secondShare`) — у скупченні другий тримає
+ *     близько половини першого, біля стовпа він галька;
+ *   • чи всі тіла ОДНАКОВІ (`sizeSpread`) — повторена п'ятнадцять разів
+ *     призма це один кристал, а не скупчення;
+ *   • чи вони РОЗХОДЯТЬСЯ (`leanMeanDeg`) — друза віялом, а не живопліт
+ *     із вертикальних стовпчиків.
+ *
+ * ОДНА ФУНКЦІЯ НА ОБИДВА БОКИ, і тому вона приймає суцільний суп
+ * трикутників, а не список тіл: еталон приходить одним мешем, наша сцена —
+ * купою мешів, і якби еталон різала одна дія, а нас інша, числа не можна
+ * було б класти поруч. Тіла тут знаходить сам вимір — за спільними
+ * вершинами.
+ */
+export interface CrystalClusterProfile {
+  /** Скільки окремих тіл у скупченні. */
+  count: number;
+  /** Висота другого за висотою, часткою висоти лідера. */
+  secondShare: number;
+  /** Медіанна висота супутника, часткою висоти лідера. */
+  medianShare: number;
+  /** Розкид висот супутників: стандартне відхилення на середнє. */
+  sizeSpread: number;
+  /** Середній нахил осі супутника від осі лідера, градуси. */
+  leanMeanDeg: number;
+  /** Найбільший такий нахил. */
+  leanMaxDeg: number;
+  /** Середня відстань підошви супутника від осі лідера, у радіусах лідера. */
+  reachMean: number;
+}
+
+interface ClusterBody {
+  height: number;
+  axis: readonly [number, number, number];
+  foot: readonly [number, number, number];
+  radius: number;
+}
+
+/**
+ * Розбиття супу трикутників на тіла за спільними вершинами.
+ *
+ * Ключ округлюється до п'яти знаків — той самий поріг, що в
+ * `rockFacetProfile`: у двох сусідніх трикутників одного тіла вершина
+ * записана одними й тими самими числами, а в двох різних тіл збіг на
+ * п'яти знаках означав би, що вони справді торкаються.
+ */
+function splitBodies(positions: readonly number[]): number[][] {
+  const triangles = Math.floor(positions.length / 9);
+  const owner = new Array<number>(triangles).fill(-1);
+  const byVertex = new Map<string, number[]>();
+  for (let triangle = 0; triangle < triangles; triangle += 1) {
+    for (let corner = 0; corner < 3; corner += 1) {
+      const at = triangle * 9 + corner * 3;
+      const key = `${positions[at]!.toFixed(5)},${positions[at + 1]!.toFixed(5)},${positions[at + 2]!.toFixed(5)}`;
+      const bucket = byVertex.get(key);
+      if (bucket) bucket.push(triangle);
+      else byVertex.set(key, [triangle]);
+    }
+  }
+  const neighbours = new Map<number, Set<number>>();
+  for (const bucket of byVertex.values()) {
+    for (const triangle of bucket) {
+      let set = neighbours.get(triangle);
+      if (!set) { set = new Set<number>(); neighbours.set(triangle, set); }
+      for (const other of bucket) if (other !== triangle) set.add(other);
+    }
+  }
+  const bodies: number[][] = [];
+  for (let triangle = 0; triangle < triangles; triangle += 1) {
+    if (owner[triangle] !== -1) continue;
+    const index = bodies.length;
+    const queue = [triangle];
+    const members: number[] = [];
+    owner[triangle] = index;
+    while (queue.length > 0) {
+      const current = queue.pop()!;
+      members.push(current);
+      for (const next of neighbours.get(current) ?? []) {
+        if (owner[next] !== -1) continue;
+        owner[next] = index;
+        queue.push(next);
+      }
+    }
+    bodies.push(members);
+  }
+  return bodies;
+}
+
+/**
+ * Вісь тіла — від центру підошви до вістря, а не головна вісь інерції.
+ *
+ * PCA дала б для таблички вісь УПОПЕРЕК кристала (вона ширша, ніж вища), і
+ * нахил таблички вийшов би близько 90°. «Куди дивиться вістря» — це те, що
+ * бачить око, і те, що робить друзу віялом.
+ */
+function bodyOf(positions: readonly number[], triangles: readonly number[]): ClusterBody | null {
+  let lowest = Number.POSITIVE_INFINITY;
+  let highest = Number.NEGATIVE_INFINITY;
+  for (const triangle of triangles) {
+    for (let corner = 0; corner < 3; corner += 1) {
+      const y = positions[triangle * 9 + corner * 3 + 1]!;
+      if (y < lowest) lowest = y;
+      if (y > highest) highest = y;
+    }
+  }
+  const height = highest - lowest;
+  if (!(height > 0)) return null;
+
+  // Підошва — центр ваги нижньої п'ятої тіла; вістря — верхньої двадцятої.
+  const footCut = lowest + height * 0.2;
+  const tipCut = highest - height * 0.05;
+  let footX = 0; let footY = 0; let footZ = 0; let footCount = 0;
+  let tipX = 0; let tipY = 0; let tipZ = 0; let tipCount = 0;
+  let widest = 0;
+  let midX = 0; let midZ = 0; let midCount = 0;
+  for (const triangle of triangles) {
+    for (let corner = 0; corner < 3; corner += 1) {
+      const at = triangle * 9 + corner * 3;
+      const x = positions[at]!; const y = positions[at + 1]!; const z = positions[at + 2]!;
+      midX += x; midZ += z; midCount += 1;
+      if (y <= footCut) { footX += x; footY += y; footZ += z; footCount += 1; }
+      if (y >= tipCut) { tipX += x; tipY += y; tipZ += z; tipCount += 1; }
+    }
+  }
+  if (footCount === 0 || tipCount === 0 || midCount === 0) return null;
+  const foot: readonly [number, number, number] = [footX / footCount, footY / footCount, footZ / footCount];
+  const tip: readonly [number, number, number] = [tipX / tipCount, tipY / tipCount, tipZ / tipCount];
+  const centreX = midX / midCount;
+  const centreZ = midZ / midCount;
+  for (const triangle of triangles) {
+    for (let corner = 0; corner < 3; corner += 1) {
+      const at = triangle * 9 + corner * 3;
+      widest = Math.max(widest, Math.hypot(positions[at]! - centreX, positions[at + 2]! - centreZ));
+    }
+  }
+  const ax = tip[0] - foot[0];
+  const ay = tip[1] - foot[1];
+  const az = tip[2] - foot[2];
+  const length = Math.hypot(ax, ay, az) || 1;
+  return { height, axis: [ax / length, ay / length, az / length], foot, radius: widest };
+}
+
+export function crystalClusterProfile(positions: readonly number[]): CrystalClusterProfile {
+  const empty: CrystalClusterProfile = {
+    count: 0, secondShare: 0, medianShare: 0, sizeSpread: 0,
+    leanMeanDeg: 0, leanMaxDeg: 0, reachMean: 0,
+  };
+  const bodies = splitBodies(positions)
+    .map((triangles) => bodyOf(positions, triangles))
+    .filter((body): body is ClusterBody => body !== null)
+    .sort((left, right) => right.height - left.height);
+  if (bodies.length === 0) return empty;
+
+  const leader = bodies[0]!;
+  const followers = bodies.slice(1);
+  if (followers.length === 0) {
+    return { ...empty, count: 1 };
+  }
+  const shares = followers.map((body) => body.height / leader.height).sort((a, b) => a - b);
+  const mean = shares.reduce((sum, value) => sum + value, 0) / shares.length;
+  const spread = Math.sqrt(
+    shares.reduce((sum, value) => sum + (value - mean) ** 2, 0) / shares.length,
+  ) / (mean || 1);
+
+  let leanSum = 0;
+  let leanMax = 0;
+  let reachSum = 0;
+  for (const body of followers) {
+    const dot = body.axis[0] * leader.axis[0]
+      + body.axis[1] * leader.axis[1]
+      + body.axis[2] * leader.axis[2];
+    const lean = (Math.acos(Math.min(1, Math.max(-1, dot))) * 180) / Math.PI;
+    leanSum += lean;
+    if (lean > leanMax) leanMax = lean;
+    reachSum += Math.hypot(body.foot[0] - leader.foot[0], body.foot[2] - leader.foot[2])
+      / (leader.radius || 1);
+  }
+
+  return {
+    count: bodies.length,
+    secondShare: followers[0]!.height / leader.height,
+    medianShare: shares[Math.floor(shares.length / 2)]!,
+    sizeSpread: spread,
+    leanMeanDeg: leanSum / followers.length,
+    leanMaxDeg: leanMax,
+    reachMean: reachSum / followers.length,
+  };
+}

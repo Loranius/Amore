@@ -30,6 +30,7 @@ import { describe, expect, it } from 'vitest';
 import { CRYSTAL_MONARCH_BODY_ID } from '@/engine/species/crystal';
 import { CRYSTAL_SUBSTRATE_BODY_ID } from '@/engine/geometry/substrate';
 import {
+  crystalClusterProfile,
   crystalProfileDistance,
   crystalSettingProfile,
   crystalSilhouetteProfile,
@@ -49,10 +50,20 @@ const REFERENCE = 'scripts/models/reference/crystal-geode.glb';
  * власним описом. Читати їх із файла означало б звіряти файл сам із собою.
  */
 const DECLARED = {
-  /** `PRISM_ASPECT` — довжина призми на ширину ВПОПЕРЕК ГРАНЕЙ. */
-  prismAspect: 3.2,
-  /** `PRISM_LENGTH / HEIGHT`, тобто де кінчається призма. */
-  shoulderAt: 0.833,
+  /**
+   * `PRISM_ASPECT` — довжина призми на ширину ВПОПЕРЕК ГРАНЕЙ.
+   *
+   * 3.2 → 2.2 (ADR-0150) на вказівку власника, який дивився на портал:
+   * «просто стовп рожевого кольору, який стирчить із землі». Еталон 3.2
+   * був чесним кварцом, і генератор до нього зійшовся, — тобто стовп був
+   * не вадою виконання, а вірним відтворенням еталона, який більше не
+   * описує те, чого хоче власник.
+   */
+  prismAspect: 2.2,
+  /** `PRISM_LENGTH / HEIGHT`, тобто де кінчається призма. 0.833 → 0.775. */
+  shoulderAt: 0.775,
+  /** `TERMINATION_ANGLE` — кут граней головки від горизонталі. */
+  terminationDeg: 52,
   /** `GEODE_WALL_SHARE` — висота породи над підошвою монарха. */
   rockRise: 0.34,
   /** `GEODE_OUTER_SHARE` — БАЗОВИЙ радіус породи; по азимуту він шумить. */
@@ -64,6 +75,21 @@ const DAYS_PER_YEAR = 365.2425;
 
 function referenceOf(name: string): number[] {
   return readGlbPositions(new Uint8Array(readFileSync(REFERENCE)), name);
+}
+
+/**
+ * Наше скупчення на заданому віці — усі тіла, крім породи.
+ *
+ * Суцільним супом, а не списком: `crystalClusterProfile` мусить різати
+ * обидва боки ОДНІЄЮ дією, інакше числа не можна класти поруч.
+ */
+function oursCluster(years: number) {
+  const states = statesOf(years);
+  const soup: number[] = [];
+  for (const mesh of states.geometry.meshes) {
+    if (mesh.bodyId !== CRYSTAL_SUBSTRATE_BODY_ID) soup.push(...mesh.positions);
+  }
+  return crystalClusterProfile(soup);
 }
 
 interface Ours {
@@ -79,7 +105,7 @@ interface Ours {
  * тіло мінімального розміру, і міряти треба той кристал, який пара
  * справді бачить.
  */
-function ours(years: number): Ours {
+function statesOf(years: number) {
   const days = Math.round(years * DAYS_PER_YEAR);
   const asOf = new Date(Date.parse(`${START}T00:00:00.000Z`) + days * 86_400_000).toISOString();
   const sources = applyEvolutionSandboxSources({
@@ -110,6 +136,11 @@ function ours(years: number): Ours {
     quality: 'high',
     reducedMotion: true,
   });
+  return states;
+}
+
+function ours(years: number): Ours {
+  const states = statesOf(years);
   const monarch = states.geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_MONARCH_BODY_ID);
   const rock = states.geometry.meshes.find((mesh) => mesh.bodyId === CRYSTAL_SUBSTRATE_BODY_ID);
   if (!monarch) throw new Error('У геометрії немає монарха — міряти нема що.');
@@ -127,13 +158,29 @@ describe('еталон каже про себе правду', () => {
 
   it('стрункість — оголошена, з поправкою на описане коло', () => {
     /*
-     * Скрипт оголошує 3.2 ВПОПЕРЕК ГРАНЕЙ, а силует бачить описане коло —
-     * воно ширше в 2/√3 ≈ 1.155 раза лише в кутах, тож виміряне число
-     * виходить трохи інше. Це не розходження: смуга нижче названа саме
-     * тим, чим є, — оголошене число плюс геометрія шестикутника.
+     * СМУГА ВИВОДИТЬСЯ, А НЕ ПІДБИРАЄТЬСЯ, і це виправлення знайшла сама
+     * зміна еталона. Стояло «оголошене × 0.95…1.12» — множник, підібраний
+     * під `PRISM_ASPECT = 3.2`; щойно скрипт оголосив 2.2, смуга
+     * розійшлась із власним описом, бо частка головки у висоті залежить
+     * від стрункості, а множник цього не знав.
+     *
+     * Виводиться так. Грань стоїть на відстані `d` від осі, тож ширина
+     * впоперек граней — `2d`, а описане коло — `d/cos30° = 1.1547d`.
+     * Призма має довжину `2d · PRISM_ASPECT`, головка підіймається на
+     * `d · tan52°`. Отже
+     *
+     *   виміряна стрункість = (2·PRISM_ASPECT + tan52°) / (2 / cos30°)
+     *
+     * При 2.2 це 2.460, при 3.2 було 3.409 — і обидва разу з тієї самої
+     * формули. Реальний вимір трохи більший (2.508), бо грані НЕРІВНІ
+     * (`FACE_OFFSETS`), і найширше місце тіла вужче за описане коло
+     * рівного шестикутника. Смуга 0.99–1.06 стереже саме цю нерівність.
      */
-    expect(crystal.aspect).toBeGreaterThan(DECLARED.prismAspect * 0.95);
-    expect(crystal.aspect).toBeLessThan(DECLARED.prismAspect * 1.12);
+    const derived = (2 * DECLARED.prismAspect
+      + Math.tan((DECLARED.terminationDeg * Math.PI) / 180))
+      / (2 / Math.cos(Math.PI / 6));
+    expect(crystal.aspect).toBeGreaterThan(derived * 0.99);
+    expect(crystal.aspect).toBeLessThan(derived * 1.06);
   });
 
   it('плече стоїть там, де його поставили', () => {
@@ -198,20 +245,27 @@ describe('наш кристал проти еталона — розрив за�
      * веде діяльність пари, а її на першому році мало. Еталон — доросла
      * друза, і сходитись із ним на першому році він не зобов'язаний.
      */
-    expect(crystalProfileDistance(reference, ours(1).crystal)).toBeLessThan(0.17);
-    expect(crystalProfileDistance(reference, ours(11).crystal)).toBeLessThan(0.05);
+    /*
+     * ПЕРЕМІРЯНО ПРОТИ КЛАСТЕРНОГО ЕТАЛОНА (ADR-0150): 0.167 / 0.056 /
+     * 0.111 на 1, 11 і 40 роках. На одинадцяти роках було 0.036 проти
+     * старого еталона — але то був інший еталон, і порівнювати ці два
+     * числа не можна. Смуга названа за виміром, з тим самим запасом, що
+     * стояв раніше.
+     */
+    expect(crystalProfileDistance(reference, ours(1).crystal)).toBeLessThan(0.18);
+    expect(crystalProfileDistance(reference, ours(11).crystal)).toBeLessThan(0.06);
     expect(crystalProfileDistance(reference, ours(40).crystal)).toBeLessThan(0.13);
   });
 
   it('З ВІКОМ КРИСТАЛ КРЕМЕЗНІШАЄ — і нижче цього вже не опускається', () => {
     /*
-     * Названа межа, не досягнення. Еталон дає 3.39 хай якого віку — у
+     * Названа межа, не досягнення. Еталон дає 2.51 хай якого віку — у
      * кварцу стрункість не залежить від того, скільки він ріс. Наш іде
-     * 3.04 → 2.61, тобто сорокарічний кристал на 23% кремезніший за
-     * еталон і на 14% за себе однорічного.
+     * 2.83 → 2.32, тобто сорокарічний кристал на 8% кремезніший за
+     * еталон і на 18% за себе однорічного (ADR-0150).
      */
-    expect(ours(1).crystal.aspect).toBeGreaterThan(3.0);
-    expect(ours(40).crystal.aspect).toBeGreaterThan(2.55);
+    expect(ours(1).crystal.aspect).toBeGreaterThan(2.6);
+    expect(ours(40).crystal.aspect).toBeGreaterThan(2.2);
   });
 
   it('ПРИЗМА СТАЛА ПРИЗМОЮ: боки паралельні, як в еталона', () => {
@@ -236,28 +290,29 @@ describe('наш кристал проти еталона — розрив за�
 
   it('ОБХВАТ СТАВ КВАРЦОВИМ: доросле тіло сідає на еталон', () => {
     /*
-     * Еталон дає стрункість 3.39. Наш кристал ішов 3.25 / 2.89 / 2.62 на
-     * 1, 11 і 40 роках; після ADR-0119 — 3.81 / 3.383 / 3.07.
+     * Еталон дає стрункість 2.51 (було 3.39 до ADR-0150). Наш кристал
+     * ішов 3.25 / 2.89 / 2.62 на 1, 11 і 40 роках; після ADR-0119 —
+     * 3.81 / 3.383 / 3.07; після ADR-0150 — 2.83 / 2.505 / 2.32.
      *
-     * На одинадцяти й двадцяти роках це 3.383 проти 3.39, тобто збіг у
-     * межах третього знака. Смуга навколо еталона свідомо тісна: саме
-     * тут найлегше тихо повернути товщину, «трохи підправивши» щось
+     * На одинадцяти роках це 2.505 проти 2.508, тобто збіг у межах
+     * третього знака. Смуга навколо еталона свідомо тісна: саме тут
+     * найлегше тихо повернути товщину, «трохи підправивши» щось
      * сусіднє.
      */
-    expect(ours(11).crystal.aspect).toBeGreaterThan(3.3);
-    expect(ours(11).crystal.aspect).toBeLessThan(3.5);
+    expect(ours(11).crystal.aspect).toBeGreaterThan(2.42);
+    expect(ours(11).crystal.aspect).toBeLessThan(2.6);
 
     /*
      * А на краях віку розходження ЗАЛИШЕНО, і воно навмисне.
      *
-     * Молодий кристал тонший (3.81): обхват веде діяльність пари, і на
-     * першому році її мало. Старий товщий (3.07): за ADR-0056 після
+     * Молодий кристал тонший (2.83): обхват веде діяльність пари, і на
+     * першому році її мало. Старий товщий (2.32): за ADR-0056 після
      * повного терміну історія показується шириною й новими гранями, бо
      * висота вже стала. Обидва — правила продукту, а не вади кварцу, і
      * підганяти їх під мінерал означало б зламати те, що власник просив.
      */
-    expect(ours(1).crystal.aspect).toBeGreaterThan(3.6);
-    expect(ours(40).crystal.aspect).toBeGreaterThan(3.0);
+    expect(ours(1).crystal.aspect).toBeGreaterThan(2.7);
+    expect(ours(40).crystal.aspect).toBeGreaterThan(2.25);
     expect(ours(40).crystal.aspect).toBeLessThan(ours(11).crystal.aspect);
   });
 
@@ -290,5 +345,70 @@ describe('наш кристал проти еталона — розрив за�
      */
     const setting = crystalSettingProfile(ours(40).monarch, ours(40).rock);
     expect(setting.rockSpread).toBeGreaterThan(3.0);
+  });
+});
+
+describe('скупчення проти еталона', () => {
+  /*
+   * ЧОМУ ЦЬОГО ВИМІРУ НЕ БУЛО, І ЩО ВІН ЗНАЙШОВ.
+   *
+   * Усі мірки вище — про ОДНЕ тіло. На запит власника «мені не подобається,
+   * як він виглядає: просто стовп рожевого кольору, який стирчить із
+   * землі» вони відповісти не могли: монарх сходився з еталоном на 0.036,
+   * тобто був вірним відтворенням еталонного кварцу. Стовпом його робило
+   * те, що НАВКОЛО.
+   *
+   * `crystalClusterProfile` міряє суп трикутників і сам знаходить у ньому
+   * тіла за спільними вершинами — одна дія на еталон (один меш друзи) і на
+   * нас (купа мешів), інакше числа не можна класти поруч.
+   *
+   * Перший вимір (2026-09-07), 11 років:
+   *
+   *              другий  медіана  розкид
+   *   еталон      0.552    0.270    0.46
+   *   наші        0.271    0.244    0.19   ← до правки
+   *   наші        0.325    0.299    0.20   ← після
+   *
+   * Медіана збігалась і до правки: дрібні кристали в нас правильні.
+   * Бракувало СУПЕРНИКА — другого тіла, помітного поруч із головним.
+   */
+  const reference = crystalClusterProfile([
+    ...referenceOf('ReferenceCrystal'), ...referenceOf('ReferenceDruse'),
+  ]);
+
+  it('ЕТАЛОН — СКУПЧЕННЯ, а не стовп із галькою', () => {
+    /*
+     * Стереже сам еталон: якщо `DRUSE_MAX_SHARE` колись повернеться до
+     * 0.26, еталон тихо стане тим, чим був, і всі висновки підуть за ним.
+     */
+    expect(reference.count).toBeGreaterThanOrEqual(16);
+    expect(reference.secondShare).toBeGreaterThan(0.5);
+    expect(reference.sizeSpread).toBeGreaterThan(0.35);
+  });
+
+  it('У НАШОГО МОНАРХА Є СУПЕРНИК', () => {
+    /*
+     * 0.30 — межа, що валить старе значення 0.271 і лишає запас під
+     * тісноту колонії: частка найвищої дитини падає з роками
+     * (`childMonarchShare`), і на двадцяти п'яти роках це вже 0.308.
+     *
+     * Стеля 0.5 — та сама, що в `ownerRules.test.ts` §2: дитина не
+     * наздоганяє монарха.
+     */
+    for (const years of [4, 11, 25]) {
+      const cluster = oursCluster(years);
+      expect(cluster.secondShare, `${years}р`).toBeGreaterThan(0.3);
+      expect(cluster.secondShare, `${years}р`).toBeLessThan(0.5);
+    }
+  });
+
+  it('дрібні кристали лишаються дрібними — медіана в еталонній смузі', () => {
+    // Скупчення — це НЕ «всі однакові й великі». Медіана в еталона 0.270;
+    // наша йде 0.334 → 0.219 з віком, бо колонія тісніє.
+    for (const years of [4, 11, 25]) {
+      const cluster = oursCluster(years);
+      expect(cluster.medianShare, `${years}р`).toBeGreaterThan(0.18);
+      expect(cluster.medianShare, `${years}р`).toBeLessThan(0.4);
+    }
   });
 });

@@ -174,8 +174,8 @@ export function veteranGirth(daysTogether: number): number {
  * monarch's radius, so without a change there it would have halved too and
  * dropped out of the brief's §4 band. See `VEIN_PROUD`.
  */
-const MONARCH_STOUTEST_ASPECT = 5;
-const MONARCH_SLIMMEST_ASPECT = 5.85;
+const MONARCH_STOUTEST_ASPECT = 3.72;
+const MONARCH_SLIMMEST_ASPECT = 4.35;
 
 /**
  * Deliberate acts beyond which more of them stop thickening the monarch.
@@ -566,7 +566,7 @@ export interface ChildDimensions {
  * as a chip, and `yearFill`'s own floor alone let one fall to 15%.
  */
 const CHILD_HEIGHT_MIN_SHARE = 0.18;
-const CHILD_HEIGHT_MAX_SHARE = 0.4;
+const CHILD_HEIGHT_MAX_SHARE = 0.5;
 
 /**
  * A child's own height-to-width ratio, seeded inside the brief's 2.5–3.2.
