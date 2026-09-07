@@ -130,7 +130,17 @@ function withTermsOff(material: CrystalMaterialState, off: readonly string[]): C
       return {
         ...body,
         shader,
-        ...(zeroEmissive ? { emissiveIntensity: 0 } : {}),
+        /*
+         * ГАСИТЬСЯ КОЛІР, А НЕ ЛИШЕ СИЛА, і це виправлення ablation'а, який
+         * нічого не гасив. Кадр життя переписує `emissiveIntensity` щокадру
+         * з `userData.evolutionBaseEmissiveIntensity` (пастка названа в
+         * `amore-crystal-look`), тож `--off=emissive` рівно нічого не
+         * вимикав: вимір показував −0.01 і читався як «свічення ні до чого».
+         * Колір кадр життя не чіпає.
+         */
+        ...(zeroEmissive
+          ? { emissiveIntensity: 0, emissiveColor: { r: 0, g: 0, b: 0 } }
+          : {}),
         ...(dullSurface
           ? { roughness: 1, metalness: 0, clearcoat: 0, reflectivity: 0, envMapIntensity: 0 }
           : {}),
