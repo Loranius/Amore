@@ -303,6 +303,29 @@ describe('Crystal organic profile phase 3a', () => {
      */
     const heights = new Set(profiles.map((profile) => profile.geometryLength));
     expect(heights.size).toBe(1);
+
+    /*
+     * І ГОЛОВНЕ: різниця мусить бути РІВНО оголошеним множником, а не
+     * приблизно ним.
+     *
+     * Це не педантизм, а те, на чому тримається порівняння з еталоном
+     * (ADR-0155). Стрункість монарха пари задає габітус, тож еталонний
+     * кварц може сказати щось про наше тіло лише після того, як множник
+     * винесено за дужки. Ділення має сенс тільки якщо після нього всі
+     * чотири форми сходяться в одне число — інакше «поправка на габітус»
+     * була б підгонкою під ту форму, на якій її придумали.
+     *
+     * Виміряно на цих чотирьох: сирі напівширини розходяться в 2.4 раза
+     * (голка 0.0865 проти плити 0.2279 у сцені пари), а поділені на
+     * `girth · max(scaleX, scaleZ)` лягають у 5.4% одна від одної
+     * (0.2459…0.2592). Смуга 6% — і вона не порожня: залишок дає
+     * асиметрія, закрут і фаза, які в кожної форми свої.
+     */
+    const neutral = profiles.map((profile, index) => {
+      const shape = crystalHabitShape(habits[index]!);
+      return widest(profile) / (shape.girth * Math.max(shape.scaleX, shape.scaleZ));
+    });
+    expect(Math.max(...neutral) / Math.min(...neutral)).toBeLessThan(1.06);
   });
 
   it('keeps the facet count off the level-of-detail knob', () => {

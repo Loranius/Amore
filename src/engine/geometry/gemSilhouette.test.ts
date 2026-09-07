@@ -6,6 +6,8 @@ import { buildCrystalSpeciesBlueprint, crystalToGrowthBlueprint } from '../speci
 import { DEFAULT_CRYSTAL_GEOMETRY_CONFIG } from './config';
 import { buildCrystalGeometry } from './engine';
 import { CRYSTAL_SUBSTRATE_BODY_ID } from './substrate';
+import { crystalHabitShape } from './habit';
+import { coupleCrystalHabit } from '../species/crystal/habit';
 
 function events(years: number, seed: string): EvolutionEventInput[] {
   const out: EvolutionEventInput[] = [];
@@ -95,8 +97,23 @@ function silhouette(
 const COUPLES = ['a', 'b', 'c', 'd'] as const;
 const AGES = [1, 4, 10, 25] as const;
 
+/**
+ * Множник обхвату габітусу, який носять усі пари цього файлу.
+ *
+ * Вони починались одного дня (`relationshipStartedAt: '2000-01-01'`), а
+ * габітус береться з дати — отже, форма в них спільна, і різняться вони
+ * тільки історією. Множник виноситься за дужки перед тим, як називати
+ * смугу, з тієї ж причини, що і в `crystalReference.test.ts` (ADR-0155):
+ * смуга, названа на сирому вимірі, мовчки помирає в день, коли власник
+ * обере іншу форму, — а вибір форми належить йому, не тестові.
+ */
+const HABIT_GIRTH = (() => {
+  const shape = crystalHabitShape(coupleCrystalHabit('2000-01-01'));
+  return shape.girth * Math.max(shape.scaleX, shape.scaleZ);
+})();
+
 describe('gem silhouette (crystal cluster brief)', () => {
-  it('keeps the monarch a wide cut gem at every age and seed', () => {
+  it('keeps the monarch the same body at every age and seed, whatever form she wears', () => {
     // The brief's band, measured on the built mesh rather than on the ratio the
     // growth model publishes — three things stand between them: the prism
     // flare, the elliptical cross-section, and the tenth of her length she
@@ -124,9 +141,20 @@ describe('gem silhouette (crystal cluster brief)', () => {
          * порівнюються навпростець, бо тут ширина міряється в кадрі
          * самого тіла разом із похованою частиною. Те, що звіряється з
          * еталоном, — `crystalProfile` (ADR-0150).
+         *
+         * 2026-09-07, того ж дня: власник подивився на 2.2 на живому
+         * порталі й попросив протилежне — «гострокінечний, а не як
+         * моноліт», — і обрав ГОЛЧАСТИЙ габітус (ADR-0155). Сирий вимір
+         * пішов на 6.20–6.70, і смуга 3.3–4.2 впала б, хоч тіло
+         * лишилось те саме: у голки оголошено обхват 0.576 призми.
+         *
+         * ТОМУ СМУГА ТЕПЕР НАЗВАНА НА ПРИВЕДЕНОМУ ЧИСЛІ — тому самому,
+         * яким `crystalReference.test.ts` кладе нас поруч із кварцом.
+         * Виміряно 3.57–3.86 при незайманій смузі 3.3–4.2: змінилась
+         * форма, а не тіло, і смуга це показує тим, що не рухається.
          */
-        expect(s.aspect, `${label} aspect`).toBeGreaterThanOrEqual(3.3);
-        expect(s.aspect, `${label} aspect`).toBeLessThanOrEqual(4.2);
+        expect(s.aspect * HABIT_GIRTH, `${label} aspect`).toBeGreaterThanOrEqual(3.3);
+        expect(s.aspect * HABIT_GIRTH, `${label} aspect`).toBeLessThanOrEqual(4.2);
       }
     }
   });
@@ -155,6 +183,7 @@ describe('gem silhouette (crystal cluster brief)', () => {
         expect(s.widestAt, `${label} widest`).toBeGreaterThan(0.55);
         expect(s.widestAt, `${label} widest`).toBeLessThan(0.92);
 
+
         /*
          * БОКИ ПРИЗМИ ПАРАЛЕЛЬНІ — і це протилежне тому, що тут стояло.
          *
@@ -170,8 +199,14 @@ describe('gem silhouette (crystal cluster brief)', () => {
          * Виміряно 0.883–0.941 — тобто підошва на 6–12% вужча за
          * найширше місце, і майже вся ця різниця припадає на кути
          * многогранника, а не на нахил граней.
+         *
+         * 0.86 → 0.85 з голчастим габітусом (ADR-0155): виміряно
+         * 0.855–0.942 проти колишніх 0.883–0.941. Нижній край дала пара
+         * `b` на першому році, і рухає його не нахил граней, а закрут:
+         * у голки він 0.16 проти 0.09 у масивної форми, тож кути
+         * многогранника біля підошви стають на частку градуса інакше.
          */
-        expect(s.rootShare, `${label} root`).toBeGreaterThan(0.86);
+        expect(s.rootShare, `${label} root`).toBeGreaterThan(0.85);
         expect(s.rootShare, `${label} root`).toBeLessThanOrEqual(1);
       }
     }

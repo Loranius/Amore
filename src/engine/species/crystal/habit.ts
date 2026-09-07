@@ -70,14 +70,41 @@ void _habitsAreArchetypes;
  * Порожня дата дає призму: вигадувати парі форму, доки вона не сказала,
  * коли почалась, — це не «за замовчуванням», це домисел.
  */
+/**
+ * Форми, які може носити МОНАРХ. Дві з чотирьох, і обидві гострокінечні.
+ *
+ * ВЛАСНИК ДВІЧІ ВІДМОВИВ ТУПОМУ МОНАРХОВІ: спершу «сталагміт» (звідки й
+ * узялась назва `massive` у словнику), потім, дивлячись на живий портал
+ * 2026-09-07: «треба щоб він був гострокінечний, а не як моноліт». Його
+ * дата давала саме `massive` — найположистішу корону з чотирьох.
+ *
+ * Спроби полагодити це всередині форми виміряні й відкинуті (ADR-0154):
+ * зняти зріз верхівки — головка росте з 0.100 висоти лише до 0.150;
+ * підняти кут до 50–57° — форма стає гострішою за призматичну й ламає
+ * сходинку габітусів; зменшити `APEX_CUT` — падають дві справжні
+ * геометричні гарантії.
+ *
+ * Тому власникові показали кадр трьох форм поруч і поставили питання
+ * прямо. Він обрав `needle` — довгий шпиль.
+ *
+ * `massive` і `tabular` лишаються в словнику: їх носять дрібні тіла
+ * (`chooseArchetype`), де присадкуватість — різноманіття, а не вада.
+ * Монарх — ні: він одна річ у кадрі, і вона мусить читатись кристалом.
+ *
+ * ПОРЯДОК ТУТ — ПІДГОНКА, І ЦЕ НАЗВАНО ВГОЛОС, як і зсув дуги кольорів у
+ * ADR-0152: він поставлений так, щоб дата власника дала `needle`. Сам по
+ * собі порядок сенсу не несе.
+ */
+export const MONARCH_HABITS = ['needle', 'prismatic'] as const;
+
 export function coupleCrystalHabit(relationshipStartedAt: string): CrystalHabit {
   const step = coupleTraitStep(
-    relationshipStartedAt, CRYSTAL_HABITS.length, stableHash32, 'habit',
+    relationshipStartedAt, MONARCH_HABITS.length, stableHash32, 'habit',
   );
   if (step === null) return 'prismatic';
   const index = Math.min(
-    CRYSTAL_HABITS.length - 1,
-    Math.round(step * (CRYSTAL_HABITS.length - 1)),
+    MONARCH_HABITS.length - 1,
+    Math.round(step * (MONARCH_HABITS.length - 1)),
   );
-  return CRYSTAL_HABITS[index]!;
+  return MONARCH_HABITS[index]!;
 }
