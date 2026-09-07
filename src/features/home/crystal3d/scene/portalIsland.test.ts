@@ -256,3 +256,54 @@ describe('масштаб сцени', () => {
     }
   });
 });
+
+describe('зерно каменю', () => {
+  /*
+   * ЩО ЦЕ СТЕРЕЖЕ, І ЯК ВОНО ЗЛАМАЛОСЬ МОВЧКИ. `PortalEnvironment` дає
+   * брилам матеріал із картою зерна (`map={rockGrain}`) — а геометрія
+   * брил розгортки не мала взагалі: усі вершини йшли з `uv` (0, 0). Карта
+   * при цьому не зникає й помилки не дає: вона просто множить колір на
+   * ОДИН тексель. Брила виходила пласкою пластиковою плямою поруч із
+   * плато, на якому зерно видно, — і в коді все виглядало правильно.
+   *
+   * Мірка — скільки плиток зерна вкладається в грань. Нуль означає, що
+   * розгортки немає; надто багато означає наждак, який на екрані телефона
+   * читається шумом (та сама межа, що в ADR-0139 і ADR-0143).
+   */
+  function tilesPerFace(geometry: {
+    getAttribute(name: string): { array: ArrayLike<number> };
+  }, from = 0, to = Number.POSITIVE_INFINITY): number {
+    const uv = geometry.getAttribute('uv').array;
+    const last = Math.min(to, uv.length);
+    const spans: number[] = [];
+    for (let at = from; at + 5 < last; at += 6) {
+      let widest = 0;
+      for (const [one, other] of [[0, 2], [2, 4], [0, 4]] as const) {
+        widest = Math.max(widest, Math.hypot(
+          uv[at + one]! - uv[at + other]!,
+          uv[at + one + 1]! - uv[at + other + 1]!,
+        ));
+      }
+      spans.push(widest);
+    }
+    spans.sort((a, b) => a - b);
+    return spans[Math.floor(spans.length / 2)] ?? 0;
+  }
+
+  it('лягає на БРИЛИ, а не лише на плато', () => {
+    // Виміряно: було 0.00 (розгортки немає), стало 0.83 — тобто грань
+    // брили бере майже цілу плитку, як і грань плато (0.54).
+    expect(tilesPerFace(buildPortalDriftGeometry(SEED, PORTAL_DRIFT_ROCKS.high)))
+      .toBeGreaterThan(0.3);
+    expect(tilesPerFace(buildPortalDriftGeometry(SEED, PORTAL_DRIFT_ROCKS.high)))
+      .toBeLessThan(4);
+  });
+
+  it('лягає на УЛАМКИ на плато', () => {
+    // Уламки лежать поруч із камерою й мають ту саму ваду: 0.00 → 1.00.
+    const island = buildPortalIslandGeometry(SEED, PORTAL_ISLAND_RUBBLE.high);
+    const rubbleFrom = PORTAL_ISLAND_CROWN_TRIANGLES * 6;
+    expect(tilesPerFace(island, rubbleFrom)).toBeGreaterThan(0.3);
+    expect(tilesPerFace(island, rubbleFrom)).toBeLessThan(4);
+  });
+});

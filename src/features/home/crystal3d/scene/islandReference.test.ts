@@ -34,9 +34,11 @@ import {
 } from './islandProfile';
 import {
   PORTAL_CLOUD_BANKS,
+  PORTAL_DRIFT_ROCKS,
   PORTAL_ISLAND_CROWN_TRIANGLES,
   PORTAL_ISLAND_RUBBLE,
   buildPortalCloudGeometry,
+  buildPortalDriftGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
 } from './portalIsland';
@@ -79,7 +81,19 @@ function ours(build: { getAttribute(name: string): { array: ArrayLike<number> } 
  * ті самі, — а нове тіло поруч: пасмо кумулусів із метакуль, зрізане
  * знизу площиною. Метакулі тут не примха: злиття куль дає перетяжки між
  * горбами, яких кільцевий генератор сцени не зробить жодним шумом, а
- * зріз площиною дає пласке дно ЗА ПОБУДОВОЮ, а не за наміром.
+ * зріз площиною дає пласке дно ЗА ПОБУДОВОЮ, а не за наміром. *
+ * ЧИСЛА БРИЛИ ДОДАНО РАЗОМ ІЗ ADR-0149, і фікстура знову інша: у GLB
+ * з'явились три тіла `ReferenceBoulder1…3` (418 020 байтів, sha256
+ * 1fc1ff06e0d7ad66). Тіла, що були, не змінились — кидок кісток для брил
+ * іде ПІСЛЯ хмари, тож острів і хмара лишились ті самі до байта.
+ *
+ * Три, а не одне: у брили близько двадцяти граней, і розкид їхніх площ
+ * на одному такому тілі гуляє від кидка більше, ніж від будови. Наші
+ * тридцять чотири брили міряються так само поштучно й усереднюються — та
+ * сама дія з обох боків.
+ *
+ * Числа `boulder*` зняті з УСІХ граней, а не лише повернутих угору: на
+ * плато ми дивимось згори, а брила висить у небі й показує і бік, і низ.
  */
 const REFERENCE_WAS = {
   overhangDrop: 0.264,
@@ -95,7 +109,13 @@ const REFERENCE_WAS = {
   cloudTopRough: 0.222,
   cloudBaseFlat: 0.035,
   cloudAspect: 5.23,
+  boulderDihedralMean: 41.7,
+  boulderDihedralMedian: 37.6,
+  boulderAreaSpread: 0.599,
 };
+
+/** Брилу видно з усіх боків, тож і міряється вона з усіх. */
+const ALL_FACES = -1;
 
 describe('еталон острова', () => {
   const island = islandSilhouetteProfile(reference('ReferenceIsland'));
@@ -158,6 +178,29 @@ describe('еталон острова', () => {
     expect(cloud.baseFlat).toBeCloseTo(REFERENCE_WAS.cloudBaseFlat, 2);
     expect(cloud.aspect).toBeCloseTo(REFERENCE_WAS.cloudAspect, 1);
     expect(cloud.baseFlat).toBeLessThan(cloud.topRough * 0.4);
+  });
+
+  it('ЕТАЛОННА БРИЛА — ОБОЛОНКА, а не кільце', () => {
+    /*
+     * Різниця будови, а не старанності. Кільцевий каркас дає радіальні
+     * грані ОДНАКОВОЇ площі: у віяла з однієї вершини всі трикутники
+     * подібні, хай як гуляє радіус. Опукла оболонка навколо кинутих
+     * точок так не вміє — сусідні точки лягають на спільну площину, і
+     * одна грань виходить утричі більшою за іншу просто тому, що точки
+     * лягли так.
+     *
+     * Якщо колись оболонку заступить кільце, еталон тихо стане таким
+     * самим, як наша сцена, і мірка перестане мати що сказати.
+     */
+    const boulders = [1, 2, 3].map((index) => rockFacetProfile(reference(`ReferenceBoulder${index}`), ALL_FACES));
+    const mean = (pick: (rock: (typeof boulders)[number]) => number): number =>
+      boulders.reduce((sum, rock) => sum + pick(rock), 0) / boulders.length;
+    expect(mean((rock) => rock.dihedralMean)).toBeCloseTo(REFERENCE_WAS.boulderDihedralMean, 0);
+    expect(mean((rock) => rock.dihedralMedian)).toBeCloseTo(REFERENCE_WAS.boulderDihedralMedian, 0);
+    expect(mean((rock) => rock.areaSpread)).toBeCloseTo(REFERENCE_WAS.boulderAreaSpread, 2);
+    // Кожне з трьох тіл, а не лише середнє: одна вдала брила з трьох
+    // сказала б про будову менше, ніж здається.
+    for (const rock of boulders) expect(rock.areaSpread).toBeGreaterThan(0.5);
   });
 });
 
@@ -336,5 +379,44 @@ describe('наші хмари проти еталона', () => {
     expect(mean((cloud) => cloud.baseFlat)).toBeLessThan(REFERENCE_WAS.cloudBaseFlat * 1.5);
     expect(mean((cloud) => cloud.topRough)).toBeGreaterThan(REFERENCE_WAS.cloudTopRough * 0.8);
     expect(mean((cloud) => cloud.topRough)).toBeLessThan(REFERENCE_WAS.cloudTopRough * 1.25);
+  });
+});
+
+describe('наші брили проти еталона', () => {
+  /*
+   * Брили міряються поштучно й усереднюються — так само, як еталонні.
+   * Пул із тридцяти чотирьох тіл РІЗНОГО РОЗМІРУ дав би розкид площ 0.57
+   * і тоді, коли кожна окрема брила виточена: у пулі до розкиду
+   * додається різниця між тілами, якої всередині тіла немає.
+   */
+  const count = PORTAL_DRIFT_ROCKS.high;
+  const all = ours(buildPortalDriftGeometry(SEED, count));
+  const floatsPerRock = all.length / count;
+  const rocks = Array.from({ length: count }, (_, index) =>
+    rockFacetProfile(all.slice(index * floatsPerRock, (index + 1) * floatsPerRock), ALL_FACES));
+  const mean = (pick: (rock: (typeof rocks)[number]) => number): number =>
+    rocks.reduce((sum, rock) => sum + pick(rock), 0) / rocks.length;
+
+  it('ГРАНІ БРИЛИ РІЗНОГО РОЗМІРУ, а не з токарного верстата', () => {
+    /*
+     * Виміряно: 0.38 проти 0.60 в еталона. Причина — рівний крок кутів
+     * кільця: віяло з рівним кроком дає подібні трикутники, хай як
+     * гуляє радіус. Нерівний крок (обмежений 0.45 щілини, щоб кут не
+     * обігнав сусідній і не вивернув грань) дав 0.52.
+     *
+     * Смуга знизу стереже здобуте, а не вдає, що розрив закрито:
+     * кільце не дасть повного розкиду оболонки, не переставши бути
+     * кільцем.
+     */
+    expect(mean((rock) => rock.areaSpread)).toBeGreaterThan(0.45);
+    expect(mean((rock) => rock.areaSpread)).toBeLessThan(REFERENCE_WAS.boulderAreaSpread * 1.3);
+  });
+
+  it('БРИЛА ЛАМАЄТЬСЯ ПІД ТИМ САМИМ КУТОМ, що еталонна', () => {
+    // Кут між сусідніми гранями — це вже не «чи різні вони», а «чи це
+    // взагалі злам». Тут ми з еталоном збігаємось із самого початку, і
+    // засувка стереже саме це: 39.3° проти 41.7°.
+    expect(mean((rock) => rock.dihedralMean)).toBeGreaterThan(REFERENCE_WAS.boulderDihedralMean * 0.8);
+    expect(mean((rock) => rock.dihedralMean)).toBeLessThan(REFERENCE_WAS.boulderDihedralMean * 1.2);
   });
 });

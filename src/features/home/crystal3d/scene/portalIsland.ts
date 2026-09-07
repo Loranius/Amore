@@ -386,6 +386,46 @@ function pushQuad(mesh: Soup, a: Point, b: Point, c: Point, d: Point, tint = 1):
   pushLit(mesh, a, c, d, tint);
 }
 
+/**
+ * Розгортка каменю по ДОМІНАНТНІЙ ОСІ ГРАНІ.
+ *
+ * Плато має власну розгортку з `xz` — воно в цій площині й лежить. Брили
+ * й уламки лежать як завгодно, і та сама проєкція розмазала б зерно на
+ * стінках у смуги. Тому вісь вибирає сама грань: у майже горизонтальної
+ * це `xz`, у майже вертикальної — та з двох бічних площин, куди вона
+ * повернута ширшим боком.
+ *
+ * ОДИНИЦІ ТІ САМІ, ЩО В ПЛАТО, і це не заощадження рядка: брила — шматок
+ * цього ж каменю, тож зерно на ній мусить бути того ж розміру, що на
+ * плато під нею. Різний масштаб на одному камені око ловить одразу, хай
+ * і не знає, що саме побачило.
+ */
+function rockUv(a: Point, b: Point, c: Point): readonly [Uv, Uv, Uv] {
+  const normal = faceNormal(a, b, c);
+  const alongX = Math.abs(normal[0]);
+  const alongY = Math.abs(normal[1]);
+  const alongZ = Math.abs(normal[2]);
+  const project = (point: Point): Uv => {
+    if (alongY >= alongX && alongY >= alongZ) {
+      return [point[0] / ROCK_TEXTURE_UNITS, point[2] / ROCK_TEXTURE_UNITS];
+    }
+    if (alongX >= alongZ) return [point[2] / ROCK_TEXTURE_UNITS, point[1] / ROCK_TEXTURE_UNITS];
+    return [point[0] / ROCK_TEXTURE_UNITS, point[1] / ROCK_TEXTURE_UNITS];
+  };
+  return [project(a), project(b), project(c)];
+}
+
+/** Трикутник каменю: власний нахил до ключа плюс зерно. */
+function pushRock(mesh: Soup, a: Point, b: Point, c: Point, tint = 1): void {
+  pushLit(mesh, a, b, c, tint, rockUv(a, b, c));
+}
+
+/** Чотирикутник каменю. Обидва трикутники беруть нормаль першого. */
+function pushRockQuad(mesh: Soup, a: Point, b: Point, c: Point, d: Point, tint = 1): void {
+  pushRock(mesh, a, b, c, tint);
+  pushRock(mesh, a, c, d, tint);
+}
+
 // ── Острів ──────────────────────────────────────────────────
 
 /**
@@ -659,7 +699,7 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
     };
     for (let corner = 0; corner < 6; corner += 1) {
       const next = (corner + 1) % 6;
-      pushQuad(mesh, ringPoint(-1, corner), ringPoint(-1, next), ringPoint(1, next), ringPoint(1, corner));
+      pushRockQuad(mesh, ringPoint(-1, corner), ringPoint(-1, next), ringPoint(1, next), ringPoint(1, corner));
     }
     for (const end of [-1, 1] as const) {
       const hub: Point = [
@@ -671,8 +711,8 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
         const next = (corner + 1) % 6;
         const first = ringPoint(end, corner);
         const second = ringPoint(end, next);
-        if (end > 0) pushLit(mesh, hub, first, second);
-        else pushLit(mesh, hub, second, first);
+        if (end > 0) pushRock(mesh, hub, first, second);
+        else pushRock(mesh, hub, second, first);
       }
     }
     return;
@@ -695,10 +735,10 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
   };
   const top = [corner(-1, -1, 1), corner(1, -1, 1), corner(1, 1, 1), corner(-1, 1, 1)] as const;
   const low = [corner(-1, -1, -1), corner(1, -1, -1), corner(1, 1, -1), corner(-1, 1, -1)] as const;
-  pushQuad(mesh, top[0], top[1], top[2], top[3]);
+  pushRockQuad(mesh, top[0], top[1], top[2], top[3]);
   for (let face = 0; face < 4; face += 1) {
     const next = (face + 1) % 4;
-    pushQuad(mesh, low[face]!, low[next]!, top[next]!, top[face]!);
+    pushRockQuad(mesh, low[face]!, low[next]!, top[next]!, top[face]!);
   }
 }
 
@@ -987,8 +1027,22 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
      */
     const sides = 7;
     const top = size * (0.42 + seededUnit(seed, `${tag}:cap`) * 0.26);
+    /*
+     * КУТИ МІЖ КУТАМИ НЕРІВНІ, і це те саме виправлення, що ADR-0147
+     * зробив ґратці плато, лише на меншому тілі. Рівні кути дають віяло
+     * з подібних трикутників: хай як гуляє радіус, площі граней
+     * лишаються майже однаковими, а однакова площа й читається
+     * виточеним. Виміряно: розкид площ 0.38 проти 0.60 в еталонної
+     * брили з опуклої оболонки; сам лише нерівний крок дає 0.52.
+     *
+     * Зсув обмежений 0.45 щілини між сусідами — менше за половину, тож
+     * кут НЕ МОЖЕ обігнати сусідній і вивернути грань. Та сама пастка
+     * вже коштувала дірок у плато.
+     */
     const ringPoint = (corner: number, level: number): Point => {
-      const a = spin + (corner / sides) * Math.PI * 2;
+      const gap = (Math.PI * 2) / sides;
+      const drift = (seededUnit(seed, `${tag}:step:${corner}`) - 0.5) * 2 * gap * 0.45;
+      const a = spin + corner * gap + drift;
       const wobble = 0.72 + seededUnit(seed, `${tag}:edge:${corner}`) * 0.56;
       const radius = size * wobble * (level === 0 ? 1 : 0.88);
       const lean = (seededUnit(seed, `${tag}:lean:${corner}`) - 0.5) * size * 0.22;
@@ -998,6 +1052,14 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
         cz + Math.sin(a) * radius,
       ];
     };
+    /*
+     * Вершина шапки ПО ЦЕНТРУ, і це перевірене рішення, а не лінощі.
+     * Зміщена вершина напрошується сама (вона теж ламає віяло), але дає
+     * 0.013 розкиду площ із 0.15 усієї правки, а в кадрі не змінює
+     * нічого: камера дивиться на брили майже врівень, і шапка з неї
+     * видна ребром. Прикраса, яка нічого не міряє й нічого не показує,
+     * тут не лишається.
+     */
     const cap: Point = [cx, rise + top * 1.16, cz];
     const tip: Point = [
       cx + (seededUnit(seed, `${tag}:tipx`) - 0.5) * size * 0.8,
@@ -1006,9 +1068,9 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
     ];
     for (let corner = 0; corner < sides; corner += 1) {
       const next = (corner + 1) % sides;
-      pushLit(mesh, ringPoint(corner, 1), ringPoint(next, 1), cap, 1.06);
-      pushQuad(mesh, ringPoint(corner, 0), ringPoint(next, 0), ringPoint(next, 1), ringPoint(corner, 1));
-      pushLit(mesh, ringPoint(next, 0), ringPoint(corner, 0), tip, 0.52);
+      pushRock(mesh, ringPoint(corner, 1), ringPoint(next, 1), cap, 1.06);
+      pushRockQuad(mesh, ringPoint(corner, 0), ringPoint(next, 0), ringPoint(next, 1), ringPoint(corner, 1));
+      pushRock(mesh, ringPoint(next, 0), ringPoint(corner, 0), tip, 0.52);
     }
   }
   return finish(mesh);

@@ -117,6 +117,37 @@ FACET_ANGLE_DEG = 11.0
 тридцять з'їв би всю форму разом із карнизом.
 """
 
+# ── ЧИСЛА ЕТАЛОНА: БРИЛА ─────────────────────────────────────
+# Брила — шматок, вирваний із плато. Її роблять не кільцями, а ОБОЛОНКОЮ
+# НАВКОЛО КИНУТИХ ТОЧОК: так її грані виходять різного розміру за
+# побудовою, а не за старанням шуму. Кільце ж дає радіальні грані
+# однакової площі, хай який рваний у нього радіус, — і саме це в нас і
+# було виміряно.
+
+BOULDER_POINTS = 15
+"""
+Скільки точок кидається в опуклу оболонку.
+
+Опукла оболонка з n точок дає близько 2n−4 граней, тобто 26 — рівно той
+бюджет, у якому живе брила сцени (28 трикутників). Порівнювати розкид
+площ на тілі з двох тисяч граней із тілом із двадцяти восьми було б
+порівнянням двох різних питань.
+"""
+
+BOULDER_CAP_SHARE = 0.35
+"""
+Частка точок, притиснутих до верхньої площини.
+
+Це колишня поверхня плато, з якої брилу вирвало: широкий плаский верх,
+що лишився цілим, і рваний злам під ним. Без цієї частки оболонка дає
+картоплину, у якої верх такий самий, як низ, — і камінь перестає бути
+ВІДЛАМКОМ чогось.
+"""
+
+BOULDER_FLAT = 0.55
+"""Висота брили на її ширину. Шматок плато пласкіший за кулю."""
+
+
 # ── ЧИСЛА ЕТАЛОНА: ХРАМ ──────────────────────────────────────
 # Дорика, бо саме її силует упізнають як «древній храм». Усі числа —
 # у НИЖНІХ ДІАМЕТРАХ КОЛОНИ, як їх і писали античні майстри.
@@ -404,6 +435,57 @@ def build_cloud(rng):
     return bm
 
 
+def build_boulder(rng):
+    """
+    Брила — опукла оболонка навколо кинутих точок, а не кільце.
+
+    ЧОМУ САМЕ ОБОЛОНКА. Кільцевий каркас дає радіальні грані ОДНАКОВОЇ
+    площі: у віяла з однієї вершини всі трикутники подібні, хай як
+    гуляє радіус. Опукла оболонка так не вміє — сусідні точки лягають
+    на спільну площину, і одна грань виходить утричі більшою за іншу
+    просто тому, що точки лягли так. Це і є та різниця, заради якої
+    Blender тут стоїть: не «краще», а ІНША БУДОВА.
+
+    Частина точок притиснута до верхньої площини — колишньої поверхні
+    плато, з якої брилу вирвало. Без них виходить картоплина, у якої
+    верх такий самий, як низ.
+    """
+    cap = round(BOULDER_POINTS * BOULDER_CAP_SHARE)
+    points = []
+    for index in range(BOULDER_POINTS):
+        angle = rng.random() * 2 * math.pi
+        if index < cap:
+            # Колишнє плато: точки лежать на одній висоті.
+            spread = 0.55 + rng.random() * 0.45
+            points.append(Vector((
+                math.cos(angle) * spread,
+                BOULDER_FLAT,
+                math.sin(angle) * spread,
+            )))
+        else:
+            # Злам: точки кидаються в об'ємі під нею.
+            spread = 0.6 + rng.random() * 0.4
+            points.append(Vector((
+                math.cos(angle) * spread,
+                BOULDER_FLAT * (0.7 - rng.random() * 1.7),
+                math.sin(angle) * spread,
+            )))
+
+    bm = bmesh.new()
+    for point in points:
+        bm.verts.new(point)
+    bm.verts.ensure_lookup_table()
+    hull = bmesh.ops.convex_hull(bm, input=bm.verts, use_existing_faces=False)
+    # Те, що не потрапило в оболонку. Списки `geom_interior` і
+    # `geom_unused` перетинаються, а `delete` падає на повторі — тож
+    # спершу за тотожністю, і лише потім видалення.
+    inside = list({id(item): item for item in
+                   hull.get('geom_interior', []) + hull.get('geom_unused', [])}.values())
+    if inside:
+        bmesh.ops.delete(bm, geom=inside, context='VERTS')
+    return bm
+
+
 def emit(name, bm, rock=False):
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
@@ -481,18 +563,32 @@ def build():
 
     cloud_mesh = emit('ReferenceCloud', build_cloud(rng))
 
+    # ТРИ БРИЛИ, А НЕ ОДНА, і це не щедрість. У брили близько двадцяти
+    # граней; розкид їхніх площ на одному такому тілі — це вибірка з
+    # двадцяти, тобто число, яке гуляє від кидка кісток більше, ніж від
+    # будови. Три тіла того самого розміру дають шістдесят граней, і
+    # мірка починає міряти БУДОВУ. Наші тридцять чотири брили міряються
+    # так само поштучно й усереднюються — та сама дія з обох боків.
+    boulders = [
+        emit(f'ReferenceBoulder{index + 1}', build_boulder(rng))
+        for index in range(3)
+    ]
+
     out = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 'reference', 'island-temple.glb',
     )
     os.makedirs(os.path.dirname(out), exist_ok=True)
     bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_yup=True)
-    return out, island_mesh, temple_mesh, cloud_mesh
+    return out, island_mesh, temple_mesh, cloud_mesh, boulders
 
 
 if __name__ == '__main__':
-    path, island_mesh, temple_mesh, cloud_mesh = build()
+    path, island_mesh, temple_mesh, cloud_mesh, boulders = build()
     data = open(path, 'rb').read()
-    total = sum(len(m.loop_triangles) for m in (island_mesh, temple_mesh, cloud_mesh))
+    total = sum(
+        len(m.loop_triangles)
+        for m in (island_mesh, temple_mesh, cloud_mesh, *boulders)
+    )
     print(f'еталон       {path}')
     print(f'острів       баня {CROWN_RISE:.2f} радіуса, корінь {ROOT_DEPTH:.2f} радіуса')
     print(f'карниз       найширше {WIDEST_OVER_TOP:.2f} радіуса, '
@@ -501,6 +597,9 @@ if __name__ == '__main__':
           f'грань від {FACET_ANGLE_DEG:.0f}°')
     print(f'хмара        {CLOUD_LOBES} горбів, стрункість {CLOUD_LOBE_ASPECT:.1f}, '
           f'зріз основи {CLOUD_BASE_CUT:.2f}')
+    print(f'брили        {len(boulders)} × {BOULDER_POINTS} точок, '
+          f'{[len(m.loop_triangles) for m in boulders]} граней, '
+          f'верх {BOULDER_CAP_SHARE:.2f}')
     print(f'храм         стрункість {COLUMN_SLENDER:.1f}, просвіт {INTERCOLUMN:.2f}, '
           f'фронтон {PEDIMENT_SLOPE_DEG:.1f}°')
     print(f'трикутників  {total}')
