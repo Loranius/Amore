@@ -187,6 +187,40 @@ function CrystalLab() {
    * виглядає цілком здоровим числом.
    */
   const withoutCrystal = params.get('crystal') === 'off';
+  /*
+   * Підкладка окремо від кристалів.
+   *
+   * `crystal=off` ховає весь артефакт разом із жеодою, тож на питання «що
+   * саме з нього стирчить з острова» відповісти ним не можна: зникає все
+   * одразу. Ця ручка лишає кристали й прибирає камінь під ними.
+   */
+  const withoutSubstrate = params.get('substrate') === 'off';
+
+  /*
+   * ВІДСТАНЬ КАМЕРИ, множник до кадру артефакта.
+   *
+   * Лабораторія доти вміла показувати рівно один кадр — той, у якому
+   * артефакт заповнює екран. Питання «як усе це виглядає, коли відійти
+   * до цілого острова» й «що видно, коли підійти до самої грані» не
+   * можна було навіть поставити, а власник ставить їх обидва.
+   *
+   *   ?cam=3     відійти втричі — острів цілком
+   *   ?cam=0.35  підійти впритул — грань і зерно
+   *
+   * Смуга 0.2…8 — не смак, а межа корисного: ближче за 0.2 камера
+   * заходить усередину тіла, далі за 8 артефакт коротший за піксель.
+   */
+  const camera = (() => {
+    const raw = Number.parseFloat(params.get('cam') ?? '');
+    if (!Number.isFinite(raw)) return 1;
+    return Math.min(8, Math.max(0.2, raw));
+  })();
+  /** Підняти око над горизонтом: 0 — рівень землі, 1 — прямо згори. */
+  const elevation = (() => {
+    const raw = Number.parseFloat(params.get('eye') ?? '');
+    if (!Number.isFinite(raw)) return null;
+    return Math.min(0.95, Math.max(0, raw));
+  })();
 
   /*
    * ЧИЇ БАЖАННЯ ВИКОНУВАЛИСЬ — щоб колір від подарунків (ADR-0151) можна
@@ -315,7 +349,11 @@ function CrystalLab() {
           artifactSceneHeight={crystalSceneHeight(states.geometry)}
           veinBearings={veinBearings}
           veinReach={crystalSubstrateSceneRadius(states.geometry)}
-          pose={crystalPoseForRegion('centre')}
+          pose={{
+            ...crystalPoseForRegion('centre'),
+            distance: crystalPoseForRegion('centre').distance * camera,
+            ...(elevation === null ? {} : { elevation }),
+          }}
           spin={0}
           allowOrbit={false}
           freeCamera={false}
@@ -326,7 +364,7 @@ function CrystalLab() {
               geometry={states.geometry}
               material={material}
               life={states.life}
-              substrateVisible
+              substrateVisible={!withoutSubstrate}
             />
           )}
           {/*

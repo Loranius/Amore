@@ -79,6 +79,15 @@ const fill = arg('fill', '');
 const gifts = arg('gifts', '');
 const theme = arg('theme', 'dark');
 /*
+ * Відстань камери, множник до кадру артефакта.
+ *
+ * Потрібна не для краси: кадр масштабується коробкою ВСІХ мешів, тож
+ * будь-яка зміна підкладки посуває камеру, а вимір яскравості береться
+ * зі СТАЛОЇ смуги пікселів. Без цієї ручки не можна спитати «а чи це
+ * взагалі кристал змінився, чи просто камера під'їхала».
+ */
+const cam = arg('cam', '');
+/*
  * Смуга за замовчуванням — РІЗНА для двох видів, і це не примха.
  *
  * Одна спільна смуга 380–520 стояла доти, доки кадр кристала не переїхав:
@@ -105,6 +114,7 @@ try {
     + (lod ? `&lod=${lod}` : '')
     + (fill ? `&fill=${encodeURIComponent(fill)}` : '')
     + (gifts ? `&gifts=${encodeURIComponent(gifts)}` : '')
+    + (cam ? `&cam=${cam}` : '')
     + (off === '' ? '' : `&off=${off}`);
   await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
   await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });

@@ -115,6 +115,7 @@ export const PORTAL_ISLAND_CROWN_TRIANGLES = PORTAL_ISLAND_SEGMENTS * (1 + (8 - 
  */
 const ISLAND_FLAT = 0.44;
 
+
 /** Розмах рельєфу верху, у частках радіуса. */
 const ISLAND_RELIEF = 0.055;
 
@@ -147,6 +148,7 @@ const ISLAND_GRIT = 0.04;
  * Зсув кожної вершини вздовж її ж радіуса ламає саму ґратку.
  */
 const ISLAND_LATTICE = 0.62;
+
 
 /** Скільки контрольних точок у кільцевому шумі. Просте число — навмисно. */
 const ISLAND_NOISE_POINTS = 19;
@@ -203,6 +205,26 @@ const ISLAND_ROOT_LEVELS: readonly (readonly [number, number])[] = [
  * випадковим разом із нею. Нижче обрив може ламатись як завгодно.
  */
 const ISLAND_CORNICE_CALM = 0.34;
+
+/**
+ * На скільки рядів ділиться кожен оголошений проліт кореня.
+ *
+ * ЧОТИРИ РІВНІ РОБИЛИ З ОБРИВУ ГРЕБІНЕЦЬ. Між кромкою й карнизом ішла
+ * ОДНА смуга на всю висоту обриву, і на екрані вона читалась не каменем,
+ * а зачесаними вертикальними пасмами: трикутник заввишки в третину
+ * острова й завширшки в один клин має співвідношення сторін близько
+ * восьми до одного, і жоден шум по радіусу цього не ховає.
+ *
+ * Два ряди на проліт дають вісім поясів замість чотирьох. Форма при
+ * цьому не змінюється: оголошені рівні лишаються тими самими точками,
+ * між ними лінійна частка, а власний шум кожного ряду ламає її на
+ * породу.
+ *
+ * ДВА, А НЕ ТРИ, І ЦЕ СТЕЛЯ БЮДЖЕТУ, А НЕ СМАК. При трьох рядах острів
+ * дає 4 634 трикутники при межі 4 200 («стеля не задерта»), тобто
+ * з'їдає бюджет, який належить сцені цілком. Два ряди вкладаються.
+ */
+const ISLAND_ROOT_ROWS = 2;
 
 /** Наскільки глибоко сходяться вістря кореня. */
 const ISLAND_ROOT_TIP = 1.6;
@@ -528,10 +550,43 @@ function crownUv(point: Point): Uv {
   return [point[0] / ROCK_TEXTURE_UNITS, point[2] / ROCK_TEXTURE_UNITS];
 }
 
+/**
+ * Рівні кореня після подрібнення: оголошені точки плюс проміжні ряди.
+ *
+ * Виводиться, а не оголошується: `ISLAND_ROOT_LEVELS` лишається єдиним
+ * місцем, де сказано, якої форми корінь, а це — лише те, скількома
+ * поясами ця форма малюється.
+ */
+const ISLAND_ROOT_ROWS_ALL: readonly (readonly [number, number])[] = (() => {
+  const out: (readonly [number, number])[] = [];
+  const rim: readonly [number, number] = [1, 0];
+  for (let level = 0; level < ISLAND_ROOT_LEVELS.length; level += 1) {
+    const from = level === 0 ? rim : ISLAND_ROOT_LEVELS[level - 1]!;
+    const to = ISLAND_ROOT_LEVELS[level]!;
+    for (let row = 1; row <= ISLAND_ROOT_ROWS; row += 1) {
+      const t = row / ISLAND_ROOT_ROWS;
+      out.push([
+        from[0] + (to[0] - from[0]) * t,
+        from[1] + (to[1] - from[1]) * t,
+      ]);
+    }
+  }
+  return out;
+})();
+
+/**
+ * Який із оголошених рівнів цей ряд представляє. Потрібно тільки для
+ * карниза: він спокійніший за решту, і спокій належить йому, а не
+ * порядковому номеру ряду.
+ */
+function rootBand(level: number): number {
+  return Math.floor(level / ISLAND_ROOT_ROWS);
+}
+
 function rootPoint(seed: number, segment: number, level: number): Point {
   const angle = segmentAngle(seed, segment, PORTAL_ISLAND_SEGMENTS);
-  const [share, drop] = ISLAND_ROOT_LEVELS[level]!;
-  const calm = level === 0 ? ISLAND_CORNICE_CALM : 1;
+  const [share, drop] = ISLAND_ROOT_ROWS_ALL[level]!;
+  const calm = rootBand(level) === 0 ? ISLAND_CORNICE_CALM : 1;
   const noise = (seededUnit(seed, `island:root:${segment}:${level}`) - 0.5)
     * 2 * ISLAND_ROOT_NOISE * calm;
   const radius = islandRadiusAt(seed, angle) * share * (1 + noise);
@@ -586,7 +641,7 @@ export function buildPortalIslandGeometry(seed: number, rubble: number): THREE.B
     (segment / segments) * ROCK_TILES_AROUND,
     y / ROCK_TEXTURE_UNITS,
   ];
-  const levels = ISLAND_ROOT_LEVELS.length;
+  const levels = ISLAND_ROOT_ROWS_ALL.length;
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
     const rim = ISLAND_TOP_RINGS.length - 1;
