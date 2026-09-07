@@ -325,3 +325,114 @@ export function rockFacetProfile(
     areaSpread: Math.sqrt(areaVariance) / (areaMean || 1),
   };
 }
+
+/** Силует хмари: бугристий верх і пласка основа — чи столова гора. */
+export interface CloudProfile {
+  /** Розкид верхньої кромки, у висотах хмари. Кумулус бугристий. */
+  topRough: number;
+  /** Розкид нижньої кромки. Основа хмари майже пласка — це її прикмета. */
+  baseFlat: number;
+  /** Ширина на висоту. */
+  aspect: number;
+}
+
+/**
+ * Верхня й нижня кромка силуету, по стовпцях.
+ *
+ * ЩО ЦЕ РОЗРІЗНЯЄ. Хмару від столової гори відрізняє не форма взагалі, а
+ * РІЗНИЦЯ між верхом і низом: у кумулуса верх бугристий, а основа майже
+ * пласка — її ріже рівень конденсації, той самий на всю хмару. Столова
+ * гора пласка з обох боків, а гірський хребет — рваний з обох.
+ *
+ * ХМАРА МІРЯЄТЬСЯ У ВЛАСНІЙ СИСТЕМІ. Пелюстки стоять по колу навколо
+ * острова, і вісь X сцени для більшості з них — погляд збоку; тому
+ * горизонтальний напрямок береться як напрямок найбільшого розмаху самої
+ * хмари.
+ *
+ * І СКАНУЮТЬСЯ ТРИКУТНИКИ, А НЕ ВЕРШИНИ. Перша редакція брала мінімум і
+ * максимум по вершинах у стовпці — у стовпці без жодної вершини основи
+ * «низом» ставала вершина горба, і рівна основа давала розкид 0.39 замість
+ * нуля. Тобто мірка міряла щільність сітки, а не силует.
+ */
+export function cloudSilhouetteProfile(
+  positions: readonly number[],
+  columns = 48,
+): CloudProfile {
+  let cx = 0;
+  let cz = 0;
+  let count = 0;
+  for (let at = 0; at + 2 < positions.length; at += 3) {
+    cx += positions[at]!;
+    cz += positions[at + 2]!;
+    count += 1;
+  }
+  if (count === 0) return { topRough: 0, baseFlat: 0, aspect: 0 };
+  cx /= count;
+  cz /= count;
+  let spreadXX = 0;
+  let spreadXZ = 0;
+  let spreadZZ = 0;
+  for (let at = 0; at + 2 < positions.length; at += 3) {
+    const dx = positions[at]! - cx;
+    const dz = positions[at + 2]! - cz;
+    spreadXX += dx * dx;
+    spreadXZ += dx * dz;
+    spreadZZ += dz * dz;
+  }
+  const angle = 0.5 * Math.atan2(2 * spreadXZ, spreadXX - spreadZZ);
+  const axisX = Math.cos(angle);
+  const axisZ = Math.sin(angle);
+  const along = (at: number) => (positions[at]! - cx) * axisX + (positions[at + 2]! - cz) * axisZ;
+
+  let low = Number.POSITIVE_INFINITY;
+  let high = Number.NEGATIVE_INFINITY;
+  let lowY = Number.POSITIVE_INFINITY;
+  let highY = Number.NEGATIVE_INFINITY;
+  for (let at = 0; at + 2 < positions.length; at += 3) {
+    const u = along(at);
+    if (u < low) low = u;
+    if (u > high) high = u;
+    const y = positions[at + 1]!;
+    if (y < lowY) lowY = y;
+    if (y > highY) highY = y;
+  }
+  const width = high - low;
+  const height = highY - lowY;
+  if (width <= 0 || height <= 0) return { topRough: 0, baseFlat: 0, aspect: 0 };
+
+  const tops: number[] = [];
+  const bases: number[] = [];
+  for (let column = 0; column < columns; column += 1) {
+    const u = low + ((column + 0.5) / columns) * width;
+    let top = Number.NEGATIVE_INFINITY;
+    let base = Number.POSITIVE_INFINITY;
+    for (let at = 0; at + 8 < positions.length; at += 9) {
+      // Той самий перетин, що в `spanAt`, лише транспонований: січемо
+      // трикутник ВЕРТИКАЛЛЮ й беремо розмах по висоті.
+      const span = spanAt(
+        positions[at + 1]!, along(at),
+        positions[at + 4]!, along(at + 3),
+        positions[at + 7]!, along(at + 6),
+        u,
+      );
+      if (!span) continue;
+      if (span[1] > top) top = span[1];
+      if (span[0] < base) base = span[0];
+    }
+    if (!Number.isFinite(top) || !Number.isFinite(base)) continue;
+    tops.push(top);
+    bases.push(base);
+  }
+
+  const deviation = (values: readonly number[]): number => {
+    if (values.length === 0) return 0;
+    const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
+    return Math.sqrt(values.reduce((sum, value) => sum + (value - mean) ** 2, 0) / values.length);
+  };
+
+  return {
+    topRough: deviation(tops) / height,
+    baseFlat: deviation(bases) / height,
+    aspect: width / height,
+  };
+}

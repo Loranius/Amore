@@ -167,6 +167,36 @@ TEMPLE_COLUMN_DIAMETER = 0.10
 """
 
 
+# ── ЧИСЛА ЕТАЛОНА: ХМАРА ─────────────────────────────────────
+# Хмару від столової гори відрізняє не форма взагалі, а РІЗНИЦЯ між
+# верхом і низом: у кумулуса верх бугристий, а основа майже пласка — її
+# ріже рівень конденсації, той самий на всю хмару. Гора пласка з обох
+# боків, хребет рваний з обох.
+
+CLOUD_LOBES = 5
+"""Скільки горбів у пасмі. Хмара — не одна куля, а купа."""
+
+CLOUD_LOBE_ASPECT = 1.0
+"""
+Ширина одного горба на його висоту НАД ОСНОВОЮ.
+
+Кумулус росте вгору так само швидко, як убік: класична «цвітна капуста»
+приблизно така сама заввишки, як завширшки. Розтягнутий горб перестає
+бути хмарою й стає пасмом туману.
+"""
+
+CLOUD_BASE_CUT = 0.42
+"""
+Яку частку радіуса нижнього горба зрізає рівень конденсації.
+
+Це і є пласке дно. Без зрізу метакулі дають картоплину, а картоплина в
+небі читається островом, а не хмарою.
+"""
+
+CLOUD_RESOLUTION = 0.14
+"""Крок сітки метакуль. Дрібніше — дорожче, грубіше — гранчаста хмара."""
+
+
 def crown_radius_at(rng_values, angle):
     """Радіус кромки в напрямку `angle` — гладкий шум по колу."""
     points = len(rng_values)
@@ -318,6 +348,62 @@ def build_temple(bm):
         bm.faces.new((a, b, c, e))
 
 
+def build_cloud(rng):
+    """
+    Пасмо кумулусів на спільній пласкій основі.
+
+    МЕТАКУЛІ, А НЕ СІТКА, і це те, заради чого Blender тут стоїть: злиття
+    куль дає перетяжки між горбами, яких кільцевий генератор сцени не
+    зробить жодним шумом. Потім `bisect_plane` зрізає низ — рівень
+    конденсації однаковий на всю хмару, тож основа виходить пласкою за
+    побудовою, а не за наміром.
+    """
+    ball = bpy.data.metaballs.new('CloudBall')
+    ball.resolution = CLOUD_RESOLUTION
+    ball.render_resolution = CLOUD_RESOLUTION
+    obj = bpy.data.objects.new('CloudSource', ball)
+    bpy.context.scene.collection.objects.link(obj)
+
+    step = 2.0 / CLOUD_LOBE_ASPECT
+    for lobe in range(CLOUD_LOBES):
+        radius = 0.8 + rng.random() * 0.45
+        element = ball.elements.new(type='BALL')
+        element.co = Vector((
+            (lobe - (CLOUD_LOBES - 1) / 2) * step + (rng.random() - 0.5) * 0.5,
+            (rng.random() - 0.5) * 0.6,
+            (rng.random() - 0.5) * 0.35,
+        ))
+        element.radius = radius
+        # Другий, менший горб над першим: кумулус росте догори купками, і
+        # саме вони дають бугристий верх.
+        if rng.random() < 0.7:
+            crest = ball.elements.new(type='BALL')
+            crest.co = element.co + Vector((
+                (rng.random() - 0.5) * 0.6,
+                (rng.random() - 0.5) * 0.4,
+                radius * (0.5 + rng.random() * 0.4),
+            ))
+            crest.radius = radius * (0.5 + rng.random() * 0.3)
+
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    baked = bpy.data.meshes.new_from_object(obj.evaluated_get(depsgraph))
+    bpy.data.objects.remove(obj)
+
+    bm = bmesh.new()
+    bm.from_mesh(baked)
+    bpy.data.meshes.remove(baked)
+    lowest = min(vert.co.z for vert in bm.verts)
+    cut = lowest + (0.8 * CLOUD_BASE_CUT)
+    bmesh.ops.bisect_plane(
+        bm,
+        geom=list(bm.verts) + list(bm.edges) + list(bm.faces),
+        plane_co=Vector((0.0, 0.0, cut)),
+        plane_no=Vector((0.0, 0.0, 1.0)),
+        clear_inner=True,
+    )
+    return bm
+
+
 def emit(name, bm, rock=False):
     mesh = bpy.data.meshes.new(name)
     bm.to_mesh(mesh)
@@ -393,24 +479,28 @@ def build():
     build_temple(stone)
     temple_mesh = emit('ReferenceTemple', stone)
 
+    cloud_mesh = emit('ReferenceCloud', build_cloud(rng))
+
     out = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 'reference', 'island-temple.glb',
     )
     os.makedirs(os.path.dirname(out), exist_ok=True)
     bpy.ops.export_scene.gltf(filepath=out, export_format='GLB', export_yup=True)
-    return out, island_mesh, temple_mesh
+    return out, island_mesh, temple_mesh, cloud_mesh
 
 
 if __name__ == '__main__':
-    path, island_mesh, temple_mesh = build()
+    path, island_mesh, temple_mesh, cloud_mesh = build()
     data = open(path, 'rb').read()
-    total = len(island_mesh.loop_triangles) + len(temple_mesh.loop_triangles)
+    total = sum(len(m.loop_triangles) for m in (island_mesh, temple_mesh, cloud_mesh))
     print(f'еталон       {path}')
     print(f'острів       баня {CROWN_RISE:.2f} радіуса, корінь {ROOT_DEPTH:.2f} радіуса')
     print(f'карниз       найширше {WIDEST_OVER_TOP:.2f} радіуса, '
           f'на {OVERHANG_DROP:.2f} нижче за кромку')
     print(f'порода       зміщення {ROCK_DISPLACE:.3f}, зерно {ROCK_GRAIN:.2f}, '
           f'грань від {FACET_ANGLE_DEG:.0f}°')
+    print(f'хмара        {CLOUD_LOBES} горбів, стрункість {CLOUD_LOBE_ASPECT:.1f}, '
+          f'зріз основи {CLOUD_BASE_CUT:.2f}')
     print(f'храм         стрункість {COLUMN_SLENDER:.1f}, просвіт {INTERCOLUMN:.2f}, '
           f'фронтон {PEDIMENT_SLOPE_DEG:.1f}°')
     print(f'трикутників  {total}')

@@ -26,10 +26,17 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { readGlbPositions } from '../evolution/glbPositions';
-import { islandSilhouetteProfile, rockFacetProfile, templeFrontProfile } from './islandProfile';
 import {
+  cloudSilhouetteProfile,
+  islandSilhouetteProfile,
+  rockFacetProfile,
+  templeFrontProfile,
+} from './islandProfile';
+import {
+  PORTAL_CLOUD_BANKS,
   PORTAL_ISLAND_CROWN_TRIANGLES,
   PORTAL_ISLAND_RUBBLE,
+  buildPortalCloudGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
 } from './portalIsland';
@@ -64,6 +71,15 @@ function ours(build: { getAttribute(name: string): { array: ArrayLike<number> } 
  *
  * Числа `crown*` зняті лише з граней, ПОВЕРНУТИХ УГОРУ: інакше в них
  * потрапляє обрив із коренем, у яких злам різкий за побудовою.
+ *
+ * ЧИСЛА ХМАРИ ДОДАНО РАЗОМ ІЗ ADR-0148, і разом з ними змінився сам
+ * файл еталона: у GLB з'явилось третє тіло, `ReferenceCloud`, тож
+ * розмір і sha256 фікстури інші (411 552 байти, 71336c11d11623ed).
+ * Змістовно це не правка старих тіл — острів і храм у ньому побайтово
+ * ті самі, — а нове тіло поруч: пасмо кумулусів із метакуль, зрізане
+ * знизу площиною. Метакулі тут не примха: злиття куль дає перетяжки між
+ * горбами, яких кільцевий генератор сцени не зробить жодним шумом, а
+ * зріз площиною дає пласке дно ЗА ПОБУДОВОЮ, а не за наміром.
  */
 const REFERENCE_WAS = {
   overhangDrop: 0.264,
@@ -76,6 +92,9 @@ const REFERENCE_WAS = {
   crownDihedralMean: 19.9,
   crownDihedralMedian: 13.7,
   crownAreaSpread: 1.08,
+  cloudTopRough: 0.222,
+  cloudBaseFlat: 0.035,
+  cloudAspect: 5.23,
 };
 
 describe('еталон острова', () => {
@@ -120,6 +139,25 @@ describe('еталон острова', () => {
     expect(temple.pedimentSlopeDeg).toBeLessThan(16.5);
     expect(temple.colonnadeVoid).toBeGreaterThan(0.55);
     expect(temple.colonnadeVoid).toBeLessThan(0.75);
+  });
+
+  it('ЕТАЛОННА ХМАРА КУПЧАСТА: верх бугристий, дно рівне', () => {
+    /*
+     * Хмару від столової гори відрізняє не форма взагалі, а РІЗНИЦЯ між
+     * верхом і низом. Рівень конденсації один на все пасмо, тож дно
+     * рівне; вгору кумулус росте купками, тож верх рваний. У гори рвані
+     * обидва краї, у пластини — жоден.
+     *
+     * Числа еталона: верх 0.222 висоти, дно 0.035 — усемеро рівніше.
+     * Якщо колись зі скрипта зникне `bisect_plane`, залишиться
+     * картоплина з метакуль, і всі наші висновки про хмари підуть за
+     * нею. Тому це стоїть тут, у мірці еталона.
+     */
+    const cloud = cloudSilhouetteProfile(reference('ReferenceCloud'));
+    expect(cloud.topRough).toBeCloseTo(REFERENCE_WAS.cloudTopRough, 2);
+    expect(cloud.baseFlat).toBeCloseTo(REFERENCE_WAS.cloudBaseFlat, 2);
+    expect(cloud.aspect).toBeCloseTo(REFERENCE_WAS.cloudAspect, 1);
+    expect(cloud.baseFlat).toBeLessThan(cloud.topRough * 0.4);
   });
 });
 
@@ -244,5 +282,59 @@ describe('наш храм проти еталона', () => {
     // сама смуга, якою міряється еталон.
     expect(temple.pedimentSlopeDeg).toBeGreaterThan(12.5);
     expect(temple.pedimentSlopeDeg).toBeLessThan(16.5);
+  });
+});
+
+describe('наші хмари проти еталона', () => {
+  /*
+   * Хмари міряються ПОШТУЧНО, і це не педантизм. Пасмо кидає розмір
+   * випадково, тож середнє по вісімнадцяти може бути еталонним і тоді,
+   * коли дві-три хмари з нього — столові гори. Проміжна редакція цієї
+   * правки саме такою й була: середнє 5.13 при розкиді від 2.6 до 10.6.
+   */
+  const banks = PORTAL_CLOUD_BANKS.high;
+  const all = ours(buildPortalCloudGeometry(SEED, banks));
+  const floatsPerCloud = all.length / banks;
+  const clouds = Array.from({ length: banks }, (_, index) =>
+    cloudSilhouetteProfile(all.slice(index * floatsPerCloud, (index + 1) * floatsPerCloud)));
+  const mean = (pick: (cloud: (typeof clouds)[number]) => number): number =>
+    clouds.reduce((sum, cloud) => sum + pick(cloud), 0) / clouds.length;
+
+  it('ЖОДНА ХМАРА НЕ Є СТОЛОВОЮ ГОРОЮ', () => {
+    /*
+     * Число, заради якого міряли. Ширина й висота кидались незалежно, і
+     * стрункість виходила добутком двох випадковостей: середнє 8.94 при
+     * розкиді від 4.46 до 18.59, тоді як в еталона 5.23. Хмара зі
+     * стрункістю 18 — це пласка смуга на горизонті, тобто рівно той
+     * краєвид, який літаючий острів мав скасувати.
+     *
+     * Тепер вільним лишається РОЗМІР, а форма кидається у вузькій смузі:
+     * ширина 4.2…10.8, стрункість 2.95…3.70 (на екрані це 4.1…6.3, бо
+     * профіль міряє силует із горбами, а не прямокутник).
+     */
+    for (const cloud of clouds) {
+      expect(cloud.aspect).toBeGreaterThan(3.4);
+      expect(cloud.aspect).toBeLessThan(7);
+    }
+    expect(mean((cloud) => cloud.aspect)).toBeCloseTo(REFERENCE_WAS.cloudAspect, 0);
+  });
+
+  it('ВЕРХ БУГРИСТИЙ, ДНО РІВНЕ — та сама різниця, що в еталона', () => {
+    /*
+     * Дно рівне, але НЕ ВИМІРЯНЕ ЛІНІЙКОЮ: до цієї правки розкид дна був
+     * рівно 0.000 в усіх вісімнадцяти хмар, бо всі п'ять горбів сиділи
+     * на одній константі, а рівний нуль у природі виглядає різаним
+     * склом. Еталон дає 0.035, ми тепер 0.031.
+     *
+     * Стеля тут важливіша за підлогу: щойно дно стає таким же рваним, як
+     * верх, хмара перестає бути хмарою.
+     */
+    for (const cloud of clouds) {
+      expect(cloud.baseFlat).toBeLessThan(cloud.topRough * 0.5);
+    }
+    expect(mean((cloud) => cloud.baseFlat)).toBeGreaterThan(REFERENCE_WAS.cloudBaseFlat * 0.5);
+    expect(mean((cloud) => cloud.baseFlat)).toBeLessThan(REFERENCE_WAS.cloudBaseFlat * 1.5);
+    expect(mean((cloud) => cloud.topRough)).toBeGreaterThan(REFERENCE_WAS.cloudTopRough * 0.8);
+    expect(mean((cloud) => cloud.topRough)).toBeLessThan(REFERENCE_WAS.cloudTopRough * 1.25);
   });
 });
