@@ -279,7 +279,11 @@ export const PORTAL_DRIFT_ROCKS: Record<'high' | 'balanced' | 'low' | 'fallback'
 
 /** Скільки хмар у морі хмар унизу. */
 export const PORTAL_CLOUD_BANKS: Record<'high' | 'balanced' | 'low' | 'fallback', number> = {
-  high: 18, balanced: 13, low: 8, fallback: 0,
+  // 18 → 46 (ADR-0165). Море хмар в еталоні власника — це ТЛО, а не смуга
+  // на обрії: воно займає більшу частину кадру. Вісімнадцять пелюсток на
+  // повне коло давали пасмо через кожні двадцять градусів, тобто рідке
+  // мереживо. Бюджет на це власник дав.
+  high: 46, balanced: 30, low: 16, fallback: 0,
 };
 
 // ── Насіння й шум ───────────────────────────────────────────
@@ -331,6 +335,17 @@ interface Soup {
   float: readonly [number, number] | null;
   /** Пари [фаза, темп], по одній на вершину. Порожньо — меш нерухомий. */
   readonly floats: number[];
+  /**
+   * Непрозорість тіла, що зараз будується: 1 — суцільне.
+   *
+   * Той самий прийом, що й `float`, і з тієї ж причини. Усі хмари живуть в
+   * одному меші, тож дальня не може бути слабшою за ближню інакше, ніж
+   * повершинно. Будівник ставить це поле перед трикутниками чергового
+   * тіла (ADR-0165).
+   */
+  alpha: number;
+  /** По одному значенню на вершину. Усі одиниці — меш непрозорий. */
+  readonly alphas: number[];
   push(
     a: Point,
     b: Point,
@@ -353,16 +368,20 @@ function soup(): Soup {
   const colors: number[] = [];
   const uvs: number[] = [];
   const floats: number[] = [];
+  const alphas: number[] = [];
   return {
     positions,
     colors,
     uvs,
     floats,
     float: null,
+    alphas,
+    alpha: 1,
     push(a, b, c, shade = 1, uv) {
       if (this.float !== null) {
         for (let corner = 0; corner < 3; corner += 1) floats.push(this.float[0], this.float[1]);
       }
+      for (let corner = 0; corner < 3; corner += 1) alphas.push(this.alpha);
       positions.push(...a, ...b, ...c);
       const corners = typeof shade === 'number' ? [shade, shade, shade] : shade;
       for (const value of corners) colors.push(value, value, value);
@@ -378,7 +397,29 @@ function soup(): Soup {
 function finish(mesh: Soup): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(mesh.positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(mesh.colors, 3));
+  /*
+   * Колір із четвертим каналом — ЛИШЕ там, де прозорість справді
+   * різна. Умова та сама, що й нижче в атрибуті руху, і з тієї ж
+   * причини: меш, у якому всі тіла суцільні, не має носити канал, у
+   * якому всюди одиниця. three вмикає `USE_COLOR_ALPHA` саме за
+   * `itemSize === 4`, тож четвертий канал тут — не декорація, а вимикач
+   * іншої гілки шейдера.
+   */
+  const graded = mesh.alphas.some((value) => value < 1);
+  if (graded) {
+    const rgba: number[] = [];
+    mesh.alphas.forEach((alpha, vertex) => {
+      rgba.push(
+        mesh.colors[vertex * 3] ?? 1,
+        mesh.colors[vertex * 3 + 1] ?? 1,
+        mesh.colors[vertex * 3 + 2] ?? 1,
+        alpha,
+      );
+    });
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(rgba, 4));
+  } else {
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(mesh.colors, 3));
+  }
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs, 2));
   /*
    * Атрибут руху ставиться ЛИШЕ там, де тіла справді ворушаться, і це не
@@ -1462,7 +1503,34 @@ export function buildPortalCloudGeometry(seed: number, count: number): THREE.Buf
   for (let index = 0; index < count; index += 1) {
     const tag = `island:cloud:${index}`;
     const angle = ((index + seededUnit(seed, `${tag}:spin`) * 0.9) / Math.max(1, count)) * Math.PI * 2;
-    const reach = 17 + seededUnit(seed, `${tag}:reach`) * 22;
+    /*
+     * ВІД КІЛЬЦЯ КАМЕРИ, а не числом (ADR-0165) — той самий урок, що з
+     * брилами: 17…39 було правдою, поки камера стояла на 3.33 радіуса.
+     * Тепер вона на 6.67, і те саме число означає вже інше.
+     *
+     * 1.3…4.6 кільця: найближче пасмо стоїть за брилами, найдальше — на
+     * межі туману. Ближче не можна — хмара між оком і островом читається
+     * не повітрям, а плямою на об'єктиві.
+     */
+    const away = seededUnit(seed, `${tag}:reach`);
+    const reach = PORTAL_CAMERA_RING * (1.3 + away * 3.3);
+    /*
+     * ПОВІТРЯНА ПЕРСПЕКТИВА, ЗАПЕЧЕНА В ВЕРШИНУ (ADR-0165).
+     *
+     * Туман до хмар не дістає й дістати не може (див. коментар над
+     * `<fog>` у `PortalEnvironment.tsx`): усе море стоїть далеко за
+     * `fogFar`, тож під туманом воно стало б рівно кольором туману, тобто
+     * зникло б цілком. Без туману ж дальня хмара нічим не відрізняється
+     * від ближньої — і кадр це показав числом: у верхній половині смуги
+     * хмари яскравіші за нижню (226 проти 202 з 255), тобто далина
+     * читалась БЛИЖЧЕ за близину. Саме через це небо виглядало
+     * наклеєними паперовими стрічками, а не глибиною.
+     *
+     * Тому глибина рахується тут, від власної віддалі хмари, і їде
+     * четвертим каналом кольору. 0.86 зблизька, 0.24 на межі: дальнє
+     * пасмо лишається натяком, ближнє тримає силует.
+     */
+    mesh.alpha = 0.86 - away * 0.62;
     /*
      * ВИСОТА МОРЯ ХМАР. Було −2.6…−4.8, стало −1.7…−3.6 на пряму вказівку
      * власника «хмари підніми вище» (ADR-0162).
@@ -1472,7 +1540,16 @@ export function buildPortalCloudGeometry(seed: number, count: number): THREE.Buf
      * починає його різати. −1.7 лишає між ними приблизно двісті
      * тисячних острова, тобто зазор, який видно, і не більше.
      */
-    const rise = -1.7 - seededUnit(seed, `${tag}:rise`) * 1.9;
+    /*
+     * ВИСОТА МОРЯ ХМАР. −1.7…−3.6 → −0.9…−5.4 (ADR-0165): смуга розтягнута
+     * і вгору, і вниз, бо в еталоні хмари не лінія, а ОБ'ЄМ — вони стоять
+     * і врівень з островом, і глибоко під ним.
+     *
+     * Вище за −0.9 не можна: корінь острова закінчується близько −1.5, і
+     * хмара, що зайшла вище, перестає бути морем ПІД островом — вона
+     * починає його різати.
+     */
+    const rise = -1.6 - seededUnit(seed, `${tag}:rise`) * 6.6;
     /*
      * ШИРИНА ЙДЕ ВІД ВІДДАЛІ, тобто задається В ГРАДУСАХ КАДРУ, а не в
      * одиницях сцени. Кадр показав, чому: хмара завширшки 10.8 одиниці

@@ -26,10 +26,16 @@ export function PortalBackdrop() {
         className="portal-backdrop"
         aria-hidden="true"
         // Небо мусить зустрітися з туманом 3D-сцени в один колір, інакше
-        // на лінії горизонту з'явиться шов. Тримати те саме значення в
-        // двох місцях означало б чекати, поки хтось поправить одне й
-        // забуде інше, — тож CSS бере його з тієї ж палітри, що й туман.
-        style={{ '--portal-sky-horizon': PORTAL_PALETTES[theme].fog } as CSSProperties}
+        // на лінії, де далина тане в туман, з'явиться шов. Тримати те саме
+        // значення в двох місцях означало б чекати, поки хтось поправить
+        // одне й забуде інше, — тож УСІ зупинки неба приходять із тієї ж
+        // палітри, що й туман (ADR-0165), а не лише горизонт.
+        style={{
+          '--portal-sky-deep': PORTAL_PALETTES[theme].skyDeep,
+          '--portal-sky-mid': PORTAL_PALETTES[theme].skyMid,
+          '--portal-sky-glow': PORTAL_PALETTES[theme].skyGlow,
+          '--portal-sky-horizon': PORTAL_PALETTES[theme].fog,
+        } as CSSProperties}
       >
         <div className="portal-backdrop__sky" />
       </div>
