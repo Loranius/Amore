@@ -17,6 +17,24 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { rockGrainTexture } from './rockGrainTexture';
+
+/*
+ * Три числа кільця, і всі три — від ВИСОТИ АРТЕФАКТА (ADR-0168).
+ *
+ * Не від острова й не від відстані камери: кільце належить кристалові,
+ * тож у молодої пари воно мале, у старої велике, і на екрані воно
+ * лишається того самого розміру ВІДНОСНО того, навколо чого висить.
+ *
+ * Нахил 0.34 радіана (19.5°) — щоб кільце читалось еліпсом, а не рискою.
+ * З камери під 23.6° горизонтальне кільце дало б майже пряму лінію
+ * упоперек кристала; нахил проти камери розкриває еліпс.
+ */
+const HALO_RADIUS_SHARE = 0.5;
+const HALO_HEIGHT_SHARE = 0.42;
+const HALO_TILT = 0.34;
+/** Повний оберт приблизно за сорок секунд: рух є, а погляд не тягне. */
+const HALO_TURN_PER_SECOND = 0.16;
+
 import { portalLevitation } from './portalLevitation';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
@@ -39,11 +57,13 @@ import {
 import {
   PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
+  PORTAL_HALO_SEGMENTS,
   PORTAL_WATERFALLS,
   PORTAL_ISLAND_RUBBLE,
   buildPortalCloudGeometry,
   buildPortalDriftGeometry,
   buildPortalFloraGeometry,
+  buildPortalHaloGeometry,
   buildPortalWaterfallGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
@@ -126,6 +146,10 @@ export function PortalEnvironment({
     () => buildPortalWaterfallGeometry(seed, PORTAL_WATERFALLS[quality]),
     [seed, quality],
   );
+  const halo = useMemo(
+    () => buildPortalHaloGeometry(seed, PORTAL_HALO_SEGMENTS[quality]),
+    [seed, quality],
+  );
 
   /*
    * Одне полотно на весь застосунок — і на обидві теми: воно несе лише
@@ -144,6 +168,7 @@ export function PortalEnvironment({
    */
   const floatClocks = useRef<{ value: number }[]>([]);
   const levitate = useMemo(() => portalLevitation(floatClocks), []);
+  const haloSpin = useRef<THREE.Group>(null);
   const floatSeconds = useRef(0);
   useFrame((_, delta) => {
     // Зупиняється разом із диханням камери, а не окремим прапорцем: камінь,
@@ -154,6 +179,14 @@ export function PortalEnvironment({
     // Усі — і брили, і трава на них. Один спільний годинник, бо камінь і
     // його кущик мусять іти в одну секунду.
     for (const clock of floatClocks.current) clock.value = floatSeconds.current;
+    /*
+     * Кільце обертається ТУТ, а не власним годинником: воно спиняється
+     * разом із диханням каменю, бо зупинка руху — це одне рішення пари,
+     * а не набір незалежних вимикачів (§47).
+     */
+    if (haloSpin.current !== null) {
+      haloSpin.current.rotation.y = floatSeconds.current * HALO_TURN_PER_SECOND;
+    }
   });
 
   /*
@@ -180,7 +213,8 @@ export function PortalEnvironment({
     // драйвера. Тепер він найважчий із п'яти, тож пропуск було б і видно.
     flora.dispose();
     falls.dispose();
-  }, [island, temple, drift, clouds, flora, falls]);
+    halo.dispose();
+  }, [island, temple, drift, clouds, flora, falls, halo]);
 
   return (
     <>
@@ -332,6 +366,45 @@ export function PortalEnvironment({
           сцени робив би сонце то вищим, то нижчим залежно від віку пари.
           А кут падіння — це різниця яскравості сусідніх граней, тобто
           рівно те, чим кристал і читається кристалом. */}
+      {/*
+        Світляне кільце навколо артефакта (ADR-0168).
+        ------------------------------------------------------------
+        ПОЗА ГРУПОЮ ОСТРОВА, і це не дрібниця розміщення. Острів
+        масштабується під кадр (`portalIslandScale`), а кільце належить
+        АРТЕФАКТОВІ: воно мусить рости разом із ним, а не з декорацією.
+        Тому і радіус, і висота беруться з `frame.artifactHeight` — того
+        самого числа, яким кадр вимірює кристал.
+
+        ДОДАВАННЯМ, А НЕ ЗАМІЩЕННЯМ. Світло не закриває те, що за ним;
+        стрічка з простою прозорістю читалась би обручем із плівки. Ціна
+        додавання названа в палітрі: на майже білому денному небі додати
+        нічого не можна, тож кільце там слабше видно — це властивість
+        світла, а не вада.
+
+        `depthWrite={false}` плюс звичайний `depthTest`: дальня половина
+        кільця ховається за кристалом, як і має, але сама вона нічого не
+        вирізає.
+      */}
+      <group
+        ref={haloSpin}
+        position={[0, PORTAL_GROUND_Y + frame.artifactHeight * HALO_HEIGHT_SHARE, 0]}
+        rotation={[HALO_TILT, 0, 0]}
+        scale={frame.artifactHeight * HALO_RADIUS_SHARE}
+      >
+        <mesh geometry={halo} frustumCulled={false} renderOrder={2}>
+          <meshBasicMaterial
+            color={palette.halo}
+            vertexColors
+            transparent
+            opacity={palette.haloOpacity}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            fog={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </group>
+
       <directionalLight
         position={[0.6, PORTAL_GROUND_Y + 5.2, 0.4]}
         intensity={palette.skyIntensity}

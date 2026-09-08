@@ -1313,6 +1313,88 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
   return finish(mesh);
 }
 
+// ── Світляне кільце ─────────────────────────────────────────
+
+/** На скільки ланок ділиться кільце, за профілем якості. */
+export const PORTAL_HALO_SEGMENTS: Record<PortalQuality, number> = {
+  high: 60, balanced: 40, low: 24, fallback: 0,
+};
+
+/**
+ * Світляне кільце навколо артефакта — в одиницях САМОГО КІЛЬЦЯ.
+ *
+ * Радіус 1, площина XZ, центр у нулі. Нахил, розмір і місце ставить той,
+ * хто його вішає: кільце належить артефактові, а артефакт росте, тож
+ * прибити тут світові координати означало б кільце, яке підходить парі
+ * рівно одного віку.
+ *
+ * ЧОМУ ТРИ РЯДИ ВЕРШИН, А НЕ ДВА. Стрічка з двох рядів має РІЗАНІ краї:
+ * при будь-якій прозорості видно рівно, де вона закінчується, і кільце
+ * читається обручем із пластику. Три ряди — зовнішній, серединний,
+ * внутрішній — дають прозорість 0 / 1 / 0 поперек стрічки, тобто край,
+ * якого не видно. Це коштує вдвічі більше трикутників і є єдиною
+ * причиною, чому кільце взагалі світиться, а не лежить.
+ *
+ * ЧОМУ ЯСКРАВІСТЬ ГУЛЯЄ ПО КОЛУ. Рівне кільце — це обруч. У еталоні
+ * власника світло збирається дугами, а між ними майже гасне; саме це й
+ * читається рухом світла, а не предметом.
+ */
+export function buildPortalHaloGeometry(seed: number, segments: number): THREE.BufferGeometry {
+  const mesh = soup();
+  if (segments < 3) return finish(mesh);
+  /*
+   * Ширина стрічки — від радіуса кільця, і 0.085 замість 0.055 після
+   * кадру: вужча стрічка на екрані телефона давала лінію в один-два
+   * пікселі, тобто подряпину, а не світло.
+   */
+  const halfWidth = 0.062;
+  const at = (index: number, side: number): Point => {
+    const angle = (index / segments) * Math.PI * 2;
+    /*
+     * Кільце НЕ ідеальне коло: радіус трохи гуляє. Ідеальне коло —
+     * єдина форма, яку око впізнає як накреслену циркулем, а сцена
+     * навколо неї вся рвана.
+     */
+    const wobble = 1 + (seededUnit(seed, `halo:wobble:${index % segments}`) - 0.5) * 0.06;
+    const radius = (1 + side * halfWidth) * wobble;
+    return [Math.cos(angle) * radius, side * halfWidth * 0.35, Math.sin(angle) * radius];
+  };
+  /** Дуги світла: дві широкі й одна вузька, розведені по колу. */
+  const glow = (index: number): number => {
+    const angle = (index / segments) * Math.PI * 2;
+    /*
+     * ПІДЛОГА, А НЕ НУЛЬ. Перша редакція гасила кільце майже до нуля між
+     * дугами, і в кадрі лишалась одна яскрава дуга ліворуч від кристала —
+     * випадковий розчерк, а не кільце. Кільце мусить читатись кільцем
+     * ЦІЛКОМ, а дуги — лише збирати в собі більше світла.
+     */
+    const wave = 0.38 + 0.62 * (0.5 + 0.5 * Math.sin(angle * 2 + 0.9));
+    const spark = 0.26 * Math.max(0, Math.sin(angle * 5 - 2.1));
+    return Math.min(1, wave + spark);
+  };
+  for (let index = 0; index < segments; index += 1) {
+    const next = (index + 1) % segments;
+    const inner = [at(index, -1), at(next, -1)] as const;
+    const core = [at(index, 0), at(next, 0)] as const;
+    const outer = [at(index, 1), at(next, 1)] as const;
+    const here = glow(index);
+    const there = glow(next);
+    // Ядро стрічки світиться, краї згасають у ніщо.
+    // Тон і прозорість ідуть ПО ТИХ САМИХ кутах: край стрічки і темніший,
+    // і прозоріший, ядро — і яскравіше, і щільніше.
+    const edge = 0.55;
+    mesh.alpha = [0, 0, there];
+    mesh.push(inner[0], inner[1], core[1], [edge, edge, there]);
+    mesh.alpha = [0, there, here];
+    mesh.push(inner[0], core[1], core[0], [edge, there, here]);
+    mesh.alpha = [here, there, 0];
+    mesh.push(core[0], core[1], outer[1], [here, there, edge]);
+    mesh.alpha = [here, 0, 0];
+    mesh.push(core[0], outer[1], outer[0], [here, edge, edge]);
+  }
+  return finish(mesh);
+}
+
 // ── Водоспади ───────────────────────────────────────────────
 
 /** Скільки водоспадів падає з кромки, за профілем якості. */
