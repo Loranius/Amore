@@ -642,6 +642,34 @@ export function buildPortalIslandGeometry(seed: number, rubble: number): THREE.B
     y / ROCK_TEXTURE_UNITS,
   ];
   const levels = ISLAND_ROOT_ROWS_ALL.length;
+  /*
+   * Вістря — своє на кожен клин, а не одна спільна голка. Конус читався
+   * б виточеним; злам породи закінчується жменею гострих країв.
+   *
+   * Але вістря — це КІЛЬЦЕ, а не жмут окремих зубців. Перша редакція
+   * зшивала кожен клин із власним вістрям одним трикутником, і між
+   * сусідніми вістрями лишалась щілина завширшки в різницю їхніх висот
+   * (до 0.5 одиниці) — дірка просто в осі острова. Промінь з-під нахилу
+   * камери влучав крізь неї у виворіт сусіднього зубця: 1 влучання з 900
+   * (ADR-0159). Тому вістря нижче зшиті смугою, як усі інші кільця, і
+   * закриті шапкою в одну точку — 144 трикутники на весь острів.
+   */
+  const tipAt = (segment: number): Point => {
+    const angle = segmentAngle(seed, segment, segments);
+    const tipShift = (seededUnit(seed, `island:tip:${segment}`) - 0.5) * 0.5;
+    return [
+      Math.cos(angle) * PORTAL_ISLAND_RADIUS * 0.05,
+      portalIslandHeightAt(seed, angle, 1) - ISLAND_ROOT_TIP + tipShift,
+      Math.sin(angle) * PORTAL_ISLAND_RADIUS * 0.05,
+    ];
+  };
+  const tips: Point[] = [];
+  for (let segment = 0; segment < segments; segment += 1) tips.push(tipAt(segment));
+  const rootEnd: Point = [
+    0,
+    Math.min(...tips.map((tip) => tip[1])) - PORTAL_ISLAND_RADIUS * 0.03,
+    0,
+  ];
   for (let segment = 0; segment < segments; segment += 1) {
     const next = (segment + 1) % segments;
     const rim = ISLAND_TOP_RINGS.length - 1;
@@ -657,28 +685,25 @@ export function buildPortalIslandGeometry(seed: number, rubble: number): THREE.B
        * з вільної камери збоку.
        */
       const deep = 1 - (level / levels) * 0.62;
-      pushLit(mesh, aboveA, belowA, belowB, deep, [
-        wallUv(segment, aboveA[1]), wallUv(segment, belowA[1]), wallUv(segment + 1, belowB[1]),
+      pushLit(mesh, aboveA, belowB, belowA, deep, [
+        wallUv(segment, aboveA[1]), wallUv(segment + 1, belowB[1]), wallUv(segment, belowA[1]),
       ]);
-      pushLit(mesh, aboveA, belowB, aboveB, deep, [
-        wallUv(segment, aboveA[1]), wallUv(segment + 1, belowB[1]), wallUv(segment + 1, aboveB[1]),
+      pushLit(mesh, aboveA, aboveB, belowB, deep, [
+        wallUv(segment, aboveA[1]), wallUv(segment + 1, aboveB[1]), wallUv(segment + 1, belowB[1]),
       ]);
       aboveA = belowA;
       aboveB = belowB;
     }
-    /*
-     * Вістря — своє на кожен клин, а не одна спільна голка. Конус читався
-     * б виточеним; злам породи закінчується жменею гострих країв.
-     */
-    const angle = segmentAngle(seed, segment, segments);
-    const tipShift = (seededUnit(seed, `island:tip:${segment}`) - 0.5) * 0.5;
-    const tip: Point = [
-      Math.cos(angle) * PORTAL_ISLAND_RADIUS * 0.05,
-      portalIslandHeightAt(seed, angle, 1) - ISLAND_ROOT_TIP + tipShift,
-      Math.sin(angle) * PORTAL_ISLAND_RADIUS * 0.05,
-    ];
-    pushLit(mesh, aboveA, tip, aboveB, 0.34, [
-      wallUv(segment, aboveA[1]), wallUv(segment, tip[1]), wallUv(segment + 1, aboveB[1]),
+    const tipA = tips[segment]!;
+    const tipB = tips[next]!;
+    pushLit(mesh, aboveA, tipB, tipA, 0.34, [
+      wallUv(segment, aboveA[1]), wallUv(segment + 1, tipB[1]), wallUv(segment, tipA[1]),
+    ]);
+    pushLit(mesh, aboveA, aboveB, tipB, 0.34, [
+      wallUv(segment, aboveA[1]), wallUv(segment + 1, aboveB[1]), wallUv(segment + 1, tipB[1]),
+    ]);
+    pushLit(mesh, tipA, tipB, rootEnd, 0.3, [
+      wallUv(segment, tipA[1]), wallUv(segment + 1, tipB[1]), wallUv(segment, rootEnd[1]),
     ]);
   }
 
@@ -754,7 +779,7 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
     };
     for (let corner = 0; corner < 6; corner += 1) {
       const next = (corner + 1) % 6;
-      pushRockQuad(mesh, ringPoint(-1, corner), ringPoint(-1, next), ringPoint(1, next), ringPoint(1, corner));
+      pushRockQuad(mesh, ringPoint(-1, corner), ringPoint(1, corner), ringPoint(1, next), ringPoint(-1, next));
     }
     for (const end of [-1, 1] as const) {
       const hub: Point = [
@@ -766,8 +791,8 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
         const next = (corner + 1) % 6;
         const first = ringPoint(end, corner);
         const second = ringPoint(end, next);
-        if (end > 0) pushRock(mesh, hub, first, second);
-        else pushRock(mesh, hub, second, first);
+        if (end > 0) pushRock(mesh, hub, second, first);
+        else pushRock(mesh, hub, first, second);
       }
     }
     return;
@@ -790,10 +815,10 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
   };
   const top = [corner(-1, -1, 1), corner(1, -1, 1), corner(1, 1, 1), corner(-1, 1, 1)] as const;
   const low = [corner(-1, -1, -1), corner(1, -1, -1), corner(1, 1, -1), corner(-1, 1, -1)] as const;
-  pushRockQuad(mesh, top[0], top[1], top[2], top[3]);
+  pushRockQuad(mesh, top[0], top[3], top[2], top[1]);
   for (let face = 0; face < 4; face += 1) {
     const next = (face + 1) % 4;
-    pushRockQuad(mesh, low[face]!, low[next]!, top[next]!, top[face]!);
+    pushRockQuad(mesh, low[face]!, top[face]!, top[next]!, low[next]!);
   }
 }
 
@@ -926,7 +951,7 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
     pushQuad(mesh, top[0], top[3], top[2], top[1], tint);
     for (let face = 0; face < 4; face += 1) {
       const next = (face + 1) % 4;
-      pushQuad(mesh, low[face]!, low[next]!, top[next]!, top[face]!, tint);
+      pushQuad(mesh, low[face]!, top[face]!, top[next]!, low[next]!, tint);
     }
   };
 
@@ -974,21 +999,31 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
         oz + cz + Math.sin(a) * TEMPLE_COLUMN_RADIUS * taper,
       ];
     };
+    /*
+     * Злам угорі — рваний, а не рівний зріз: у зламаної колони верх
+     * нерівний, і саме це відрізняє руїну від недобудови.
+     *
+     * Підйом рахується НА КУТ, а не на трикутник, і верх стовбура йде за
+     * ним. Поки підйом був спільний на обидві вершини одного трикутника
+     * віяла, сусідні трикутники розходились по висоті, а стінка під ними
+     * лишалась рівною — між ними зяяли щілини, крізь які промінь бачив
+     * виворіт наступної грані. Променева проба ловила це як 5 влучань у
+     * спину з 900 (ADR-0159).
+     */
+    const lift = (corner: number): number => (share2 < 1
+      ? seededUnit(seed, `temple:break:${index}:${corner}`) * TEMPLE_COLUMN_RADIUS * 0.7
+      : 0);
+    const torn = (corner: number): Point => {
+      const point = ringPoint(1, corner);
+      return [point[0], point[1] + lift(corner), point[2]];
+    };
     for (let corner = 0; corner < sides; corner += 1) {
       const next = (corner + 1) % sides;
-      pushQuad(mesh, ringPoint(0, corner), ringPoint(0, next), ringPoint(1, next), ringPoint(1, corner));
+      pushQuad(mesh, ringPoint(0, corner), torn(corner), torn(next), ringPoint(0, next));
     }
-    // Злам угорі — рваний, а не рівний зріз: у зламаної колони верх
-    // нерівний, і саме це відрізняє руїну від недобудови.
     const hub: Point = [ox + cx, stepTop + height + (share2 < 1 ? TEMPLE_COLUMN_RADIUS * 0.3 : 0), oz + cz];
     for (let corner = 0; corner < sides; corner += 1) {
-      const next = (corner + 1) % sides;
-      const first = ringPoint(1, corner);
-      const second = ringPoint(1, next);
-      const lift = share2 < 1
-        ? seededUnit(seed, `temple:break:${index}:${corner}`) * TEMPLE_COLUMN_RADIUS * 0.7
-        : 0;
-      pushLit(mesh, hub, [first[0], first[1] + lift, first[2]], [second[0], second[1] + lift, second[2]]);
+      pushLit(mesh, hub, torn((corner + 1) % sides), torn(corner));
     }
   });
 
@@ -1123,9 +1158,9 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
     ];
     for (let corner = 0; corner < sides; corner += 1) {
       const next = (corner + 1) % sides;
-      pushRock(mesh, ringPoint(corner, 1), ringPoint(next, 1), cap, 1.06);
-      pushRockQuad(mesh, ringPoint(corner, 0), ringPoint(next, 0), ringPoint(next, 1), ringPoint(corner, 1));
-      pushRock(mesh, ringPoint(next, 0), ringPoint(corner, 0), tip, 0.52);
+      pushRock(mesh, ringPoint(corner, 1), cap, ringPoint(next, 1), 1.06);
+      pushRockQuad(mesh, ringPoint(corner, 1), ringPoint(next, 1), ringPoint(next, 0), ringPoint(corner, 0));
+      pushRock(mesh, ringPoint(corner, 0), ringPoint(next, 0), tip, 0.52);
     }
   }
   return finish(mesh);

@@ -307,3 +307,153 @@ describe('зерно каменю', () => {
     expect(tilesPerFace(island, rubbleFrom)).toBeLessThan(4);
   });
 });
+
+// ============================================================
+// Жоден меш сцени не вивернутий навиворіт.
+// ------------------------------------------------------------
+// ЧОМУ ЦЕ ОКРЕМИЙ ТЕСТ, А НЕ ДРІБНИЦЯ. Три з чотирьох мешів сцени
+// малюються `meshBasicMaterial` без `side`, тобто ТІЛЬКИ лицем.
+// Трикутник, намотаний навиворіт, з камери просто зникає — і крізь дірку
+// видно нутро тіла разом з усім, що всередині нього стоїть. Власник
+// побачив це як білий клин на обриві острова й назвав «підкладка
+// кристала стирчить з обриву»: підкладка була ні до чого, крізь ближню
+// стінку обриву було видно те, що законно лежить усередині острова.
+//
+// ЧОМУ САМЕ ПРОМІНЬ, А НЕ ОБ'ЄМ. Знакований об'єм меша — очевидна
+// мірка, і вона тут НЕ ПРАЦЮЄ: виміряно на цій самій ваді, острів із
+// вивернутим обривом давав +0.43, тобто «правильно». Причина в тому, що
+// об'єм за теоремою про дивергенцію має сенс лише для замкненого тіла, а
+// жоден з цих мешів не замкнений — уламки й колони не мають дна, бо дно
+// закопане. Промінь такої вимоги не має: він робить рівно те, що робить
+// відеокарта, і питає рівно те, що бачить око.
+//
+// Хмари сюди не входять НАВМИСНЕ: вони малюються `DoubleSide` і є
+// пласкими пелюстками, а не тілами, тож у їхньої намотки немає сенсу,
+// який можна перевірити.
+// ============================================================
+describe('намотка мешів сцени', () => {
+  type Ray = readonly [number, number, number];
+
+  /** Той самий насінний шум, що в будівника: тест не кидає монету. */
+  function unit(label: string): number {
+    let hash = 2166136261 ^ SEED;
+    for (let index = 0; index < label.length; index += 1) {
+      hash = Math.imul(hash ^ label.charCodeAt(index), 16777619);
+    }
+    return ((hash >>> 0) % 100000) / 100000;
+  }
+
+  const sub = (a: Ray, b: Ray): Ray => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+  const cross = (a: Ray, b: Ray): Ray => [
+    a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0],
+  ];
+  const dot = (a: Ray, b: Ray): number => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+  /**
+   * Möller–Trumbore, ДВОБІЧНИЙ: відстань до трикутника або `null`.
+   *
+   * Двобічний навмисне. Односторонній перетин відкидав би саме ті
+   * трикутники, які ця перевірка шукає, — і тест мовчав би про ваду,
+   * яку мав ловити.
+   */
+  function distanceTo(from: Ray, dir: Ray, a: Ray, b: Ray, c: Ray): number | null {
+    const edge1 = sub(b, a);
+    const edge2 = sub(c, a);
+    const pivot = cross(dir, edge2);
+    const det = dot(edge1, pivot);
+    if (Math.abs(det) < 1e-12) return null;
+    const inverse = 1 / det;
+    const span = sub(from, a);
+    const u = inverse * dot(span, pivot);
+    if (u < 0 || u > 1) return null;
+    const other = cross(span, edge1);
+    const v = inverse * dot(dir, other);
+    if (v < 0 || u + v > 1) return null;
+    const along = inverse * dot(edge2, other);
+    return along > 1e-9 ? along : null;
+  }
+
+  function faces(geometry: { getAttribute(name: string): { array: ArrayLike<number> } }): Ray[][] {
+    const p = points(geometry);
+    const out: Ray[][] = [];
+    for (let at = 0; at + 8 < p.length; at += 9) {
+      out.push([
+        [p[at]!, p[at + 1]!, p[at + 2]!],
+        [p[at + 3]!, p[at + 4]!, p[at + 5]!],
+        [p[at + 6]!, p[at + 7]!, p[at + 8]!],
+      ]);
+    }
+    return out;
+  }
+
+  /**
+   * Скільки променів з-над горизонту першим влучають у СПИНУ трикутника.
+   *
+   * Промені йдуть з висоти 10…80°, бо камера порталу дивиться на острів
+   * ЗГОРИ й нижче не опускається. Знизу відкрите дно закопаних тіл видно
+   * законно — колона справді не має підошви, — і вимагати від нього
+   * лиця означало б додати невидимі трикутники заради тесту.
+   */
+  function backfaces(
+    name: string,
+    geometry: { getAttribute(n: string): { array: ArrayLike<number> } },
+    rays = 900,
+  ): number {
+    const face = faces(geometry);
+    const lo: [number, number, number] = [Infinity, Infinity, Infinity];
+    const hi: [number, number, number] = [-Infinity, -Infinity, -Infinity];
+    for (const triangle of face) {
+      for (const point of triangle) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          lo[axis] = Math.min(lo[axis]!, point[axis]!);
+          hi[axis] = Math.max(hi[axis]!, point[axis]!);
+        }
+      }
+    }
+    const mid: Ray = [(lo[0] + hi[0]) / 2, (lo[1] + hi[1]) / 2, (lo[2] + hi[2]) / 2];
+    const span = Math.hypot(hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]);
+    let back = 0;
+    for (let index = 0; index < rays; index += 1) {
+      const azimuth = unit(`${name}:az:${index}`) * Math.PI * 2;
+      const elevation = ((10 + unit(`${name}:el:${index}`) * 70) * Math.PI) / 180;
+      const eye: Ray = [
+        mid[0] + Math.cos(elevation) * Math.cos(azimuth) * span * 2,
+        mid[1] + Math.sin(elevation) * span * 2,
+        mid[2] + Math.cos(elevation) * Math.sin(azimuth) * span * 2,
+      ];
+      // Ціль — центр НАЯВНОГО трикутника, а не точка в коробці: інакше
+      // рідкі тіла (брили в небі) ловили б 38 влучань з 900.
+      const aimed = face[Math.floor(unit(`${name}:aim:${index}`) * face.length)]!;
+      const aim: Ray = [
+        (aimed[0]![0] + aimed[1]![0] + aimed[2]![0]) / 3,
+        (aimed[0]![1] + aimed[1]![1] + aimed[2]![1]) / 3,
+        (aimed[0]![2] + aimed[1]![2] + aimed[2]![2]) / 3,
+      ];
+      const dir = sub(aim, eye);
+      let nearest = Infinity;
+      let first: Ray[] | null = null;
+      for (const triangle of face) {
+        const along = distanceTo(eye, dir, triangle[0]!, triangle[1]!, triangle[2]!);
+        if (along !== null && along < nearest) { nearest = along; first = triangle; }
+      }
+      if (!first) continue;
+      const normal = cross(sub(first[1]!, first[0]!), sub(first[2]!, first[0]!));
+      if (dot(normal, dir) > 0) back += 1;
+    }
+    return back;
+  }
+
+  // Виміряно на ваді й після правки, 900 променів на меш:
+  // острів 255 → 0, храм 349 → 0, брили 38 з 38 → 0.
+  it('острів: жодна грань не дивиться спиною до камери', () => {
+    expect(backfaces('острів', buildPortalIslandGeometry(SEED, PORTAL_ISLAND_RUBBLE.high))).toBe(0);
+  });
+
+  it('храм: жодна грань не дивиться спиною до камери', () => {
+    expect(backfaces('храм', buildPortalTempleGeometry(SEED))).toBe(0);
+  });
+
+  it('брили: жодна грань не дивиться спиною до камери', () => {
+    expect(backfaces('брили', buildPortalDriftGeometry(SEED, PORTAL_DRIFT_ROCKS.high))).toBe(0);
+  });
+});
