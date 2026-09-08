@@ -91,6 +91,20 @@ export function decodePng(buffer) {
   return { width, height, channels, data };
 }
 
+/**
+ * Піксель за координатами — [r, g, b].
+ *
+ * Існує заради однієї вади, яка вже коштувала виправлення ADR. Знімки
+ * порталу — PNG типу 2, тобто ТРИ канали; одноразова мірка, написана з
+ * кроком 4 «бо RGBA», читає піксель зі зсувом, що росте вздовж рядка, і
+ * повертає правдоподібні, але випадкові числа. Тут крок береться з самого
+ * зображення, тож помилитись у ньому більше нема де.
+ */
+export function pixelAt(image, x, y) {
+  const offset = (y * image.width + x) * image.channels;
+  return [image.data[offset], image.data[offset + 1], image.data[offset + 2]];
+}
+
 /** Знімає гамму sRGB: байт екрана → лінійне значення каналу. */
 export function srgbToLinear(byte) {
   const c = byte / 255;

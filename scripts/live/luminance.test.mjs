@@ -6,6 +6,7 @@ import {
   facetSeparations,
   findPlateaus,
   inverseAces,
+  pixelAt,
   pixelLuminance,
   srgbToLinear,
 } from './luminance.mjs';
@@ -215,5 +216,46 @@ describe('порожня вибірка меж — це не нуль', () => {
       plateau(70, 80, 0.01),
     ]);
     expect(murky.boundaries).toHaveLength(0);
+  });
+});
+
+describe('піксель за координатами', () => {
+  it('бере крок із самого зображення, а не з припущення про RGBA', () => {
+    /*
+     * ВАДА, ЯКУ ЦЕ ЗАМІНЮЄ. Знімки порталу — PNG типу 2, тобто ТРИ канали.
+     * Одноразова мірка, написана з кроком 4 «бо RGBA», читає піксель зі
+     * зсувом, що росте вздовж рядка, і повертає правдоподібні, але
+     * випадкові числа. Одне таке число встигло потрапити в ADR
+     * (див. ADR-0165 §6 і пастку 11 у README).
+     *
+     * Тест бере зображення 2×2 з трьома каналами й вимагає саме той
+     * піксель, який у ньому лежить. З кроком 4 останній рядок вийшов би за
+     * межі буфера й дав би undefined.
+     */
+    const image = {
+      width: 2,
+      height: 2,
+      channels: 3,
+      data: Uint8Array.from([
+        10, 11, 12, 20, 21, 22,
+        30, 31, 32, 40, 41, 42,
+      ]),
+    };
+    expect(pixelAt(image, 0, 0)).toEqual([10, 11, 12]);
+    expect(pixelAt(image, 1, 0)).toEqual([20, 21, 22]);
+    expect(pixelAt(image, 0, 1)).toEqual([30, 31, 32]);
+    expect(pixelAt(image, 1, 1)).toEqual([40, 41, 42]);
+  });
+
+  it('однаково працює на чотириканальному знімку', () => {
+    // Тип 6 теж трапляється; помилитись має бути ніде в обидва боки.
+    const image = {
+      width: 1,
+      height: 2,
+      channels: 4,
+      data: Uint8Array.from([1, 2, 3, 255, 4, 5, 6, 255]),
+    };
+    expect(pixelAt(image, 0, 0)).toEqual([1, 2, 3]);
+    expect(pixelAt(image, 0, 1)).toEqual([4, 5, 6]);
   });
 });
