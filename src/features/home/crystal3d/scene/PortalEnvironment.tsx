@@ -39,10 +39,12 @@ import {
 import {
   PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
+  PORTAL_WATERFALLS,
   PORTAL_ISLAND_RUBBLE,
   buildPortalCloudGeometry,
   buildPortalDriftGeometry,
   buildPortalFloraGeometry,
+  buildPortalWaterfallGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
   portalIslandScale,
@@ -120,6 +122,10 @@ export function PortalEnvironment({
     () => buildPortalFloraGeometry(seed, quality),
     [seed, quality],
   );
+  const falls = useMemo(
+    () => buildPortalWaterfallGeometry(seed, PORTAL_WATERFALLS[quality]),
+    [seed, quality],
+  );
 
   /*
    * Одне полотно на весь застосунок — і на обидві теми: воно несе лише
@@ -173,7 +179,8 @@ export function PortalEnvironment({
     // зміну профілю якості, і кожна попередня геометрія лишалась у пам'яті
     // драйвера. Тепер він найважчий із п'яти, тож пропуск було б і видно.
     flora.dispose();
-  }, [island, temple, drift, clouds, flora]);
+    falls.dispose();
+  }, [island, temple, drift, clouds, flora, falls]);
 
   return (
     <>
@@ -268,6 +275,34 @@ export function PortalEnvironment({
             vertexColors
             side={THREE.DoubleSide}
             onBeforeCompile={levitate}
+          />
+        </mesh>
+
+      {/*
+        Водоспади з кромки (ADR-0167).
+        ------------------------------------------------------------
+        Шостий draw call, і платиться він за ПРОЗОРІСТЬ: вода малюється
+        напівпрозорою й без запису глибини, а в меші каменю це означало б
+        напівпрозорий острів.
+
+        `depthWrite={false}` — щоб дві стрічки, які перекрились, не
+        вирізали одна одну; глибину вони ЧИТАЮТЬ, тож обрив, що стоїть
+        ближче, воду закриває.
+
+        Двобічний: стрічка пласка, а острів обертається рукою пари.
+
+        Туман УВІМКНЕНО, на відміну від хмар: падіння висить при самому
+        острові, тобто всередині смуги туману, і без нього дальній
+        водоспад був би такий самий чіткий, як ближній.
+      */}
+        <mesh geometry={falls} frustumCulled={false} renderOrder={1}>
+          <meshBasicMaterial
+            color={palette.waterfall}
+            vertexColors
+            transparent
+            opacity={palette.waterfallOpacity}
+            depthWrite={false}
+            side={THREE.DoubleSide}
           />
         </mesh>
 

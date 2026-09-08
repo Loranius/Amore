@@ -15,10 +15,12 @@ import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import {
   PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
+  PORTAL_WATERFALLS,
   PORTAL_ISLAND_RUBBLE,
   buildPortalCloudGeometry,
   buildPortalDriftGeometry,
   buildPortalFloraGeometry,
+  buildPortalWaterfallGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
 } from './portalIsland';
@@ -33,17 +35,22 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * тіл), тож він мусить знати внесок сцени — інакше довелось би просто
  * послабити межу й перевірка втратила б сенс.
  *
- * П'ять мешів: острів (разом з уламками — камінь той самий, тож окремий
+ * Шість мешів: острів (разом з уламками — камінь той самий, тож окремий
  * прохід коштував би draw call і не давав нічого), храм, брили в небі,
- * рослинність і море хмар.
+ * рослинність, море хмар і водоспади.
  *
  * 4 → 5 (ADR-0163), і платимо ми цей call за КОЛІР, а не за геометрію.
  * Вершинний колір у `meshBasicMaterial` МНОЖИТЬСЯ на колір матеріалу, тож
  * трава, покладена в меш каменю, вийшла б кольору «камінь × зелень».
  * Пофарбувати її можна лише власним матеріалом, а власний матеріал і є
  * draw call. Зате меш ОДИН на обидва місця — і плато, і летючі брили.
+ *
+ * 5 → 6 (ADR-0167) — водоспади, і цей call платиться за ПРОЗОРІСТЬ. Вода
+ * малюється без запису глибини й напівпрозорою; у меші каменю це означало б
+ * напівпрозорий острів. Власник дозволив +3 call'и разом із бюджетом
+ * трикутників (ADR-0164), тож це другий із трьох.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 5;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 6;
 
 /**
  * СТЕЛЯ трикутників оточення, а не точне число.
@@ -87,18 +94,23 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 5;
  * відмінність від еталона: там зелена САМА ЗЕМЛЯ, а в нас зелені було
  * 0.04% кадру. Вартість 5 846, тобто 98.3%.
  *
+ * 5 950 → 6 100 (ADR-0167): водоспади. **120 трикутників** на п'ять
+ * падінь — по двадцять чотири на стрічку з дванадцяти ланок. Найдешевша
+ * зміна цієї сцени за весь еталон: одна сота бюджету за те, що з острова
+ * ллється вода. Вартість 5 966, тобто 97.8%.
+ *
  * **ЧОМУ СТЕЛЯ НЕ СТРИБНУЛА ОДРАЗУ ДО 15 000**, які власник дозволив.
  * Дозвіл — це конверт, а стеля — мірка проти ТИХОГО роздування, і мірка,
  * втричі більша за виміряне, не міряє нічого (це записано абзацом вище й
  * не перестало бути правдою від того, що бюджет виріс). Стеля йде за
  * вартістю крок за кроком, і кожен крок названий.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 5_950;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 6_100;
 
 /**
  * Реальна вартість оточення — джерело правди для стелі вище.
  *
- * Будує ті самі чотири геометрії, які малює `PortalEnvironment`, і рахує
+ * Будує ті самі геометрії, які малює `PortalEnvironment`, і рахує
  * їхні трикутники. Дорого, і саме тому це функція для тесту, а не для
  * рантайму.
  */
@@ -112,6 +124,7 @@ export function measurePortalEnvironmentTriangles(
     buildPortalDriftGeometry(seed, PORTAL_DRIFT_ROCKS[quality]),
     buildPortalCloudGeometry(seed, PORTAL_CLOUD_BANKS[quality]),
     buildPortalFloraGeometry(seed, quality),
+    buildPortalWaterfallGeometry(seed, PORTAL_WATERFALLS[quality]),
   ];
   let total = 0;
   for (const piece of pieces) {
@@ -527,6 +540,15 @@ export interface PortalPalette {
   flora: string;
   /** Море хмар унизу. Не туман: це тіло, і воно має власний тон. */
   cloudSea: string;
+  /**
+   * Вода, що падає з кромки.
+   *
+   * Не білий: біла вода під вечірнім небом читається снігом — те саме, що
+   * вже сталося з хмарами. Вона ловить те світло, яке навколо неї.
+   */
+  waterfall: string;
+  /** Наскільки щільний струмінь на самій кромці. Далі згасає вершиною. */
+  waterfallOpacity: number;
   /** Наскільки хмари щільні. Уночі це натяк, удень — підлога світу. */
   cloudOpacity: number;
   /**
@@ -706,6 +728,9 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
      * лишається тлом, прохолодне — тим, що в ньому стоїть.
      */
     cloudSea: '#e4dbe6',
+    // Удень вода ловить захід: тепла й дуже світла, але не біла.
+    waterfall: '#f7ecec',
+    waterfallOpacity: 0.88,
     cloudOpacity: 0.92,
     skyLight: '#e8f1fb',
     skyIntensity: 2.1,
@@ -771,6 +796,9 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     // Хмари вночі — не білі. Біле море хмар під нічним небом читається
     // снігом у прожекторі; тут це відбитий місяць.
     cloudSea: '#6d6194',
+    // Уночі вода — відбитий місяць: холодна бузкова, і слабша, ніж удень.
+    waterfall: '#b9aee2',
+    waterfallOpacity: 0.62,
     cloudOpacity: 0.68,
     // Нічне небо: майже темрява, але не чорнота — джерело з нульовим
     // кольором перестає бути джерелом.

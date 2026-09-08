@@ -353,7 +353,7 @@ interface Soup {
    * повершинно. Будівник ставить це поле перед трикутниками чергового
    * тіла (ADR-0165).
    */
-  alpha: number;
+  alpha: number | readonly [number, number, number];
   /** По одному значенню на вершину. Усі одиниці — меш непрозорий. */
   readonly alphas: number[];
   push(
@@ -391,7 +391,16 @@ function soup(): Soup {
       if (this.float !== null) {
         for (let corner = 0; corner < 3; corner += 1) floats.push(this.float[0], this.float[1]);
       }
-      for (let corner = 0; corner < 3; corner += 1) alphas.push(this.alpha);
+      /*
+       * Або одне число на тіло, або три на кути — так само, як `shade`.
+       * Три знадобились водоспаду: стрічка мусить згасати ВЗДОВЖ падіння,
+       * а одне число на трикутник дало б смуги завширшки з ланку.
+       */
+      if (typeof this.alpha === 'number') {
+        for (let corner = 0; corner < 3; corner += 1) alphas.push(this.alpha);
+      } else {
+        alphas.push(...this.alpha);
+      }
       positions.push(...a, ...b, ...c);
       const corners = typeof shade === 'number' ? [shade, shade, shade] : shade;
       for (const value of corners) colors.push(value, value, value);
@@ -1299,6 +1308,155 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
       pushRock(mesh, ringPoint(corner, 1), cap, ringPoint(next, 1), 1.06);
       pushRockQuad(mesh, ringPoint(corner, 1), ringPoint(next, 1), ringPoint(next, 0), ringPoint(corner, 0));
       pushRock(mesh, ringPoint(corner, 0), ringPoint(next, 0), tip, 0.52);
+    }
+  }
+  return finish(mesh);
+}
+
+// ── Водоспади ───────────────────────────────────────────────
+
+/** Скільки водоспадів падає з кромки, за профілем якості. */
+export const PORTAL_WATERFALLS: Record<PortalQuality, number> = {
+  high: 5, balanced: 3, low: 2, fallback: 0,
+};
+
+/**
+ * Водоспади з кромки — те, що робить острів островом, а не брилою.
+ *
+ * ЧОМУ СТРІЧКА, А НЕ ТІЛО. Вода тут не має об'єму, який хтось побачить:
+ * з камери під 23.6° падіння видно збоку, тобто пласким. Стрічка, повернута
+ * до осі (як пелюстка хмари), дає рівно той силует, і коштує вісімнадцять
+ * трикутників замість сотні.
+ *
+ * ЧОМУ ПРОЗОРІСТЬ ЙДЕ ВЕРШИНОЮ. Падіння мусить ЗНИКАТИ внизу, а не
+ * обриватись: під островом немає ані озера, ані туману, який би його
+ * з'їв, — там порожнеча, і різаний край стрічки читався б шматком скла.
+ * Один множник на весь меш такого не вміє, тому альфа кладеться в
+ * четвертий канал кольору (той самий, що в хмар, ADR-0165) і згасає
+ * вздовж падіння.
+ *
+ * ЧОМУ СТРУМІНЬ ШИРШАЄ. Вода, що падає, розсипається: вгорі це струмінь
+ * завширшки з розколину, внизу — завіса. Стала ширина читалась би
+ * стрічкою тканини, вивішеною за борт.
+ */
+export function buildPortalWaterfallGeometry(seed: number, count: number): THREE.BufferGeometry {
+  const mesh = soup();
+  const rows = ISLAND_ROOT_ROWS_ALL.length;
+  // Скільки ланок падає у вільному повітрі під коренем.
+  const freeLinks = 3;
+  for (let index = 0; index < count; index += 1) {
+    const tag = `island:fall:${index}`;
+    /*
+     * Клини розведені по колу рівно, з місцевим зсувом. Випадковий вибір
+     * із повторами посадив би два водоспади на один клин, і замість двох
+     * падінь вийшло б одне подвійної яскравості.
+     */
+    const segment = Math.floor(
+      ((index + 0.5) / count + (seededUnit(seed, `${tag}:spin`) - 0.5) * 0.6 / count)
+      * PORTAL_ISLAND_SEGMENTS,
+    ) % PORTAL_ISLAND_SEGMENTS;
+    const angle = segmentAngle(seed, segment, PORTAL_ISLAND_SEGMENTS);
+    const out: Point = [Math.cos(angle), 0, Math.sin(angle)];
+    const across: Point = [-out[2], 0, out[0]];
+    /*
+     * ВУЗЬКО. 0.028…0.048 радіуса острова дало в кадрі білі ЛАТКИ на
+     * породі завширшки з десяту частину острова: на такій ширині стрічка
+     * перестає бути струменем. Водоспад упізнають за тим, що він ДОВГИЙ І
+     * ТОНКИЙ, а не за тим, що він білий.
+     */
+    const width = 0.016 + seededUnit(seed, `${tag}:wide`) * 0.013;
+    /*
+     * ВОДА ЙДЕ ПО ПОРОДІ, А НЕ ПО ПРЯМІЙ, І ЦЕ НЕ ПРИКРАСА.
+     *
+     * Перша редакція пускала стрічку рівно вниз від кромки плато. Кадр
+     * показав, чим це є: острів найширший НЕ на кромці — виміряно 1.03
+     * радіуса на плато проти 1.32 на висоті −0.4, — тож пряма стрічка йшла
+     * ВСЕРЕДИНІ породи й з'являлась лише там, де обрив уже звузився. Видно
+     * було нижню половину падіння без початку, тобто стовп туману.
+     *
+     * Тому профіль береться з тієї самої арифметики, що будує обрив
+     * (`ISLAND_ROOT_ROWS_ALL` і `islandRadiusAt`), і відсувається назовні
+     * на зазор. Це ще й правда про воду: вона тече по каменю.
+     *
+     * Береться ГЛАДКИЙ профіль, без пошумленого `rootPoint`: шум там
+     * кидається на кожну вершину окремо, і стрічка від нього тремтіла б
+     * упоперек породи замість того, щоб її облягати.
+     */
+    const clearance = 0.035 + seededUnit(seed, `${tag}:gap`) * 0.02;
+    const spine = (link: number): { at: Point; spread: number } => {
+      const rim = portalIslandHeightAt(seed, angle, 1);
+      const spread = link / (rows + freeLinks + 1);
+      /*
+       * ЛАНКА НУЛЬ — САМА КРОМКА. `ISLAND_ROOT_ROWS_ALL` починається вже
+       * НИЖЧЕ за неї, тож без цієї ланки вода з'являлась на кілька
+       * пікселів під плато, і в кадрі це читалось не падінням, а білою
+       * подряпиною на породі: витік було видно, а джерело — ні.
+       */
+      if (link === 0) {
+        const radius = islandRadiusAt(seed, angle) + clearance;
+        return { at: [Math.cos(angle) * radius, rim, Math.sin(angle) * radius], spread };
+      }
+      if (link <= rows) {
+        const [share, drop] = ISLAND_ROOT_ROWS_ALL[link - 1]!;
+        const radius = islandRadiusAt(seed, angle) * share + clearance;
+        return { at: [Math.cos(angle) * radius, rim - drop, Math.sin(angle) * radius], spread };
+      }
+      // Нижче кореня падати нема по чому: вода йде у вільне повітря,
+      // тримаючи той радіус, на якому корінь її покинув.
+      const [lastShare, lastDrop] = ISLAND_ROOT_ROWS_ALL[rows - 1]!;
+      const radius = islandRadiusAt(seed, angle) * lastShare + clearance;
+      const step = (link - rows) * 0.16;
+      return {
+        at: [Math.cos(angle) * radius, rim - lastDrop - step, Math.sin(angle) * radius],
+        spread,
+      };
+    };
+    const edge = (link: number, side: number): Point => {
+      const { at, spread } = spine(link);
+      // Ширшає донизу, але не безмежно: корінь квадратний дає завісу, а не лійку.
+      const half = width * (1 + Math.sqrt(spread) * 1.4);
+      const sway = (seededUnit(seed, `${tag}:sway:${link}`) - 0.5) * width * 0.4;
+      return [
+        at[0] + across[0] * (side * half + sway),
+        at[1],
+        at[2] + across[2] * (side * half + sway),
+      ];
+    };
+    /*
+     * ЗГАСАННЯ РАХУЄТЬСЯ ПО ГЛИБИНІ, А НЕ ПО НОМЕРУ ЛАНКИ, і це друге
+     * виправлення за кадром.
+     *
+     * Ланки не рівні: біля кромки ряди кореня стоять густо, а нижче
+     * розходяться. Згасання за номером ланки давало яскравим перші
+     * тридцять відсотків ЛАНОК, що по висоті — кілька пікселів: у кадрі
+     * це читалось не падінням, а білою латкою на породі. Перед тим
+     * зворотна крайність — 1 - t² — тримала стрічку майже до кінця, і
+     * під островом стояв сірий стовп пари.
+     *
+     * Глибина — те, що бачить око. Струмінь яскравий там, де він ще
+     * цілий, і тане з висотою падіння.
+     */
+    const links = rows + freeLinks + 1;
+    const spineY: number[] = [];
+    for (let link = 0; link <= links; link += 1) spineY.push(spine(link).at[1]);
+    const span = Math.max(1e-6, spineY[0]! - spineY[links]!);
+    const fade = (link: number): number => {
+      const fallen = (spineY[0]! - spineY[Math.min(link, links)]!) / span;
+      return Math.max(0, 1 - fallen) ** 1.25;
+    };
+    for (let link = 0; link < links; link += 1) {
+      const aboveL = edge(link, -1);
+      const aboveR = edge(link, 1);
+      const belowL = edge(link + 1, -1);
+      const belowR = edge(link + 1, 1);
+      const top = fade(link);
+      const bottom = fade(link + 1);
+      // Яскравіше вгорі, де струмінь ще цілий; нижче — водяний пил.
+      const shade = 0.66 + 0.34 * top;
+      mesh.alpha = [top, top, bottom];
+      mesh.push(aboveL, aboveR, belowR, shade);
+      mesh.alpha = [top, bottom, bottom];
+      mesh.push(aboveL, belowR, belowL, shade);
     }
   }
   return finish(mesh);
