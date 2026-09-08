@@ -1,8 +1,16 @@
 import { describe, expect, it } from 'vitest';
+import type * as THREE from 'three';
+import type { PortalFloraLayout } from './portalIsland';
 import {
+  PORTAL_BUSHES,
   PORTAL_DRIFT_ROCKS,
   PORTAL_FLORA_TUFTS,
+  PORTAL_ISLAND_CROWN_TRIANGLES,
   PORTAL_ISLAND_RADIUS,
+  PORTAL_ISLAND_SEGMENTS,
+  PORTAL_ISLAND_TOP_RING_COUNT,
+  PORTAL_MOSS_COVER,
+  PORTAL_RIM_TUFTS,
   buildPortalDriftGeometry,
   buildPortalFloraGeometry,
   buildPortalIslandGeometry,
@@ -75,31 +83,62 @@ function hit(from: P, dir: P, a: P, b: P, c: P): number | null {
   return along > 1e-9 ? along : null;
 }
 
-const flora = () => buildPortalFloraGeometry(SEED, PORTAL_FLORA_TUFTS.high, PORTAL_DRIFT_ROCKS.high);
+const flora = () => buildPortalFloraGeometry(SEED, 'high');
 
-/** Основа кущика — спільна нижня точка трьох його листків. */
+/**
+ * Межі родів зелені в меші — з самого меша (ADR-0166).
+ *
+ * Досі цей файл ділив меш кроком у три трикутники: кущик — три листки, і
+ * більше в меші нічого не було. Тепер там п'ять родів зелені різної
+ * довжини (мох 1, кущик 3, кущ 5, звис 2, трава на брилі 3), і ділення
+ * стало б ДРУГОЮ КОПІЄЮ арифметики будівника — розійшлася б із першою
+ * тієї миті, коли хтось поворухне густину моху. Тому будівник публікує
+ * розклад, а тест його читає.
+ */
+function layout(geometry: THREE.BufferGeometry): PortalFloraLayout {
+  const published = geometry.userData.floraLayout as PortalFloraLayout | undefined;
+  expect(published, 'меш трави не опублікував свій розклад').toBeDefined();
+  return published!;
+}
+
+/**
+ * Основа кущика — спільна нижня точка трьох його листків.
+ *
+ * Основа — СЕРЕДИНА між двома нижніми кутами листка, а не перший кут.
+ * Листок стоїть на землі парою точок, розведених убік від основи, тож
+ * перший кут зсунутий від неї на пів ширини листка. Перша редакція цього
+ * тесту брала саме його — і промінь, пущений із зсунутої точки, подеколи
+ * промахувався повз трикутник плато й летів до самого обриву: 0.47
+ * замість 0.01. Вада була в мірці, а не в посадці.
+ *
+ * Береться ЛИШЕ трава — кущики плато й кущики на брилах. Мох лежить на
+ * землі й основи не має; кущ має п'ять листків, а не три; звис росте вниз,
+ * і питати в нього про камінь під основою — те саме, що питати про камінь
+ * під бурулькою.
+ */
 function tufts(): { seat: P; float: readonly [number, number] }[] {
   const geometry = flora();
   const face = triangles(geometry);
   const marks = floats(geometry);
+  const plan = layout(geometry);
   const out: { seat: P; float: readonly [number, number] }[] = [];
-  /*
-   * Основа — СЕРЕДИНА між двома нижніми кутами листка, а не перший кут.
-   *
-   * Листок стоїть на землі парою точок, розведених убік від основи, тож
-   * перший кут зсунутий від неї на пів ширини листка. Перша редакція цього
-   * тесту брала саме його — і промінь, пущений із зсунутої точки, подеколи
-   * промахувався повз трикутник плато й летів до самого обриву: 0.47
-   * замість 0.01. Вада була в мірці, а не в посадці.
-   */
-  for (let blade = 0; blade < face.length; blade += 3) {
-    const left = face[blade]![0]!;
-    const right = face[blade]![1]!;
-    const at = blade * 3 * 2;
-    out.push({
-      seat: [(left[0] + right[0]) / 2, (left[1] + right[1]) / 2, (left[2] + right[2]) / 2],
-      float: [marks[at]!, marks[at + 1]!],
-    });
+  const spans: readonly (readonly [number, number])[] = [
+    [plan.moss, plan.moss + plan.tufts],
+    [
+      plan.moss + plan.tufts + plan.bushes + plan.drapes + plan.rockMoss,
+      plan.moss + plan.tufts + plan.bushes + plan.drapes + plan.rockMoss + plan.rockTufts,
+    ],
+  ];
+  for (const [from, to] of spans) {
+    for (let blade = from; blade < to; blade += 3) {
+      const left = face[blade]![0]!;
+      const right = face[blade]![1]!;
+      const at = blade * 3 * 2;
+      out.push({
+        seat: [(left[0] + right[0]) / 2, (left[1] + right[1]) / 2, (left[2] + right[2]) / 2],
+        float: [marks[at]!, marks[at + 1]!],
+      });
+    }
   }
   return out;
 }
@@ -111,6 +150,7 @@ describe('рослинність на островах', () => {
     const grown = tufts();
     const still = grown.filter((tuft) => tuft.float[0] === 0 && tuft.float[1] === 0);
     const flying = grown.filter((tuft) => tuft.float[1] !== 0);
+    // Кущики плато — саме вони; мох, кущі й звиси до `tufts()` не входять.
     expect(still.length).toBe(PORTAL_FLORA_TUFTS.high);
     expect(flying.length).toBeGreaterThan(PORTAL_DRIFT_ROCKS.high * 0.5);
     expect(flying.length).toBeLessThanOrEqual(PORTAL_DRIFT_ROCKS.high);
@@ -213,26 +253,135 @@ describe('рослинність на островах', () => {
     expect(worst).toBeLessThan(0.0041);
   });
 
-  it('не вилазить за кромку плато', () => {
-    // Кущик, що звисає з обриву, читається не травою, а дірою в силуеті.
+  it('тримає ТРАВУ в межах плато, а ЗВИС — за його кромкою', () => {
+    /*
+     * ПРАВИЛО РОЗДВОЇЛОСЬ, І ЦЕ СВІДОМА ЗМІНА ЗМІСТУ (ADR-0166).
+     *
+     * Було одне: «не вилазить за кромку плато», бо кущик, що звисає з
+     * обриву, читається не травою, а дірою в силуеті. Для трави це
+     * лишається правдою й перевіряється далі.
+     *
+     * Але звис із кромки існує рівно заради протилежного: в еталоні
+     * власника зелень перевалюється через край і висить над порожнечею,
+     * і саме це малює силует острова зеленим на тлі неба. Тому для нього
+     * правило обернене — сідало на плато, кінчик за кромкою й НИЖЧЕ за
+     * сідало.
+     */
     for (const tuft of tufts().filter((one) => one.float[1] === 0)) {
       expect(Math.hypot(tuft.seat[0], tuft.seat[2])).toBeLessThan(PORTAL_ISLAND_RADIUS);
     }
+
+    const geometry = flora();
+    const face = triangles(geometry);
+    const plan = layout(geometry);
+    const from = plan.moss + plan.tufts + plan.bushes;
+    expect(plan.drapes).toBe(PORTAL_RIM_TUFTS.high * 2);
+    /*
+     * Кромка міряється ПО САМОМУ ПЛАТО, а не по `PORTAL_ISLAND_RADIUS`.
+     * Радіальне тремтіння ґратки (ADR-0147) зсуває вершини вздовж
+     * радіуса, тож зовнішнє кільце місцями виходить за одиницю — до 1.08
+     * на цьому насінні. Порівнювати з номінальним радіусом означало б
+     * міряти тремтіння, а не посадку.
+     */
+    const rim = Math.max(...triangles(buildPortalIslandGeometry(SEED, 0))
+      .slice(0, PORTAL_ISLAND_CROWN_TRIANGLES)
+      .flat()
+      .map((point) => Math.hypot(point[0], point[2])));
+    let beyond = 0;
+    for (let leaf = from; leaf < from + plan.drapes; leaf += 1) {
+      const [left, right, tip] = face[leaf]! as [P, P, P];
+      const base: P = [(left[0] + right[0]) / 2, (left[1] + right[1]) / 2, (left[2] + right[2]) / 2];
+      // Сідало — на плато: звис росте з землі, а не з повітря поруч.
+      expect(Math.hypot(base[0], base[2])).toBeLessThanOrEqual(rim);
+      // Кінчик — нижче за сідало. Це і є різниця між звисом і кущиком.
+      expect(tip[1]).toBeLessThan(base[1]);
+      if (Math.hypot(tip[0], tip[2]) > Math.hypot(base[0], base[2])) beyond += 1;
+    }
+    // Кожен звис тягнеться НАЗОВНІ — інакше він висить під плато, де його
+    // не видно взагалі, і всі ці трикутники оплачені даремно.
+    expect(beyond).toBe(plan.drapes);
+  });
+
+  it('вкриває плато мохом, а не самими кущиками', () => {
+    /*
+     * ЧОМУ ЦЕ ОКРЕМА ГАРАНТІЯ. Кущики дали 0.04% кадру — трава, яку видно,
+     * лише коли її шукаєш. В еталоні власника зелена САМА ЗЕМЛЯ. Латка
+     * коштує один трикутник і вкриває площу, якої тридцять вісім кущиків
+     * не вкриють ніколи, тож саме мох, а не кущики, і є зелень острова.
+     *
+     * Перевіряється частка ВКРИТИХ КЛІТИНОК, бо саме нею густина й
+     * задана: клітинок на плато `сегменти × (кільця - 2) × 2`, і кожна
+     * або зелена, або ні.
+     */
+    const geometry = flora();
+    const plan = layout(geometry);
+    const cells = PORTAL_ISLAND_SEGMENTS * (PORTAL_ISLAND_TOP_RING_COUNT - 2) * 2;
+    const share = plan.moss / cells;
+    expect(share).toBeGreaterThan(PORTAL_MOSS_COVER.high * 0.85);
+    expect(share).toBeLessThan(PORTAL_MOSS_COVER.high * 1.15);
+    // І моху більше, ніж усіх кущиків разом: земля зелена, трава — деталь.
+    expect(plan.moss).toBeGreaterThan(plan.tufts + plan.bushes);
+  });
+
+  it('кладе мох НА плато, а не в нього і не над ним', () => {
+    /*
+     * Латка — це сам трикутник плато, піднятий на 0.006. Нуль дав би
+     * z-fighting із породою під собою; помітний підйом читався б зеленою
+     * лускою, що відстала від землі.
+     *
+     * Перевіряється відстань від кожної вершини моху до найближчої
+     * вершини плато: вона мусить дорівнювати саме тому підйому.
+     */
+    const geometry = flora();
+    const plan = layout(geometry);
+    const face = triangles(geometry);
+    const crown = triangles(buildPortalIslandGeometry(SEED, 0))
+      .slice(0, PORTAL_ISLAND_CROWN_TRIANGLES)
+      .flat();
+    let worst = 0;
+    for (let patch = 0; patch < plan.moss; patch += 1) {
+      for (const point of face[patch]!) {
+        let nearest = Infinity;
+        for (const vertex of crown) {
+          const gap = Math.hypot(point[0] - vertex[0], point[2] - vertex[2]);
+          if (gap < 1e-9) nearest = Math.min(nearest, point[1] - vertex[1]);
+        }
+        expect(Number.isFinite(nearest), `${point.join(',')} — вершини плато під мохом немає`)
+          .toBe(true);
+        worst = Math.max(worst, Math.abs(nearest - 0.006));
+      }
+    }
+    expect(worst).toBeLessThan(1e-6);
   });
 
   it('порожній профіль якості не малює нічого', () => {
-    const empty = buildPortalFloraGeometry(SEED, PORTAL_FLORA_TUFTS.fallback, PORTAL_DRIFT_ROCKS.fallback);
+    const empty = buildPortalFloraGeometry(SEED, 'fallback');
     expect(empty.getAttribute('position').array.length).toBe(0);
   });
 
-  it('коштує три трикутники на кущик, і жодного більше', () => {
+  it('коштує рівно стільки, скільки оголосив, і жодного трикутника більше', () => {
     /*
-     * Листок — ОДИН трикутник, бо матеріал двобічний. Другий трикутник на
-     * кожен листок подвоїв би весь цей меш заради нічого; це той самий
-     * виняток, що в хмар (ADR-0159): пласка пелюстка не є тілом.
+     * ЗМІНА ЗМІСТУ (ADR-0166). Було «три трикутники на кущик, і жодного
+     * більше» — правда, поки меш складався з самих кущиків. Тепер родів
+     * зелені п'ять, і незмінним лишається інше: сума розкладу мусить
+     * дорівнювати мешу. Розклад, який не сходиться з мешем, гірший за
+     * відсутній — за ним ріжуть тести.
+     *
+     * Листок і далі ОДИН трикутник, бо матеріал двобічний; це той самий
+     * виняток, що в хмар (ADR-0159): пласка пелюстка не є тілом. Звідси
+     * решта чисел: кущик — 3, кущ — 5, звис — 2, латка — 1.
      */
-    const count = triangles(flora()).length;
-    expect(count % 3).toBe(0);
-    expect(count / 3).toBe(tufts().length);
+    const geometry = flora();
+    const plan = layout(geometry);
+    const count = triangles(geometry).length;
+    expect(
+      plan.moss + plan.tufts + plan.bushes + plan.drapes + plan.rockMoss + plan.rockTufts,
+    ).toBe(count);
+    expect(plan.tufts).toBe(PORTAL_FLORA_TUFTS.high * 3);
+    expect(plan.bushes).toBe(PORTAL_BUSHES.high * 5);
+    expect(plan.drapes).toBe(PORTAL_RIM_TUFTS.high * 2);
+    expect(plan.rockTufts % 3).toBe(0);
+    // Шапка брили — віяло з семи трикутників, по одному на кут.
+    expect(plan.rockMoss % 7).toBe(0);
   });
 });

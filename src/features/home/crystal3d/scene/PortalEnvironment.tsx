@@ -39,7 +39,6 @@ import {
 import {
   PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
-  PORTAL_FLORA_TUFTS,
   PORTAL_ISLAND_RUBBLE,
   buildPortalCloudGeometry,
   buildPortalDriftGeometry,
@@ -118,7 +117,7 @@ export function PortalEnvironment({
     [seed, quality],
   );
   const flora = useMemo(
-    () => buildPortalFloraGeometry(seed, PORTAL_FLORA_TUFTS[quality], PORTAL_DRIFT_ROCKS[quality]),
+    () => buildPortalFloraGeometry(seed, quality),
     [seed, quality],
   );
 
@@ -170,7 +169,11 @@ export function PortalEnvironment({
     temple.dispose();
     drift.dispose();
     clouds.dispose();
-  }, [island, temple, drift, clouds]);
+    // Меш трави тут бракувало від самого ADR-0163: він перебудовується на
+    // зміну профілю якості, і кожна попередня геометрія лишалась у пам'яті
+    // драйвера. Тепер він найважчий із п'яти, тож пропуск було б і видно.
+    flora.dispose();
+  }, [island, temple, drift, clouds, flora]);
 
   return (
     <>

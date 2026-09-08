@@ -114,6 +114,16 @@ export const PORTAL_ISLAND_SEGMENTS = 72;
 const ISLAND_TOP_RINGS: readonly number[] = [0.13, 0.28, 0.44, 0.6, 0.74, 0.85, 0.94, 1];
 
 /**
+ * Скільки кілець має верх острова.
+ *
+ * Публікується, бо густина моху задана ЧАСТКОЮ вкритих клітинок, а
+ * клітинок на плато — `сегменти × (кільця - 2) × 2`. Тест, який виписав
+ * би це число рукою, застряг би на сьогоднішній топології й мовчки
+ * розійшовся б із нею завтра.
+ */
+export const PORTAL_ISLAND_TOP_RING_COUNT = ISLAND_TOP_RINGS.length;
+
+/**
  * Скільки трикутників на початку меша острова належать ВЕРХУ.
  *
  * Публікується з тієї ж причини, з якої підкладка артефакта публікує
@@ -1240,7 +1250,7 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
      * каменях (ADR-0163). Далі — більша: зміна розміру з відстанню і є те,
      * чим око міряє глибину, а тіней у цій сцені немає взагалі.
      */
-    const { tag, cx, cz, rise, size, spin, float } = driftRockAt(seed, index, count);
+    const { tag, cx, cz, rise, size, float } = driftRockAt(seed, index, count);
     mesh.float = float;
 
     /*
@@ -1252,8 +1262,10 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
      * острова, з якої її вирвало), майже пряма стінка і КОРОТКИЙ рваний
      * злам знизу.
      */
-    const sides = 7;
-    const { top } = driftRockAt(seed, index, count);
+    const sides = DRIFT_ROCK_SIDES;
+    const rock = driftRockAt(seed, index, count);
+    const { top } = rock;
+
     /*
      * КУТИ МІЖ КУТАМИ НЕРІВНІ, і це те саме виправлення, що ADR-0147
      * зробив ґратці плато, лише на меншому тілі. Рівні кути дають віяло
@@ -1266,19 +1278,8 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
      * кут НЕ МОЖЕ обігнати сусідній і вивернути грань. Та сама пастка
      * вже коштувала дірок у плато.
      */
-    const ringPoint = (corner: number, level: number): Point => {
-      const gap = (Math.PI * 2) / sides;
-      const drift = (seededUnit(seed, `${tag}:step:${corner}`) - 0.5) * 2 * gap * 0.45;
-      const a = spin + corner * gap + drift;
-      const wobble = 0.72 + seededUnit(seed, `${tag}:edge:${corner}`) * 0.56;
-      const radius = size * wobble * (level === 0 ? 1 : 0.88);
-      const lean = (seededUnit(seed, `${tag}:lean:${corner}`) - 0.5) * size * 0.22;
-      return [
-        cx + Math.cos(a) * radius,
-        rise + (level === 0 ? 0 : top) + lean,
-        cz + Math.sin(a) * radius,
-      ];
-    };
+    const ringPoint = (corner: number, level: number): Point =>
+      driftRockCorner(seed, rock, corner, level);
     /*
      * Вершина шапки ПО ЦЕНТРУ, і це перевірене рішення, а не лінощі.
      * Зміщена вершина напрошується сама (вона теж ламає віяло), але дає
@@ -1307,9 +1308,44 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
 
 // ── Рослинність ─────────────────────────────────────────────
 
+/** Профіль якості сцени — той самий ключ, що в решти лічильників. */
+export type PortalQuality = 'high' | 'balanced' | 'low' | 'fallback';
+
 /** Скільки кущиків росте на плато, за профілем якості. */
-export const PORTAL_FLORA_TUFTS: Record<'high' | 'balanced' | 'low' | 'fallback', number> = {
+export const PORTAL_FLORA_TUFTS: Record<PortalQuality, number> = {
   high: 38, balanced: 24, low: 12, fallback: 0,
+};
+
+/**
+ * Частка трикутників плато, вкритих мохом (ADR-0166).
+ *
+ * ЛАТКА — ЦЕ САМ ТРИКУТНИК ПЛАТО, піднятий на волосину. Не довільний
+ * многокутник «десь на поверхні»: довільний лежав би у власній площині й
+ * провисав над хордою рівно так само, як провисав кущик, посаджений на
+ * криву висоти (ADR-0140). Трикутник плато лежить на плато за побудовою.
+ *
+ * Тому й міряється це часткою, а не кількістю: клітинок на плато рівно
+ * `PORTAL_ISLAND_SEGMENTS * (кільця - 1) * 2`, і частка каже, скільки з
+ * них зелені.
+ */
+export const PORTAL_MOSS_COVER: Record<PortalQuality, number> = {
+  high: 0.52, balanced: 0.38, low: 0.22, fallback: 0,
+};
+
+/**
+ * Кущі по кромці плато — те, що звисає з обриву.
+ *
+ * В еталоні власника край острова НЕ голий: зелень перевалюється через
+ * кромку й висить над порожнечею. Це найдешевша частина всієї зелені й
+ * найпомітніша — саме кромка малює силует острова на тлі неба.
+ */
+export const PORTAL_RIM_TUFTS: Record<PortalQuality, number> = {
+  high: 128, balanced: 78, low: 34, fallback: 0,
+};
+
+/** Кущі, що вже читаються деревцями. Стоять поясом ближче до кромки. */
+export const PORTAL_BUSHES: Record<PortalQuality, number> = {
+  high: 22, balanced: 14, low: 6, fallback: 0,
 };
 
 /**
@@ -1337,8 +1373,8 @@ function pushTuft(
   tag: string,
   seat: Point,
   size: number,
+  blades = 3,
 ): void {
-  const blades = 3;
   const spin = seededUnit(seed, `${tag}:spin`) * Math.PI * 2;
   for (let blade = 0; blade < blades; blade += 1) {
     const angle = spin + (blade / blades) * Math.PI * 2
@@ -1370,6 +1406,138 @@ function pushTuft(
 }
 
 /**
+ * Скільки трикутників меша трави належить кожному роду зелені, в порядку
+ * укладання: мох плато, кущики плато, кущі, звиси з кромки, мох на шапках
+ * брил, трава на брилах.
+ *
+ * ПУБЛІКУЄТЬСЯ З МЕША, А НЕ РАХУЄТЬСЯ ЗАНОВО. Раніше тест ділив меш на
+ * кущики кроком у три трикутники — це працювало, поки в меші не було
+ * нічого, крім кущиків. Тепер там п'ять родів зелені різної довжини, і
+ * будь-яка спроба відновити межі ділінням стала б ДРУГОЮ КОПІЄЮ тієї
+ * самої арифметики: вона розійшлася б із першою тієї миті, коли хтось
+ * поворухне густину моху. Число, яке залежить від насіння, мусить іти
+ * від того, хто його породив.
+ */
+export interface PortalFloraLayout {
+  readonly moss: number;
+  readonly tufts: number;
+  readonly bushes: number;
+  readonly drapes: number;
+  readonly rockMoss: number;
+  readonly rockTufts: number;
+}
+
+/**
+ * Половина клітинки плато — трикутник, який справді лежить у мешеві.
+ *
+ * Витягнуто в функцію, бо користувачів стало троє: кущик, кущ і мохова
+ * латка. Друга копія цієї арифметики розійшлася б із першою, і латка
+ * поїхала б від трави на тому самому камені — та сама вада, від якої
+ * `driftRockAt` тримає купи разом (ADR-0163).
+ */
+function crownCell(
+  seed: number,
+  segment: number,
+  level: number,
+  outerHalf: boolean,
+): readonly [Point, Point, Point] {
+  const next = (segment + 1) % PORTAL_ISLAND_SEGMENTS;
+  const inner = crownPoint(seed, segment, level);
+  return outerHalf
+    ? [inner, crownPoint(seed, next, level + 1), crownPoint(seed, segment, level + 1)]
+    : [inner, crownPoint(seed, next, level), crownPoint(seed, next, level + 1)];
+}
+
+/**
+ * Точка ВСЕРЕДИНІ трикутника плато, барицентрично. Три спроби до цього, і
+ * кожна попередня — окрема вада:
+ *
+ *  1. **На криву висоти** — ADR-0140. Плато намальоване пласкими
+ *     трикутниками МІЖ вибірками кривої, між ними хорда провисає, і
+ *     кущик висить над каменем.
+ *  2. **На найнижчий кут клітинки** — правило уламка й храму, і воно
+ *     їхнє по праву: вони лежать на клітинці ПІДОШВОЮ, тож вищий кут
+ *     підняв би протилежний у повітря. Кущик підошви не має, він точка,
+ *     — і те саме правило топило його на 0.021 радіуса острова там, де
+ *     клітинка крута.
+ *  3. **На саму вершину.** Належить мешу за визначенням, але вершини
+ *     стоять ґраткою, а ще промінь, пущений рівно крізь вершину, не
+ *     влучає в жоден із трикутників, що в ній сходяться, — тобто таку
+ *     посадку не можна ані перевірити, ані відрізнити від ґратки оком.
+ *
+ * Точка всередині трикутника лежить у його площині, тобто на мешеві, за
+ * арифметикою. Ваги тримаються не ближче за 0.12 до ребра, щоб кущик не
+ * з'їжджав на стик двох площин, де «поверхня» неоднозначна.
+ */
+function crownSeat(
+  seed: number,
+  tag: string,
+  cell: readonly [Point, Point, Point],
+  sink = 0.004,
+): Point {
+  const rawA = 0.12 + seededUnit(seed, `${tag}:bary`) * 0.76;
+  const rawB = 0.12 + seededUnit(seed, `${tag}:bary2`) * (0.88 - rawA);
+  const weights = [rawA, rawB, 1 - rawA - rawB] as const;
+  return [
+    cell[0][0] * weights[0] + cell[1][0] * weights[1] + cell[2][0] * weights[2],
+    cell[0][1] * weights[0] + cell[1][1] * weights[1] + cell[2][1] * weights[2] - sink,
+    cell[0][2] * weights[0] + cell[1][2] * weights[1] + cell[2][2] * weights[2],
+  ];
+}
+
+/**
+ * Звисаюча зелень: листок, що падає з кромки НАЗОВНІ й УНИЗ.
+ *
+ * `pushTuft` тут не годиться, і це не дрібниця форми. Його листок завжди
+ * тягнеться вгору від сідала — так росте трава, — а кромка потрібна
+ * протилежним: зелень перевалюється через край і висить над порожнечею.
+ * Саме звис, а не кущик на краю, робить силует острова зеленим на тлі
+ * неба; кущик на кромці з камери під 23.6° ховається за самою кромкою.
+ *
+ * Листків два, а не три: третій дивився б усередину острова, де його
+ * затуляє плато.
+ */
+function pushDrape(
+  mesh: Soup,
+  seed: number,
+  tag: string,
+  seat: Point,
+  outward: number,
+  size: number,
+): void {
+  const out: Point = [Math.cos(outward), 0, Math.sin(outward)];
+  const across: Point = [-out[2], 0, out[0]];
+  for (let leaf = 0; leaf < 2; leaf += 1) {
+    const skew = (seededUnit(seed, `${tag}:skew:${leaf}`) - 0.5) * 0.9;
+    const width = size * (0.16 + seededUnit(seed, `${tag}:wide:${leaf}`) * 0.12);
+    /*
+     * НАЗОВНІ БІЛЬШЕ, НІЖ УНИЗ, і це не смак форми. Камера дивиться на
+     * острів згори під 23.6°: те, що падає рівно вниз, ховається за
+     * власною кромкою, і з кадру видно тільки виліт. Перша редакція
+     * мала виліт 0.42…0.92 розміру проти падіння 0.7…2.2 — тобто
+     * зелень, посаджену там, де її не видно.
+     */
+    const reach = size * (0.72 + seededUnit(seed, `${tag}:reach:${leaf}`) * 0.7);
+    const fall = size * (0.6 + seededUnit(seed, `${tag}:fall:${leaf}`) * 1.4);
+    const base: Point = [
+      seat[0] + across[0] * skew * size * 0.4,
+      seat[1],
+      seat[2] + across[2] * skew * size * 0.4,
+    ];
+    const left: Point = [base[0] + across[0] * width, base[1], base[2] + across[2] * width];
+    const right: Point = [base[0] - across[0] * width, base[1], base[2] - across[2] * width];
+    const tip: Point = [
+      base[0] + out[0] * reach,
+      base[1] - fall,
+      base[2] + out[2] * reach,
+    ];
+    // Темніше на кінчику, а не на основі: звис висить у тіні власного
+    // острова, і світло до нього приходить згори, з боку кромки.
+    mesh.push(left, right, tip, [0.95, 0.95, 0.46]);
+  }
+}
+
+/**
  * Рослинність на всіх островах — і на великому, і на малих.
  *
  * ОКРЕМИЙ МЕШ, І ЦЕ КОШТУЄ П'ЯТИЙ DRAW CALL. Причина не в геометрії, а в
@@ -1386,10 +1554,19 @@ function pushTuft(
  */
 export function buildPortalFloraGeometry(
   seed: number,
-  tufts: number,
-  rocks: number,
+  quality: PortalQuality,
 ): THREE.BufferGeometry {
   const mesh = soup();
+  const tufts = PORTAL_FLORA_TUFTS[quality];
+  const rocks = PORTAL_DRIFT_ROCKS[quality];
+
+  /*
+   * ПРОФІЛЬ, А НЕ П'ЯТЬ ЧИСЕЛ. Раніше сюди передавали окремо кількість
+   * кущиків і окремо кількість брил, і другу мусив підібрати той, хто
+   * кличе: трава на брилах будується по одній на камінь, тож розбіжність
+   * означала б кущики в порожньому небі. Тепер ключ профілю один, і
+   * розійтись цим числам більше нема де.
+   */
 
   /*
    * НА ПЛАТО — від третього кільця назовні.
@@ -1399,45 +1576,76 @@ export function buildPortalFloraGeometry(
    * центру, тож 2…5 — це поясок між артефактом і кромкою.
    */
   mesh.float = [0, 0];
+
+  /*
+   * МОХОВІ ЛАТКИ — ПЕРШЕ, ЩО РОБИТЬ ОСТРІВ ЗЕЛЕНИМ (ADR-0166).
+   *
+   * Кущики дали 0.04% кадру: трава, яку видно, лише коли її шукаєш. В
+   * еталоні власника зелена САМА ЗЕМЛЯ, а трава на ній — деталь. Латка
+   * коштує один трикутник і вкриває площу, якої тридцять кущиків не
+   * вкриють ніколи.
+   *
+   * ЧОМУ НЕ ПОФАРБУВАТИ ПЛАТО. Вершинний колір множиться на колір
+   * матеріалу, а материал плато — камінь; помножити камінь на зелень
+   * можна лише вниз, і вдень це дало б болото замість моху. Уночі гірше:
+   * палітра навмисно тримає траву СВІТЛІШОЮ за камінь («трава ловить
+   * місяць»), а множення вгору не вміє. Тому мох живе в меші трави, де
+   * колір уже правильний в обидві пори доби.
+   *
+   * Клітинки перебираються ВСІ, а не вибираються випадково: вибір із
+   * повторами дав би латки одна на одній і лисини поруч. Кільце 1 —
+   * найближче до жеоди, за яким уже видно поверхню.
+   */
+  const mark = (): number => mesh.positions.length / 9;
+  const startMoss = mark();
+  const cover = PORTAL_MOSS_COVER[quality];
+  for (let segment = 0; segment < PORTAL_ISLAND_SEGMENTS; segment += 1) {
+    for (let level = 1; level + 1 < ISLAND_TOP_RINGS.length; level += 1) {
+      for (const outerHalf of [false, true]) {
+        const tag = `island:moss:${segment}:${level}:${outerHalf ? 'o' : 'i'}`;
+        /*
+         * ДВІ ЧАСТОТИ, А НЕ ОДНА. Кидок на клітинку сам по собі дає
+         * конфеті: зелений трикутник, сірий, зелений — і кадр показав
+         * саме це, лускату мозаїку замість луки. Зелень у природі
+         * росте плямами, і пляма тут — зона з восьми клинів на два
+         * кільця. Місцевий кидок лишає її краї рваними.
+         */
+        const zone = seededUnit(seed, `island:mosszone:${Math.floor(segment / 8)}:${Math.floor(level / 2)}`);
+        if (seededUnit(seed, tag) * 0.45 + zone * 0.55 >= cover) continue;
+        const cell = crownCell(seed, segment, level, outerHalf);
+        /*
+         * Піднято на 0.006 радіуса острова. Нуль дав би z-fighting із
+         * породою під собою — два трикутники в одній площині сперечаються
+         * за піксель і мерехтять при найменшому русі камери.
+         */
+        const lifted = cell.map((point) => [point[0], point[1] + 0.006, point[2]] as Point);
+        /*
+         * ВЛАСНИЙ МНОЖНИК ТОНУ, темніший за все інше в цьому меші.
+         * Латка лежить майже горизонтально, тобто дивиться просто на
+         * ключ, і без множника виходила майже повним кольором матеріалу
+         * — найяскравішою зеленню сцени. Земля не буває яскравішою за
+         * те, що на ній росте.
+         */
+        pushLit(mesh, lifted[0]!, lifted[1]!, lifted[2]!, 0.66);
+      }
+    }
+  }
+
+  /*
+   * КУЩИКИ — від третього кільця назовні.
+   *
+   * Ближче до осі стоїть жеода з кристалами, і кущик під нею просто
+   * закопаний: намальований, невидимий і оплачений. Кільця нумеруються від
+   * центру, тож 2…5 — це поясок між артефактом і кромкою.
+   */
+  const startTufts = mark();
   for (let index = 0; index < tufts; index += 1) {
     const tag = `island:flora:${index}`;
     const segment = Math.floor(seededUnit(seed, `${tag}:segment`) * PORTAL_ISLAND_SEGMENTS);
     const ring = 2 + Math.floor(seededUnit(seed, `${tag}:ring`) * 4);
-    /*
-     * Сідає ВСЕРЕДИНУ ТРИКУТНИКА ПЛАТО, барицентрично. Три спроби до цього,
-     * і кожна попередня — окрема вада:
-     *
-     *  1. **На криву висоти** — ADR-0140. Плато намальоване пласкими
-     *     трикутниками МІЖ вибірками кривої, між ними хорда провисає, і
-     *     кущик висить над каменем.
-     *  2. **На найнижчий кут клітинки** — правило уламка й храму, і воно
-     *     їхнє по праву: вони лежать на клітинці ПІДОШВОЮ, тож вищий кут
-     *     підняв би протилежний у повітря. Кущик підошви не має, він
-     *     точка, — і те саме правило топило його на 0.021 радіуса острова
-     *     там, де клітинка крута.
-     *  3. **На саму вершину.** Належить мешу за визначенням, але вершини
-     *     стоять ґраткою, а ще промінь, пущений рівно крізь вершину, не
-     *     влучає в жоден із трикутників, що в ній сходяться, — тобто таку
-     *     посадку не можна ані перевірити, ані відрізнити від ґратки оком.
-     *
-     * Точка ВСЕРЕДИНІ трикутника лежить у його площині, тобто на мешеві, за
-     * арифметикою. Ваги тримаються не ближче за 0.12 до ребра, щоб кущик не
-     * з'їжджав на стик двох площин, де «поверхня» неоднозначна.
-     */
     const level = Math.min(ISLAND_TOP_RINGS.length - 2, ring);
-    const next = (segment + 1) % PORTAL_ISLAND_SEGMENTS;
-    const inner = crownPoint(seed, segment, level);
-    const cell: readonly Point[] = seededUnit(seed, `${tag}:half`) < 0.5
-      ? [inner, crownPoint(seed, next, level), crownPoint(seed, next, level + 1)]
-      : [inner, crownPoint(seed, next, level + 1), crownPoint(seed, segment, level + 1)];
-    const rawA = 0.12 + seededUnit(seed, `${tag}:bary`) * 0.76;
-    const rawB = 0.12 + seededUnit(seed, `${tag}:bary2`) * (0.88 - rawA);
-    const weights = [rawA, rawB, 1 - rawA - rawB] as const;
-    const seat: Point = [
-      cell[0]![0] * weights[0] + cell[1]![0] * weights[1] + cell[2]![0] * weights[2],
-      cell[0]![1] * weights[0] + cell[1]![1] * weights[1] + cell[2]![1] * weights[2] - 0.004,
-      cell[0]![2] * weights[0] + cell[1]![2] * weights[1] + cell[2]![2] * weights[2],
-    ];
+    const cell = crownCell(seed, segment, level, seededUnit(seed, `${tag}:half`) >= 0.5);
+    const seat = crownSeat(seed, tag, cell);
     /*
      * РОЗМІР — ВИМІРЯНИЙ, а не вгаданий (ADR-0163).
      *
@@ -1453,6 +1661,45 @@ export function buildPortalFloraGeometry(
   }
 
   /*
+   * КУЩІ — той самий кущик, більший і густіший.
+   *
+   * Стовбура немає навмисно, і це не лінощі: меш трави має ОДИН колір
+   * матеріалу, тож коричневий стовбур у ньому неможливий, а зелений
+   * стовбур — це просто ще один листок. При екранній висоті кущика в 18
+   * пікселів стовбур усе одно був би завтовшки в два, тобто шумом.
+   * П'ять листків замість трьох і потрійний розмір дають силует куща —
+   * рівно те, чим деревце в еталоні й читається з нашої відстані.
+   */
+  const startBushes = mark();
+  for (let index = 0; index < PORTAL_BUSHES[quality]; index += 1) {
+    const tag = `island:bush:${index}`;
+    const segment = Math.floor(seededUnit(seed, `${tag}:segment`) * PORTAL_ISLAND_SEGMENTS);
+    // Пояс 4…6: далі від жеоди, ближче до кромки, де в еталоні й стоять дерева.
+    const level = 4 + Math.floor(seededUnit(seed, `${tag}:ring`) * 3);
+    const cell = crownCell(seed, segment, level, seededUnit(seed, `${tag}:half`) >= 0.5);
+    const seat = crownSeat(seed, tag, cell);
+    pushTuft(mesh, seed, tag, seat, 0.058 + seededUnit(seed, `${tag}:size`) * 0.042, 5);
+  }
+
+  /*
+   * ЗВИС ІЗ КРОМКИ — найдешевша зелень і найпомітніша.
+   *
+   * Кромка малює силует острова на тлі неба, і саме там голий камінь
+   * читається зрізаним. Сідало береться на ЗОВНІШНЬОМУ кільці плато, а
+   * зелень падає назовні й униз — через край.
+   */
+  const startDrapes = mark();
+  const rim = ISLAND_TOP_RINGS.length - 2;
+  for (let index = 0; index < PORTAL_RIM_TUFTS[quality]; index += 1) {
+    const tag = `island:rim:${index}`;
+    const segment = Math.floor(seededUnit(seed, `${tag}:segment`) * PORTAL_ISLAND_SEGMENTS);
+    const cell = crownCell(seed, segment, rim, true);
+    const seat = crownSeat(seed, tag, cell);
+    const outward = Math.atan2(seat[2], seat[0]);
+    pushDrape(mesh, seed, tag, seat, outward, 0.075 + seededUnit(seed, `${tag}:size`) * 0.085);
+  }
+
+  /*
    * НА БРИЛАХ — по одному кущику, і на самій шапці.
    *
    * Шапка брили — це колишня поверхня острова, з якої її вирвало
@@ -1463,6 +1710,41 @@ export function buildPortalFloraGeometry(
    * вдвічі більший, інакше на дальніх каменях трава читалась би мохом, а
    * на ближніх — деревами.
    */
+  /*
+   * МОХ НА ШАПКАХ БРИЛ — дрібні острови теж зелені.
+   *
+   * Шапка брили — це колишня поверхня острова, з якої її вирвало, тобто
+   * рівно те місце, де зелень і мала лишитись. Без неї камені в небі
+   * читаються сірими плитами поруч із зеленим островом, і кадр каже, що
+   * вони з іншого світу.
+   *
+   * Віяло шапки будується ТІЄЮ САМОЮ функцією, що й сам камінь
+   * (`driftRockCorner`): друга копія цих кидків розійшлася б із першою й
+   * зелень поїхала б із каменя.
+   */
+  const startRockMoss = mark();
+  for (let index = 0; index < rocks; index += 1) {
+    const rock = driftRockAt(seed, index, rocks);
+    const tag = `island:driftmoss:${index}`;
+    if (seededUnit(seed, `${tag}:bare`) < 0.3) continue;
+    mesh.float = rock.float;
+    const lift = rock.size * 0.012;
+    const cap: Point = [rock.cx, rock.rise + rock.top * 1.16 + lift, rock.cz];
+    for (let corner = 0; corner < DRIFT_ROCK_SIDES; corner += 1) {
+      const next = (corner + 1) % DRIFT_ROCK_SIDES;
+      const a = driftRockCorner(seed, rock, corner, 1);
+      const b = driftRockCorner(seed, rock, next, 1);
+      pushLit(
+        mesh,
+        [a[0], a[1] + lift, a[2]],
+        cap,
+        [b[0], b[1] + lift, b[2]],
+        0.66,
+      );
+    }
+  }
+
+  const startRockTufts = mark();
   for (let index = 0; index < rocks; index += 1) {
     const rock = driftRockAt(seed, index, rocks);
     const tag = `island:driftflora:${index}`;
@@ -1477,7 +1759,47 @@ export function buildPortalFloraGeometry(
     ], rock.size * 0.34);
   }
 
-  return finish(mesh);
+  const geometry = finish(mesh);
+  const layout: PortalFloraLayout = {
+    moss: startTufts - startMoss,
+    tufts: startBushes - startTufts,
+    bushes: startDrapes - startBushes,
+    drapes: startRockMoss - startDrapes,
+    rockMoss: startRockTufts - startRockMoss,
+    rockTufts: mark() - startRockTufts,
+  };
+  geometry.userData.floraLayout = layout;
+  return geometry;
+}
+
+/** Скільки кутів має летюча брила. Спільне для каменю й моху на ньому. */
+const DRIFT_ROCK_SIDES = 7;
+
+/**
+ * Кут летючої брили — СПІЛЬНА арифметика каменю й того, що на ньому росте.
+ *
+ * Витягнуто з `buildPortalDriftGeometry` тоді, коли шапка брили дістала
+ * мох (ADR-0166). Друга копія цих кидків розійшлася б із першою тієї миті,
+ * коли хтось поворухне тремтіння кутів, і зелень поїхала б із каменя —
+ * рівно те, від чого `driftRockAt` уже стереже розміщення й фазу.
+ */
+function driftRockCorner(
+  seed: number,
+  rock: { tag: string; cx: number; cz: number; rise: number; size: number; top: number; spin: number },
+  corner: number,
+  level: number,
+): Point {
+  const gap = (Math.PI * 2) / DRIFT_ROCK_SIDES;
+  const drift = (seededUnit(seed, `${rock.tag}:step:${corner}`) - 0.5) * 2 * gap * 0.45;
+  const a = rock.spin + corner * gap + drift;
+  const wobble = 0.72 + seededUnit(seed, `${rock.tag}:edge:${corner}`) * 0.56;
+  const radius = rock.size * wobble * (level === 0 ? 1 : 0.88);
+  const lean = (seededUnit(seed, `${rock.tag}:lean:${corner}`) - 0.5) * rock.size * 0.22;
+  return [
+    rock.cx + Math.cos(a) * radius,
+    rock.rise + (level === 0 ? 0 : rock.top) + lean,
+    rock.cz + Math.sin(a) * radius,
+  ];
 }
 
 /**
