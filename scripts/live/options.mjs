@@ -199,6 +199,7 @@ export function parseShotArgs(argv) {
     login: true,
     breakdown: false,
     profile: null,
+    again: 0,
   };
 
   for (const raw of argv) {
@@ -223,6 +224,10 @@ export function parseShotArgs(argv) {
       // стоїть, як і тапи: питання «а чи вертається назад» інакше не
       // поставити.
       case 'zoom': zooms.push(...asList(value).map(parseNotches)); break;
+      // Другий кадр того самого екрана через N мс: «що рухається, коли пара
+      // нічого не робить». Без цього анімацію сцени нема чим перевірити —
+      // один знімок про рух не каже нічого.
+      case 'again': options.again = Number(value); break;
       case 'theme': options.theme = value; break;
       // Сховище ДО запуску застосунку: свіжий контекст браузера — це завжди
       // «перший раз», а частина порталу побудована саме на пам'яті між
@@ -255,6 +260,9 @@ export function parseShotArgs(argv) {
   if (!Number.isFinite(options.settle) || options.settle < 0) {
     throw new OptionError('--settle має бути невід’ємним числом мілісекунд.');
   }
+  if (!Number.isFinite(options.again) || options.again < 0) {
+    throw new OptionError('--again має бути невід’ємним числом мілісекунд.');
+  }
   if (options.theme !== null && options.theme !== 'dark' && options.theme !== 'light') {
     throw new OptionError('--theme приймає лише dark або light.');
   }
@@ -281,6 +289,7 @@ export function parseShotArgs(argv) {
     still: options.still,
     breakdown: options.breakdown,
     profile: options.profile,
+    again: options.again,
     login: options.login,
   };
 }

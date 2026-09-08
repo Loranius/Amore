@@ -102,6 +102,17 @@ describe('arguments', () => {
   });
 });
 
+describe('другий кадр', () => {
+  it('бере паузу в мілісекундах і відмовляє від’ємній', () => {
+    // Один знімок про рух не каже нічого; два поспіль кажуть, що рухається
+    // саме, а що стоїть (ADR-0162).
+    expect(parseShotArgs(['--again=4000']).again).toBe(4000);
+    expect(parseShotArgs([]).again).toBe(0);
+    expect(() => parseShotArgs(['--again=-1'])).toThrow(OptionError);
+    expect(() => parseShotArgs(['--again=пізніше'])).toThrow(OptionError);
+  });
+});
+
 describe('зум сцени', () => {
   it('бере клацання колеса зі знаком і в порядку, в якому їх дали', () => {
     // Порядок важить: `--zoom=-6 --zoom=6` — це питання «а чи вертається

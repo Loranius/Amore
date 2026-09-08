@@ -17,6 +17,7 @@ import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { rockGrainTexture } from './rockGrainTexture';
+import { portalLevitation } from './portalLevitation';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -53,6 +54,14 @@ export interface PortalEnvironmentProps {
   /** Профіль якості з пайплайну кристала — сцена не має права коштувати
    *  більше за сам артефакт на слабкому пристрої. */
   quality: 'high' | 'balanced' | 'low' | 'fallback';
+  /**
+   * Чи просив пристрій менше руху.
+   *
+   * Левітація брил зупиняється разом із диханням камери: §47 каже, що
+   * зменшений рух зберігає простір і прибирає подорож, а камінь, що
+   * гойдається під нерухомою камерою, — це і є подорож без згоди.
+   */
+  reduceMotion: boolean;
   /** Кадр камери для поточного аспекту; сцена й камера мусять читати
    *  одні й ті самі числа, тож він приходить згори. */
   frame: PortalCameraFrame;
@@ -88,6 +97,7 @@ export function PortalEnvironment({
   seed,
   theme,
   quality,
+  reduceMotion,
   frame,
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
@@ -113,6 +123,25 @@ export function PortalEnvironment({
    * при двох порталах.
    */
   const rockGrain = useMemo(() => rockGrainTexture(), []);
+
+  /*
+   * ЛЕВІТАЦІЯ БРИЛ (ADR-0162).
+   *
+   * Годинник живе в рефі, а не в стані: він рухається щокадру, і стан
+   * перемальовував би все дерево шістдесят разів на секунду заради одного
+   * числа в уніформі. Так само влаштований годинник аврори в рушії.
+   */
+  const floatClock = useRef<{ value: number } | null>(null);
+  const levitate = useMemo(() => portalLevitation(floatClock), []);
+  const floatSeconds = useRef(0);
+  useFrame((_, delta) => {
+    // Зупиняється разом із диханням камери, а не окремим прапорцем: камінь,
+    // що гойдається під нерухомою камерою, — це подорож без згоди (§47).
+    if (reduceMotion) return;
+    if (floatClock.current === null) return;
+    floatSeconds.current += Math.min(delta, 1 / 15);
+    floatClock.current.value = floatSeconds.current;
+  });
 
   /*
    * ОДИН МАСШТАБ НА ВСЮ СЦЕНУ, І ВІН ІДЕ ЗА КАДРОМ.
@@ -195,7 +224,17 @@ export function PortalEnvironment({
         каже камінь, який висить поруч без опори.
       */}
         <mesh geometry={drift} frustumCulled={false}>
-          <meshBasicMaterial color={palette.driftRock} vertexColors map={rockGrain} />
+          {/*
+            ЛЕВІТАЦІЯ — тут і тільки тут. Меш острова того самого атрибута
+            не має, тож він не рухається за побудовою, а не за домовленістю
+            (ADR-0162).
+          */}
+          <meshBasicMaterial
+            color={palette.driftRock}
+            vertexColors
+            map={rockGrain}
+            onBeforeCompile={levitate}
+          />
         </mesh>
 
       {/*

@@ -51,6 +51,8 @@ const USAGE = `
   --ink=<css>                        колір елемента числом: чорнило, тло, контраст, відтінок
   --tap=<css>                        тапнути перший збіг і зняти кадр; можна кілька,
                                      вони йдуть послідовно (модалка → її вміст)
+  --again=<мс>                       другий кадр того самого екрана через N мс:
+                                     що рухається, коли пара нічого не робить
   --zoom=<клацань>                   покрутити колесо над полотном і зняти кадр:
                                      від'ємне — ближче, додатне — далі; можна
                                      кілька, вони йдуть послідовно від поточної
@@ -220,6 +222,48 @@ async function main() {
               `  колір   ${selector}: ${ink.ink} (відтінок ${ink.inkHue ?? '—'}°)`
               + ` на ${ink.background}, контраст ${ink.contrast}:1`,
             );
+          }
+
+          /*
+           * ЩО РУХАЄТЬСЯ САМО (ADR-0162).
+           *
+           * Один знімок про рух не каже нічого, а два поспіль кажуть рівно
+           * те, що треба: де сцена жива, а де стоїть. Друкується не тільки
+           * скільки пікселів змінилось, а й ДЕ — по клітинках 40×40, бо
+           * питання майже завжди саме таке: «а чи не рухається те, що не
+           * мало б».
+           */
+          if (options.again > 0) {
+            const before = decodePng(readFileSync(file));
+            await portal.page.waitForTimeout(options.again);
+            const againFile = `${outDir}/${name}-again.png`;
+            await portal.page.screenshot({ path: againFile });
+            const after = decodePng(readFileSync(againFile));
+            const cell = 40;
+            const grid = new Map();
+            let moved = 0;
+            for (let y = 0; y < Math.min(before.height, after.height); y += 1) {
+              for (let x = 0; x < Math.min(before.width, after.width); x += 1) {
+                const at = (y * before.width + x) * before.channels;
+                const to = (y * after.width + x) * after.channels;
+                const delta = Math.abs(before.data[at] - after.data[to])
+                  + Math.abs(before.data[at + 1] - after.data[to + 1])
+                  + Math.abs(before.data[at + 2] - after.data[to + 2]);
+                if (delta <= 12) continue;
+                moved += 1;
+                const key = `${Math.floor(x / cell) * cell},${Math.floor(y / cell) * cell}`;
+                grid.set(key, (grid.get(key) ?? 0) + 1);
+              }
+            }
+            const total = before.width * before.height;
+            console.log(
+              `  рух     за ${options.again} мс → ${againFile}`
+              + ` · змінилось ${moved} пікселів (${(moved / total * 100).toFixed(2)}%)`,
+            );
+            const top = [...grid].sort((one, other) => other[1] - one[1]).slice(0, 6);
+            for (const [key, count] of top) {
+              console.log(`          x${key.split(',')[0]} y${key.split(',')[1]}  ${count} з ${cell * cell}`);
+            }
           }
 
           /*

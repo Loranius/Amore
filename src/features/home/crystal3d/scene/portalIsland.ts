@@ -302,6 +302,17 @@ interface Soup {
   readonly positions: number[];
   readonly colors: number[];
   readonly uvs: number[];
+  /**
+   * Власний рух тіла, що зараз будується: [фаза, темп] або `null`.
+   *
+   * Один меш несе всі брили — інакше сцена платила б draw call за кожну, —
+   * тож щоб вони левітували НЕ В ОДИН ГОЛОС, кожна вершина мусить знати, до
+   * якої брили належить. Будівник ставить це поле перед тим, як класти
+   * трикутники чергового тіла, і воно їде у вершинний атрибут (ADR-0162).
+   */
+  float: readonly [number, number] | null;
+  /** Пари [фаза, темп], по одній на вершину. Порожньо — меш нерухомий. */
+  readonly floats: number[];
   push(
     a: Point,
     b: Point,
@@ -323,11 +334,17 @@ function soup(): Soup {
   const positions: number[] = [];
   const colors: number[] = [];
   const uvs: number[] = [];
+  const floats: number[] = [];
   return {
     positions,
     colors,
     uvs,
+    floats,
+    float: null,
     push(a, b, c, shade = 1, uv) {
+      if (this.float !== null) {
+        for (let corner = 0; corner < 3; corner += 1) floats.push(this.float[0], this.float[1]);
+      }
       positions.push(...a, ...b, ...c);
       const corners = typeof shade === 'number' ? [shade, shade, shade] : shade;
       for (const value of corners) colors.push(value, value, value);
@@ -345,6 +362,15 @@ function finish(mesh: Soup): THREE.BufferGeometry {
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(mesh.positions, 3));
   geometry.setAttribute('color', new THREE.Float32BufferAttribute(mesh.colors, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs, 2));
+  /*
+   * Атрибут руху ставиться ЛИШЕ там, де тіла справді ворушаться, і це не
+   * заощадження двох флоатів на вершину. Меш без нього не можна зрушити
+   * навіть помилково: острів стоїть нерухомо тому, що йому нічим рухатись,
+   * а не тому, що хтось не забув передати нуль (ADR-0162).
+   */
+  if (mesh.floats.length > 0) {
+    geometry.setAttribute('portalFloat', new THREE.Float32BufferAttribute(mesh.floats, 2));
+  }
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
   return geometry;
@@ -1105,6 +1131,23 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
     const cx = Math.cos(angle) * reach;
     const cz = Math.sin(angle) * reach;
     const spin = seededUnit(seed, `${tag}:turn`) * Math.PI * 2;
+    /*
+     * ЛЕВІТАЦІЯ: своя фаза й свій темп на кожну брилу (ADR-0162).
+     *
+     * Спільна фаза дала б не летючі камені, а один камінь, розмножений
+     * копіюванням: усі підіймаються разом, і око читає це як тремтіння
+     * камери. Спільний темп при різних фазах читається краще, але за
+     * пів хвилини спостереження вертається те саме — вони проходять
+     * верхню точку по черзі, з рівним кроком, як зубці шестерні.
+     *
+     * Темп 0.72…1.34 — вузько навмисно: ширше й найшвидша брила почала б
+     * обганяти найповільнішу на цілий період, а два камені, що йдуть у
+     * протифазі поруч, читаються гойдалкою.
+     */
+    mesh.float = [
+      seededUnit(seed, `${tag}:float`) * Math.PI * 2,
+      0.72 + seededUnit(seed, `${tag}:pace`) * 0.62,
+    ];
 
     /*
      * ФОРМА — БРИЛА, А НЕ САМОЦВІТ, і це виправлення знайшов кадр.
@@ -1192,7 +1235,16 @@ export function buildPortalCloudGeometry(seed: number, count: number): THREE.Buf
     const tag = `island:cloud:${index}`;
     const angle = ((index + seededUnit(seed, `${tag}:spin`) * 0.9) / Math.max(1, count)) * Math.PI * 2;
     const reach = 17 + seededUnit(seed, `${tag}:reach`) * 22;
-    const rise = -2.6 - seededUnit(seed, `${tag}:rise`) * 2.2;
+    /*
+     * ВИСОТА МОРЯ ХМАР. Було −2.6…−4.8, стало −1.7…−3.6 на пряму вказівку
+     * власника «хмари підніми вище» (ADR-0162).
+     *
+     * Межа зверху не смак: корінь острова закінчується близько −1.5, і
+     * хмара, що зайшла вище за неї, перестає бути морем ПІД островом — вона
+     * починає його різати. −1.7 лишає між ними приблизно двісті
+     * тисячних острова, тобто зазор, який видно, і не більше.
+     */
+    const rise = -1.7 - seededUnit(seed, `${tag}:rise`) * 1.9;
     /*
      * ШИРИНА ЙДЕ ВІД ВІДДАЛІ, тобто задається В ГРАДУСАХ КАДРУ, а не в
      * одиницях сцени. Кадр показав, чому: хмара завширшки 10.8 одиниці
