@@ -35,8 +35,23 @@ describe('вільна камера конструктора', () => {
     const rig = read('crystal3d/scene/PortalEnvironment.tsx');
 
     expect(stage).toMatch(/enableRotate=\{freeCamera \|\| allowOrbit\}/);
-    expect(stage).toMatch(/enableZoom=\{freeCamera\}/);
+    /*
+     * МАСШТАБ БІЛЬШЕ НЕ ОЗНАКА ЦЬОГО РЕЖИМУ (ADR-0160).
+     *
+     * Тут стояло `enableZoom={freeCamera}`, і це було вірно, поки масштаб
+     * існував ТІЛЬКИ в конструкторі. Власник попросив зум на головній
+     * («на х5 вперед і назад»), тож ознакою став `handZoom` — вільна
+     * камера АБО дозволена орбіта. Що лишилось ознакою саме цього режиму —
+     * зсув: він зрушує точку прицілу, тобто дозволяє загубити артефакт за
+     * краєм кадру, і парі такого жесту не дають.
+     */
+    expect(stage).toMatch(/const handZoom = freeCamera \|\| allowOrbit;/);
+    expect(stage).toMatch(/enableZoom=\{handZoom\}/);
     expect(stage).toMatch(/enablePan=\{freeCamera\}/);
+    // Власні межі огляду конструктора не з'їдені спільною ×5: 0.16 ближче
+    // за 1/5, і саме заради цього числа режим існує.
+    expect(stage).toContain('Math.max(0.6, frame.distance * 0.16)');
+    expect(stage).toContain('frame.distance * 3.2');
     expect(rig).toMatch(/if \(freeCamera\) \{[\s\S]*?return;/);
     expect(rig).toMatch(/if \(wasFreeCamera\.current\) \{[\s\S]*?createSceneDirector\(target\)/);
   });

@@ -20,7 +20,7 @@ import { rockGrainTexture } from './rockGrainTexture';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
-  NO_MANUAL_TURN,
+  NO_MANUAL_VIEW,
   advanceSceneDirector,
   createSceneDirector,
   sceneDirectorPose,
@@ -285,7 +285,7 @@ export function PortalCameraRig({
   // Що директор написав минулого кадру. Різниця між цим і тим, де камера
   // насправді опинилась, — і є те, що зробив палець через OrbitControls:
   // інакше кожен кадр стирав би ручний оберт.
-  const written = useRef<{ azimuth: number; elevation: number } | null>(null);
+  const written = useRef<{ azimuth: number; elevation: number; distance: number } | null>(null);
   const wasFreeCamera = useRef(freeCamera);
 
   useFrame((_, delta) => {
@@ -308,7 +308,7 @@ export function PortalCameraRig({
       wasFreeCamera.current = false;
     }
 
-    let drift = NO_MANUAL_TURN;
+    let drift = NO_MANUAL_VIEW;
     if (written.current && orbit) {
       const actual = portalCameraTurn(
         [camera.position.x, camera.position.y, camera.position.z],
@@ -317,6 +317,13 @@ export function PortalCameraRig({
       drift = {
         azimuth: shortestTurn(written.current.azimuth, actual.azimuth),
         elevation: actual.elevation - written.current.elevation,
+        /*
+         * Масштаб — ВІДНОШЕННЯ, а не різниця, бо `distance` пози сама є
+         * множником кадру. Знаменник береться з того, що директор
+         * написав минулого кадру, тож зведення пальців на 10% лишається
+         * десятьма відсотками і зблизька, і здалеку.
+         */
+        zoom: written.current.distance > 1e-6 ? actual.distance / written.current.distance : 1,
       };
     }
 

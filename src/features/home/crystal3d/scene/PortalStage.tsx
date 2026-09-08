@@ -12,8 +12,8 @@ import { OrbitControls } from '@react-three/drei';
 import { PORTAL_ORBIT_DAMPING, coarsePointerNow, portalOrbitRotateSpeed } from './portalOrbit';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
-import type { WorldCameraPose } from '@/features/world/crystalAtlas';
-import type { WorldMotionMode } from '@/features/world/sceneDirector';
+import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
+import { MANUAL_ZOOM_RANGE, type WorldMotionMode } from '@/features/world/sceneDirector';
 import {
   PORTAL_KEY_LIGHT,
   PORTAL_PALETTES,
@@ -107,6 +107,33 @@ export function PortalStage({
     [aspect, crystalsSceneRadius, artifactSceneHeight],
   );
   const palette = PORTAL_PALETTES[theme];
+  /*
+   * Від чого відлічується ×5 (ADR-0160).
+   *
+   * Від відстані, на якій маршрут ЩОЙНО закадрував артефакт, а не від
+   * сталої в одиницях сцени. Кадр і так їде за віком кристала, тож стала
+   * означала б, що на молодій парі «×5 назад» показує пів неба, а на
+   * дорослій — ледве відступ. Множник кадру тримає жест тим самим у будь-
+   * якому віці.
+   *
+   * ТІ САМІ ЧИСЛА ЗНАЄ Й ДИРЕКТОР (`MANUAL_ZOOM_RANGE`), і саме тому вони
+   * одна стала на двох. Орбіта зупиняє жест, директор зберігає результат;
+   * розійшлись би — між ними з'явилась би мертва зона, у якій палець
+   * тягне, а камера стоїть.
+   */
+  const zoomAnchor = frame.distance * (pose?.distance ?? CRYSTAL_CENTRE_POSE.distance);
+  const handZoom = freeCamera || allowOrbit;
+  /*
+   * Режим огляду конструктора лишається зі СВОЇМИ межами (0.16…3.2), і це
+   * навмисне виключення. Вони старші за це прохання й вирішують іншу
+   * задачу: підійти впритул до грані (0.6 одиниці — там, де камера ще не
+   * пірнула в тіло) у режимі, де директор камеру не тримає взагалі.
+   * Накинути на них ×5 означало б ВІДІБРАТИ 0.16.
+   */
+  const nearest = freeCamera
+    ? Math.max(0.6, frame.distance * 0.16)
+    : zoomAnchor / MANUAL_ZOOM_RANGE;
+  const farthest = freeCamera ? frame.distance * 3.2 : zoomAnchor * MANUAL_ZOOM_RANGE;
 
   return (
     <>
@@ -184,7 +211,7 @@ export function PortalStage({
         key={freeCamera ? 'free-camera' : 'directed-camera'}
         ref={controls}
         enablePan={freeCamera}
-        enableZoom={freeCamera}
+        enableZoom={handZoom}
         enableRotate={freeCamera || allowOrbit}
         enableDamping={!reduceMotion}
         /*
@@ -196,14 +223,26 @@ export function PortalStage({
          */
         dampingFactor={PORTAL_ORBIT_DAMPING}
         rotateSpeed={portalOrbitRotateSpeed(coarsePointer, freeCamera)}
-        // Жести двома пальцями лишаються типовими: у режимі головної
-        // масштаб і зсув однаково вимкнені, а перевизначати їх означало б
-        // забрати в сторінки щипок.
+        /*
+         * ЩИПОК ТЕПЕР НАШ, І ЦЕ ЦІНА, А НЕ ДРІБНИЦЯ.
+         *
+         * Тут стояло, що масштаб на головній вимкнено, «а перевизначати
+         * жести двома пальцями означало б забрати в сторінки щипок». Так
+         * і є: над полотном пара більше не збільшить сторінку двома
+         * пальцями. Власник попросив зум прямо, і плата названа, а не
+         * схована. Поза полотном щипок лишається сторінці — `OrbitControls`
+         * слухає лише елемент `<canvas>`.
+         *
+         * Зсув НЕ вмикається разом із масштабом. Зсув зрушує точку
+         * прицілу, тобто дозволяє вивести артефакт із кадру й лишити пару
+         * дивитись у порожнє небо без способу повернутись; масштаб цього
+         * зробити не може.
+         */
         zoomSpeed={0.78}
         panSpeed={0.68}
         screenSpacePanning={freeCamera}
-        minDistance={freeCamera ? Math.max(0.6, frame.distance * 0.16) : 0}
-        maxDistance={freeCamera ? frame.distance * 3.2 : Infinity}
+        minDistance={handZoom ? nearest : 0}
+        maxDistance={handZoom ? farthest : Infinity}
         // Сцена стоїть на землі: дозволити камері пірнути під підлогу
         // означало б показати виворіт подіуму й вивернуті нормалі поля.
         minPolarAngle={Math.PI * (freeCamera ? 0.06 : 0.22)}

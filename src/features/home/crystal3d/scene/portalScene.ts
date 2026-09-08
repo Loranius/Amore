@@ -234,22 +234,26 @@ export function portalCameraView(
 }
 
 /**
- * The bearing and rise a camera actually stands at — the inverse of the two
- * angular halves of `portalCameraView`.
+ * Where a camera actually stands — the inverse of `portalCameraView`.
  *
  * The director needs this to notice what the couple's finger did: orbit
  * controls move the camera themselves, and the only way to keep a hand turn
  * instead of overwriting it is to read back the difference between where the
  * camera is and where the director last put it (ADR-0022).
  *
- * Distance is not returned because nothing changes it — orbiting is rotation
- * and zoom is disabled — so reading it back would only feed rounding error
- * into a value the atlas owns.
+ * ВІДСТАНЬ ТЕЖ ПОВЕРТАЄТЬСЯ, і тут стояло, що не повертається, бо «її ніхто
+ * не міняє: орбіта — це оберт, а масштаб вимкнено». Масштаб більше не
+ * вимкнено (ADR-0160), і без цього числа палець, що зводить два пальці,
+ * стирався б наступним же кадром — рівно так, як стирався б оберт до того,
+ * як його навчились зчитувати.
+ *
+ * Повертається СИРА відстань у одиницях сцени, а не частка кадру: чия вона
+ * частка, знає той, хто тримає кадр, а тут його немає.
  */
 export function portalCameraTurn(
   position: readonly [number, number, number],
   target: readonly [number, number, number],
-): { azimuth: number; elevation: number } {
+): { azimuth: number; elevation: number; distance: number } {
   const dx = position[0] - target[0];
   const dy = position[1] - target[1];
   const dz = position[2] - target[2];
@@ -257,6 +261,7 @@ export function portalCameraTurn(
   return {
     azimuth: Math.atan2(dx, dz),
     elevation: distance > 1e-9 ? dy / distance : 0,
+    distance,
   };
 }
 

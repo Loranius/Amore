@@ -106,6 +106,15 @@ function pick(map, value, what) {
 }
 
 /** Маршрут → шлях із хешем. Невідоме коротке ім'я — помилка, а не здогадка. */
+/** Клацання колеса: ціле, не нуль, зі знаком браузера (мінус — ближче). */
+export function parseNotches(value) {
+  const notches = Number(value);
+  if (!Number.isInteger(notches) || notches === 0) {
+    throw new OptionError('--zoom приймає ціле число клацань колеса, не нуль (напр. --zoom=-6).');
+  }
+  return notches;
+}
+
 export function routePath(route) {
   const value = String(route).trim();
   if (value === '') throw new OptionError('Порожній маршрут.');
@@ -176,6 +185,7 @@ export function parseShotArgs(argv) {
   const inks = [];
   const taps = [];
   const tapPoints = [];
+  const zooms = [];
   const seed = [];
   const options = {
     tier: DEFAULTS.tier,
@@ -208,6 +218,11 @@ export function parseShotArgs(argv) {
       // Дотик по координаті, а не по селектору. Для сцени це єдиний спосіб:
       // зірки живуть у полотні, і селектора в них немає.
       case 'tap-at': tapPoints.push(parsePoint(value)); break;
+      // Зум сцени колесом над полотном: `--zoom=-6` ближче, `--zoom=6` далі.
+      // Можна кілька — вони йдуть ПОСЛІДОВНО від того місця, де камера вже
+      // стоїть, як і тапи: питання «а чи вертається назад» інакше не
+      // поставити.
+      case 'zoom': zooms.push(...asList(value).map(parseNotches)); break;
       case 'theme': options.theme = value; break;
       // Сховище ДО запуску застосунку: свіжий контекст браузера — це завжди
       // «перший раз», а частина порталу побудована саме на пам'яті між
@@ -258,6 +273,7 @@ export function parseShotArgs(argv) {
     settle: options.settle,
     taps,
     tapPoints,
+    zooms,
     seed,
     theme: options.theme,
     keepServer: options.keepServer,

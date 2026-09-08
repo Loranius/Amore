@@ -91,7 +91,30 @@ describe('arguments', () => {
     expect(() => parseShotArgs(['--theme=neon'])).toThrow(OptionError);
     expect(() => parseShotArgs(['--port=nope'])).toThrow(OptionError);
     expect(() => parseShotArgs(['--settle=-1'])).toThrow(OptionError);
-    expect(() => parseShotArgs(['--zoom=2'])).toThrow(OptionError);
+    /*
+     * `--zoom=2` СТОЯЛО ТУТ ЯК ПРИКЛАД НЕВІДОМОГО ПРАПОРЦЯ, і тепер він
+     * відомий (ADR-0160): оснастка вміє крутити колесо над полотном.
+     * Замінено на прапорець, якого немає й не планується, — інакше цей
+     * рядок перевіряв би не «невідоме падає», а «список прапорців такий,
+     * яким був того дня».
+     */
+    expect(() => parseShotArgs(['--rotate=2'])).toThrow(OptionError);
+  });
+});
+
+describe('зум сцени', () => {
+  it('бере клацання колеса зі знаком і в порядку, в якому їх дали', () => {
+    // Порядок важить: `--zoom=-6 --zoom=6` — це питання «а чи вертається
+    // назад», і взяти з них одне останнє означало б не поставити його.
+    expect(parseShotArgs(['--zoom=-6', '--zoom=6']).zooms).toEqual([-6, 6]);
+    expect(parseShotArgs(['--zoom=-3,3']).zooms).toEqual([-3, 3]);
+    expect(parseShotArgs([]).zooms).toEqual([]);
+  });
+
+  it('відмовляє нулю й дробам, а не крутить колесо навмання', () => {
+    expect(() => parseShotArgs(['--zoom=0'])).toThrow(OptionError);
+    expect(() => parseShotArgs(['--zoom=1.5'])).toThrow(OptionError);
+    expect(() => parseShotArgs(['--zoom=ближче'])).toThrow(OptionError);
   });
 });
 

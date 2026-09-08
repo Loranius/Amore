@@ -8,6 +8,7 @@ import { CRYSTAL_CENTRE_POSE, crystalPoseForRegion } from './crystalAtlas';
 import {
   advanceSceneDirector,
   createSceneDirector,
+  MANUAL_ZOOM_RANGE,
   MODULE_SPIN_RATE,
   effectiveMotionMode,
   sceneDirectorPose,
@@ -119,7 +120,7 @@ describe('travel (brief §22)', () => {
       target: CROWN,
       mode: 'idle',
       dt: Number.NaN,
-      drift: { azimuth: Number.NaN, elevation: Number.POSITIVE_INFINITY },
+      drift: { azimuth: Number.NaN, elevation: Number.POSITIVE_INFINITY, zoom: Number.NaN },
     });
     for (const value of Object.values(sceneDirectorPose(state))) {
       expect(Number.isFinite(value)).toBe(true);
@@ -181,7 +182,7 @@ describe('hand rotation (answers ADR-0021’s open question)', () => {
       target: CRYSTAL_CENTRE_POSE,
       mode: 'interaction',
       dt: FRAME_MS,
-      drift: { azimuth: 0.8, elevation: 0.05 },
+      drift: { azimuth: 0.8, elevation: 0.05, zoom: 1 },
     });
     state = run(state, CRYSTAL_CENTRE_POSE, 1.5, 'interaction');
     expect(sceneDirectorPose(state).azimuth).toBeCloseTo(CRYSTAL_CENTRE_POSE.azimuth + 0.8, 3);
@@ -194,7 +195,7 @@ describe('hand rotation (answers ADR-0021’s open question)', () => {
       target: CRYSTAL_CENTRE_POSE,
       mode: 'idle',
       dt: FRAME_MS,
-      drift: { azimuth: 1.2, elevation: 0 },
+      drift: { azimuth: 1.2, elevation: 0, zoom: 1 },
     });
     state = run(state, CROWN, 2.5);
     // Dissolved to invisibility rather than to exactly zero: the decay and the
@@ -290,7 +291,90 @@ describe('reading the camera back (ADR-0022)', () => {
       const read = portalCameraTurn(placed.position, placed.target);
       expect(read.azimuth, region).toBeCloseTo(pose.azimuth, 9);
       expect(read.elevation, region).toBeCloseTo(pose.elevation, 9);
+      // Відстань — так само, і саме з неї директор бере масштаб руки
+      // (ADR-0160). Кадр множиться на `distance` пози, тож зчитане мусить
+      // ділитись назад рівно в неї.
+      expect(read.distance / frame.distance, region).toBeCloseTo(pose.distance, 9);
     }
+  });
+});
+
+// ============================================================
+// Масштаб рукою — ×5 вперед і ×5 назад (ADR-0160).
+// ------------------------------------------------------------
+// Прохання власника дослівно: «додай можливість зуму кристала і сцени на х5
+// вперед і назад». Тут стережеться те, чого не видно на екрані: що жест
+// переживає наступний кадр (без цього директор стер би його, як стирав
+// оберт до ADR-0022), що він не виходить за названу межу і що подорож
+// повертає кадр маршрутові.
+// ============================================================
+describe('масштаб рукою (ADR-0160)', () => {
+  /** Один кадр із заданим відношенням відстані — те, що звітує орбіта. */
+  function pinch(state: SceneDirectorState, zoom: number, mode: Exclude<WorldMotionMode, 'navigation'> = 'interaction') {
+    return advanceSceneDirector(state, {
+      target: CRYSTAL_CENTRE_POSE, mode, dt: FRAME_MS, drift: { azimuth: 0, elevation: 0, zoom },
+    });
+  }
+
+  it('тримає наближення, поки пара стоїть на місці', () => {
+    let state = run(createSceneDirector(CRYSTAL_CENTRE_POSE), CRYSTAL_CENTRE_POSE, 0.2);
+    state = pinch(state, 0.5);
+    state = run(state, CRYSTAL_CENTRE_POSE, 1.5, 'interaction');
+    expect(sceneDirectorPose(state).distance).toBeCloseTo(CRYSTAL_CENTRE_POSE.distance * 0.5, 3);
+  });
+
+  it('складає кадри жесту, а не бере останній', () => {
+    // Щипок приходить десятками дрібних кроків, і кожен — відношення до
+    // попереднього кадру. Множник, узятий як «остання відповідь», дав би
+    // ривок у кінці жесту замість плавного наближення.
+    let state = run(createSceneDirector(CRYSTAL_CENTRE_POSE), CRYSTAL_CENTRE_POSE, 0.2);
+    for (let step = 0; step < 10; step += 1) state = pinch(state, 0.9);
+    expect(state.manual.zoom).toBeCloseTo(0.9 ** 10, 6);
+  });
+
+  it('не пускає далі за ×5 у жоден бік', () => {
+    let near = run(createSceneDirector(CRYSTAL_CENTRE_POSE), CRYSTAL_CENTRE_POSE, 0.2);
+    let far = near;
+    for (let step = 0; step < 200; step += 1) {
+      near = pinch(near, 0.9);
+      far = pinch(far, 1.1);
+    }
+    expect(near.manual.zoom).toBeCloseTo(1 / MANUAL_ZOOM_RANGE, 9);
+    expect(far.manual.zoom).toBeCloseTo(MANUAL_ZOOM_RANGE, 9);
+    // Затиснуто в самому збереженому числі, а не лише в позі: інакше
+    // зворотний жест спершу з'їдав би невидимий запас.
+    expect(sceneDirectorPose(near).distance).toBeCloseTo(CRYSTAL_CENTRE_POSE.distance / MANUAL_ZOOM_RANGE, 3);
+  });
+
+  it('повертає кадр маршрутові, щойно пара кудись їде', () => {
+    // Та сама відповідь, що й для оберту: інакше Вішлист відкривався б
+    // упритул або здалеку залежно від того, як пара розглядала кристал.
+    let state = run(createSceneDirector(CRYSTAL_CENTRE_POSE), CRYSTAL_CENTRE_POSE, 0.2);
+    state = pinch(state, 0.25, 'idle');
+    state = run(state, CROWN, 2.5);
+    // До непомітності, а не рівно в одиницю — той самий поріг осідання, що
+    // й у ручного оберту поруч: наближення вчетверо повертається як 0.9994,
+    // тобто шість сотих відсотка кадру.
+    expect(state.manual.zoom).toBeCloseTo(1, 2);
+    expect(sceneDirectorPose(state).distance).toBeCloseTo(CROWN.distance, 2);
+  });
+
+  it('дихання лишається часткою відстані і зблизька', () => {
+    // Амплітуда дихання — 0.6% відстані. Якби масштаб не множив її разом
+    // із базою, на ×5 те саме число стало б п'ятивідсотковим гойданням —
+    // рівно там, де пара розглядає грань.
+    let state = run(createSceneDirector(CRYSTAL_CENTRE_POSE), CRYSTAL_CENTRE_POSE, 3);
+    state = pinch(state, 1 / MANUAL_ZOOM_RANGE, 'idle');
+    state = run(state, CRYSTAL_CENTRE_POSE, 6);
+    let low = Infinity;
+    let high = -Infinity;
+    for (let t = 0; t < 60; t += FRAME_MS) {
+      state = run(state, CRYSTAL_CENTRE_POSE, FRAME_MS);
+      const d = sceneDirectorPose(state).distance;
+      low = Math.min(low, d);
+      high = Math.max(high, d);
+    }
+    expect((high - low) / ((high + low) / 2)).toBeLessThan(0.02);
   });
 });
 

@@ -50,21 +50,43 @@ const IDLE_GAIN: Readonly<Record<WorldMotionMode, number>> = {
  */
 export const MODULE_SPIN_RATE = (2 * Math.PI) / 120;
 
-/** What the couple turned by hand, on top of whatever the route asked for. */
-export interface ManualTurn {
+/**
+ * How far the couple may zoom by hand, either way.
+ *
+ * Прохання власника, дослівно: «додай можливість зуму кристала і сцени на
+ * х5 вперед і назад». П'ять — не смак і не запас: це те число, яке він
+ * назвав, і воно тут єдиним місцем, бо ту саму межу мусять знати двоє —
+ * директор (щоб не пустити далі) і `OrbitControls` (щоб жест зупинився
+ * там сам, а не пружинив назад). Два числа розійшлись би, і між ними
+ * з'явилась би мертва зона, у якій палець тягне, а камера стоїть.
+ */
+export const MANUAL_ZOOM_RANGE = 5;
+
+/**
+ * What the couple did by hand, on top of whatever the route asked for.
+ *
+ * Два кути ДОДАЮТЬСЯ, а масштаб МНОЖИТЬСЯ, і це не недогляд симетрії.
+ * `distance` пози — уже множник кадру (`portalCameraView`), тож «удвічі
+ * ближче» — це 0.5 незалежно від того, з якої відстані почали; додаткова
+ * ж поправка означала б, що той самий жест наближає по-різному на різних
+ * маршрутах. Нейтральне значення тому 1, а не 0.
+ */
+export interface ManualView {
   azimuth: number;
   elevation: number;
+  /** Ratio on the pose's distance. 1 = exactly as the route framed it. */
+  zoom: number;
 }
 
-export const NO_MANUAL_TURN: ManualTurn = { azimuth: 0, elevation: 0 };
+export const NO_MANUAL_VIEW: ManualView = { azimuth: 0, elevation: 0, zoom: 1 };
 
 export interface SceneDirectorState {
   /** Where the route wants the camera. */
   target: WorldCameraPose;
   /** Where the camera has got to, before manual turn and idle motion. */
   base: WorldCameraPose;
-  /** Retained hand rotation. Survives standing still, dissolves on travel. */
-  manual: ManualTurn;
+  /** Retained hand view. Survives standing still, dissolves on travel. */
+  manual: ManualView;
   /** Smoothed idle amplitude, 0–1. Smoothed so a mode change fades. */
   idleGain: number;
   /** Seconds of idle motion accumulated. Only advances while the idle is on. */
@@ -100,7 +122,7 @@ export interface SceneDirectorInput {
    * How far the orbit controls moved the camera away from what the director
    * last wrote — that is, what the couple's finger did.
    */
-  drift?: ManualTurn;
+  drift?: ManualView;
 }
 
 /**
@@ -177,7 +199,7 @@ export function createSceneDirector(target: WorldCameraPose = CRYSTAL_CENTRE_POS
   return {
     target,
     base: target,
-    manual: NO_MANUAL_TURN,
+    manual: NO_MANUAL_VIEW,
     idleGain: 0,
     clock: 0,
     spinAngle: 0,
@@ -198,15 +220,20 @@ export function advanceSceneDirector(
   input: SceneDirectorInput,
 ): SceneDirectorState {
   const dt = Number.isFinite(input.dt) ? Math.min(Math.max(input.dt, 0), MAX_STEP) : 0;
-  const drift = input.drift ?? NO_MANUAL_TURN;
+  const drift = input.drift ?? NO_MANUAL_VIEW;
   const retargeted = !samePose(state.target, input.target);
 
   // Hand rotation is picked up wherever it happened, including the damping tail
   // after the finger lifts — the director reads what the controls did rather
   // than trying to know when a drag is over.
-  const turned: ManualTurn = {
+  const zoomStep = Number.isFinite(drift.zoom) && drift.zoom > 0 ? drift.zoom : 1;
+  const turned: ManualView = {
     azimuth: state.manual.azimuth + (Number.isFinite(drift.azimuth) ? drift.azimuth : 0),
     elevation: state.manual.elevation + (Number.isFinite(drift.elevation) ? drift.elevation : 0),
+    // Затиснуто ТУТ, а не в позі: інакше збережене число росло б без
+    // кінця, поки палець тягне за межу, і зворотний жест спершу з'їдав би
+    // цей невидимий запас — камера стояла б, хоч пальцем уже ведуть.
+    zoom: clampZoom(state.manual.zoom * zoomStep),
   };
 
   if (input.mode === 'reduced') {
@@ -217,7 +244,7 @@ export function advanceSceneDirector(
     return {
       target: input.target,
       base: input.target,
-      manual: retargeted ? NO_MANUAL_TURN : turned,
+      manual: retargeted ? NO_MANUAL_VIEW : turned,
       idleGain: 0,
       clock: state.clock,
       // §47: під зменшеним рухом кристал не обертається. Кут лишається там,
@@ -251,11 +278,14 @@ export function advanceSceneDirector(
   // travel. This is the question ADR-0021 left open, answered: keeping the turn
   // across a route change would land Wishlist on whichever side they happened
   // to have spun to, which is exactly the spatial memory §20 is asking for.
-  const manual: ManualTurn = settled
+  const manual: ManualView = settled
     ? turned
     : {
       azimuth: turned.azimuth * (1 - k),
       elevation: turned.elevation * (1 - k),
+      // Розчиняється до ОДИНИЦІ, бо одиниця — це «як кадрував маршрут».
+      // Нуль тут поставив би камеру в точку прицілу.
+      zoom: 1 + (turned.zoom - 1) * (1 - k),
     };
 
   const spin = Number.isFinite(input.spin) ? input.spin! : 0;
@@ -280,6 +310,12 @@ export function advanceSceneDirector(
   };
 }
 
+/** Масштаб руки в межах, які назвав власник. */
+function clampZoom(zoom: number): number {
+  if (!Number.isFinite(zoom) || zoom <= 0) return 1;
+  return Math.min(MANUAL_ZOOM_RANGE, Math.max(1 / MANUAL_ZOOM_RANGE, zoom));
+}
+
 /** Кут у межах одного оберту, щоб число не росло без кінця. */
 function wrapAngle(angle: number): number {
   const turn = 2 * Math.PI;
@@ -299,8 +335,16 @@ export function sceneDirectorPose(state: SceneDirectorState): WorldCameraPose {
     targetHeight: state.base.targetHeight
       + Math.sin((2 * Math.PI * t) / IDLE_HEIGHT_PERIOD + 1.7) * IDLE_HEIGHT_AMPLITUDE * gain,
     elevation: state.base.elevation + state.manual.elevation,
-    distance: state.base.distance
-      + Math.sin((2 * Math.PI * t) / IDLE_DISTANCE_PERIOD + 0.9) * IDLE_DISTANCE_AMPLITUDE * gain,
+    /*
+     * Масштаб руки МНОЖИТЬ усе разом із диханням, а не додається поруч.
+     * Дихання — це частка відстані (0.6%), і якщо його лишити поза
+     * множником, то зблизька, на ×5, воно стало б п'ятивідсотковим
+     * гойданням: те саме число, яке було на межі помітності, почало б
+     * гуляти рівно там, де пара розглядає грань.
+     */
+    distance: (state.base.distance
+      + Math.sin((2 * Math.PI * t) / IDLE_DISTANCE_PERIOD + 0.9) * IDLE_DISTANCE_AMPLITUDE * gain)
+      * state.manual.zoom,
     luminosity: state.base.luminosity,
   };
 }

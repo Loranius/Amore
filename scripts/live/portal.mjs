@@ -812,6 +812,41 @@ export async function tapPoint(page, { x, y }, { after = 1200 } = {}) {
   return true;
 }
 
+/**
+ * Зум сцени колесом над полотном (ADR-0160).
+ *
+ * КОЛЕСО, А НЕ ЩИПОК, і це названа межа оснастки. `OrbitControls` слухає
+ * `wheel` і `touchstart` двома пальцями; CDP уміє послати перше й не вміє
+ * друге без ручної збірки `TouchEvent`. Обидва входи ведуть в ОДИН
+ * `dollyIn/dollyOut`, тож колесо перевіряє ту саму дорогу — але воно НЕ
+ * доводить, що щипок доходить до полотна на телефоні. Це лишається
+ * неперевіреним, і краще знати про це, ніж вважати перевіреним.
+ *
+ * Крок — «клацання» колеса: три клацання приблизно дають той множник, який
+ * `OrbitControls` кладе на `zoomSpeed`. Знак як у браузера: від'ємне —
+ * ближче.
+ */
+export async function wheelOverScene(page, notches, { after = 1400, selector = 'canvas' } = {}) {
+  const box = await page.evaluate((css) => {
+    const node = document.querySelector(css);
+    if (node === null) return null;
+    const rect = node.getBoundingClientRect();
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height / 2 };
+  }, selector);
+  if (box === null) return false;
+  await page.mouse.move(box.x, box.y);
+  const step = notches < 0 ? -100 : 100;
+  for (let index = 0; index < Math.abs(notches); index += 1) {
+    await page.mouse.wheel(0, step);
+    // Дрібними кроками, бо `OrbitControls` із згасанням розносить один
+    // великий крок на кадри так само, як і десять малих, — а от сцена між
+    // ними встигає пере­малюватись, і кадр не бреше про проміжний стан.
+    await page.waitForTimeout(40);
+  }
+  await page.waitForTimeout(after);
+  return true;
+}
+
 /** Тап по першому збігу — те саме, що робить палець, разом із очікуванням. */
 export async function tapSelector(page, selector, { after = 1200 } = {}) {
   const box = await page.evaluate((css) => {

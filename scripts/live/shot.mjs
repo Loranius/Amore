@@ -23,7 +23,9 @@ import {
   readToneMapping,
   tapPoint,
   tapSelector,
+  wheelOverScene,
 } from './portal.mjs';
+import { artifactSpan } from './artifactSpan.mjs';
 
 // ============================================================
 // npm run live -- <маршрут…> [прапорці]
@@ -49,6 +51,12 @@ const USAGE = `
   --ink=<css>                        колір елемента числом: чорнило, тло, контраст, відтінок
   --tap=<css>                        тапнути перший збіг і зняти кадр; можна кілька,
                                      вони йдуть послідовно (модалка → її вміст)
+  --zoom=<клацань>                   покрутити колесо над полотном і зняти кадр:
+                                     від'ємне — ближче, додатне — далі; можна
+                                     кілька, вони йдуть послідовно від поточної
+                                     камери. Поруч друкується розмір артефакта
+                                     в пікселях — інакше «трохи більше» й «удвічі
+                                     більше» на око те саме
   --settle=<мс>                      скільки чекати після появи сцени (типово ${DEFAULTS.settle})
   --out=<тека>                       куди складати знімки (типово ${DEFAULTS.out})
   --port=<порт>                      dev-сервер (типово ${DEFAULTS.port})
@@ -212,6 +220,62 @@ async function main() {
               `  колір   ${selector}: ${ink.ink} (відтінок ${ink.inkHue ?? '—'}°)`
               + ` на ${ink.background}, контраст ${ink.contrast}:1`,
             );
+          }
+
+          /*
+           * Зум сцени (ADR-0160): жест, кадр і РОЗМІР АРТЕФАКТА числом.
+           *
+           * Розмір — головне тут. Знімок після зуму виглядає правдоподібно
+           * навіть тоді, коли камера не зрушила: сцена жива, кадр щоразу
+           * трохи інший, і око читає цю різницю як «подіяло». Тому поруч
+           * друкується висота артефакта в пікселях і її відношення до
+           * кадру ДО жесту.
+           */
+          if (options.zooms.length > 0) {
+            const canvasBox = await probeSelectors(portal.page, ['canvas']);
+            // `probeSelectors` віддає прямокутник масивом [x, y, w, h] у CSS-
+            // пікселях; знімок — у пристроєвих, тож масштаб береться зі
+            // ставлення ширин, а не з `device.scale`: він може бути іншим.
+            const stage = canvasBox.canvas?.boxes?.[0] ?? null;
+            const spanOf = (path) => {
+              const image = decodePng(readFileSync(path));
+              if (stage === null) return artifactSpan(image);
+              const scale = image.width / (device.width || image.width);
+              return artifactSpan(image, {
+                x: stage[0] * scale,
+                y: stage[1] * scale,
+                width: stage[2] * scale,
+                height: stage[3] * scale,
+              });
+            };
+            const before = spanOf(file);
+            if (before === null) {
+              console.log('  зум     артефакта в кадрі немає — міряти нічого');
+            } else {
+              console.log(`  зум     до жесту: артефакт ${before.width}×${before.height} px`);
+            }
+            for (const [index, notches] of options.zooms.entries()) {
+              const moved = await wheelOverScene(portal.page, notches);
+              if (!moved) {
+                console.log('  зум     полотна немає — жест нікуди слати');
+                break;
+              }
+              const suffix = options.zooms.length > 1 ? `-zoom${index + 1}` : '-zoom';
+              const zoomFile = `${outDir}/${name}${suffix}.png`;
+              await portal.page.screenshot({ path: zoomFile });
+              const after = spanOf(zoomFile);
+              const sign = notches < 0 ? 'ближче' : 'далі';
+              if (after === null) {
+                console.log(`  зум     ${sign} ${Math.abs(notches)} → ${zoomFile} · артефакта в кадрі немає`);
+                continue;
+              }
+              const ratio = before === null ? null : after.height / before.height;
+              console.log(
+                `  зум     ${sign} ${Math.abs(notches)} → ${zoomFile}`
+                + ` · артефакт ${after.width}×${after.height} px`
+                + (ratio === null ? '' : ` · ×${ratio.toFixed(2)} до першого кадру`),
+              );
+            }
           }
 
           // Дотики по координаті — для сцени, де селектора немає.
