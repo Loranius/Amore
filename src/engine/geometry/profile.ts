@@ -63,9 +63,22 @@ function facetPlan(
   const max = mother ? MAIN_FACET_MAX : CHILD_FACET_MAX;
   const mainFacets = min + (seededUnit(body.seed, 'geometry:main-facets') < 0.5 ? 0 : max - min);
 
+  /*
+   * ЗАРОБЛЕНЕ РАХУЄТЬСЯ ВІД ШЕСТИ, А НЕ ВІД ЧИСЛА СТОРІН.
+   *
+   * Доти база збігалася з кількістю сторін, бо сторін було шість-сім —
+   * стільки ж, скільки в кварцової призми. Відколи власник зняв стелю на
+   * кількість граней (ADR-0158) і сторін стало тринадцять, та сама
+   * формула мовчки з'їла б усі фаски: пара з десятьма заробленими
+   * гранями дістала б `10 − 13 < 0`, тобто НУЛЬ фасок замість чотирьох.
+   *
+   * Шість — це кварц, і воно тут стала величина виду, а не число сторін
+   * нашого тіла. Скільки сторін — вирішує вид; скільки фасок — вирішують
+   * фотографії пари (ADR-0004), і одне не має права з'їдати друге.
+   */
   const published = body.attributes['facetCount'];
   const earned = typeof published === 'number' && Number.isFinite(published)
-    ? Math.max(0, Math.round(published) - min)
+    ? Math.max(0, Math.round(published) - (mother ? FACET_EARN_BASE : CHILD_FACET_EARN_BASE))
     : 0;
   return { mainFacets, chamfers: Math.min(MAX_CHAMFERS, earned) };
 }
@@ -138,11 +151,22 @@ const MONARCH_GROUND_SINK = 0.15;
  * every face narrow, and narrow faces read as noise rather than as a cut stone.
  * A quartz prism has six large ones.
  */
-const MAIN_FACET_MIN = 6;
-const MAIN_FACET_MAX = 7;
+const MAIN_FACET_MIN = 9;
+const MAIN_FACET_MAX = 10;
+
+/**
+ * Скільки сторін має призма монарха — опубліковано для мірок.
+ *
+ * Читає `crystalReference.test.ts`: профіль міряє НАЙДАЛЬШУ від осі
+ * точку, тобто описане коло, і воно залежить від кількості сторін
+ * (`1/cos(π/n)`: 1.155 у шестикутника, 1.056 у дев'яти-десятигранника).
+ * Без цього числа порівняння з еталонним кварцом мовчки міряло б
+ * кількість кутів замість товщини тіла.
+ */
+export const MONARCH_MAIN_FACETS = { min: MAIN_FACET_MIN, max: MAIN_FACET_MAX } as const;
 /** Children read as the monarch's own mineral, one or two faces simpler. */
-const CHILD_FACET_MIN = 5;
-const CHILD_FACET_MAX = 6;
+const CHILD_FACET_MIN = 7;
+const CHILD_FACET_MAX = 8;
 
 /**
  * How wide a chamfer is, as a fraction of the gap between two main facets.
@@ -151,8 +175,17 @@ const CHILD_FACET_MAX = 6;
 const CHAMFER_WIDTH = 0.22;
 /** How far a chamfer sits inside the main radius — a cut removes material. */
 const CHAMFER_INSET = 0.965;
+/**
+ * Від скількох граней рахується ЗАРОБЛЕНЕ. Шість — кварцова призма.
+ *
+ * Окремо від кількості сторін навмисно: сторони — властивість виду,
+ * фаски — те, що пара заробила фотографіями.
+ */
+const FACET_EARN_BASE = 6;
+const CHILD_FACET_EARN_BASE = 5;
+
 /** Ceiling on earned chamfers, so a couple with thousands of photos still has a prism. */
-const MAX_CHAMFERS = 6;
+const MAX_CHAMFERS = 12;
 
 /** Main facets differ in width by up to this much, so the prism is cut rather than machined. */
 const FACET_WIDTH_JITTER = 0.16;

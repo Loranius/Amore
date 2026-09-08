@@ -29,6 +29,7 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { CRYSTAL_MONARCH_BODY_ID } from '@/engine/species/crystal';
 import { crystalHabitShape } from '@/engine/geometry/habit';
+import { MONARCH_MAIN_FACETS } from '@/engine/geometry/profile';
 import { coupleCrystalHabit } from '@/engine/species/crystal/habit';
 import { CRYSTAL_SUBSTRATE_BODY_ID } from '@/engine/geometry/substrate';
 import {
@@ -162,9 +163,31 @@ function habitGirth(): number {
   return shape.girth * Math.max(shape.scaleX, shape.scaleZ);
 }
 
+/**
+ * Множник ОПИСАНОГО КОЛА: у скільки разів найдальший кут перерізу
+ * далі за грань.
+ *
+ * Профіль міряє найдальшу від осі точку, тобто описане коло, і воно
+ * залежить від кількості сторін: `1/cos(π/n)` — 1.1547 у шестикутника,
+ * 1.0555 у дев'яти-десятигранника. Еталонний кварц шестигранний, наша
+ * призма — дев'яти-десятигранна (ADR-0158), тож без цієї поправки
+ * порівняння міряло б кількість кутів, а не товщину тіла: виміряно,
+ * приведена стрункість підскочила з 3.33 на 3.59 у день, коли граней
+ * стало більше, хоч тіло не схудло ані на соту.
+ *
+ * Береться середина смуги 9–10; крайні дають 1.0642 і 1.0515, тобто
+ * розкид 0.6% — вужче за смугу, яку ця поправка обслуговує.
+ */
+const CORNER_REACH = (() => {
+  const sides = (MONARCH_MAIN_FACETS.min + MONARCH_MAIN_FACETS.max) / 2;
+  const ours = 1 / Math.cos(Math.PI / sides);
+  const reference = 1 / Math.cos(Math.PI / 6);
+  return ours / reference;
+})();
+
 /** Профіль тіла, приведений до габітусно-нейтрального кварцу. */
 function flattened(profile: CrystalProfile): CrystalProfile {
-  const factor = habitGirth();
+  const factor = habitGirth() * CORNER_REACH;
   return {
     ...profile,
     bands: profile.bands.map((band) => band / factor),
@@ -326,24 +349,32 @@ describe('наш кристал проти еталона — розрив за�
      *
      * Виміряно: 0.101 / 0.020 / 0.102 — ТІСНІШЕ, ніж будь-коли раніше,
      * хоч еталон при цьому ніхто не підганяв.
+     *
+     * ПЕРЕМІРЯНО ПІСЛЯ ЗНЯТТЯ СТЕЛІ ГРАНЕЙ (ADR-0158): 0.062 / 0.029 /
+     * 0.097. Призма стала дев'яти-десятигранною, тобто переріз
+     * круглішим, і в мірку зайшла ще одна відома величина — описане коло
+     * (`CORNER_REACH` вище). Винесена за дужки, вона лишає ті самі три
+     * числа того ж порядку: на одному році розрив навіть упав удвічі, бо
+     * кругліший переріз ближчий до еталонного кварцу саме там, де тіло
+     * найтонше.
      */
     const distance = (years: number): number =>
       crystalProfileDistance(reference, flattened(ours(years).crystal));
-    expect(distance(1)).toBeLessThan(0.12);
-    expect(distance(11)).toBeLessThan(0.026);
-    expect(distance(40)).toBeLessThan(0.12);
+    expect(distance(1)).toBeLessThan(0.075);
+    expect(distance(11)).toBeLessThan(0.035);
+    expect(distance(40)).toBeLessThan(0.11);
   });
 
   it('З ВІКОМ КРИСТАЛ КРЕМЕЗНІШАЄ — і нижче цього вже не опускається', () => {
     /*
      * Названа межа, не досягнення. Еталон дає 3.39 хай якого віку — у
      * кварцу стрункість не залежить від того, скільки він ріс. Наш іде
-     * 3.79 → 3.33 → 3.02 (приведено до нейтрального обхвату), тобто
+     * 3.54 → 3.29 → 2.96 (приведено до нейтрального обхвату), тобто
      * сорокарічний кристал на 11% кремезніший за еталон і на 20% за себе
      * однорічного.
      */
-    expect(flattened(ours(1).crystal).aspect).toBeGreaterThan(3.5);
-    expect(flattened(ours(40).crystal).aspect).toBeGreaterThan(2.9);
+    expect(flattened(ours(1).crystal).aspect).toBeGreaterThan(3.4);
+    expect(flattened(ours(40).crystal).aspect).toBeGreaterThan(2.8);
   });
 
   it('ПРИЗМА СТАЛА ПРИЗМОЮ: боки паралельні, як в еталона', () => {
@@ -389,20 +420,24 @@ describe('наш кристал проти еталона — розрив за�
      * сирі стрункості в них розходяться вдвічі (2.19…5.78). Це
      * стережеться числом у `geometry/profile.test.ts`.
      */
-    expect(flattened(ours(11).crystal).aspect).toBeGreaterThan(3.25);
-    expect(flattened(ours(11).crystal).aspect).toBeLessThan(3.45);
+    // 3.25–3.45 → 3.20–3.40 (ADR-0158): виміряно 3.285 проти еталонних
+    // 3.391. Кругліший переріз лишає після поправки на описане коло
+    // невелику решту — дев'ять сторін проти десяти дають 0.6% різниці,
+    // а поправка бере середину смуги.
+    expect(flattened(ours(11).crystal).aspect).toBeGreaterThan(3.2);
+    expect(flattened(ours(11).crystal).aspect).toBeLessThan(3.4);
 
     /*
      * А на краях віку розходження ЗАЛИШЕНО, і воно навмисне.
      *
-     * Молодий кристал тонший (3.79): обхват веде діяльність пари, і на
-     * першому році її мало. Старий товщий (3.02): за ADR-0056 після
+     * Молодий кристал тонший (3.54): обхват веде діяльність пари, і на
+     * першому році її мало. Старий товщий (2.96): за ADR-0056 після
      * повного терміну історія показується шириною й новими гранями, бо
      * висота вже стала. Обидва — правила продукту, а не вади кварцу, і
      * підганяти їх під мінерал означало б зламати те, що власник просив.
      */
-    expect(flattened(ours(1).crystal).aspect).toBeGreaterThan(3.6);
-    expect(flattened(ours(40).crystal).aspect).toBeGreaterThan(2.95);
+    expect(flattened(ours(1).crystal).aspect).toBeGreaterThan(3.45);
+    expect(flattened(ours(40).crystal).aspect).toBeGreaterThan(2.85);
     expect(flattened(ours(40).crystal).aspect).toBeLessThan(
       flattened(ours(11).crystal).aspect,
     );

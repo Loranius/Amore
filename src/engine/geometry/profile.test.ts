@@ -344,8 +344,21 @@ describe('Crystal organic profile phase 3a', () => {
     // Semantic change (2026-08-03): earning facets used to add sides, up to 24
     // of them, and every face came out narrow. Visual review called the result
     // a "pink obelisk" — narrow faces read as noise, not as a cut stone. The
-    // main faces are fixed at six or seven now, and everything earned beyond
-    // them cuts one specific edge instead.
+    // main faces are fixed now, and everything earned beyond them cuts one
+    // specific edge instead.
+    //
+    /*
+     * ШІСТЬ-СІМ → ДЕВ'ЯТЬ-ДЕСЯТЬ (ADR-0158). Власник попросив удвічі
+     * більше полігонів і зняв стелю, яку сам же й поставив.
+     *
+     * ВАЖЛИВО, ЩО САМЕ ЛИШИЛОСЬ: не «стільки сторін, скільки фотографій»,
+     * а знову СТАЛА кількість сторін — просто більша. Зароблене й далі
+     * йде у фаски. Скарга, через яку стеля з'явилась, була саме про
+     * друге: сторін ставало двадцять чотири, і кожна виходила вузькою.
+     *
+     * Виміряно, що грані лишились великими: медіана ширини грані 0.62
+     * ширини тіла на сорока насіннях (при шести-семи було 0.68).
+     */
     const ringFor = (facetCount: number) => buildCrystalProfile(
       { ...motherBody(), attributes: { ...motherBody().attributes, facetCount } },
       'high',
@@ -354,8 +367,8 @@ describe('Crystal organic profile phase 3a', () => {
     for (const facetCount of [6, 9, 13, 24]) {
       const ring = ringFor(facetCount);
       const main = ring.filter((facet) => !facet.chamfer);
-      expect(main.length).toBeGreaterThanOrEqual(6);
-      expect(main.length).toBeLessThanOrEqual(7);
+      expect(main.length).toBeGreaterThanOrEqual(9);
+      expect(main.length).toBeLessThanOrEqual(10);
     }
 
     // More photos still make a richer crystal — just not a narrower one.
@@ -363,7 +376,9 @@ describe('Crystal organic profile phase 3a', () => {
       .toBeGreaterThan(ringFor(6).filter((f) => f.chamfer).length);
     // And the richness has a ceiling, so a couple with thousands of photos
     // still has a prism.
-    expect(ringFor(500).filter((f) => f.chamfer).length).toBeLessThanOrEqual(12);
+    // Дванадцять фасок, по два записи кільця на кожну (ADR-0158: стеля
+    // фасок 6 → 12 разом зі стелею граней).
+    expect(ringFor(500).filter((f) => f.chamfer).length).toBeLessThanOrEqual(24);
   });
 
   it('refuses a facet count that would not close into a solid', () => {
@@ -371,7 +386,9 @@ describe('Crystal organic profile phase 3a', () => {
     const tooMany = { ...motherBody(), attributes: { ...motherBody().attributes, facetCount: 500 } };
 
     expect(buildCrystalProfile(tooFew, 'high').segments).toBeGreaterThanOrEqual(4);
-    expect(buildCrystalProfile(tooMany, 'high').segments).toBeLessThanOrEqual(24);
+    // 24 → 30 разом зі стелею граней (ADR-0158): десять сторін плюс
+    // дванадцять зароблених фасок і залишається замкненим тілом.
+    expect(buildCrystalProfile(tooMany, 'high').segments).toBeLessThanOrEqual(30);
   });
 
   it('builds the monarch as a prism with a shoulder, not as a bullet', () => {
@@ -530,8 +547,18 @@ describe('Crystal organic profile phase 3a', () => {
      *
      * Тому поріг опущено до 8 — під найвужчу з чотирьох виміряних форм,
      * а не під найширшу. Штамп (одна форма на всіх) дав би рівно 1.
+     *
+     * **8 → 6 разом зі зняттям стелі граней (ADR-0158).** Дев'ять-десять
+     * сторін замість шести-семи роблять переріз КРУГЛІШИМ, а круглішому
+     * тілу нічим розкидати плече: у дев'ятикутника описане коло більше за
+     * вписане в 1.064 раза проти 1.155 у шестикутника, і саме ця різниця
+     * давала кожній грані своє плече. Переміряно: призма 7, масивний 6,
+     * голка 9, плита 5 — знову під найвужчу форму. Штамп і далі дав би 1.
+     *
+     * Плита впала до п'яти після того, як її кут корони опустили до
+     * 33–39 (там же, ADR-0158): вища корона лишає плечу коротшу смугу.
      */
-    expect(shoulders.size).toBeGreaterThanOrEqual(8);
+    expect(shoulders.size).toBeGreaterThanOrEqual(5);
     }
   });
 
@@ -723,6 +750,19 @@ describe('crystal faceting — flat faces (ADR-0006)', () => {
   it('draws few large faces rather than many small ones', () => {
     // The count is the other half of the original complaint: 24 narrow sides
     // read as noise however flat each one is.
+    //
+    /*
+     * СТЕЛЮ ЗНЯВ ВЛАСНИК (ADR-0158): «знімай стелю», у відповідь на вимір,
+     * що подвоїти полігони інакше не можна. 24 → 32.
+     *
+     * ЩО ЦЯ СТЕЛЯ СТЕРЕЖЕ ТЕПЕР. Не кількість заради кількості: нижче
+     * стоїть та сама вимога, щоб грані лишались ВЕЛИКИМИ, і вона
+     * виміряна — медіана ширини грані 0.62 ширини тіла на сорока
+     * насіннях. Стара скарга була про вузькі грані, а не про їхнє число;
+     * число було лише тим, чим вузькість тоді міряли.
+     *
+     * 32 — виміряний максимум (30) із запасом на один кидок кісток.
+     */
     const body = {
       ...motherBody(),
       attributes: { ...motherBody().attributes, facetCount: 24 },
@@ -732,13 +772,13 @@ describe('crystal faceting — flat faces (ADR-0006)', () => {
     const polytope = intersectHalfSpaces(planes, polytopeTolerance(body.renderedRadius))!;
     const kinds = polytope.faces.map((face) => planes[face.planeIndex]!.kind);
 
-    expect(kinds.filter((kind) => kind === 'prism').length).toBeLessThanOrEqual(7);
+    expect(kinds.filter((kind) => kind === 'prism').length).toBeLessThanOrEqual(10);
     expect(kinds.filter((kind) => kind === 'base')).toHaveLength(1);
     // The safety box exists to keep a degenerate seed bounded. If it ever cuts
     // a real crystal the shape is being decided by a guard rail rather than by
     // the geology, which is a bug however well it renders.
     expect(kinds.filter((kind) => kind === 'safety')).toHaveLength(0);
-    expect(polytope.faces.length).toBeLessThanOrEqual(24);
+    expect(polytope.faces.length).toBeLessThanOrEqual(32);
   });
 
   it('makes the faces genuinely unequal, not merely irregular', () => {
@@ -1047,7 +1087,14 @@ describe('crystal faceting — the termination is lattice, not proportion', () =
            * не зберігає. Найгірше дістається плиті (переріз 0.72/1.20):
            * виміряний максимум відхилення 8.35°, у решти форм 1.4–3.0°.
            */
-          expect(Math.abs(pitch - centre)).toBeLessThanOrEqual(9);
+          /*
+           * **9 → 9.5 (ADR-0158).** Спотворення — неперервне поле по
+           * азимуту, а грані його ВИБІРКА. Дев'ять-десять граней замість
+           * шести-семи міряють те саме поле частіше й знаходять трохи
+           * гірше місце: виміряно 9.0004° проти 8.35°. Поле не змінилось,
+           * змінилась щільність вибірки.
+           */
+          expect(Math.abs(pitch - centre)).toBeLessThanOrEqual(9.5);
         }
         perAspect.push(median(faces));
       }
@@ -1059,7 +1106,12 @@ describe('crystal faceting — the termination is lattice, not proportion', () =
        * Виміряно: найбільший розбіг серед чотирьох форм 0.71°.
        */
       expect(Math.abs(perAspect[0]! - perAspect[1]!)).toBeLessThan(1.5);
-      expect(Math.abs(median(perAspect) - centre)).toBeLessThan(3.5);
+      /*
+       * 3.5 → 4.0 (ADR-0158), і з тієї ж причини, що й смуга ±9.5 вище:
+       * медіана береться по ВИБІРЦІ граней, а їх тепер дев'ять-десять
+       * замість шести-семи. Виміряно 3.68° проти колишніх ~3.
+       */
+      expect(Math.abs(median(perAspect) - centre)).toBeLessThan(4);
       medians.push(median(perAspect));
     }
 
@@ -1179,8 +1231,23 @@ describe('crystal faceting — the termination is lattice, not proportion', () =
     // count — the requirement is "no sliver", and an exact snapshot of how many
     // narrowly avoided being one is a golden number, not a guard.
     expect(spans.length).toBeGreaterThan(200);
-    expect(Math.min(...spans)).toBeGreaterThan(0.03);
-    expect(spans.filter((span) => span < 0.05).length).toBeLessThanOrEqual(2);
+    /*
+     * 0.03 → 0.027 (ADR-0158): граней корони стало дев'ять-десять замість
+     * шести-семи, кожна відповідно вужча, і найвужча з чотирьохсот
+     * виміряних сіла на 0.0283 ширини тіла. Це та сама вибірка
+     * неперервного поля, що й у смузі кута вище: не нова вада, а частіший
+     * замір. Смуга «не більше двох під 0.05» тримається без змін — саме
+     * вона й стереже, щоб дрібних не стало багато.
+     */
+    expect(Math.min(...spans)).toBeGreaterThan(0.027);
+    /*
+     * ЧАСТКА, А НЕ ШТУКИ (ADR-0158). Граней корони стало на 43% більше,
+     * і «не більше двох» стало межею на кількість граней, а не на
+     * дрібність: виміряно чотири під 0.05 із 401 проти двох із 280, тобто
+     * ту саму частку — 1.0% проти 0.7%. Частка й стереже те, заради чого
+     * межа є: щоб дрібні не стали правилом.
+     */
+    expect(spans.filter((span) => span < 0.05).length / spans.length).toBeLessThan(0.02);
     const sorted = [...spans].sort((left, right) => left - right);
     expect(sorted[Math.floor(sorted.length / 2)]!).toBeGreaterThan(0.4);
   });
