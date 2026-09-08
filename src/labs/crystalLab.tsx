@@ -90,7 +90,7 @@ const SHADER_TERMS = [
   'rimStrength', 'skyStrength', 'coreStrength', 'glassStrength',
   'veilStrength', 'auroraStrength', 'axialTintStrength', 'innerFlowStrength',
   'facetEdgeStrength', 'inclusionContrast', 'surfaceReliefStrength',
-  'surfaceVeinStrength',
+  'surfaceVeinStrength', 'sheenStrength',
 ] as const;
 
 type ShaderTerm = (typeof SHADER_TERMS)[number];
@@ -220,6 +220,22 @@ function CrystalLab() {
     const raw = Number.parseFloat(params.get('eye') ?? '');
     if (!Number.isFinite(raw)) return null;
     return Math.min(0.95, Math.max(0, raw));
+  })();
+  /*
+   * ОБЕРТ, У ГРАДУСАХ — щоб питання «а як воно виглядає при обертанні»
+   * можна було поставити НЕРУХОМИМ кадром.
+   *
+   *   ?az=0 ?az=12 ?az=24 …
+   *
+   * Без цієї ручки перелив по гранях перевіряти нічим: обертання в
+   * порталі веде директор камери, а знімок нерухомий, тож два різні
+   * ракурси доводилось ловити випадком. Ручка робить із «переливу» пару
+   * кадрів, які можна відняти один від одного (ADR-0161).
+   */
+  const azimuth = (() => {
+    const raw = Number.parseFloat(params.get('az') ?? '');
+    if (!Number.isFinite(raw)) return 0;
+    return (raw * Math.PI) / 180;
   })();
 
   /*
@@ -351,6 +367,7 @@ function CrystalLab() {
           veinReach={crystalSubstrateSceneRadius(states.geometry)}
           pose={{
             ...crystalPoseForRegion('centre'),
+            azimuth: crystalPoseForRegion('centre').azimuth + azimuth,
             distance: crystalPoseForRegion('centre').distance * camera,
             ...(elevation === null ? {} : { elevation }),
           }}

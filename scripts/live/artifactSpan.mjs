@@ -37,6 +37,38 @@ export function pixelHue(r, g, b) {
 }
 
 /**
+ * Маска пікселів артефакта в межах `box`, рядок за рядком.
+ *
+ * Окремо від `artifactSpan`, бо порівняння двох кадрів питає не рамку, а
+ * саме маску: «які пікселі належать тілу на ОБОХ кадрах» — і лише на них
+ * має сенс віднімати світло (ADR-0161).
+ */
+export function artifactMask(image, box, {
+  hueFrom = 285,
+  hueTo = 345,
+  minSaturation = 0.12,
+  minValue = 60,
+} = {}) {
+  const x0 = Math.max(0, Math.floor(box?.x ?? 0));
+  const y0 = Math.max(0, Math.floor(box?.y ?? 0));
+  const width = Math.max(0, Math.min(image.width - x0, Math.ceil(box?.width ?? image.width)));
+  const height = Math.max(0, Math.min(image.height - y0, Math.ceil(box?.height ?? image.height)));
+  const mask = new Uint8Array(width * height);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const at = ((y + y0) * image.width + (x + x0)) * image.channels;
+      const { hue, saturation, value } = pixelHue(
+        image.data[at], image.data[at + 1], image.data[at + 2],
+      );
+      if (value < minValue || saturation < minSaturation) continue;
+      if (hue < hueFrom || hue > hueTo) continue;
+      mask[y * width + x] = 1;
+    }
+  }
+  return mask;
+}
+
+/**
  * Прямокутник, у який вписується артефакт, у пікселях знімка.
  *
  * НАЙБІЛЬША ЗВ'ЯЗНА ПЛЯМА, а не рамка всіх відповідних пікселів, і це не
@@ -68,18 +100,9 @@ export function artifactSpan(image, box, {
   const height = Math.max(0, y1 - y0);
   if (width === 0 || height === 0) return null;
 
-  const mask = new Uint8Array(width * height);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      const at = ((y + y0) * image.width + (x + x0)) * image.channels;
-      const { hue, saturation, value } = pixelHue(
-        image.data[at], image.data[at + 1], image.data[at + 2],
-      );
-      if (value < minValue || saturation < minSaturation) continue;
-      if (hue < hueFrom || hue > hueTo) continue;
-      mask[y * width + x] = 1;
-    }
-  }
+  const mask = artifactMask(image, { x: x0, y: y0, width, height }, {
+    hueFrom, hueTo, minSaturation, minValue,
+  });
 
   // Обхід у ширину власним стеком, а не рекурсією: тіло на весь екран —
   // це сотні тисяч пікселів, і рекурсія лягла б на глибині стека.

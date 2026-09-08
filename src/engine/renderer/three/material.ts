@@ -15,6 +15,7 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.shaderVersion,
     recipe.rimStrength.toFixed(6),
     recipe.skyStrength.toFixed(6),
+    recipe.sheenStrength.toFixed(6),
     rgbKey(recipe.skyColor),
     rgbKey(recipe.groundColor),
     rgbKey(recipe.rimColor),
@@ -102,6 +103,7 @@ uniform float uEvolutionInclusionContrast;
 uniform float uEvolutionCoreStrength;
 uniform vec3 uEvolutionCoreColor;
 uniform float uEvolutionGlassStrength;
+uniform float uEvolutionSheenStrength;
 uniform float uEvolutionVeilStrength;
 uniform float uEvolutionVeilScale;
 uniform float uEvolutionAuroraStrength;
@@ -321,6 +323,55 @@ const FRAGMENT_BODY = /* glsl */ `
     outgoingLight += uEvolutionRimColor * evolutionRim * uEvolutionFacetEdgeStrength;
   }
 
+  // ── Перелив: у кімнати є СТОРОНИ ──────────────────────────
+  // evolutionUpness вище питає в відбитого променя тільки одне: вгору він
+  // дивиться чи вниз. Для призми це майже не питання — всі її грані близькі
+  // до вертикальних, тож усі відбиті промені близькі до горизонтальних і
+  // дістають ту саму відповідь. Кристал через це стоїть під обертом
+  // нерухомий: виміряно 10.1% медіанної зміни за 4° повороту, і майже все те
+  // були зсунуті межі граней, а не світло, що біжить по тілу.
+  //
+  // Тут та сама кімната дістає АЗИМУТ. Дві грані, повернуті в різні боки,
+  // відбивають різне; коли кристал крутять, кожна грань проходить крізь цю
+  // різницю. Це і є перелив, і це той самий механізм, який дала б карта
+  // оточення, якби вона тут була (render/envMap.ts каже, чому немає).
+  //
+  // НЕ ЗАЛЕЖИТЬ ВІД ЧАСУ. Перелив, що йде сам по собі, — це мерехтіння; те,
+  // що просив власник, з'являється від ОБЕРТУ, тож єдиний його вхід —
+  // напрямок погляду.
+  if ( uEvolutionSheenStrength > 0.0001 ) {
+    vec3 evolutionWorldReflected = inverseTransformDirection( evolutionReflected, viewMatrix );
+    float evolutionBearing = atan( evolutionWorldReflected.z, evolutionWorldReflected.x );
+    // Дві пелюстки, а не одна. Одна дає рівно один світлий бік і один темний,
+    // що читається другим прожектором; дві кладуть на кожен півоберт і
+    // відблиск, і затінок — так поводиться кімната, а не лампа.
+    float evolutionPlay =
+      0.62 * sin( evolutionBearing + 0.7 )
+      + 0.38 * sin( evolutionBearing * 2.0 - 1.9 );
+
+    // Відтінок їде разом із яскравістю: бузкове небо на одному боці розмаху,
+    // трояндовий обідок на другому. Обидва кінці вже в родині пари, тож
+    // перелив не може винести колір за межі заслуженого (ADR-0004).
+    //
+    // Нормалізовано до свого найяскравішого каналу — щоб підмішувався
+    // ВІДТІНОК, а не втрата: множення на сирий колір притемнило б тіло тим
+    // сильніше, чим темніший кінець розмаху.
+    vec3 evolutionSheenTint = mix(
+      uEvolutionSkyColor,
+      uEvolutionRimColor,
+      0.5 + 0.5 * evolutionPlay
+    );
+    evolutionSheenTint /= max(
+      0.25,
+      max( evolutionSheenTint.r, max( evolutionSheenTint.g, evolutionSheenTint.b ) )
+    );
+
+    // Знакове. Терм, який лише додає, — це підйом, а підйом рівно й є те, що
+    // сплощує грані (те саме, за що вище прибрано сталу чверть у неба).
+    outgoingLight *= mix( vec3( 1.0 ), evolutionSheenTint, uEvolutionSheenStrength )
+      * ( 1.0 + evolutionPlay * uEvolutionSheenStrength );
+  }
+
   // ── Aurora in the fissure ─────────────────────────────────
   // Only the vein carries this, and only below its lip: the seam is a crack the
   // crystals came out of, and what makes it read as their source rather than as
@@ -532,11 +583,13 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     && recipe.facetEdgeStrength <= 0
     && recipe.axialTintStrength <= 0
     && recipe.innerFlowStrength <= 0
+    && recipe.sheenStrength <= 0
   ) return;
 
   material.onBeforeCompile = (shader) => {
     shader.uniforms['uEvolutionRimStrength'] = { value: recipe.rimStrength };
     shader.uniforms['uEvolutionSkyStrength'] = { value: recipe.skyStrength };
+    shader.uniforms['uEvolutionSheenStrength'] = { value: recipe.sheenStrength };
     shader.uniforms['uEvolutionSkyColor'] = { value: toColor(recipe.skyColor) };
     shader.uniforms['uEvolutionGroundColor'] = { value: toColor(recipe.groundColor) };
     shader.uniforms['uEvolutionRimColor'] = { value: toColor(recipe.rimColor) };

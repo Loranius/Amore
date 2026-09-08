@@ -104,6 +104,7 @@ function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string
     // retuned.
     body.shader.innerFlowStrength,
     body.shader.innerFlowTurns,
+    body.shader.sheenStrength,
     facetTintingSignature(body.facets),
   ].map((value) => typeof value === 'number' ? value.toFixed(6) : String(value)).join('|');
 }
@@ -460,6 +461,27 @@ function shaderRecipe(
     glassStrength: round6(micro ? 0 : clamp01(
       0.66 + pressures.refinement * 0.26 + state.purity * 0.2 - state.fracture * 0.24,
     )),
+    /*
+     * Перелив — частка того самого бюджету відбиття, що й небо з обідком, і
+     * тому йде через `reflectionScale`: він каже, скільки цьому профілю
+     * якості дозволено витратити на кімнату, якої немає.
+     *
+     * Власник просив прямо: «накинь переливи на кристал при обертанні, але не
+     * дуже виразні». «Не дуже виразні» тут — не смак, а число: 0.12 означає
+     * розгойдування яскравості на ±12% від того, що набралось, і стільки ж
+     * підмішаного відтінку. Вибрано виміром, а не на око (ADR-0161).
+     *
+     * ОДНЕ ЧИСЛО НА ВСІ ТІЛА, без окремої частки для дрібних — і це
+     * вимірене рішення, а не недогляд. Сусідні терми мають гілку `micro`, і
+     * я був написав таку саму; потім перевірив, чи вона взагалі спрацьовує.
+     * На синтетичній парі з 9, 14, 28 і 43 тілами (6, 11, 25 і 40 років)
+     * роль `micro` не дісталась ЖОДНОМУ тілу: `roleFor` віддає її лише
+     * тому, чий tier не збігся з чотирма названими, а рушій росту інших не
+     * видає. Гілка, яку не можна побачити, — це не обережність, а мертвий
+     * код, і саме так у цьому файлі вже накопичувались терми, що нічого не
+     * робили.
+     */
+    sheenStrength: round6(reflectionEnabled ? preset.reflectionScale * 0.12 : 0),
     veilStrength: round6(micro ? 0 : textureTier(0.4 + inclusionBase * 0.5, preset)),
     veilScale: round6(5.5 + pressures.surfaceComplexity * 3.5),
     // The aurora belongs to the ground, not to the crystals standing in it.
@@ -968,6 +990,9 @@ function buildSubstrateMaterial(
       // The vein is not glass. It is opaque quartz sitting in stone, and an
       // edge that lit up would make the seam read as a pane set into the floor.
       glassStrength: 0,
+      // Перелив теж ні. Жила — не грань: вона не повертається до ока різними
+      // боками, тож азимут відбиття на ній нічого не розрізняє.
+      sheenStrength: 0,
       // Veils instead, and stronger than any crystal's. Milky quartz *is*
       // cloud; the mottling is what separates the seam from polished stone at
       // the distance the portal actually looks at it from.

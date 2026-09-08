@@ -67,6 +67,12 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // and so is the gold that marked a closed year — those two were the "one part
   // yellow, one part pink" the owner named, and neither was about wishes.
   //
+  // 1.12.0: перелив. Обчислена кімната дістала АЗИМУТ — досі вона знала лише
+  // верх і низ, а для призми це майже не питання: усі її грані близькі до
+  // вертикальних, тож усі відбиті промені дістають ту саму відповідь і кристал
+  // стоїть під обертом нерухомий. Одне число (`sheenStrength`) розгойдує
+  // яскравість і підмішує відтінок за азимутом відбитого променя.
+  //
   // 1.9.0: zoning moved inside the stone. The inclusion band used to multiply
   // the shaded result — specular highlight included — which is what a stain on
   // the surface does; it now modulates the light coming from within, and it is
@@ -83,7 +89,7 @@ export const DEFAULT_CRYSTAL_MATERIAL_CONFIG: CrystalMaterialConfig = {
   // warm channel, and the `micro` value step was applied inside the albedo cap
   // that then divided it back out. Both were inert; the step now follows the
   // cap and every body's shell changes with its role.
-  rulesVersion: '1.11.0',
+  rulesVersion: '1.12.0',
   quality: 'balanced',
   allowIridescence: true,
   allowProceduralReflection: true,

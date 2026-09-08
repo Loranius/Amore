@@ -16,6 +16,13 @@
 //
 //   node scripts/lab/artifact.mjs --years=11 --band=900-1100
 //   node scripts/lab/artifact.mjs --species=tree --years=1
+//   node scripts/lab/artifact.mjs --years=11 --az=0,4,8,12 --turn-off=sheenStrength
+//
+// `--az` — оберт нерухомим кадром: питання «як воно виглядає при обертанні»
+// одним знімком не поставити. `--turn-off=<терм>` знімає другий кадр кожного
+// ракурсу без названого терму й рахує зміну ЙОГО ВЛАСНОГО внеску — без цього
+// між ракурсами рухаються межі граней, і вони перекривають усе решта
+// (ADR-0161: 10.1% до правки й 10.4% після, тобто мірка не сказала нічого).
 //
 // Драйвер один на обидва види навмисно: браузер, SwiftShader, підміна
 // профілю, контрольний кадр і арифметика світла мусять бути ті самі,
@@ -25,8 +32,9 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ensureServer, openPortal, readToneMapping } from '../live/portal.mjs';
 import {
-  decodePng, scanBand, findPlateaus, facetSeparations,
+  decodePng, scanBand, findPlateaus, facetSeparations, pixelLuminance,
 } from '../live/luminance.mjs';
+import { artifactMask } from '../live/artifactSpan.mjs';
 import { DEVICES, TIERS } from '../live/options.mjs';
 
 const PORT = 5199;
@@ -87,6 +95,32 @@ const theme = arg('theme', 'dark');
  * взагалі кристал змінився, чи просто камера під'їхала».
  */
 const cam = arg('cam', '');
+/*
+ * ОБЕРТИ, У ГРАДУСАХ, ЧЕРЕЗ КОМУ — `--az=0,4,8`.
+ *
+ * Питання «чи переливається кристал, коли його крутять» не можна
+ * поставити одним кадром, а обертання в порталі веде директор камери —
+ * два ракурси доводилось ловити випадком. Ця ручка робить із переливу
+ * пару НЕРУХОМИХ кадрів, які можна відняти один від одного (ADR-0161).
+ */
+/*
+ * Який терм міряти окремо під обертом — `--turn-off=sheenStrength`.
+ *
+ * Не те саме, що `--off`: `--off` прибирає терм із ОБОХ кадрів і питає, як
+ * без нього виглядає кристал. Цей прибирає його з ДРУГОГО кадру кожного
+ * ракурсу, щоб відняти рух меж граней і лишити внесок самого терму.
+ */
+const offForTurn = arg('turn-off', '');
+
+const bearings = arg('az', '')
+  .split(',')
+  .map((text) => text.trim())
+  .filter((text) => text !== '')
+  .map((text) => {
+    const value = Number(text);
+    if (!Number.isFinite(value)) throw new Error(`--az приймає градуси через кому, не «${text}»`);
+    return value;
+  });
 /*
  * Смуга за замовчуванням — РІЗНА для двох видів, і це не примха.
  *
@@ -237,6 +271,112 @@ try {
           : `ЧИТАЄТЬСЯ ГЛАДКОЮ ФОРМОЮ (нижче 10%, ${spread.boundaries.length} меж).`);
     }
   }
+  /*
+   * ПЕРЕЛИВ ПРИ ОБЕРТАННІ (ADR-0161).
+   *
+   * Профіль вище відповідає на «чи різняться дві сусідні грані ЗАРАЗ». Це
+   * інше питання: «чи змінюється світло на тілі, коли кристал повертають».
+   * Кристал може мати чудове розділення граней і при цьому бути нерухомим
+   * під обертом — саме так тут і було, бо тон грані запечений за її РАНГОМ,
+   * а не за кутом до ока.
+   *
+   * ПОВНИЙ КАДР ЦЬОГО НЕ КАЖЕ, і це виміряно, а не передбачено. Між двома
+   * ракурсами рухаються самі межі граней, а межа — найконтрастніше місце
+   * тіла; медіана по всьому тілу через це стоїть близько 10% незалежно від
+   * того, є перелив чи немає. Перше вимірювання дало 10.1% до правки й
+   * 10.4% після, тобто не сказало нічого.
+   *
+   * Тому з `--off=<терм>` знімається ДРУГИЙ кадр кожного ракурсу, і
+   * рахується зміна ВНЕСКУ терму: (з ним − без нього) на одному ракурсі
+   * проти того самого на другому. Рух меж стоїть в обох кадрах однаково й
+   * віднімається начисто, лишається рівно те, що робить сам терм.
+   */
+  if (bearings.length > 1) {
+    const shots = [];
+    for (const bearing of bearings) {
+      const frame = { bearing };
+      for (const [slot, address] of [['with', url], ['without', `${url}&off=${off === '' ? '' : `${off},`}${offForTurn}`]]) {
+        if (slot === 'without' && offForTurn === '') continue;
+        await portal.page.goto(`${address}&az=${bearing}`, { waitUntil: 'load', timeout: 60_000 });
+        await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
+        await portal.page.waitForTimeout(9_000);
+        const shot = await portal.page.screenshot();
+        if (slot === 'with') {
+          writeFileSync(join(OUT, `${species}-lab-az${bearing}.png`), shot);
+        }
+        frame[slot] = decodePng(shot);
+      }
+      frame.mask = artifactMask(frame.with);
+      shots.push(frame);
+    }
+
+    console.log('\nПЕРЕЛИВ ПРИ ОБЕРТАННІ');
+    if (offForTurn === '') {
+      console.log('   (без --off=<терм> міряється весь кадр, а в ньому рух меж граней');
+      console.log('    перекриває сам перелив — див. коментар у scripts/lab/artifact.mjs)');
+    }
+    const light = (image, at) => pixelLuminance(
+      image.data[at], image.data[at + 1], image.data[at + 2], tone,
+    );
+    const full = [];
+    const owned = [];
+    for (let index = 0; index + 1 < shots.length; index += 1) {
+      const a = shots[index];
+      const b = shots[index + 1];
+      const { width, height, channels } = a.with;
+      const inside = (mask, x, y) => mask[y * width + x] === 1
+        && mask[y * width + x - 1] === 1 && mask[y * width + x + 1] === 1
+        && mask[(y - 1) * width + x] === 1 && mask[(y + 1) * width + x] === 1;
+      const whole = [];
+      const term = [];
+      for (let y = 1; y + 1 < height; y += 1) {
+        for (let x = 1; x + 1 < width; x += 1) {
+          if (!inside(a.mask, x, y) || !inside(b.mask, x, y)) continue;
+          const at = (y * width + x) * channels;
+          const la = light(a.with, at);
+          const lb = light(b.with, at);
+          const mean = (la + lb) / 2;
+          if (mean < 1e-4) continue;
+          whole.push(Math.abs(la - lb) / mean);
+          if (a.without !== undefined && b.without !== undefined) {
+            // Внесок терму на кожному ракурсі, і різниця між внесками. Рух
+            // меж стоїть в обох кадрах однаково, тож віднімається начисто.
+            const ca = la - light(a.without, at);
+            const cb = lb - light(b.without, at);
+            term.push(Math.abs(ca - cb) / mean);
+          }
+        }
+      }
+      const median = (values) => {
+        if (values.length === 0) return null;
+        values.sort((one, other) => one - other);
+        return values[Math.floor(values.length / 2)];
+      };
+      const wholeMedian = median(whole);
+      const termMedian = median(term);
+      if (wholeMedian === null) {
+        console.log(`   ${a.bearing}° → ${b.bearing}°: спільних пікселів тіла немає`);
+        continue;
+      }
+      full.push(wholeMedian);
+      console.log(
+        `   ${String(a.bearing).padStart(4)}° → ${String(b.bearing).padStart(4)}°`
+        + `  весь кадр ${(wholeMedian * 100).toFixed(1)}%`
+        + (termMedian === null ? '' : `  ·  сам ${offForTurn} ${(termMedian * 100).toFixed(2)}%`)
+        + `  (${whole.length} спільних пікселів тіла)`,
+      );
+      if (termMedian !== null) owned.push(termMedian);
+    }
+    const median = (values) => {
+      values.sort((one, other) => one - other);
+      return values[Math.floor(values.length / 2)];
+    };
+    if (full.length > 0) {
+      console.log(`   МЕДІАНА ПО ПАРАХ: весь кадр ${(median(full) * 100).toFixed(1)}%`
+        + (owned.length > 0 ? `, сам ${offForTurn} ${(median(owned) * 100).toFixed(2)}%` : ''));
+    }
+  }
+
   const errors = portal.logs.filter((line) => /error|Error/.test(line));
   if (errors.length > 0) {
     console.log(`\nПОМИЛКИ СТОРІНКИ (${errors.length}):`);
