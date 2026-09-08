@@ -1100,11 +1100,69 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
  * цю лінію просто ховається за самим островом — промінь до неї встигає
  * впертись у плато.
  */
+/**
+ * ЛЕВІТАЦІЯ: своя фаза й свій темп на кожну брилу (ADR-0162).
+ *
+ * Спільна фаза дала б не летючі камені, а один камінь, розмножений
+ * копіюванням: усі підіймаються разом, і око читає це як тремтіння камери.
+ * Спільний темп при різних фазах читається краще, але за пів хвилини
+ * вертається те саме — вони проходять верхню точку по черзі, з рівним
+ * кроком, як зубці шестерні.
+ *
+ * Темп 0.72…1.34 — вузько навмисно: ширше, і найшвидша брила обганяла б
+ * найповільнішу на цілий період, а два камені в протифазі поруч читаються
+ * гойдалкою.
+ *
+ * ФУНКЦІЯ, А НЕ РЯДОК У БУДІВНИКУ, бо це число знають ДВОЄ: сама брила й
+ * трава, що на ній росте (ADR-0163). Трава, яка порахувала б фазу
+ * самостійно, одного дня почала б літати окремо від каменя.
+ */
+function driftFloat(seed: number, tag: string): readonly [number, number] {
+  return [
+    seededUnit(seed, `${tag}:float`) * Math.PI * 2,
+    0.72 + seededUnit(seed, `${tag}:pace`) * 0.62,
+  ];
+}
+
+/**
+ * Де стоїть брила номер `index` і яка вона завбільшки.
+ *
+ * Спільне з будівником брил, бо росте на них трава, і рости вона мусить
+ * САМЕ ТАМ, де камінь. Друга копія цієї арифметики розійшлась би з першою
+ * тієї ж миті, коли хтось поворухне будь-яке з чисел, — і кущ повис би в
+ * повітрі поруч із каменем.
+ */
+function driftRockAt(seed: number, index: number, count: number): {
+  tag: string;
+  cx: number;
+  cz: number;
+  rise: number;
+  size: number;
+  top: number;
+  spin: number;
+  float: readonly [number, number];
+} {
+  const tag = `island:drift:${index}`;
+  const angle = ((index + seededUnit(seed, `${tag}:spin`) * 0.8) / Math.max(1, count)) * Math.PI * 2;
+  const reach = PORTAL_ISLAND_RADIUS * (4.6 + seededUnit(seed, `${tag}:reach`) * 3.4);
+  const rise = -0.42 + seededUnit(seed, `${tag}:rise`) * 1.5;
+  const size = (0.055 + seededUnit(seed, `${tag}:size`) * 0.085)
+    * (reach / PORTAL_ISLAND_RADIUS) * 0.42;
+  return {
+    tag,
+    cx: Math.cos(angle) * reach,
+    cz: Math.sin(angle) * reach,
+    rise,
+    size,
+    top: size * (0.42 + seededUnit(seed, `${tag}:cap`) * 0.26),
+    spin: seededUnit(seed, `${tag}:turn`) * Math.PI * 2,
+    float: driftFloat(seed, tag),
+  };
+}
+
 export function buildPortalDriftGeometry(seed: number, count: number): THREE.BufferGeometry {
   const mesh = soup();
   for (let index = 0; index < count; index += 1) {
-    const tag = `island:drift:${index}`;
-    const angle = ((index + seededUnit(seed, `${tag}:spin`) * 0.8) / Math.max(1, count)) * Math.PI * 2;
     /*
      * ЗА КІЛЬЦЕМ КАМЕРИ, І ЦЕ ГАРАНТІЯ, А НЕ ЗАПАС.
      *
@@ -1118,36 +1176,13 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
      * наслідок одразу: брила опинялась перед об'єктивом і затуляла
      * артефакт темною плямою на пів екрана. Оснастка чесно впала —
      * «кристала в кадрі немає».
-     */
-    const reach = PORTAL_ISLAND_RADIUS * (4.6 + seededUnit(seed, `${tag}:reach`) * 3.4);
-    const rise = -0.42 + seededUnit(seed, `${tag}:rise`) * 1.5;
-    /*
-     * Далі — більша. Без цього дальні брили читаються крихтами, а зміна
-     * розміру з відстанню і є те, чим око міряє глибину; тут це єдина
-     * підказка глибини взагалі, бо тіней у сцені немає.
-     */
-    const size = (0.055 + seededUnit(seed, `${tag}:size`) * 0.085)
-      * (reach / PORTAL_ISLAND_RADIUS) * 0.42;
-    const cx = Math.cos(angle) * reach;
-    const cz = Math.sin(angle) * reach;
-    const spin = seededUnit(seed, `${tag}:turn`) * Math.PI * 2;
-    /*
-     * ЛЕВІТАЦІЯ: своя фаза й свій темп на кожну брилу (ADR-0162).
      *
-     * Спільна фаза дала б не летючі камені, а один камінь, розмножений
-     * копіюванням: усі підіймаються разом, і око читає це як тремтіння
-     * камери. Спільний темп при різних фазах читається краще, але за
-     * пів хвилини спостереження вертається те саме — вони проходять
-     * верхню точку по черзі, з рівним кроком, як зубці шестерні.
-     *
-     * Темп 0.72…1.34 — вузько навмисно: ширше й найшвидша брила почала б
-     * обганяти найповільнішу на цілий період, а два камені, що йдуть у
-     * протифазі поруч, читаються гойдалкою.
+     * Розміщення рахує `driftRockAt` — спільно з травою, що росте на цих
+     * каменях (ADR-0163). Далі — більша: зміна розміру з відстанню і є те,
+     * чим око міряє глибину, а тіней у цій сцені немає взагалі.
      */
-    mesh.float = [
-      seededUnit(seed, `${tag}:float`) * Math.PI * 2,
-      0.72 + seededUnit(seed, `${tag}:pace`) * 0.62,
-    ];
+    const { tag, cx, cz, rise, size, spin, float } = driftRockAt(seed, index, count);
+    mesh.float = float;
 
     /*
      * ФОРМА — БРИЛА, А НЕ САМОЦВІТ, і це виправлення знайшов кадр.
@@ -1159,7 +1194,7 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
      * злам знизу.
      */
     const sides = 7;
-    const top = size * (0.42 + seededUnit(seed, `${tag}:cap`) * 0.26);
+    const { top } = driftRockAt(seed, index, count);
     /*
      * КУТИ МІЖ КУТАМИ НЕРІВНІ, і це те саме виправлення, що ADR-0147
      * зробив ґратці плато, лише на меншому тілі. Рівні кути дають віяло
@@ -1210,6 +1245,181 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
 }
 
 // ── Море хмар ───────────────────────────────────────────────
+
+// ── Рослинність ─────────────────────────────────────────────
+
+/** Скільки кущиків росте на плато, за профілем якості. */
+export const PORTAL_FLORA_TUFTS: Record<'high' | 'balanced' | 'low' | 'fallback', number> = {
+  high: 38, balanced: 24, low: 12, fallback: 0,
+};
+
+/**
+ * Один кущик: три листки з однієї точки, кожен своїм азимутом.
+ *
+ * ТРИ, А НЕ ОДИН. Листок — це один трикутник, тобто площина; з боку вона
+ * видна смужкою в піксель, і кущик із одного листка зникає рівно тоді, коли
+ * пара повернула сцену. Три листки, розведені азимутом, лишають хоч один
+ * повернутим до ока з будь-якого боку — і це, а не пишність, вирішує,
+ * скільки їх тут.
+ *
+ * ДВОБІЧНИЙ МАТЕРІАЛ, тож намотка на листку нічого не значить — і саме тому
+ * листок коштує ОДИН трикутник, а не два. Це той самий виняток, що в хмар
+ * (ADR-0159): пласка пелюстка не є тілом, і питати в неї, де в неї
+ * середина, немає сенсу.
+ *
+ * Тон рахується явно, а не з нахилу до ключа: листок стоїть майже
+ * вертикально, тож `litShade` дала б усім листкам одне число, і кущик
+ * читався б пласкою плямою. Темніше при землі, світліше на кінчику — так
+ * само, як хмара світліша вгорі.
+ */
+function pushTuft(
+  mesh: Soup,
+  seed: number,
+  tag: string,
+  seat: Point,
+  size: number,
+): void {
+  const blades = 3;
+  const spin = seededUnit(seed, `${tag}:spin`) * Math.PI * 2;
+  for (let blade = 0; blade < blades; blade += 1) {
+    const angle = spin + (blade / blades) * Math.PI * 2
+      + (seededUnit(seed, `${tag}:skew:${blade}`) - 0.5) * 0.7;
+    const width = size * (0.11 + seededUnit(seed, `${tag}:wide:${blade}`) * 0.08);
+    const height = size * (0.62 + seededUnit(seed, `${tag}:tall:${blade}`) * 0.72);
+    // Кінчик відхилений УБІК, а не строго вгору: рівні листки читаються
+    // щіткою. Нахил свій на кожен, і в межах чверті власної висоти.
+    const lean = size * (0.18 + seededUnit(seed, `${tag}:lean:${blade}`) * 0.34);
+    const across: Point = [-Math.sin(angle), 0, Math.cos(angle)];
+    const along: Point = [Math.cos(angle), 0, Math.sin(angle)];
+    const left: Point = [
+      seat[0] + across[0] * width,
+      seat[1],
+      seat[2] + across[2] * width,
+    ];
+    const right: Point = [
+      seat[0] - across[0] * width,
+      seat[1],
+      seat[2] - across[2] * width,
+    ];
+    const tip: Point = [
+      seat[0] + along[0] * lean,
+      seat[1] + height,
+      seat[2] + along[2] * lean,
+    ];
+    mesh.push(left, right, tip, [0.5, 0.5, 0.98]);
+  }
+}
+
+/**
+ * Рослинність на всіх островах — і на великому, і на малих.
+ *
+ * ОКРЕМИЙ МЕШ, І ЦЕ КОШТУЄ П'ЯТИЙ DRAW CALL. Причина не в геометрії, а в
+ * кольорі: вершинний колір у `meshBasicMaterial` МНОЖИТЬСЯ на колір
+ * матеріалу, тож трава всередині меша каменю вийшла б кольору
+ * «камінь × зелень». Пофарбувати її можна лише власним матеріалом, а
+ * власний матеріал і є draw call (ADR-0163).
+ *
+ * Зате меш ОДИН на обидва місця, і саме тому він несе атрибут левітації:
+ * кущик на брилі мусить літати РАЗОМ із нею, а кущик на плато — стояти.
+ * Фаза [0, 0] дає рівно нуль зсуву, і це єдине місце в сцені, де
+ * нерухомість тримається переданим нулем, а не відсутністю атрибута.
+ * Названо навмисно, і тест на це є.
+ */
+export function buildPortalFloraGeometry(
+  seed: number,
+  tufts: number,
+  rocks: number,
+): THREE.BufferGeometry {
+  const mesh = soup();
+
+  /*
+   * НА ПЛАТО — від третього кільця назовні.
+   *
+   * Ближче до осі стоїть жеода з кристалами, і кущик під нею просто
+   * закопаний: намальований, невидимий і оплачений. Кільця нумеруються від
+   * центру, тож 2…5 — це поясок між артефактом і кромкою.
+   */
+  mesh.float = [0, 0];
+  for (let index = 0; index < tufts; index += 1) {
+    const tag = `island:flora:${index}`;
+    const segment = Math.floor(seededUnit(seed, `${tag}:segment`) * PORTAL_ISLAND_SEGMENTS);
+    const ring = 2 + Math.floor(seededUnit(seed, `${tag}:ring`) * 4);
+    /*
+     * Сідає ВСЕРЕДИНУ ТРИКУТНИКА ПЛАТО, барицентрично. Три спроби до цього,
+     * і кожна попередня — окрема вада:
+     *
+     *  1. **На криву висоти** — ADR-0140. Плато намальоване пласкими
+     *     трикутниками МІЖ вибірками кривої, між ними хорда провисає, і
+     *     кущик висить над каменем.
+     *  2. **На найнижчий кут клітинки** — правило уламка й храму, і воно
+     *     їхнє по праву: вони лежать на клітинці ПІДОШВОЮ, тож вищий кут
+     *     підняв би протилежний у повітря. Кущик підошви не має, він
+     *     точка, — і те саме правило топило його на 0.021 радіуса острова
+     *     там, де клітинка крута.
+     *  3. **На саму вершину.** Належить мешу за визначенням, але вершини
+     *     стоять ґраткою, а ще промінь, пущений рівно крізь вершину, не
+     *     влучає в жоден із трикутників, що в ній сходяться, — тобто таку
+     *     посадку не можна ані перевірити, ані відрізнити від ґратки оком.
+     *
+     * Точка ВСЕРЕДИНІ трикутника лежить у його площині, тобто на мешеві, за
+     * арифметикою. Ваги тримаються не ближче за 0.12 до ребра, щоб кущик не
+     * з'їжджав на стик двох площин, де «поверхня» неоднозначна.
+     */
+    const level = Math.min(ISLAND_TOP_RINGS.length - 2, ring);
+    const next = (segment + 1) % PORTAL_ISLAND_SEGMENTS;
+    const inner = crownPoint(seed, segment, level);
+    const cell: readonly Point[] = seededUnit(seed, `${tag}:half`) < 0.5
+      ? [inner, crownPoint(seed, next, level), crownPoint(seed, next, level + 1)]
+      : [inner, crownPoint(seed, next, level + 1), crownPoint(seed, segment, level + 1)];
+    const rawA = 0.12 + seededUnit(seed, `${tag}:bary`) * 0.76;
+    const rawB = 0.12 + seededUnit(seed, `${tag}:bary2`) * (0.88 - rawA);
+    const weights = [rawA, rawB, 1 - rawA - rawB] as const;
+    const seat: Point = [
+      cell[0]![0] * weights[0] + cell[1]![0] * weights[1] + cell[2]![0] * weights[2],
+      cell[0]![1] * weights[0] + cell[1]![1] * weights[1] + cell[2]![1] * weights[2] - 0.004,
+      cell[0]![2] * weights[0] + cell[1]![2] * weights[1] + cell[2]![2] * weights[2],
+    ];
+    /*
+     * РОЗМІР — ВИМІРЯНИЙ, а не вгаданий (ADR-0163).
+     *
+     * Перша редакція мала 0.052…0.088 радіуса острова, і кадр показав, чим
+     * це є: медіана кущика 47 пікселів на екрані заввишки 1830, найбільший
+     * 172 — тобто чверть висоти самого кристала. Власник просив «трохи
+     * рослинності», а вийшли зарості.
+     *
+     * 0.020…0.034 дає медіану 18 пікселів: трава при кристалі, а не поруч
+     * із ним.
+     */
+    pushTuft(mesh, seed, tag, seat, 0.020 + seededUnit(seed, `${tag}:size`) * 0.014);
+  }
+
+  /*
+   * НА БРИЛАХ — по одному кущику, і на самій шапці.
+   *
+   * Шапка брили — це колишня поверхня острова, з якої її вирвало
+   * (`buildPortalDriftGeometry`), тобто єдине місце на камені, де трава
+   * могла лишитись. На зламі знизу її не буває.
+   *
+   * Розмір іде від каменя, а не сталий: брила вдвічі більша носить кущик
+   * вдвічі більший, інакше на дальніх каменях трава читалась би мохом, а
+   * на ближніх — деревами.
+   */
+  for (let index = 0; index < rocks; index += 1) {
+    const rock = driftRockAt(seed, index, rocks);
+    const tag = `island:driftflora:${index}`;
+    if (seededUnit(seed, `${tag}:bare`) < 0.28) continue;
+    mesh.float = rock.float;
+    const away = seededUnit(seed, `${tag}:away`) * Math.PI * 2;
+    const reach = rock.size * 0.42 * seededUnit(seed, `${tag}:reach`);
+    pushTuft(mesh, seed, tag, [
+      rock.cx + Math.cos(away) * reach,
+      rock.rise + rock.top * 0.94,
+      rock.cz + Math.sin(away) * reach,
+    ], rock.size * 0.34);
+  }
+
+  return finish(mesh);
+}
 
 /**
  * Хмари далеко внизу — те, що робить висоту висотою.

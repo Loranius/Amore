@@ -15,9 +15,11 @@ import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import {
   PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
+  PORTAL_FLORA_TUFTS,
   PORTAL_ISLAND_RUBBLE,
   buildPortalCloudGeometry,
   buildPortalDriftGeometry,
+  buildPortalFloraGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
 } from './portalIsland';
@@ -32,11 +34,17 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * тіл), тож він мусить знати внесок сцени — інакше довелось би просто
  * послабити межу й перевірка втратила б сенс.
  *
- * Чотири меші: острів (разом з уламками — камінь той самий, тож окремий
- * прохід коштував би draw call і не давав нічого), храм, брили в небі й
- * море хмар.
+ * П'ять мешів: острів (разом з уламками — камінь той самий, тож окремий
+ * прохід коштував би draw call і не давав нічого), храм, брили в небі,
+ * рослинність і море хмар.
+ *
+ * 4 → 5 (ADR-0163), і платимо ми цей call за КОЛІР, а не за геометрію.
+ * Вершинний колір у `meshBasicMaterial` МНОЖИТЬСЯ на колір матеріалу, тож
+ * трава, покладена в меш каменю, вийшла б кольору «камінь × зелень».
+ * Пофарбувати її можна лише власним матеріалом, а власний матеріал і є
+ * draw call. Зате меш ОДИН на обидва місця — і плато, і летючі брили.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 4;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 5;
 
 /**
  * СТЕЛЯ трикутників оточення, а не точне число.
@@ -63,8 +71,14 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 4;
  * сімдесят двох клинах, тобто 3.5% оточення. Реальна вартість під новою
  * стелею — 4 202 проти 4 058 до правки, тобто 96.6%: стеля лишається
  * межею, а не дозволом.
+ *
+ * 4 350 → 4 500 (ADR-0163). Рослинність на всіх островах коштує **186
+ * трикутників**: тридцять вісім кущиків на плато й по одному на кожній
+ * другій-третій брилі, кожен із трьох листків по одному трикутнику. Це 4.2%
+ * оточення за те, що на камені щось росте. Реальна вартість під новою
+ * стелею — 4 388, тобто 97.5%.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 4_350;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 4_500;
 
 /**
  * Реальна вартість оточення — джерело правди для стелі вище.
@@ -82,6 +96,7 @@ export function measurePortalEnvironmentTriangles(
     buildPortalTempleGeometry(seed),
     buildPortalDriftGeometry(seed, PORTAL_DRIFT_ROCKS[quality]),
     buildPortalCloudGeometry(seed, PORTAL_CLOUD_BANKS[quality]),
+    buildPortalFloraGeometry(seed, PORTAL_FLORA_TUFTS[quality], PORTAL_DRIFT_ROCKS[quality]),
   ];
   let total = 0;
   for (const piece of pieces) {
@@ -414,6 +429,22 @@ export interface PortalPalette {
   templeStone: string;
   /** Брили, що висять у повітрі. Той самий камінь, але далі й тьмяніше. */
   driftRock: string;
+  /**
+   * Рослинність на островах (ADR-0163).
+   *
+   * ЄДИНИЙ ЗЕЛЕНИЙ У СЦЕНІ, і він тут за дозволом `DESIGN.md`: Rare Colour
+   * стосується поверхонь порталу — ґрунту, картки, канта, — а світ артефакта
+   * живе за іншим законом, бо він не інтерфейс, а предмет. «Життя навколо
+   * них — середовище, і воно кольорове тому, що кораловий риф кольоровий.»
+   *
+   * Напрямок контрасту РІЗНИЙ у двох порах доби, і це не недогляд симетрії,
+   * а те саме «тема міняє світло, а не продукт». Уночі камінь темний
+   * (L 0.129), і трава ловить місяць — вона світліша (L 0.288). Удень
+   * камінь блідий (L 0.392), і трава темніша за нього (L 0.218). В обидві
+   * пори вона видима, і в обидві вона МЕНШ насичена за камінь, тож зелень
+   * не виходить із приглушеного світу острова.
+   */
+  flora: string;
   /** Море хмар унизу. Не туман: це тіло, і воно має власний тон. */
   cloudSea: string;
   /** Наскільки хмари щільні. Уночі це натяк, удень — підлога світу. */
@@ -500,6 +531,9 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     // Вапняк під сонцем — тепліший і світліший за плато під ним.
     templeStone: '#e6d8cc',
     driftRock: '#a091ac',
+    // Удень трава ТЕМНІША за камінь: вапнякове плато під сонцем бліде, і
+    // світла зелень на ньому просто зникла б.
+    flora: '#5f8a72',
     cloudSea: '#f2f6fb',
     cloudOpacity: 0.92,
     skyLight: '#e8f1fb',
@@ -538,6 +572,8 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     // ловить місяць там, де злам його розсіює.
     templeStone: '#8b80ab',
     driftRock: '#5a4c85',
+    // Уночі — навпаки: камінь темний, і трава ловить місяць.
+    flora: '#6d9c86',
     // Хмари вночі — не білі. Біле море хмар під нічним небом читається
     // снігом у прожекторі; тут це відбитий місяць.
     cloudSea: '#6d6194',

@@ -72,17 +72,22 @@ export const PORTAL_DRIFT_OFFSET_GLSL = /* glsl */ `
 `;
 
 /**
- * Годинник левітації — рівно один на меш, і його віддають назад.
+ * Годинник левітації — СПИСОК уніформ, а не одна.
  *
  * `onBeforeCompile` кличеться, коли Three компілює програму, тобто не тоді,
  * коли зручно React'ові. Тому уніформа створюється тут, а посилання на неї
- * лягає в переданий об'єкт: кадр рухає її напряму, не перемальовуючи
- * дерево. Так само влаштований годинник аврори в рушії.
+ * лягає в переданий масив: кадр рухає їх напряму, не перемальовуючи дерево.
+ * Так само влаштований годинник аврори в рушії.
+ *
+ * СПИСОК, А НЕ ОДНА, і це не запас на майбутнє — це вже сталося. Той самий
+ * рух носять ДВА матеріали: брили й трава, що на них росте (ADR-0163). Поки
+ * тут стояло одне посилання, друга компіляція затирала першу, і рухався б
+ * рівно один із двох мешів — камінь без трави або трава без каменя.
  */
-export function portalLevitation(clock: { current: { value: number } | null }) {
+export function portalLevitation(clocks: { current: { value: number }[] }) {
   return (shader: { vertexShader: string; uniforms: Record<string, { value: number }> }): void => {
     shader.uniforms['uPortalFloatSeconds'] = { value: 0 };
-    clock.current = shader.uniforms['uPortalFloatSeconds']!;
+    clocks.current.push(shader.uniforms['uPortalFloatSeconds']!);
     shader.vertexShader = shader.vertexShader
       .replace('void main() {', `${DECLARATION}\nvoid main() {`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${PORTAL_DRIFT_OFFSET_GLSL}`);

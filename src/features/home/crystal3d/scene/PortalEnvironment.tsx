@@ -39,9 +39,11 @@ import {
 import {
   PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
+  PORTAL_FLORA_TUFTS,
   PORTAL_ISLAND_RUBBLE,
   buildPortalCloudGeometry,
   buildPortalDriftGeometry,
+  buildPortalFloraGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
   portalIslandScale,
@@ -115,6 +117,10 @@ export function PortalEnvironment({
     () => buildPortalCloudGeometry(seed, PORTAL_CLOUD_BANKS[quality]),
     [seed, quality],
   );
+  const flora = useMemo(
+    () => buildPortalFloraGeometry(seed, PORTAL_FLORA_TUFTS[quality], PORTAL_DRIFT_ROCKS[quality]),
+    [seed, quality],
+  );
 
   /*
    * Одне полотно на весь застосунок — і на обидві теми: воно несе лише
@@ -131,16 +137,18 @@ export function PortalEnvironment({
    * перемальовував би все дерево шістдесят разів на секунду заради одного
    * числа в уніформі. Так само влаштований годинник аврори в рушії.
    */
-  const floatClock = useRef<{ value: number } | null>(null);
-  const levitate = useMemo(() => portalLevitation(floatClock), []);
+  const floatClocks = useRef<{ value: number }[]>([]);
+  const levitate = useMemo(() => portalLevitation(floatClocks), []);
   const floatSeconds = useRef(0);
   useFrame((_, delta) => {
     // Зупиняється разом із диханням камери, а не окремим прапорцем: камінь,
     // що гойдається під нерухомою камерою, — це подорож без згоди (§47).
     if (reduceMotion) return;
-    if (floatClock.current === null) return;
+    if (floatClocks.current.length === 0) return;
     floatSeconds.current += Math.min(delta, 1 / 15);
-    floatClock.current.value = floatSeconds.current;
+    // Усі — і брили, і трава на них. Один спільний годинник, бо камінь і
+    // його кущик мусять іти в одну секунду.
+    for (const clock of floatClocks.current) clock.value = floatSeconds.current;
   });
 
   /*
@@ -233,6 +241,29 @@ export function PortalEnvironment({
             color={palette.driftRock}
             vertexColors
             map={rockGrain}
+            onBeforeCompile={levitate}
+          />
+        </mesh>
+
+      {/*
+        Рослинність — п'ятий і останній об'єкт сцени (ADR-0163).
+        ------------------------------------------------------------
+        Окремий меш коштує draw call, і платимо ми його за КОЛІР: вершинний
+        колір множиться на колір матеріалу, тож трава всередині меша каменю
+        вийшла б кольору «камінь × зелень».
+
+        Двобічна навмисно. Листок — один трикутник, тобто площина; з
+        одного боку її не видно взагалі, а другий трикутник на кожен
+        листок коштував би вдвічі більше за весь цей меш.
+
+        Той самий `levitate`, що й у брил: кущик на летючому камені мусить
+        літати разом із ним. Кущики плато несуть фазу [0, 0] і стоять.
+      */}
+        <mesh geometry={flora} frustumCulled={false}>
+          <meshBasicMaterial
+            color={palette.flora}
+            vertexColors
+            side={THREE.DoubleSide}
             onBeforeCompile={levitate}
           />
         </mesh>
