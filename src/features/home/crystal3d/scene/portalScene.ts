@@ -112,7 +112,7 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
  * не перестало бути правдою від того, що бюджет виріс). Стеля йде за
  * вартістю крок за кроком, і кожен крок названий.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 6_400;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 6_500;
 
 /**
  * Реальна вартість оточення — джерело правди для стелі вище.
@@ -757,7 +757,7 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     waterfall: '#f7ecec',
     waterfallOpacity: 0.88,
     halo: '#f0b8dc',
-    haloOpacity: 0.46,
+    haloOpacity: 0.36,
     cloudOpacity: 0.92,
     skyLight: '#e8f1fb',
     skyIntensity: 2.1,

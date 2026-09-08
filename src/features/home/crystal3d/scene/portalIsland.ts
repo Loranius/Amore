@@ -356,6 +356,21 @@ interface Soup {
   alpha: number | readonly [number, number, number];
   /** По одному значенню на вершину. Усі одиниці — меш непрозорий. */
   readonly alphas: number[];
+  /**
+   * Зсув вершини В ПЛОЩИНІ ЕКРАНА: [праворуч, угору] в одиницях меша.
+   *
+   * Той самий прийом, що `float` і `alpha`, і з тієї ж причини — але тут
+   * він робить те, чого геометрією не зробиш узагалі: БІЛБОРД. Тіло, яке
+   * має світитися навколо артефакта з будь-якого боку, не може бути
+   * пласким чотирикутником у світі: пара крутить острів рукою, і такий
+   * чотирикутник показав би ребро. Зсув у площині екрана рахує вершинний
+   * шейдер (ADR-0170), а сюди кладеться тільки те, НАСКІЛЬКИ зсувати.
+   *
+   * `null` — вершина лишається там, де стоїть. Так живе саме кільце.
+   */
+  glow: readonly [number, number] | null;
+  /** Пари зсувів, по одній на вершину. Усі нулі — білбордів немає. */
+  readonly glows: number[];
   push(
     a: Point,
     b: Point,
@@ -379,6 +394,7 @@ function soup(): Soup {
   const uvs: number[] = [];
   const floats: number[] = [];
   const alphas: number[] = [];
+  const glows: number[] = [];
   return {
     positions,
     colors,
@@ -387,6 +403,8 @@ function soup(): Soup {
     float: null,
     alphas,
     alpha: 1,
+    glows,
+    glow: null,
     push(a, b, c, shade = 1, uv) {
       if (this.float !== null) {
         for (let corner = 0; corner < 3; corner += 1) floats.push(this.float[0], this.float[1]);
@@ -400,6 +418,9 @@ function soup(): Soup {
         for (let corner = 0; corner < 3; corner += 1) alphas.push(this.alpha);
       } else {
         alphas.push(...this.alpha);
+      }
+      for (let corner = 0; corner < 3; corner += 1) {
+        glows.push(this.glow?.[0] ?? 0, this.glow?.[1] ?? 0);
       }
       positions.push(...a, ...b, ...c);
       const corners = typeof shade === 'number' ? [shade, shade, shade] : shade;
@@ -448,6 +469,14 @@ function finish(mesh: Soup): THREE.BufferGeometry {
    */
   if (mesh.floats.length > 0) {
     geometry.setAttribute('portalFloat', new THREE.Float32BufferAttribute(mesh.floats, 2));
+  }
+  /*
+   * Той самий закон, що вище: атрибут білборда ставиться ЛИШЕ там, де
+   * хоч одна вершина справді зсувається. Меш без нього не можна
+   * розвернути до камери навіть помилково.
+   */
+  if (mesh.glows.some((value) => value !== 0)) {
+    geometry.setAttribute('portalGlow', new THREE.Float32BufferAttribute(mesh.glows, 2));
   }
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
@@ -1475,6 +1504,30 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
 
 // ── Світляне кільце ─────────────────────────────────────────
 
+/**
+ * Диски світіння навколо артефакта — у тих самих одиницях, що й кільце.
+ *
+ * Кільце має радіус 1, і той, хто його вішає, множить усе на висоту
+ * артефакта; ці числа їдуть тим самим множником, тож світіння росте
+ * разом із кристалом, а не з декорацією.
+ *
+ * Два, а не один: широкий і слабкий — це повітря навколо тіла, вузький
+ * і яскравий на вістрі — те, що око читає як джерело. Один диск дає або
+ * пляму, або нічого.
+ */
+const HALO_GLOWS: readonly { height: number; radius: number; alpha: number }[] = [
+  /*
+   * ВИСОТИ ВИМІРЯНІ ЗА СИЛУЕТОМ, а не поставлені «по центру».
+   * Додавання видно лише там, де за тілом небо: над плато острів
+   * закриває нижню третину кристала, і диск, поставлений на висоті
+   * кільця, світив у камінь. Обидва підняті у верхню половину — туди,
+   * де кристал і межує з небом.
+   */
+  { height: 0.25, radius: 0.52, alpha: 0.5 },
+  { height: 0.75, radius: 0.58, alpha: 0.62 },
+  { height: 1.2, radius: 0.34, alpha: 0.72 },
+];
+
 /** На скільки ланок ділиться кільце, за профілем якості. */
 export const PORTAL_HALO_SEGMENTS: Record<PortalQuality, number> = {
   high: 60, balanced: 40, low: 24, fallback: 0,
@@ -1502,6 +1555,14 @@ export const PORTAL_HALO_SEGMENTS: Record<PortalQuality, number> = {
 export function buildPortalHaloGeometry(seed: number, segments: number): THREE.BufferGeometry {
   const mesh = soup();
   if (segments < 3) return finish(mesh);
+  /*
+   * Межа між кільцем і дисками ПУБЛІКУЄТЬСЯ, а не відновлюється.
+   *
+   * Здавалося б, її видно з атрибута: у кільця зсув нульовий, у дисків
+   * ні. Але ЦЕНТРАЛЬНА вершина диска теж має нульовий зсув — вона й є
+   * центр, — тож за атрибутом два тіла не розрізнити. Перша редакція
+   * тестів на цьому й спіткнулась: мірки кільця почали бачити радіус 0.
+   */
   /*
    * Ширина стрічки — від радіуса кільця, і 0.085 замість 0.055 після
    * кадру: вужча стрічка на екрані телефона давала лінію в один-два
@@ -1552,7 +1613,108 @@ export function buildPortalHaloGeometry(seed: number, segments: number): THREE.B
     mesh.alpha = [here, 0, 0];
     mesh.push(core[0], outer[1], outer[0], [here, edge, edge]);
   }
-  return finish(mesh);
+  /*
+   * ── СВІТІННЯ НАВКОЛО АРТЕФАКТА ────────────────────────────
+   *
+   * Це «bloom для бідних», і саме так світіння робили до постобробки:
+   * додавальний диск із м'яким краєм, повернутий до ока. Повноекранний
+   * прохід нам заборонений, доки не поставлено діагноз білому фону на
+   * пристрої власника (`render/gfxProfile.ts`), і цей шлях від того
+   * діагнозу не залежить узагалі — жодного render target, жодного
+   * нового матеріалу, жодного нового draw call: диски їдуть у мешеві
+   * кільця, бо в них те саме додавальне змішування.
+   *
+   * ЧОМУ ДИСК, А НЕ ЧОТИРИКУТНИК. Чотирикутник має чотири кути, тобто
+   * альфа в ньому може бути лише на краях; щоб яскравість спадала ВІД
+   * ЦЕНТРА, потрібна вершина в центрі. Віяло з центром і двома кільцями
+   * дає спад у два кроки — це вже читається світлом, а не наклейкою.
+   *
+   * ЧОМУ ЙОГО НЕ ВИДНО ПОВЕРХ КРИСТАЛА. Диск стоїть у площині, що
+   * проходить ЧЕРЕЗ вісь артефакта, тобто всередині його тіла; ближня
+   * половина кристала пише глибину й затуляє ближню половину диска.
+   * Лишається рівно те, що поза силуетом, — тобто сяйво навколо, а не
+   * пляма на гранях.
+   */
+  const ringTriangles = mesh.positions.length / 9;
+  for (const disc of HALO_GLOWS) {
+    /*
+     * ТРИ КІЛЬЦЯ, А НЕ ДВА, І ОБОВ'ЯЗКОВО ПО ДВА ТРИКУТНИКИ НА ЛАНКУ.
+     *
+     * Перша редакція клала між кільцями по одному трикутнику
+     * (внутрішня вершина плюс дві зовнішні) — і кадр показав СОНЦЕ З
+     * ПРОМЕНЯМИ: половина кожної ланки лишалась незакритою, тож диск
+     * вийшов зіркою. Смуга між двома кільцями — це чотирикутник, і
+     * закрити його можна лише двома трикутниками.
+     */
+    /*
+     * ЯСКРАВІШЕ НЕ В ЦЕНТРІ, А НА СЕРЕДИНІ, і це не смак кривої.
+     * Центр диска лежить НА ОСІ артефакта, тобто всередині його тіла:
+     * ближня половина кристала пише глибину й закриває саме ту частину,
+     * де світло найсильніше. Максимум, посаджений у центр, витрачається
+     * на невидиме. Перенесений на середнє кільце, він лягає рівно на
+     * силует — а сяйво навколо силуету і є те, чого ми домагаємось.
+     */
+    const rings: readonly { at: number; alpha: number; shade: number }[] = [
+      { at: 0, alpha: disc.alpha * 0.55, shade: 1 },
+      { at: 0.44, alpha: disc.alpha, shade: 0.82 },
+      { at: 1, alpha: 0, shade: 0.4 },
+    ];
+    const sides = 12;
+    const anchor: Point = [0, disc.height, 0];
+    const on = (ring: { at: number }, angle: number): readonly [number, number] => [
+      Math.cos(angle) * disc.radius * ring.at,
+      Math.sin(angle) * disc.radius * ring.at,
+    ];
+    /**
+     * Трикутник із трьома РІЗНИМИ зсувами.
+     *
+     * `glow` — поле тіла, як `float` і `alpha`, тобто одне на три кути.
+     * Диску потрібні три різні, тож зсуви двох останніх вершин
+     * дописуються прямо в масив. Це єдине місце в файлі, де так робиться,
+     * і воно назване: інакше довелось би заводити ще одну форму `push`
+     * заради одного тіла.
+     */
+    const spoke = (
+      offsets: readonly (readonly [number, number])[],
+      alphas: readonly [number, number, number],
+      shades: readonly [number, number, number],
+    ): void => {
+      mesh.alpha = alphas;
+      mesh.glow = offsets[0]!;
+      const at = (mesh.positions.length / 3) * 2;
+      mesh.push(anchor, anchor, anchor, shades);
+      for (let corner = 1; corner < 3; corner += 1) {
+        mesh.glows[at + corner * 2] = offsets[corner]![0];
+        mesh.glows[at + corner * 2 + 1] = offsets[corner]![1];
+      }
+    };
+    for (let band = 0; band + 1 < rings.length; band += 1) {
+      const inner = rings[band]!;
+      const outer = rings[band + 1]!;
+      for (let corner = 0; corner < sides; corner += 1) {
+        const a = (corner / sides) * Math.PI * 2;
+        const b = ((corner + 1) / sides) * Math.PI * 2;
+        spoke(
+          [on(inner, a), on(outer, a), on(outer, b)],
+          [inner.alpha, outer.alpha, outer.alpha],
+          [inner.shade, outer.shade, outer.shade],
+        );
+        // Друга половина смуги. У центральному віялі її немає: там
+        // «внутрішнє кільце» — одна точка, і чотирикутника не існує.
+        if (inner.at > 0) {
+          spoke(
+            [on(inner, a), on(outer, b), on(inner, b)],
+            [inner.alpha, outer.alpha, inner.alpha],
+            [inner.shade, outer.shade, inner.shade],
+          );
+        }
+      }
+    }
+  }
+  mesh.glow = null;
+  const geometry = finish(mesh);
+  geometry.userData.haloLayout = { ring: ringTriangles, glow: mesh.positions.length / 9 - ringTriangles };
+  return geometry;
 }
 
 // ── Водоспади ───────────────────────────────────────────────

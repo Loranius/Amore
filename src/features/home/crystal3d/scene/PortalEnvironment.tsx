@@ -54,6 +54,7 @@ const HALO_TILT = 0;
 const HALO_TURN_PER_SECOND = 0.16;
 
 import { portalLevitation } from './portalLevitation';
+import { portalGlowBillboard } from './portalGlowBillboard';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -419,6 +420,7 @@ export function PortalEnvironment({
             depthWrite={false}
             fog={false}
             side={THREE.DoubleSide}
+            onBeforeCompile={portalGlowBillboard}
           />
         </mesh>
       </group>
