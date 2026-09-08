@@ -22,6 +22,7 @@ import {
   PORTAL_ISLAND_CROWN_TRIANGLES,
   PORTAL_CAMERA_RING,
   PORTAL_ISLAND_RADIUS,
+  PORTAL_TEMPLE_FACE,
   PORTAL_ISLAND_RUBBLE,
   buildPortalCloudGeometry,
   buildPortalDriftGeometry,
@@ -184,6 +185,72 @@ describe('храм', () => {
     const ground = crownSurfaceAt(crown, lowest![0], lowest![2]);
     expect(ground, 'підошва храму над плато').not.toBeNull();
     expect(lowest![1]).toBeLessThanOrEqual(ground!);
+  });
+
+  it('ДИВИТЬСЯ ФАСАДОМ НА АРТЕФАКТ, а не на світові осі', () => {
+    /*
+     * Досі храм будувався по світових осях, фасадом на +Z. Камера теж
+     * стоїть на +Z, але храм — збоку, тож у кадр потрапляв його БІК:
+     * три колони замість чотирьох і жодного фронтону. Найдорожча
+     * частина будівлі не показувалась узагалі (ADR-0169).
+     *
+     * Це не про камеру, а про світ: пара крутить острів рукою, і храм,
+     * повернутий до артефакта, лишається правильним із будь-якого боку.
+     * Тому й перевіряється напрямок НА ЦЕНТР, а не на камеру.
+     */
+    let cx = 0;
+    let cz = 0;
+    let count = 0;
+    for (let at = 0; at + 2 < temple.length; at += 3) {
+      cx += temple[at]!;
+      cz += temple[at + 2]!;
+      count += 1;
+    }
+    cx /= count;
+    cz /= count;
+    const toCentre = Math.hypot(cx, cz);
+    expect(PORTAL_TEMPLE_FACE[0]).toBeCloseTo(-cx / toCentre, 1);
+    expect(PORTAL_TEMPLE_FACE[1]).toBeCloseTo(-cz / toCentre, 1);
+  });
+
+  it('СВІТИТЬСЯ ЗСЕРЕДИНИ: є грань, яскравіша за самий камінь', () => {
+    /*
+     * Власник попросив «теплий храм». Ані світильника, ані другого
+     * матеріалу тут бути не може — сцена намальована, а draw call'и
+     * вичерпані (ADR-0168), — тож тепло запечене в тон грані: множник
+     * більший за одиницю виводить колір за камінь у бік білого.
+     *
+     * Стережеться саме ІСНУВАННЯ такої грані. Тон — єдине, чим тут
+     * можна дати світло, і рефакторинг, який зведе всі тони під
+     * одиницю, мовчки погасить храм.
+     */
+    const colours = buildPortalTempleGeometry(SEED).getAttribute('color').array;
+    let brightest = 0;
+    for (let at = 0; at < colours.length; at += 1) brightest = Math.max(brightest, colours[at]!);
+    expect(brightest).toBeGreaterThan(1.1);
+  });
+
+  it('вміщається в кільце між жеодою й кромкою — з обома запасами', () => {
+    /*
+     * Храм виріс на чверть (ADR-0169), і місця в цьому кільці рівно
+     * стільки, скільки є: усередині 0.5 радіуса його бути не може
+     * (`DESIGN.md`), зовні — обрис острова. Обидва запаси малі, тож
+     * наступна спроба збільшити храм мусить упасть ТУТ, а не в кадрі.
+     */
+    let inner = Number.POSITIVE_INFINITY;
+    let worstOuter = Number.POSITIVE_INFINITY;
+    for (let at = 0; at + 2 < temple.length; at += 3) {
+      const x = temple[at]!;
+      const z = temple[at + 2]!;
+      const radius = Math.hypot(x, z);
+      inner = Math.min(inner, radius);
+      worstOuter = Math.min(worstOuter, portalIslandRadiusAt(SEED, Math.atan2(z, x)) - radius);
+    }
+    // Виміряно: внутрішній край на 0.527, тобто 0.027 запасу від 0.5.
+    expect(inner - PORTAL_ISLAND_RADIUS * 0.5).toBeGreaterThan(0.01);
+    expect(inner - PORTAL_ISLAND_RADIUS * 0.5).toBeLessThan(0.12);
+    // І зовнішній: найтісніший кут не ближче за сотую до обрису.
+    expect(worstOuter).toBeGreaterThan(0.01);
   });
 });
 

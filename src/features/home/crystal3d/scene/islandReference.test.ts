@@ -37,6 +37,7 @@ import {
   PORTAL_DRIFT_ROCKS,
   PORTAL_ISLAND_CROWN_TRIANGLES,
   PORTAL_ISLAND_RUBBLE,
+  PORTAL_TEMPLE_FACE,
   buildPortalCloudGeometry,
   buildPortalDriftGeometry,
   buildPortalIslandGeometry,
@@ -288,7 +289,19 @@ describe('наш острів проти еталона', () => {
 });
 
 describe('наш храм проти еталона', () => {
-  const temple = templeFrontProfile(ours(buildPortalTempleGeometry(SEED)));
+  /*
+   * МІРКА ПОВЕРНУТА РАЗОМ ІЗ ХРАМОМ (ADR-0169). Профіль проєктує тіло на
+   * площину XY, тобто мовчки вважає, що фасад дивиться на +Z — так і
+   * стоїть еталон із Blender. Наш храм розвернутий до артефакта, і без
+   * `PORTAL_TEMPLE_FACE` та сама мірка бачила його навскіс: колонада
+   * 0.575 замість 0.655, фронтон 12.5° замість 14°. Форма не змінилась
+   * ані на трикутник — брехала проєкція.
+   */
+  const temple = templeFrontProfile(
+    ours(buildPortalTempleGeometry(SEED)),
+    40,
+    PORTAL_TEMPLE_FACE,
+  );
 
   it('КОЛОНИ СТОЯТЬ ПО-ДОРІЙСЬКИ, а не як вийде', () => {
     /*

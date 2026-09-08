@@ -139,13 +139,26 @@ function spanAt(
 export function templeFrontProfile(
   positions: readonly number[],
   samples = 40,
+  /**
+   * Куди дивиться фасад, одиничним вектором у площині XZ.
+   *
+   * За замовчуванням — на +Z, бо саме так стоїть еталон із Blender. Наш
+   * храм розвернутий до артефакта (ADR-0169), і без цього повороту
+   * проєкція дивилась би на нього навскіс: колонада читалась 0.575
+   * замість 0.655, а фронтон 12.5° замість 14°. Форма при цьому не
+   * змінювалась ані на трикутник — брехала мірка.
+   */
+  facing: readonly [number, number] = [0, 1],
 ): TempleProfile {
+  const [faceX, faceZ] = facing;
+  /** Горизонталь фасаду: те, що для повернутого храму замінює світове X. */
+  const across = (x: number, z: number): number => x * faceZ - z * faceX;
   let lowY = Number.POSITIVE_INFINITY;
   let highY = Number.NEGATIVE_INFINITY;
   let lowX = Number.POSITIVE_INFINITY;
   let highX = Number.NEGATIVE_INFINITY;
   for (let at = 0; at + 2 < positions.length; at += 3) {
-    const x = positions[at]!;
+    const x = across(positions[at]!, positions[at + 2]!);
     const y = positions[at + 1]!;
     if (y < lowY) lowY = y;
     if (y > highY) highY = y;
@@ -162,9 +175,9 @@ export function templeFrontProfile(
     const spans: [number, number][] = [];
     for (let at = 0; at + 8 < positions.length; at += 9) {
       const span = spanAt(
-        positions[at]!, positions[at + 1]!,
-        positions[at + 3]!, positions[at + 4]!,
-        positions[at + 6]!, positions[at + 7]!,
+        across(positions[at]!, positions[at + 2]!), positions[at + 1]!,
+        across(positions[at + 3]!, positions[at + 5]!), positions[at + 4]!,
+        across(positions[at + 6]!, positions[at + 8]!), positions[at + 7]!,
         y,
       );
       if (span) spans.push(span);

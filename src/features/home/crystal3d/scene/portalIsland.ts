@@ -936,8 +936,33 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
  * Позаду — бо кадр телефона має 1.94 одиниці ширини на глибині
  * артефакта, і храм збоку від нього просто вийшов би за край; глибше він
  * і менший, і цілком у кадрі.
+ *
+ * ПРИСУНУТО ДО ОСІ (ADR-0169): 0.778 радіуса → 0.680. Храм виріс на
+ * чверть, а місця в кільці між жеодою й кромкою рівно стільки, скільки
+ * є: усередині 0.5 радіуса храму бути не може (`DESIGN.md`), зовні —
+ * обрис острова, який у цьому секторі гуляє між 0.96 і 1.08. Виміряно на
+ * кутах нижньої сходинки: внутрішній кут виходить на 0.527, зовнішній на
+ * 0.946 при обрисі 0.967.
  */
-const TEMPLE_AT: readonly [number, number] = [0.34, -0.7];
+const TEMPLE_AT: readonly [number, number] = [0.297, -0.612];
+
+/**
+ * Куди дивиться фасад храму — одиничний вектор на центр острова.
+ *
+ * Публікується, бо будь-яка мірка ФАСАДУ мусить дивитись у тому самому
+ * напрямку. Профіль храму проєктує тіло на площину XY, тобто мовчки
+ * вважає, що фасад повернутий на +Z; відколи храм розвернувся до
+ * артефакта (ADR-0169), така проєкція бачить його навскіс — і показала
+ * колонаду 0.575 замість 0.655 та фронтон 12.5° замість 14°.
+ *
+ * Форма не змінилась ані на трикутник. Змінилась мірка, і саме її
+ * довелось повернути разом із храмом.
+ */
+export const PORTAL_TEMPLE_FACE: readonly [number, number] = (() => {
+  const [ox, oz] = TEMPLE_AT;
+  const length = Math.hypot(ox, oz) || 1;
+  return [-ox / length, -oz / length];
+})();
 
 /**
  * Храм міряється НИЖНІМ ДІАМЕТРОМ КОЛОНИ, як його й міряли ті, хто це
@@ -952,12 +977,18 @@ const TEMPLE_AT: readonly [number, number] = [0.34, -0.7];
  * не була видна оком: одна вірна пропорція з трьох рятує силует рівно
  * настільки, щоб він не читався поламаним.
  *
- * 0.0415 радіуса острова — єдине розмірне число храму. Воно каже, який він
+ * 0.0519 радіуса острова — єдине розмірне число храму. Воно каже, який він
  * МАЛИЙ, а не яких він пропорцій: ширина при чотирьох колонах виходить
- * 0.376, тобто на глибині 8 від камери близько 90 CSS-пікселів — менше за
- * чверть екрана телефона.
+ * 0.47 радіуса острова.
+ *
+ * 0.0415 → 0.0519 (ADR-0169), тобто на чверть. Межу поставив не смак, а
+ * кільце: усередині 0.5 радіуса храму бути не може, зовні його ловить
+ * обрис острова, і на чверті приросту нижня сходинка вже торкається
+ * обох меж (див. `TEMPLE_AT`). Більший храм тут вимагав би або
+ * посунути жеоду, або звузити сходинки — обидва рішення власника, а не
+ * мої.
  */
-const TEMPLE_COLUMN_DIAMETER = 0.0415;
+const TEMPLE_COLUMN_DIAMETER = 0.0519;
 
 /** Висота колони на її нижній діаметр. Дорика тримається 4–6.5. */
 const TEMPLE_COLUMN_SLENDER = 5.6;
@@ -1043,13 +1074,39 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
   }
   ground -= TEMPLE_STEP;
 
+  /*
+   * ХРАМ ДИВИТЬСЯ НА АРТЕФАКТ (ADR-0169).
+   *
+   * Досі він будувався по світових осях, фасадом на +Z. Камера теж
+   * стоїть на +Z, але храм — на (0.30, −0.61), тобто збоку: з кадру
+   * було видно його БІК, три колони замість чотирьох і жодного
+   * фронтону. Найдорожча частина будівлі — портик — не показувалась
+   * узагалі.
+   *
+   * Тому все нижче будується в МІСЦЕВИХ координатах (+Z — фасад), а
+   * `place` повертає їх так, щоб фасад дивився в центр острова. Це не
+   * лише про кадр: пара крутить острів рукою, і храм, повернутий до
+   * артефакта, лишається правильним із будь-якого боку, тоді як храм,
+   * повернутий до камери, розвернувся б спиною на першому ж дотику.
+   *
+   * Обертання застосовується ДО того, як `pushLit` рахує нормаль, — бо
+   * інакше тон запікся б для неповернутого храму, і бік, що дивиться на
+   * сонце, лишився б темним.
+   */
+  const [faceX, faceZ] = PORTAL_TEMPLE_FACE;
+  const place = (lx: number, ly: number, lz: number): Point => [
+    ox + lx * faceZ + lz * faceX,
+    ly,
+    oz - lx * faceX + lz * faceZ,
+  ];
+
   const box = (
     cx: number, cy: number, cz: number,
     hx: number, hy: number, hz: number,
     tint = 1,
   ): void => {
     const at = (sx: number, sy: number, sz: number): Point =>
-      [cx + sx * hx, cy + sy * hy, cz + sz * hz];
+      place(cx + sx * hx, cy + sy * hy, cz + sz * hz);
     const top = [at(-1, 1, -1), at(1, 1, -1), at(1, 1, 1), at(-1, 1, 1)] as const;
     const low = [at(-1, -1, -1), at(1, -1, -1), at(1, -1, 1), at(-1, -1, 1)] as const;
     pushQuad(mesh, top[0], top[3], top[2], top[1], tint);
@@ -1064,12 +1121,110 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
   for (let step = 0; step < 3; step += 1) {
     const grow = 1 + (2 - step) * 0.075;
     box(
-      ox, stepTop + TEMPLE_STEP / 2, oz,
+      0, stepTop + TEMPLE_STEP / 2, 0,
       (TEMPLE_WIDTH / 2) * grow, TEMPLE_STEP / 2, (TEMPLE_DEPTH / 2) * grow,
       1 - step * 0.04,
     );
     stepTop += TEMPLE_STEP;
   }
+
+  /*
+   * ── СВІТЛО ВСЕРЕДИНІ ──────────────────────────────────────
+   *
+   * Власник попросив «теплий храм». Тепло тут не можна дати ані
+   * світильником (сцена намальована, а не освітлена), ані другим
+   * матеріалом (draw call'и вичерпані ADR-0168) — лишається один шлях:
+   * ЗАПЕКТИ його в тон грані. Тон вершини множиться на колір матеріалу,
+   * і множник більший за одиницю виводить колір за камінь у бік білого,
+   * тобто читається світлом, що лягло на стіну, а не каменем.
+   *
+   * СТІНА, А НЕ ПІДЛОГА, І ЦЕ ВИПРАВЛЕНО ЗА КАДРОМ. Перша редакція
+   * світила підлогою портика — і в кадрі її не було видно взагалі.
+   * Арифметика проста: камера стоїть на 23.6° над обрієм, тобто
+   * тангенс 0.437; глибина портика 0.39, тож промінь від верху передньої
+   * колони падає всередині лише на 0.17 при висоті колони 0.29. Підлога
+   * ховається за власною колонадою повністю.
+   *
+   * Стіна целли стоїть ВЕРТИКАЛЬНО й видна крізь просвіти між колонами —
+   * тобто рівно там, де око й шукає нутро храму. Це та сама помилка, що
+   * з мохом на шапках брил: прикраса, поставлена туди, куди камера не
+   * дивиться, оплачена й невидима.
+   */
+  /*
+   * СТІНА — УЛАМОК, А НЕ СТІНА. Перша редакція перекривала всю ширину
+   * портика, і мірка колонади це впіймала: повітря в силуеті впало з
+   * 0.655 до 0.493, тобто храм із колонади став коробкою з колонами.
+   * Еталон власника — відкритий портик, крізь який видно небо, і саме це
+   * число його стереже.
+   *
+   * Розмір уламка ВИМІРЯНИЙ проти цієї мірки, а не вгаданий: на повну
+   * ширину повітря 0.493, на 0.28 прольоту — 0.571, на 0.62 — 0.608, на
+   * 0.72 при висоті 0.56 колони — 0.62 з запасом. Теплого каменю досить,
+   * щоб побачити його у двох просвітах, і замало, щоб силует перестав
+   * дихати.
+   */
+  const wallHalfW = TEMPLE_WIDTH / 2 - TEMPLE_COLUMN_RADIUS * 2.6;
+  const wallHeight = TEMPLE_COLUMN_HEIGHT * 0.56;
+  const wallZ = -TEMPLE_DEPTH * 0.1;
+  const wallThick = TEMPLE_COLUMN_RADIUS * 0.55;
+  /*
+   * Стіна ОБВАЛЕНА з одного боку: рівний прямокутник між колонами
+   * читався б новою кладкою, а храм тут древній. Правий край нижчий і
+   * коротший — та сама рука, що обламала три колони зі списку.
+   */
+  const wallRight = -wallHalfW * 0.72;
+  const wallDrop = wallHeight * 0.45;
+  const face = (x0: number, x1: number, y1: number, tint: number): void => {
+    pushQuad(
+      mesh,
+      place(x1, stepTop, wallZ + wallThick),
+      place(x1, y1, wallZ + wallThick),
+      place(x0, stepTop + wallHeight, wallZ + wallThick),
+      place(x0, stepTop, wallZ + wallThick),
+      tint,
+    );
+  };
+  // Передня грань тепла — це і є «світло всередині».
+  face(-wallHalfW, wallRight, stepTop + wallHeight - wallDrop, 1.5);
+  // Торець і верх лишаються каменем: світло падає з нутра, а не звідусіль.
+  pushQuad(
+    mesh,
+    place(-wallHalfW, stepTop, wallZ - wallThick),
+    place(-wallHalfW, stepTop + wallHeight, wallZ - wallThick),
+    place(wallRight, stepTop + wallHeight - wallDrop, wallZ - wallThick),
+    place(wallRight, stepTop, wallZ - wallThick),
+    0.82,
+  );
+  pushQuad(
+    mesh,
+    place(-wallHalfW, stepTop + wallHeight, wallZ - wallThick),
+    place(-wallHalfW, stepTop + wallHeight, wallZ + wallThick),
+    place(wallRight, stepTop + wallHeight - wallDrop, wallZ + wallThick),
+    place(wallRight, stepTop + wallHeight - wallDrop, wallZ - wallThick),
+    1.06,
+  );
+  /*
+   * ТОРЦІ ЗАКРИТІ, і це не педантизм. Стіна без них — розкрита коробка:
+   * промінь із камери заходить у відкритий бік і бачить її виворіт.
+   * Променева проба зловила рівно одне таке влучання з дев'ятисот
+   * (ADR-0159), і одного досить: у кадрі це чорна дірка в білому камені.
+   */
+  pushQuad(
+    mesh,
+    place(-wallHalfW, stepTop, wallZ + wallThick),
+    place(-wallHalfW, stepTop + wallHeight, wallZ + wallThick),
+    place(-wallHalfW, stepTop + wallHeight, wallZ - wallThick),
+    place(-wallHalfW, stepTop, wallZ - wallThick),
+    0.88,
+  );
+  pushQuad(
+    mesh,
+    place(wallRight, stepTop, wallZ - wallThick),
+    place(wallRight, stepTop + wallHeight - wallDrop, wallZ - wallThick),
+    place(wallRight, stepTop + wallHeight - wallDrop, wallZ + wallThick),
+    place(wallRight, stepTop, wallZ + wallThick),
+    0.9,
+  );
 
   // ── Колонада по периметру ─────────────────────────────────
   const columns: (readonly [number, number])[] = [];
@@ -1097,11 +1252,11 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
       // Ентазис у мініатюрі: верх вужчий за низ. Циліндр однакової
       // товщини читається трубою, а не колоною.
       const taper = 1 - 0.14 * level;
-      return [
-        ox + cx + Math.cos(a) * TEMPLE_COLUMN_RADIUS * taper,
+      return place(
+        cx + Math.cos(a) * TEMPLE_COLUMN_RADIUS * taper,
         stepTop + height * level,
-        oz + cz + Math.sin(a) * TEMPLE_COLUMN_RADIUS * taper,
-      ];
+        cz + Math.sin(a) * TEMPLE_COLUMN_RADIUS * taper,
+      );
     };
     /*
      * Злам угорі — рваний, а не рівний зріз: у зламаної колони верх
@@ -1125,7 +1280,7 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
       const next = (corner + 1) % sides;
       pushQuad(mesh, ringPoint(0, corner), torn(corner), torn(next), ringPoint(0, next));
     }
-    const hub: Point = [ox + cx, stepTop + height + (share2 < 1 ? TEMPLE_COLUMN_RADIUS * 0.3 : 0), oz + cz];
+    const hub: Point = place(cx, stepTop + height + (share2 < 1 ? TEMPLE_COLUMN_RADIUS * 0.3 : 0), cz);
     for (let corner = 0; corner < sides; corner += 1) {
       pushLit(mesh, hub, torn((corner + 1) % sides), torn(corner));
     }
@@ -1139,24 +1294,29 @@ export function buildPortalTempleGeometry(seed: number): THREE.BufferGeometry {
   const beamY = stepTop + TEMPLE_COLUMN_HEIGHT + TEMPLE_BEAM / 2;
   const halfW = TEMPLE_WIDTH / 2 - TEMPLE_COLUMN_RADIUS;
   const halfD = TEMPLE_DEPTH / 2 - TEMPLE_COLUMN_RADIUS;
-  box(ox, beamY, oz + halfD, halfW + TEMPLE_COLUMN_RADIUS, TEMPLE_BEAM / 2, TEMPLE_COLUMN_RADIUS, 1.04);
-  box(ox + halfW, beamY, oz, TEMPLE_COLUMN_RADIUS, TEMPLE_BEAM / 2, halfD, 0.94);
-  box(ox - halfW, beamY, oz, TEMPLE_COLUMN_RADIUS, TEMPLE_BEAM / 2, halfD * 0.55, 0.94);
+  box(0, beamY, halfD, halfW + TEMPLE_COLUMN_RADIUS, TEMPLE_BEAM / 2, TEMPLE_COLUMN_RADIUS, 1.04);
+  box(halfW, beamY, 0, TEMPLE_COLUMN_RADIUS, TEMPLE_BEAM / 2, halfD, 0.94);
+  box(-halfW, beamY, 0, TEMPLE_COLUMN_RADIUS, TEMPLE_BEAM / 2, halfD * 0.55, 0.94);
 
   // ── Уламок фронтону над фасадом ───────────────────────────
   const gableY = beamY + TEMPLE_BEAM / 2;
   // Нахил фронтону — оголошений, а не «щоб гарно»: 14° усередині
   // грецьких 12.5–16°. Перша редакція мала прибиту висоту 0.073, тобто
   // 21°, і це вже читалось двосхилим дахом хати.
-  const peak: Point = [
-    ox - halfW * 0.15,
+  const peak: Point = place(
+    -halfW * 0.15,
     gableY + (halfW + TEMPLE_COLUMN_RADIUS) * Math.tan((TEMPLE_PEDIMENT_DEG * Math.PI) / 180),
-    oz + halfD,
-  ];
-  const left: Point = [ox - halfW - TEMPLE_COLUMN_RADIUS, gableY, oz + halfD];
-  const right: Point = [ox + halfW * 0.45, gableY, oz + halfD];
+    halfD,
+  );
+  const left: Point = place(-halfW - TEMPLE_COLUMN_RADIUS, gableY, halfD);
+  const right: Point = place(halfW * 0.45, gableY, halfD);
   const depth = TEMPLE_COLUMN_RADIUS * 1.2;
-  const back = (p: Point): Point => [p[0], p[1], p[2] - depth];
+  // Назад — уздовж МІСЦЕВОЇ осі глибини, а не світової.
+  const back = (point: Point): Point => [
+    point[0] - faceX * depth,
+    point[1],
+    point[2] - faceZ * depth,
+  ];
   pushLit(mesh, left, right, peak, 1.08);
   pushLit(mesh, back(right), back(left), back(peak), 0.9);
   pushQuad(mesh, left, peak, back(peak), back(left), 1.02);
