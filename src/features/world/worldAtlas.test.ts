@@ -281,11 +281,21 @@ describe('pose → camera (brief §21)', () => {
     // PORTAL_GROUND_Y, not zero — the scene's origin sits at the artifact's
     // waist, and measuring from the world origin instead of the body's own
     // ground is the error this project keeps making.
+    /*
+     * **ЦІЛЬ БІЛЬШЕ НЕ ЗОБОВ'ЯЗАНА БУТИ НАД ЗЕМЛЕЮ (ADR-0164).** Власник
+     * відвів кадр до острова, а острів ВИСИТЬ ПІД площиною, на якій стоїть
+     * кристал: плато на нулі, корінь іде глибоко вниз. Камера, що цілиться
+     * в острів, цілиться нижче за землю — і це та сама земля, тільки тепер
+     * у неї є низ.
+     *
+     * Вимога до ОКА лишається дослівно: `OrbitControls` не пускає камеру
+     * під підлогу (`maxPolarAngle`), і поза, що там починається, билася б
+     * із ним щокадру.
+     */
     for (const { name, frame } of FRAMES) {
       for (const region of WORLD_REGIONS) {
         const view = portalCameraView(frame, crystalPoseForRegion(region));
         expect(view.position[1], `${name}/${region}`).toBeGreaterThan(PORTAL_GROUND_Y);
-        expect(view.target[1], `${name}/${region}`).toBeGreaterThan(PORTAL_GROUND_Y);
       }
     }
   });

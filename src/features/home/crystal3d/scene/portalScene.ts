@@ -137,8 +137,20 @@ const DEG = Math.PI / 180;
  * читабельним, змінна лишає ріст видимим. Обидві межі названі числом, а
  * не смаком.
  */
-const FRAME_BASE_HEIGHT = 0.985;
-const FRAME_PER_ARTIFACT = 1.079;
+/*
+ * ×3.2 НА ОБИДВА (ADR-0164), і це пряме рішення власника.
+ *
+ * Він показав еталон — літаючий острів у небі, кристал маленький посеред
+ * нього — і на питання «кадр йде за кристалом чи за островом» відповів
+ * «відвести камеру до острова».
+ *
+ * ОБИДВА множники однакові, і саме тому все, що ці числа тримали, лишилось
+ * чинним: висота кадру й далі афінна, тож частка екрана й далі росте з
+ * віком у тій самій пропорції — просто від меншої бази. Ріст видно; кристал
+ * більше не єдине, що видно.
+ */
+const FRAME_BASE_HEIGHT = 0.985 * 3.2;
+const FRAME_PER_ARTIFACT = 1.079 * 3.2;
 
 /**
  * Кадр для артефакта, про висоту якого нічого не відомо.
@@ -190,7 +202,18 @@ const TARGET_SHARE_OF_ARTIFACT = PORTAL_TARGET_SHARE_OF_ARTIFACT;
  * 8°); тепер задається прямо, щоб кут не залежав від того, як далеко відійшла
  * камера. Підлога має читатись як поверхня, що йде вглиб, а не як лінія.
  */
-const EYE_ELEVATION_SIN = 0.14;
+/*
+ * 0.14 → 0.40 (ADR-0164). Вісім градусів над горизонтом — це погляд УЗДОВЖ
+ * плато: острів видно з ребра, його ближній край стоїть удвічі ближче за
+ * дальній і через це заповнює весь кадр, а сам диск не читається взагалі.
+ * Еталон власника дивиться згори — видно ВЕСЬ острів, і небо обабіч нього.
+ * 0.40 — це 23.6°, тобто всередині смуги 10…28°, яку тримає
+ * `portalScene.test.ts`.
+ */
+const EYE_ELEVATION_SIN = 0.4;
+
+/** Наскільки ціль опускається під кристал, у частках відстані. */
+const FRAME_ISLAND_DROP = 0.075;
 
 export interface PortalCameraFrame {
   position: readonly [number, number, number];
@@ -198,6 +221,16 @@ export interface PortalCameraFrame {
   fov: number;
   /** Відстань від камери до точки прицілу. */
   distance: number;
+  /**
+   * Висота артефакта, під яку зібрано цей кадр.
+   *
+   * ПУБЛІКУЄТЬСЯ, А НЕ ВІДНОВЛЮЄТЬСЯ (ADR-0164). Атлас діставав її діленням
+   * `target.y − ground` на `TARGET_SHARE_OF_ARTIFACT`, і поки ціль стояла
+   * рівно на тій частці, це працювало. Відколи камера кадрує ОСТРІВ, ціль
+   * опущена ще й на його половину — обернення почало брехати, і брехало б
+   * тихо: пози маршрутів поїхали б, а впала б не арифметика, а ракурс.
+   */
+  artifactHeight: number;
   fogNear: number;
   fogFar: number;
 }
@@ -228,14 +261,32 @@ export function portalCameraView(
   // TARGET_SHARE_OF_ARTIFACT його висоти над землею. Брати її звідси, а не
   // окремим аргументом, — щоб поза й кадр не могли розійтись у тому, який
   // артефакт вони описують.
-  const artifactHeight = Math.max(
-    1e-3,
-    (frame.target[1] - PORTAL_GROUND_Y) / TARGET_SHARE_OF_ARTIFACT,
-  );
-  const targetY = PORTAL_GROUND_Y + artifactHeight * pose.targetHeight;
+  // Береться з кадру, а не відновлюється діленням: див. `artifactHeight` у
+  // `PortalCameraFrame`.
+  const artifactHeight = Math.max(1e-3, frame.artifactHeight);
+  // Опускання під острів — теж із кадру: інакше центральна поза підняла б
+  // камеру назад до кристала й ракурс головної тихо змінився б.
+  const drop = PORTAL_GROUND_Y + artifactHeight * TARGET_SHARE_OF_ARTIFACT - frame.target[1];
+  const targetY = PORTAL_GROUND_Y + artifactHeight * pose.targetHeight - drop;
 
   const eyeDistance = Math.max(1e-3, frame.distance * pose.distance);
-  const rise = eyeDistance * pose.elevation;
+  /*
+   * ОКО НІКОЛИ НЕ ПІРНАЄ ПІД ПІДЛОГУ, і це гарантія, а не побажання
+   * (ADR-0164).
+   *
+   * `OrbitControls` не пускає камеру під підлогу (`maxPolarAngle`), тож
+   * поза, що починається там, не рендериться як написана — вона щокадру
+   * б'ється з керуванням. Досі цього не могло статись, бо ціль стояла над
+   * землею; відколи камера кадрує острів, ціль опущена нижче за неї, і
+   * будь-яка поза, чиє око стоїть НИЖЧЕ за ціль, може опинитись під світом.
+   *
+   * Тут не «виправляється поза», а оголошується межа: підйом підводиться
+   * рівно настільки, щоб око лишилось над підлогою. Пози, яким цього
+   * бракує, підняті в атласі явно — щоб число, яке малюється, було тим,
+   * яке написане.
+   */
+  const floor = PORTAL_GROUND_Y + eyeDistance * 0.02 - targetY;
+  const rise = Math.max(eyeDistance * pose.elevation, floor);
   const radius = Math.sqrt(Math.max(0, eyeDistance * eyeDistance - rise * rise));
 
   return {
@@ -349,7 +400,20 @@ export function portalCameraFrame(
   const byWidth = width / (2 * tangent * safeAspect);
   const distance = Math.max(byHeight, byWidth);
 
-  const targetY = PORTAL_GROUND_Y + safeHeight * TARGET_SHARE_OF_ARTIFACT;
+  /*
+   * ЦІЛЬ ОПУЩЕНА НА ПІВ ОСТРОВА (ADR-0164).
+   *
+   * Камера кадрує острів, а острів висить ПІД площиною, на якій стоїть
+   * кристал: плато на нулі, корінь іде на півтори одиниці вниз. Ціль,
+   * поставлена на кристал, кладе весь цей корінь у нижню третину кадру, і
+   * острів «сідає» на док.
+   *
+   * Частка ВІДСТАНІ, а не світова стала: масштаб острова сам іде за
+   * відстанню (`portalIslandScale`), тож так само мусить іти і те, на
+   * скільки камера опускається. 0.075 — це приблизно половина кореня при
+   * масштабі 0.15.
+   */
+  const targetY = PORTAL_GROUND_Y + safeHeight * TARGET_SHARE_OF_ARTIFACT - distance * FRAME_ISLAND_DROP;
   // Камера трохи вище за ціль, тож пряма відстань більша за z-виніс.
   const rise = distance * EYE_ELEVATION_SIN;
   const eyeY = targetY + rise;
@@ -360,6 +424,7 @@ export function portalCameraFrame(
     target: [0, targetY, 0],
     fov: FOV,
     distance,
+    artifactHeight: safeHeight,
     // Туман починається одразу за артефактом: він мусить з'їдати далеку
     // підлогу й задні колони, але не мити сам кристал.
     fogNear: distance * 0.96,

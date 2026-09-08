@@ -70,7 +70,9 @@ export interface WorldCameraPose {
 const CENTRE: WorldCameraPose = {
   azimuth: 0,
   targetHeight: 0.58,
-  elevation: 0.14,
+  // Той самий кут, що в кадрі (`EYE_ELEVATION_SIN`): центральна поза мусить
+  // відтворювати кадр ТОЧНО, інакше головна тихо змінила б ракурс.
+  elevation: 0.4,
   distance: 1,
   luminosity: 1,
 };
@@ -109,7 +111,17 @@ const CRYSTAL_ATLAS: Readonly<Record<WorldRegion, WorldCameraPose>> = {
   // are now a full quarter apart. The note is kept because the reasoning it
   // recorded — that a shared bearing is allowed when the climb is real — is
   // still the atlas rule; it simply no longer applies to this pair.
-  aspiration: pose({ azimuth: QUARTER, targetHeight: 0.86, elevation: -0.05, distance: 0.78 }),
+  //
+  // **`elevation` −0.05 → 0.02 (ADR-0164).** Це єдина поза, що дивилась
+  // ЗНИЗУ ВГОРУ, і вона стояла на самій межі: око було на 2.9° нижче за
+  // ціль. Відколи камера кадрує острів, ціль опущена ще й на пів його
+  // кореня — і те око пірнуло під підлогу на 0.0015 одиниці. `OrbitControls`
+  // туди не пускає (`maxPolarAngle`), тож поза билася б із ним щокадру.
+  //
+  // 0.02 — найменше, що дає запас: погляд лишається майже врівень із
+  // короною, «вгору» читається тепер тим, що ціль стоїть на 0.86 висоти
+  // тіла, а не нахилом ока.
+  aspiration: pose({ azimuth: QUARTER, targetHeight: 0.86, elevation: 0.02, distance: 0.78 }),
 
   // An upper forward facet: what has been decided is still ahead, and faces
   // the couple.
@@ -156,7 +168,11 @@ const CRYSTAL_ATLAS: Readonly<Record<WorldRegion, WorldCameraPose>> = {
 
   // The base and what has settled in it. Looking slightly up, because a
   // foundation is seen from beside it rather than from above.
-  foundation: pose({ azimuth: -QUARTER * 1.4, targetHeight: 0.18, elevation: -0.02, distance: 0.8 }),
+  // `elevation` −0.02 → 0.08 (ADR-0164), з тієї ж причини, що в `aspiration`:
+  // ціль опущена на пів острова, і поза, чиє око стояло НИЖЧЕ за ціль,
+  // опинилась під підлогою. Ця — найглибша з усіх (ціль на 0.18 висоти
+  // тіла), тож їй треба найбільше.
+  foundation: pose({ azimuth: -QUARTER * 1.4, targetHeight: 0.18, elevation: 0.08, distance: 0.8 }),
 
   // The one warm region (§21). Warmth is the world's, not a second palette;
   // the pose only puts the camera where the warm light falls.
@@ -172,7 +188,9 @@ const CRYSTAL_ATLAS: Readonly<Record<WorldRegion, WorldCameraPose>> = {
 
   // A way through rather than a face (§41). Close and low, as if about to
   // pass into it.
-  threshold: pose({ azimuth: -Math.PI * 0.75, targetHeight: 0.42, elevation: -0.04, distance: 0.62, luminosity: 0.85 }),
+  // `elevation` −0.04 → 0.05 (ADR-0164). Те саме: око було нижче за ціль, а
+  // ціль поїхала вниз разом з островом.
+  threshold: pose({ azimuth: -Math.PI * 0.75, targetHeight: 0.42, elevation: 0.05, distance: 0.62, luminosity: 0.85 }),
 };
 
 export function crystalPoseForRegion(region: WorldRegion): WorldCameraPose {

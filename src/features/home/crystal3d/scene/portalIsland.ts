@@ -71,8 +71,13 @@ export const PORTAL_ISLAND_RADIUS = 1;
  * «острів», а не «рівнина»: видно, де камінь кінчається.
  *
  * Більше за 0.3532 — і краї виходять за кадр при будь-якому віці пари.
+ *
+ * 0.30 → 0.244 (ADR-0164). Власник показав еталон, де острів займає близько
+ * сімдесяти відсотків півширини кадру, а не вісімдесяти п'яти: над ним і під
+ * ним є небо, і саме воно робить його ЛІТАЮЧИМ. 0.244 × 0.3532 і дає ті
+ * сімдесят.
  */
-const ISLAND_SCALE_PER_DISTANCE = 0.3;
+const ISLAND_SCALE_PER_DISTANCE = 0.15;
 
 /**
  * Світовий масштаб острова для цього кадру.
@@ -83,6 +88,19 @@ const ISLAND_SCALE_PER_DISTANCE = 0.3;
 export function portalIslandScale(cameraDistance: number): number {
   return Math.max(1, cameraDistance) * ISLAND_SCALE_PER_DISTANCE;
 }
+
+/**
+ * На якому радіусі стоїть камера, В ОДИНИЦЯХ ОСТРОВА.
+ *
+ * Масштаб іде за відстанню, тож це число СТАЛЕ в будь-якому віці пари — і
+ * саме тому воно годиться в гарантію, а не в запас.
+ *
+ * Опубліковане, бо його знають ДВОЄ: брили в небі (вони мусять висіти за
+ * ним) і тест, що це стереже. Поки воно було вписане числом 4.6, зміна
+ * масштабу острова тихо завела брили ВСЕРЕДИНУ кільця — 6.67 проти
+ * колишніх 3.33, — і жодне з тих 4.6 про це не сказало (ADR-0164).
+ */
+export const PORTAL_CAMERA_RING = PORTAL_ISLAND_RADIUS / ISLAND_SCALE_PER_DISTANCE;
 
 /** Скільки клинів у круга острова. */
 export const PORTAL_ISLAND_SEGMENTS = 72;
@@ -1144,7 +1162,7 @@ function driftRockAt(seed: number, index: number, count: number): {
 } {
   const tag = `island:drift:${index}`;
   const angle = ((index + seededUnit(seed, `${tag}:spin`) * 0.8) / Math.max(1, count)) * Math.PI * 2;
-  const reach = PORTAL_ISLAND_RADIUS * (4.6 + seededUnit(seed, `${tag}:reach`) * 3.4);
+  const reach = PORTAL_CAMERA_RING * (1.38 + seededUnit(seed, `${tag}:reach`) * 1.02);
   const rise = -0.42 + seededUnit(seed, `${tag}:rise`) * 1.5;
   const size = (0.055 + seededUnit(seed, `${tag}:size`) * 0.085)
     * (reach / PORTAL_ISLAND_RADIUS) * 0.42;
