@@ -36,6 +36,7 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.surfaceVeinStrength.toFixed(6),
     recipe.facetEdgeStrength.toFixed(6),
     recipe.facetEdgeWidth.toFixed(6),
+    recipe.interiorLevel.toFixed(6),
     recipe.axialTintStrength.toFixed(6),
     rgbKey(recipe.footColor),
     recipe.innerFlowStrength.toFixed(6),
@@ -112,6 +113,7 @@ uniform vec3 uEvolutionAuroraSecondColor;
 uniform float uEvolutionAuroraDepth;
 uniform float uEvolutionPhase;
 uniform float uEvolutionFacetEdgeStrength;
+uniform float uEvolutionInteriorLevel;
 uniform float uEvolutionFacetEdgeWidth;
 uniform float uEvolutionAxialTintStrength;
 uniform vec3 uEvolutionFootColor;
@@ -312,6 +314,15 @@ const FRAGMENT_BODY = /* glsl */ `
   // year crystal the same rim as the monarch. A rim measured in object space
   // would thicken as the body shrinks until a small crystal was nothing but
   // outline.
+  //
+  // ОБВІД ВІДКЛАДАЄТЬСЯ, А НЕ ДОДАЄТЬСЯ ТУТ (ADR-0175).
+  //
+  // Фарба грані множить підсумковий колір у кінці шейдера, і поки обвід
+  // лежав тут, вона множила і його: на темній грані обвід гаснув разом із
+  // нутром. Еталонні камені влаштовані навпаки — нутро темне, світлий
+  // саме обвід, — тож обвід тепер додається ПІСЛЯ фарби й лишається тим
+  // самим на всіх гранях тіла.
+  vec3 evolutionEdgePaint = vec3( 0.0 );
   if ( uEvolutionFacetEdgeStrength > 0.0001 ) {
     // Floored, and not defensively: a suppressed edge carries 1 at all three
     // corners, so its derivative is exactly zero and an unfloored smoothstep
@@ -320,7 +331,7 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 edgeWidth = max( fwidth( vEvolutionEdge ) * uEvolutionFacetEdgeWidth, vec3( 1e-5 ) );
     vec3 edgeFalloff = smoothstep( vec3( 0.0 ), edgeWidth, vEvolutionEdge );
     float evolutionRim = 1.0 - min( min( edgeFalloff.x, edgeFalloff.y ), edgeFalloff.z );
-    outgoingLight += uEvolutionRimColor * evolutionRim * uEvolutionFacetEdgeStrength;
+    evolutionEdgePaint = uEvolutionRimColor * evolutionRim * uEvolutionFacetEdgeStrength;
   }
 
   // ── Перелив: у кімнати є СТОРОНИ ──────────────────────────
@@ -541,6 +552,20 @@ const FRAGMENT_BODY = /* glsl */ `
   outgoingLight *= mix( 1.0, vEvolutionFacetTone, uEvolutionFacetPaintStrength );
 
   /*
+   * РІВЕНЬ НУТРА — тут, разом із фарбою, і теж перед обводом (ADR-0175).
+   *
+   * Один множник на все тіло: відношення тонів граней він зберігає точно,
+   * тож розділення граней від нього не рухається, а рухається лише те, як
+   * високо тіло сидить на кривій тонування. Саме там заслужений колір
+   * (ADR-0004) і вицвітав у білий.
+   */
+  outgoingLight *= uEvolutionInteriorLevel;
+
+  // Обвід — після фарби й після рівня, тому й такий світлий на темній
+  // грані. Це і є «нутро темне, світлий обвід» еталонних каменів.
+  outgoingLight += evolutionEdgePaint;
+
+  /*
    * ПІДОШВА ↔ ВІСТРЯ — ТЕЖ ОСТАННІМ РЯДКОМ, і це та сама помилка, що
    * ADR-0086 уже одного разу знайшов на фарбі грані.
    *
@@ -584,6 +609,11 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     && recipe.axialTintStrength <= 0
     && recipe.innerFlowStrength <= 0
     && recipe.sheenStrength <= 0
+    // Рівень нутра теж рахується термом: тіло з `interiorLevel` 0.55 і
+    // всіма іншими термами в нулі — це темніше тіло, а не те саме
+    // (ADR-0175). Без цього рядка «мікро»-кристали, у яких вимкнено все,
+    // світились би на повну.
+    && recipe.interiorLevel >= 1
   ) return;
 
   material.onBeforeCompile = (shader) => {
@@ -607,6 +637,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionAuroraDepth'] = { value: recipe.auroraDepth };
     shader.uniforms['uEvolutionPhase'] = { value: 0 };
     shader.uniforms['uEvolutionFacetEdgeStrength'] = { value: recipe.facetEdgeStrength };
+    shader.uniforms['uEvolutionInteriorLevel'] = { value: recipe.interiorLevel };
     shader.uniforms['uEvolutionFacetPaintStrength'] = { value: 1 };
     shader.uniforms['uEvolutionFacetEdgeWidth'] = { value: recipe.facetEdgeWidth };
     shader.uniforms['uEvolutionAxialTintStrength'] = { value: recipe.axialTintStrength };

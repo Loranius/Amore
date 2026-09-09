@@ -105,6 +105,11 @@ function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string
     body.shader.innerFlowStrength,
     body.shader.innerFlowTurns,
     body.shader.sheenStrength,
+    // Рівень нутра — тією ж логікою, що й потік вище: сьогодні він однаковий
+    // у всіх кристалів і відрізняє лише камінь підкладки, якого і без того
+    // ніщо не переплутає. Але батч ділить один матеріал, і якщо колись
+    // з'явиться тіло з іншим рівнем, воно не має світитись чужим.
+    body.shader.interiorLevel,
     facetTintingSignature(body.facets),
   ].map((value) => typeof value === 'number' ? value.toFixed(6) : String(value)).join('|');
 }
@@ -521,6 +526,20 @@ function shaderRecipe(
     // the first. A stylized gem keeps reading as a gem on any stage precisely
     // because its facets are outlined by the surface itself.
     facetEdgeStrength: round6(micro ? 0 : emphasized ? 0.34 : focal ? 0.28 : 0.22),
+    /*
+     * 0.55, і це виміряне число, а не смак (ADR-0175).
+     *
+     * До нього стовбур монарха давав грані зі значеннями 0.75–0.93 і
+     * насиченістю 0.23–0.38 — блідий пластик. Після: 0.58–0.84 і
+     * 0.33–0.48, а розділення граней не просіло ні на відсоток (найслабша
+     * пара 34% → 38%), бо множник один на все тіло й відношення тонів
+     * зберігає точно.
+     *
+     * Однакове на всіх рівнях якості навмисно: на слабкому телефоні
+     * вимкнено сяйво, вуаль і перелив, тобто рівно ті терми, які
+     * піднімали тіло вгору. Опустити нутро там ще потрібніше, ніж тут.
+     */
+    interiorLevel: 0.55,
     facetEdgeWidth: 1.4,
     // Gone. This was the foot-to-tip gradient, and it is the other half of the
     // two-tone the owner named: it painted the base toward the core colour
@@ -1054,6 +1073,13 @@ function buildSubstrateMaterial(
       // read from its edges. Weaker than the crystals', because stone catches
       // less on a fracture than quartz does on a grown face.
       facetEdgeStrength: 0.12,
+      /*
+       * Камінь лишається як був. Він і не вицвітав: жеода стоїть у тіні
+       * кристала й міряється в межах 0.4–0.6 значення, а темніший камінь
+       * забрав би в кристала контраст із підкладкою — те саме, чим
+       * кристал і тримається на кадрі.
+       */
+      interiorLevel: 1,
       facetEdgeWidth: 1.4,
       // The rock has no foot and no tip: it is broken rubble, not a grown body,
       // and there is no axis for a gradient to run along. Growth striation is

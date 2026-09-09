@@ -225,3 +225,41 @@ describe('lights inside the monarch (crystal cluster brief §9)', () => {
     frozen.dispose();
   });
 });
+
+describe('вогні тримають відношення до каменю, у якому горять', () => {
+  /*
+   * ВИМОГА (ADR-0175): нутро тіла опущено до 0.55, і вогні мусять піти за
+   * ним. Це не ручка яскравості, а збереження відношення: вогні адитивні
+   * й малюються без перевірки глибини, тож при незмінній силі проти
+   * темнішого каменю вони перестають бути вкрапленнями в ньому й стають
+   * намистом на ньому. Виміряно на живому порталі — саме так і виглядало.
+   */
+  it('множить силу на рівень нутра', () => {
+    const { geometry, material, life } = build();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const full = createThreeCrystalInnerSparks(bundle, geometry, life, 1)!;
+    const dimmed = createThreeCrystalInnerSparks(bundle, geometry, life, 0.55)!;
+    const strengthOf = (sparks: typeof full) => (
+      (sparks.points.material as THREE.ShaderMaterial).uniforms['uSparkStrength']!.value as number
+    );
+    expect(strengthOf(dimmed) / strengthOf(full)).toBeCloseTo(0.55, 6);
+    full.dispose();
+    dimmed.dispose();
+  });
+
+  it('не гасне до нуля й не розганяється вище за власну силу', () => {
+    // Коридор, а не довіра до викликача: рівень приходить із рецепта
+    // шейдера, і рецепт колись може стати нулем на «мікро»-тілі.
+    const { geometry, material, life } = build();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const strengthOf = (level: number) => {
+      const sparks = createThreeCrystalInnerSparks(bundle, geometry, life, level)!;
+      const value = (sparks.points.material as THREE.ShaderMaterial)
+        .uniforms['uSparkStrength']!.value as number;
+      sparks.dispose();
+      return value;
+    };
+    expect(strengthOf(0)).toBeCloseTo(1.4 * 0.05, 6);
+    expect(strengthOf(4)).toBeCloseTo(1.4, 6);
+  });
+});

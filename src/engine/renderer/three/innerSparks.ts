@@ -124,6 +124,17 @@ export function createThreeCrystalInnerSparks(
   bundle: ThreeCrystalRenderBundle,
   geometry: CrystalGeometryState,
   life: CrystalLifeState,
+  /*
+   * Рівень нутра тіла, у яке ці вогні вкладені (ADR-0175).
+   *
+   * Не окрема ручка яскравості, а ЗБЕРЕЖЕННЯ ВІДНОШЕННЯ. Вогні малюються
+   * адитивно й без перевірки глибини — сила 1.4 була підібрана проти тіла,
+   * яке світилось удвічі яскравіше. Опустивши нутро й лишивши вогні як
+   * були, ми не «зробили іскри помітнішими», а змінили те, чим вони є:
+   * замість вкраплень у камені вийшло намисто на камені. Виміряно на
+   * живому порталі — саме так воно й виглядало.
+   */
+  interiorLevel = 1,
 ): ThreeCrystalInnerSparks | null {
   if (life.innerSparks.length === 0) return null;
   const frame = monarchFrame(geometry);
@@ -165,7 +176,7 @@ export function createThreeCrystalInnerSparks(
       uSparkScale: { value: frame.height * 26 },
       // Rose, in §6's family. The lights are the same light the flow carries.
       uSparkColor: { value: new THREE.Color().setRGB(1, 0.72, 0.86) },
-      uSparkStrength: { value: 1.4 },
+      uSparkStrength: { value: 1.4 * Math.max(0.05, Math.min(1, interiorLevel)) },
     },
     transparent: true,
     // Additive, because a light inside a stone adds to what is already there.

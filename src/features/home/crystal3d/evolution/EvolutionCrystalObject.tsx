@@ -58,8 +58,16 @@ export function EvolutionCrystalObject({
   // own — quality tier, reduced motion — and rebuilding every batch to move a
   // point cloud would throw away the geometry upload with it.
   const sparks = useMemo(
-    () => createThreeCrystalInnerSparks(bundle, geometry, life),
-    [bundle, geometry, life],
+    () => createThreeCrystalInnerSparks(
+      bundle,
+      geometry,
+      life,
+      // Рівень нутра монарха — того тіла, у якому ці вогні й горять
+      // (ADR-0175). Вогні адитивні, тож без цього вони світили б проти
+      // темнішого каменю сильніше, ніж світили проти світлого.
+      material.bodies.find((body) => body.bodyId === 'crystal:mother')?.shader.interiorLevel ?? 1,
+    ),
+    [bundle, geometry, life, material],
   );
 
   /*
