@@ -1,11 +1,20 @@
 import { useMutation } from '@tanstack/react-query';
 import { supabase } from '@/lib/supabase';
+/*
+ * Розбір відповіді живе окремо й БЕЗ клієнта бази: цей модуль на першому
+ * рядку тягне `@/lib/supabase`, який кидає виняток при імпорті, коли
+ * немає ключів. Поки чиста функція лежала тут, її тест падав у CI, де
+ * ключів немає (ADR-0172).
+ */
+import {
+  parseScheduleReminderResult,
+  type ScheduleReminderResult,
+} from './scheduleReminderResult';
+
 import { useToast } from '@/providers/ToastProvider';
 
-export type ScheduleReminderResult =
-  | 'sent'
-  | 'already_sent'
-  | 'already_complete';
+export { parseScheduleReminderResult };
+export type { ScheduleReminderResult };
 
 interface ScheduleReminderInput {
   recipientId: number;
@@ -17,25 +26,6 @@ type RpcResponse = Promise<{ data: unknown; error: RpcError | null }>;
 type RpcCaller = (fn: string, args?: Record<string, unknown>) => RpcResponse;
 
 const rpc = supabase.rpc.bind(supabase) as unknown as RpcCaller;
-
-const RESULTS: readonly ScheduleReminderResult[] = [
-  'sent', 'already_sent', 'already_complete',
-];
-
-/**
- * Відповідь RPC → результат, або виняток.
- *
- * Виділено з мутації, щоб бути перевіреним: список станів може змінитись
- * разом із базою (стан `recipient_off_duty` тут був і пішов разом із
- * «тишею у вихідний»), і незнайоме значення мусить ЛАМАТИСЬ, а не
- * проходити мовчки. Мовчазне проходження коштувало б рівно того, заради
- * чого перевірка й існує: портал сказав би «нагадування надіслано» там,
- * де база його не створила.
- */
-export function parseScheduleReminderResult(data: unknown): ScheduleReminderResult {
-  if (RESULTS.includes(data as ScheduleReminderResult)) return data as ScheduleReminderResult;
-  throw new Error('Schedule reminder RPC returned an invalid result');
-}
 
 async function sendScheduleFillReminder(
   input: ScheduleReminderInput,

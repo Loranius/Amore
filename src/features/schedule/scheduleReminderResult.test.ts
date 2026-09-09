@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { parseScheduleReminderResult } from './useScheduleReminder';
+/*
+ * ІМПОРТ ІЗ ЧИСТОГО МОДУЛЯ, а не з гака (ADR-0172). Гак на першому рядку
+ * тягне `@/lib/supabase`, який кидає виняток при імпорті, коли немає
+ * ключів. На машині розробника вони є в `.env.local`, у CI — немає, тож
+ * цей файл падав саме там і тільки там: 2531 тест зелений, конвеєр
+ * червоний, а локальний прогін нічого не показував.
+ */
+import { parseScheduleReminderResult } from './scheduleReminderResult';
 
 /*
  * Контракт відповіді RPC нагадування (міграція
