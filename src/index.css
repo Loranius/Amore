@@ -3059,11 +3059,16 @@ textarea::placeholder {
    коли профіль не дефолтний: без нього помилка набору в адресному рядку
    телефона («blomo» замість «bloom») тихо дала б порожній профіль, і
    висновок про причину білого фону вийшов би хибним.
-   Див. crystal3d/render/gfxProfile.ts. */
+   Див. crystal3d/render/gfxProfile.ts.
+
+   ВИЩЕ ЗА ДОК (ADR-0171). Значок стояв на `bottom: 6px` — тобто рівно під
+   нижньою навігацією, яка на телефоні його наполовину закриває. Для
+   значка, який власник мусить ПРОЧИТАТИ з телефона, це те саме, що його
+   не мати. */
 .crystal-gfx-badge {
   position: absolute;
-  left: 4px;
-  bottom: 6px;
+  left: 8px;
+  bottom: 104px;
   padding: 2px 8px;
   border-radius: var(--radius-pill);
   background: rgba(49, 37, 58, 0.72);

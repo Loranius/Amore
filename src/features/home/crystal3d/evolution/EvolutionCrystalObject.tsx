@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
+import type * as THREE from 'three';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import { CRYSTAL_SUBSTRATE_BODY_ID, type CrystalGeometryState } from '@/engine/geometry';
 import type { CrystalLifeState } from '@/engine/life';
@@ -18,6 +19,16 @@ export interface EvolutionCrystalObjectProps {
   life: CrystalLifeState;
   /** Portal presentation may seat the crystals directly in a solid plinth. */
   substrateVisible?: boolean;
+  /**
+   * Карта оточення — ТІЛЬКИ ДІАГНОСТИКА (`?gfx=env`), ADR-0171.
+   *
+   * Матеріал артефакта вже публікує `envMapIntensity`, тобто місце для
+   * карти в ньому було завжди — не було лише самої карти. Вона лишається
+   * підозрюваною в білому фоні на пристрої власника
+   * (`render/gfxProfile.ts`), тож приходить ззовні й за прапорцем, а не
+   * будується тут.
+   */
+  envMap?: THREE.Texture | null;
 }
 
 /**
@@ -29,6 +40,7 @@ export function EvolutionCrystalObject({
   material,
   life,
   substrateVisible = true,
+  envMap = null,
 }: EvolutionCrystalObjectProps) {
   const pulseUntil = useRef(0);
   const pointerDown = useRef<CrystalPointerSample | null>(null);
@@ -49,6 +61,19 @@ export function EvolutionCrystalObject({
     () => createThreeCrystalInnerSparks(bundle, geometry, life),
     [bundle, geometry, life],
   );
+
+  /*
+   * Карта чіпляється ПІСЛЯ побудови батчів, а не всередині неї: батч
+   * будується з опублікованого стану матеріалу (Volume VI), а карта
+   * оточення — властивість перегляду, не стану. Тримати її в стані
+   * означало б, що діагностичний прапорець міняє те, що хешується.
+   */
+  useEffect(() => {
+    for (const material of bundle.materials.values()) {
+      material.envMap = envMap;
+      material.needsUpdate = true;
+    }
+  }, [bundle, envMap]);
 
   useEffect(() => () => bundle.dispose(), [bundle]);
   // The factory parents the cloud itself, next to the crystal batches and

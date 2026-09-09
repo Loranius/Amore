@@ -28,6 +28,8 @@ import {
   type EvolutionRuntimeMetrics,
 } from './EvolutionRuntimeProbe';
 import { isEvolutionDiagnosticsEnabled } from './featureFlag';
+import { buildStudioEnvMap } from '../render/envMap';
+import { describeGfx, gfxProfileFromLocation, isDefaultGfx } from '../render/gfxProfile';
 import { useEvolutionCrystalPipeline } from './useEvolutionCrystalPipeline';
 import './evolutionPreview.css';
 
@@ -37,6 +39,21 @@ import './evolutionPreview.css';
 // платить кожен, хто просто відкрив портал, заради гілки, у яку майже ніхто
 // ніколи не заходить.
 const LegacyCrystalScene = lazy(() => import('../CrystalScene'));
+
+/*
+ * ДІАГНОСТИКА ПЕРЕЇХАЛА НА ТУ СЦЕНУ, ЯКУ ПАРА СПРАВДІ БАЧИТЬ (ADR-0171).
+ *
+ * `?gfx=` читався в `CrystalScene`, а вона з переходом на Evolution
+ * лишилась аварійним фолбеком: на головній її не монтує ніхто. Тобто
+ * прапорець, на якому тримається все питання «чи можна повернути Bloom»,
+ * не діяв на єдиному екрані, де його треба міряти. Власник відкрив
+ * посилання й не побачив НІЧОГО — і був правий.
+ *
+ * `postprocessing` важить сотні кілобайт, тож проба лишається за
+ * `React.lazy`: у головний чанк вона не потрапляє, доки в адресі немає
+ * прапорця.
+ */
+const BloomProbe = lazy(() => import('../render/BloomProbe'));
 
 function formatTopology(value: number): string {
   if (value < 1_000) return String(value);
@@ -108,6 +125,17 @@ export default function EvolutionCrystalPreviewScene() {
    * Гаки стоять ТУТ, до ранніх виходів нижче, з тієї ж причини, що й
    * `useWorldFrameloop`.
    */
+  /*
+   * Профіль читається ОДИН РАЗ при монтуванні: щоб його змінити, сторінку
+   * треба перезавантажити. Для діагностики з телефона це навіть краще —
+   * кожен вимір починається з чистого контексту WebGL.
+   */
+  const [gfx] = useState(() =>
+    gfxProfileFromLocation(typeof window === 'undefined' ? '' : window.location.search),
+  );
+  const envMap = useMemo(() => (gfx.env ? buildStudioEnvMap() : null), [gfx.env]);
+  useEffect(() => () => envMap?.dispose(), [envMap]);
+
   const events = pipeline?.artifact.events;
   const growthEvents = useMemo<readonly GrowthEvent[] | null>(
     () => events?.map((event) => ({
@@ -244,13 +272,30 @@ export default function EvolutionCrystalPreviewScene() {
                * не показував.
                */
               substrateVisible
+              envMap={envMap}
             />
           </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
+          {gfx.bloom && (
+            <Suspense fallback={null}>
+              <BloomProbe />
+            </Suspense>
+          )}
         </Canvas>
         {diagnosticsVisible && (
           <span className="evolution-preview-badge" aria-label="Метрики Evolution preview">
             {badge}
+          </span>
+        )}
+        {/*
+          Значок профілю. Потрібен саме на телефоні: якщо помилитись у
+          слові (`?gfx=blomo`), профіль мовчки вийде дефолтним, власник
+          побачить сцену без білого фону й зробить ХИБНИЙ висновок, що
+          Bloom безпечний. Значок показує, що РЕАЛЬНО ввімкнено.
+        */}
+        {!isDefaultGfx(gfx) && (
+          <span className="crystal-gfx-badge" aria-label="Графічний профіль">
+            {describeGfx(gfx)}
           </span>
         )}
         {diagnosticsVisible && pipeline.diagnostics.length > 0 && (
