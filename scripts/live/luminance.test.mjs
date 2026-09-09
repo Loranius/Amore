@@ -6,8 +6,11 @@ import {
   facetSeparations,
   findPlateaus,
   inverseAces,
+  facetProfile,
+  findFacets,
   pixelAt,
   pixelLuminance,
+  scanBand,
   srgbToLinear,
 } from './luminance.mjs';
 
@@ -257,5 +260,124 @@ describe('піксель за координатами', () => {
     };
     expect(pixelAt(image, 0, 0)).toEqual([1, 2, 3]);
     expect(pixelAt(image, 0, 1)).toEqual([4, 5, 6]);
+  });
+});
+
+describe('смуга бачить лише тіло', () => {
+  /*
+   * ВИМОГА: профіль граней має описувати кристал, а не кадр (ADR-0174).
+   *
+   * Виміряно, чому це окремий тест: у смузі без маски стовпець усереднює
+   * небо над тілом і щебінь під ним разом із самим тілом, і на живому
+   * прогоні з двадцяти трьох плато кристалові належали два — решта була
+   * каменем острова. Числа виглядали здоровими й описували не те.
+   */
+  const frame = (rows) => {
+    const height = rows.length;
+    const width = rows[0].length;
+    const data = new Uint8Array(width * height * 3);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const at = (y * width + x) * 3;
+        data[at] = rows[y][x];
+        data[at + 1] = rows[y][x];
+        data[at + 2] = rows[y][x];
+      }
+    }
+    return { width, height, channels: 3, data };
+  };
+  const tone = { toneMapping: TONE_MAPPING_NONE, exposure: 1 };
+
+  it('усереднює лише піксели маски', () => {
+    // Два рядки: верхній — яскраве небо, нижній — тіло. Без маски стовпець
+    // дав би середнє двох, тобто число, якого немає на жодній грані.
+    const image = frame([[255, 255], [40, 40]]);
+    const mask = new Uint8Array(4);
+    mask[2] = 1;
+    mask[3] = 1;
+    const [left] = scanBand(image, { y0: 0, y1: 2, x0: 0, x1: 2 }, tone, { mask, minSamples: 1 });
+    expect(left).toBeCloseTo(srgbToLinear(40), 6);
+  });
+
+  it('повертає NaN там, де тіла немає, а не нуль', () => {
+    const image = frame([[40, 40], [40, 40]]);
+    const mask = new Uint8Array(4);
+    mask[0] = 1;
+    mask[2] = 1;
+    const columns = scanBand(image, { y0: 0, y1: 2, x0: 0, x1: 2 }, tone, { mask, minSamples: 1 });
+    expect(Number.isFinite(columns[0])).toBe(true);
+    // Нуль читався б як «дуже темна грань» і потрапив би в профіль.
+    expect(Number.isNaN(columns[1])).toBe(true);
+  });
+
+  it('не тягне плато крізь порожній стовпець', () => {
+    // Дві однакові площини, між ними діра — це ДВА плато, а не одне
+    // широке: між ними видно небо, і оком це два різні тіла.
+    const columns = [
+      ...Array.from({ length: 12 }, () => 0.5),
+      Number.NaN,
+      ...Array.from({ length: 12 }, () => 0.5),
+    ];
+    expect(findPlateaus(columns)).toHaveLength(2);
+  });
+});
+
+describe('грані шукаються від ребра', () => {
+  /*
+   * ВИМОГА (`amore-crystal-look`): сусідні грані мають різнитися на 30%+,
+   * і саме це число має друкувати прилад.
+   *
+   * Виміряно, чому цього не робив `findPlateaus` (ADR-0174): на стовбурі
+   * монарха він знайшов НУЛЬ плато там, де око бачить п'ять граней із
+   * кроками 34–48%. Грань має власний перепад ~20% (ADR-0085) і несе
+   * іскри — один стовпець на 17–32% яскравіший за сусідні.
+   */
+  const ramp = (from, to, width) => Array.from(
+    { length: width },
+    (_, index) => from + ((to - from) * index) / (width - 1),
+  );
+
+  it('ділить смугу по ребрах, а не по рівності', () => {
+    // Дві грані, кожна з власним схилом 20% — рівного пробігу немає ніде.
+    const columns = [...ramp(0.50, 0.60, 12), ...ramp(0.30, 0.36, 12)];
+    const facets = findFacets(columns);
+    expect(facets).toHaveLength(2);
+    expect(facetProfile(facets).weakest).toBeGreaterThan(0.3);
+  });
+
+  it('не ріже грань іскрою', () => {
+    const columns = [...ramp(0.50, 0.60, 12), ...ramp(0.30, 0.36, 12)];
+    // Іскра: один стовпець на третину яскравіший (виміряно на кадрі).
+    columns[5] = columns[5] * 1.32;
+    columns[17] = columns[17] * 1.28;
+    const facets = findFacets(columns);
+    expect(facets).toHaveLength(2);
+    // Медіана грані іскри не бачить — середнє побачило б.
+    expect(facets[0].luminance).toBeLessThan(0.61);
+  });
+
+  it('не рахує гранню стовпці самого ребра', () => {
+    const columns = [...ramp(0.50, 0.52, 12), 0.9, ...ramp(0.30, 0.32, 12)];
+    const facets = findFacets(columns);
+    expect(facets).toHaveLength(2);
+    // Обвід яскравіший за обидві грані; якби він потрапив у грань, її
+    // яскравість поїхала б угору.
+    expect(Math.max(...facets.map((facet) => facet.luminance))).toBeLessThan(0.53);
+  });
+
+  it('розділяє грані порожнім стовпцем', () => {
+    const columns = [...ramp(0.5, 0.5, 10), Number.NaN, ...ramp(0.5, 0.5, 10)];
+    expect(findFacets(columns)).toHaveLength(2);
+  });
+
+  it('найслабша пара, а не медіана: одна пара, що збіглася, видна', () => {
+    const facets = [
+      { from: 0, to: 9, luminance: 0.5 },
+      { from: 12, to: 21, luminance: 0.2 },
+      { from: 24, to: 33, luminance: 0.198 },
+    ];
+    const profile = facetProfile(facets);
+    expect(profile.weakest).toBeCloseTo(0.01, 2);
+    expect(profile.strongest).toBeCloseTo(0.6, 2);
   });
 });

@@ -32,9 +32,9 @@ import { writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { ensureServer, openPortal, readToneMapping } from '../live/portal.mjs';
 import {
-  decodePng, scanBand, findPlateaus, facetSeparations, pixelLuminance,
+  decodePng, scanBand, findFacets, facetProfile, pixelLuminance,
 } from '../live/luminance.mjs';
-import { artifactMask } from '../live/artifactSpan.mjs';
+import { artifactMask, artifactSpan } from '../live/artifactSpan.mjs';
 import { DEVICES, TIERS } from '../live/options.mjs';
 
 const PORT = 5199;
@@ -62,9 +62,10 @@ const years = arg('years', '11');
  */
 const off = arg('off', '');
 /*
- * Смуга по X обмежує вимір ТІЛОМ. Без неї в медіану потрапляють переходи
- * тіло↔тло — вони завжди 80%+ і ховають справжнє число за собою, рівно
- * як і крайні плато, які `facetSeparations` уже відкидає.
+ * Смуга по X звужує вимір до частини тіла — наприклад, до одного
+ * стовбура, коли в смузі стоять і дітки. Тіло від тла відділяє маска
+ * (`artifactSpan`), тож перехід тіло↔тло в число не потрапляє й без цього
+ * ключа; він лишається для питань на кшталт «а що робить саме ця грань».
  */
 const xRange = arg('x', '');
 const quality = arg('quality', 'high');
@@ -131,8 +132,26 @@ const bearings = arg('az', '')
  * поки не вгадаєш смугу. Дерево на 380–520 стоїть кроною, тож там число
  * лишається тим, що було.
  */
-const DEFAULT_BAND = { crystal: '900-1100', tree: '380-520' };
-const rows = band(arg('band', DEFAULT_BAND[species]));
+const DEFAULT_BAND = { tree: '380-520' };
+/*
+ * СМУГА КРИСТАЛА БІЛЬШЕ НЕ ПРИБИТА ЧИСЛОМ, і це виправлення приладу, а не
+ * зручність (ADR-0174).
+ *
+ * Стояло 900–1100 — смуга, яка на теперішньому кадрі проходить нижче
+ * стовбура монарха, по дітках і по щебеню жеоди. Усі числа, зняті нею,
+ * описували камінь: із двадцяти трьох плато кристалові належали два.
+ *
+ * Тепер смуга береться від САМОГО ТІЛА: контрольний кадр (`crystal=off`)
+ * дає маску артефакта, маска — його верх і низ, і смуга лягає на пояс
+ * 22–42% висоти від вістря. Це стовбур монарха: нижче починаються дітки,
+ * вище — вінець. `--band=` як стояв, так і стоїть.
+ */
+const SHAFT_FROM = 0.22;
+const SHAFT_TO = 0.42;
+const explicitBand = arg('band', '');
+let rows = explicitBand === ''
+  ? (species === 'crystal' ? null : band(DEFAULT_BAND[species]))
+  : band(explicitBand);
 
 const server = await ensureServer(PORT, { silent: true });
 const portal = await openPortal({
@@ -162,115 +181,165 @@ try {
   mkdirSync(OUT, { recursive: true });
   const tag = off === '' ? 'base' : `off-${off.replace(/,/g, '+')}`;
   const file = join(OUT, `${species}-lab-${years}y-${quality}${lod ? `-${lod}` : ''}${fill ? `-${fill}` : ''}${gifts ? `-${gifts}` : ''}-${theme}-${tag}.png`);
-  writeFileSync(file, await portal.page.screenshot());
+  /*
+   * ОДИН ЗНІМОК — І ЗБЕРЕЖЕНИЙ, І ВИМІРЯНИЙ.
+   *
+   * Було два: один у файл, другий у вимір. Поки між ними стояла ще й
+   * навігація на контрольний кадр, це виглядало неминучим, але вадою було
+   * не місце, а сам факт: сцена жива, іскри мерехтять, і два знімки
+   * підряд — це два різні кадри. Виміряно (ADR-0174): звіт казав «5
+   * граней, найслабша пара 24%», а у збереженому файлі їх шість і
+   * найслабша 32%. Тобто число описувало кадр, якого ніхто не бачив, і
+   * перевірити його по файлу було неможливо.
+   */
+  const shot = await portal.page.screenshot();
+  writeFileSync(file, shot);
 
   /*
-   * ЧИ КРИСТАЛ УЗАГАЛІ НАМАЛЬОВАНИЙ — контрольним кадром у ТОМУ Ж прогоні.
+   * ЧИ КРИСТАЛ УЗАГАЛІ НАМАЛЬОВАНИЙ — З ЛІЧИЛЬНИКА, А НЕ З ПІКСЕЛІВ.
    *
-   * Без цієї перевірки оснастка вже брехала впевнено: коли бандл
-   * виявився звільненим, сцена малювалась цілком — руїна, обеліски,
-   * каміння, — і профіль звітував «ЧИТАЄТЬСЯ КРИСТАЛОМ, 85%», бо міряв
-   * обеліск проти неба. Два прогони з трьох.
+   * Стояв контрольний кадр `crystal=off`, і його пікселі віднімались від
+   * основного. Це не працює й не могло працювати: камера вписує КОРОБКУ
+   * ВСІХ МЕШІВ, тож без кристала вона під'їжджає, і зсунутий острів
+   * відрізняється від себе самого по всьому кадру. Виміряно на живому
+   * прогоні (ADR-0174): «тіло» вийшло заввишки 1400 пікселів із 1830 —
+   * тобто маскою став увесь острів разом із небом.
    *
-   * Перша редакція цієї перевірки не спрацювала й теж чесно про це
-   * каже: вона звіряла лічильник трикутників УСІЄЇ сцени (11 916 без
-   * кристала, 12 472 з ним) із числом трикутників кристала (2 284) — і
-   * 11 916 > 2 284 у будь-якому разі. Порівнювати треба сцену з собою,
-   * а не з частиною себе.
+   * Лабораторія вже публікує обидва числа сама, і вони точні: скільки
+   * трикутників має бути за станом геометрії й скільки намальовано.
+   * Питання «чи кристал у кадрі» ставиться їм, а не растру.
    */
-  const controlUrl = species === 'crystal' ? `${url}&crystal=off` : null;
-  let controlColumns = null;
-  if (controlUrl !== null) {
-    await portal.page.goto(controlUrl, { waitUntil: 'load', timeout: 60_000 });
-    await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
-    await portal.page.waitForTimeout(9_000);
-    const control = decodePng(await portal.page.screenshot());
-    controlColumns = scanBand(
-      control, { ...rows, x1: control.width }, await readToneMapping(portal.page),
+  const counted = await portal.page.evaluate(() => {
+    const stage = document.querySelector('[data-lab-expected-triangles]');
+    return {
+      expected: Number(stage?.getAttribute('data-lab-expected-triangles') ?? 0),
+      drawn: Number(stage?.getAttribute('data-lab-drawn-triangles') ?? 0),
+    };
+  });
+  if (counted.drawn < counted.expected) {
+    throw new Error(
+      `Кристал намальований не весь: ${counted.drawn} трикутників із ${counted.expected}. `
+      + 'Профіль не знімається.',
     );
   }
-
-  await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
-  await portal.page.waitForSelector('[data-evolution-preview="ready"]', { timeout: 60_000 });
-  await portal.page.waitForTimeout(9_000);
+  console.log(`трикутників  ${counted.drawn} із ${counted.expected}`);
 
   const tone = await readToneMapping(portal.page);
-  const image = decodePng(await portal.page.screenshot());
-  const columns = scanBand(image, { ...rows, x1: image.width }, tone);
+  const image = decodePng(shot);
 
   /*
-   * Скільки стовпців смуги кристал справді змінив. Нуль означає, що його
-   * в кадрі немає, хай яким здоровим виглядає профіль.
+   * МАСКА ТІЛА — НАЙБІЛЬША ЗВ'ЯЗНА ПЛЯМА СВОГО ВІДТІННУ.
+   *
+   * Без маски стовпець смуги усереднює всю її висоту: небо над тілом, мох
+   * і брили під ним, і саме тіло — усе одним числом. Скільки це коштувало,
+   * виміряно (ADR-0174): у смузі 900–1100 із двадцяти трьох плато
+   * кристалові належали два, а «медіана меж 18%», якою мірялись усі
+   * ablation'и, описувала камінь острова.
+   *
+   * ЦІНА НАЗВАНА: вікно відтінку 285–345° — рожеве. Колір кристала
+   * заслужений (ADR-0151), і при `--gifts=shared` тіло піде в зелень;
+   * тоді маска не знайде тіла й вимір ЗУПИНИТЬСЯ з цим повідомленням, а
+   * не збреше. Вікно рухається ключем `--hue=від-до`.
    */
-  if (controlColumns !== null) {
-    let changed = 0;
-    for (let x = 0; x < Math.min(columns.length, controlColumns.length); x += 1) {
-      if (Math.abs(columns[x] - controlColumns[x]) > 0.01) changed += 1;
+  /*
+   * Дерево міряється без маски, і це сказано вголос. Вікно відтінку тут
+   * рожеве, крона зелена, і мовчазне «маска нічого не знайшла» коштувало
+   * б рівно тієї брехні, від якої ця маска й з'явилась.
+   */
+  const hueWindow = /^(\d+)-(\d+)$/.exec(arg('hue', '285-345'));
+  if (!hueWindow) throw new Error('--hue має вигляд 285-345');
+  const hues = { hueFrom: Number(hueWindow[1]), hueTo: Number(hueWindow[2]) };
+  const blob = species === 'crystal' ? artifactSpan(image, null, hues) : null;
+  if (species === 'crystal' && (blob === null || blob.pixels < 500)) {
+    throw new Error(
+      `Тіла в кадрі не видно: у вікні відтінку ${hues.hueFrom}–${hues.hueTo}° `
+      + `найбільша пляма — ${blob?.pixels ?? 0} пікселів. Спробуйте --hue=від-до.`,
+    );
+  }
+  let wide = null;
+  if (blob !== null) {
+    wide = artifactMask(image, null, hues);
+    // Поза плямою маска гаситься: інтерфейс, іскри над вістрям і будь-що
+    // рожеве в кадрі тілом не є (той самий доказ, що й в `artifactSpan`).
+    for (let y = 0; y < image.height; y += 1) {
+      for (let x = 0; x < image.width; x += 1) {
+        const inside = x >= blob.left && x <= blob.right && y >= blob.top && y <= blob.bottom;
+        if (!inside) wide[y * image.width + x] = 0;
+      }
     }
-    if (changed < 20) {
+    console.log(`тіло  x ${blob.left}–${blob.right}, y ${blob.top}–${blob.bottom}, ${blob.pixels} пікселів`);
+    if (rows === null) {
+      rows = {
+        y0: Math.round(blob.top + blob.height * SHAFT_FROM),
+        y1: Math.round(blob.top + blob.height * SHAFT_TO),
+      };
+    }
+  }
+
+  const columns = scanBand(
+    image, { ...rows, x0: 0, x1: image.width }, tone,
+    wide === null ? {} : { mask: wide },
+  );
+  if (wide !== null) {
+    const owned = columns.filter((value) => Number.isFinite(value)).length;
+    if (owned < 20) {
       throw new Error(
-        'Кристала в кадрі немає: контрольний знімок (crystal=off) відрізняється лише в '
-        + `${changed} стовпцях зі ${columns.length}. Профіль не знімається.`,
+        `Кристала в смузі немає: тілу належать лише ${owned} стовпців зі ${columns.length}. `
+        + 'Профіль не знімається.',
       );
     }
-    console.log(`кристал змінив ${changed} стовпців смуги зі ${columns.length}`);
+    console.log(`тілу належать ${owned} стовпців смуги зі ${columns.length}`);
   }
-  const all = findPlateaus(columns);
+
   const bounds = /^(\d+)-(\d+)$/.exec(xRange);
-  const plateaus = bounds
-    ? all.filter((step) => step.from >= Number(bounds[1]) && step.to <= Number(bounds[2]))
-    : all;
-  const spread = facetSeparations(plateaus);
+  const inside = (entry) => !bounds
+    || (entry.from >= Number(bounds[1]) && entry.to <= Number(bounds[2]));
+  const facets = findFacets(columns).filter(inside);
+  const profile = facetProfile(facets);
 
   console.log(`знімок  ${file}`);
   console.log(`тонування  ${JSON.stringify(tone)}`);
   console.log(`смуга  y ${rows.y0}–${rows.y1}, ширина ${image.width}`
     + (bounds ? `, тіло x ${bounds[1]}–${bounds[2]}` : '')
     + (off === '' ? '' : `, вимкнено: ${off}`));
-  console.log(`плато  ${plateaus.length} (усього в смузі ${all.length})`);
-  if (plateaus.length === 0 && all.length > 0) {
-    for (const step of all) {
-      console.log(`   [поза межами] x ${step.from}–${step.to}  ${step.luminance.toFixed(4)}`);
-    }
+
+  /*
+   * ГРАНІ, А НЕ ПЛАТО, і це заміна самого приладу (ADR-0174).
+   *
+   * `findPlateaus` шукає пробіг, рівний у межах 8%. На цьому кристалі таких
+   * пробігів нуль — не тому, що граней немає, а тому, що грань має власний
+   * перепад ~20% (ADR-0085) і по ній розсипані іскри. Виміряно: у смузі
+   * стовбура прилад звітував «плато замало, щоб порівнювати» там, де око
+   * бачить п'ять граней із кроками 34–48%.
+   *
+   * `findFacets` шукає РЕБРА й бере те, що між ними, а яскравість грані
+   * рахує медіаною — іскра медіану не рухає.
+   */
+  console.log(`граней  ${facets.length}`);
+  for (const facet of facets) {
+    console.log(`   x ${String(facet.from).padStart(4)}–${String(facet.to).padStart(4)}  ${facet.luminance.toFixed(4)}`);
   }
-  for (const step of plateaus) {
-    console.log(`   x ${String(step.from).padStart(4)}–${String(step.to).padStart(4)}  ${step.luminance.toFixed(4)}`);
-  }
-  if (spread.steps.length === 0) {
-    console.log('РІЗНИЦЯ МІЖ СУСІДНІМИ ГРАНЯМИ: плато замало, щоб порівнювати.');
+  if (profile.steps.length === 0) {
+    console.log('РІЗНИЦЯ МІЖ СУСІДНІМИ ГРАНЯМИ: граней замало, щоб порівнювати.');
   } else {
-    console.log(`усі переходи  ${spread.steps.map((s) => `${(s * 100).toFixed(0)}%`).join(', ')}`);
-    console.log(`   з них МЕЖІ ГРАНЕЙ  ${spread.boundaries.map((s) => `${(s * 100).toFixed(0)}%`).join(', ')}`);
-    console.log(`медіана всіх ${(spread.median * 100).toFixed(0)}%, медіана меж `
-      + `${(spread.boundaryMedian * 100).toFixed(0)}%, найбільша ${(spread.max * 100).toFixed(0)}%`);
+    console.log(`кроки  ${profile.steps.map((step) => `${(step * 100).toFixed(0)}%`).join(', ')}`);
+    console.log(`найслабша пара ${(profile.weakest * 100).toFixed(0)}%, медіана `
+      + `${(profile.median * 100).toFixed(0)}%, найбільша ${(profile.strongest * 100).toFixed(0)}%`);
     /*
-     * ВЕРДИКТ БЕРЕ МЕДІАНУ МЕЖ, а не медіану всіх переходів.
+     * ВЕРДИКТ БЕРЕ НАЙСЛАБШУ ПАРУ, а не медіану.
      *
-     * Поріг 30% (`amore-crystal-look`) — про різницю двох СУСІДНІХ
-     * ПЛОЩИН. Медіана всіх переходів відповідає на це питання лише тоді,
-     * коли одна грань дає одне плато; при грані в 60–85 пікселів із
-     * власним перепадом ~20% (ADR-0085) вона ріжеться на два-три плато, і
-     * більшість пар — переходи ВСЕРЕДИНІ грані.
-     *
-     * Саме тому це число стрибало 6% → 47% від прогону до прогону при
-     * незмінній формі, і саме тому за ним не можна було судити.
+     * Поріг 30% (`amore-crystal-look`) — про дві СУСІДНІ площини. Одна
+     * пара, що збіглася, читається оком як одна велика площина, хай яка
+     * добра медіана: саме так ламались усі три попередні ключі тонування
+     * (ADR-0086), і саме цього медіана не показувала.
      */
-    if (spread.boundaries.length === 0) {
-      /*
-       * Порожня вибірка — це НЕ нуль. Меж не знайдено або тому, що
-       * поверхня справді рівна, або тому, що плато замало, щоб відрізнити
-       * стрибок від схилу. Оголошувати «гладка форма» в обох випадках
-       * означало б підмінити вимір здогадом.
-       */
-      console.log('МЕЖ ГРАНЕЙ НЕ ЗНАЙДЕНО: або поверхня рівна, або плато замало для судження.');
-    } else {
-      console.log(spread.boundaryMedian >= 0.3
-        ? `ЧИТАЄТЬСЯ КРИСТАЛОМ (поріг 30% на межах граней, ${spread.boundaries.length} меж).`
-        : spread.boundaryMedian >= 0.1
-          ? `МЕЖА: нижче 30%, але не гладке (${spread.boundaries.length} меж).`
-          : `ЧИТАЄТЬСЯ ГЛАДКОЮ ФОРМОЮ (нижче 10%, ${spread.boundaries.length} меж).`);
-    }
+    console.log(profile.weakest >= 0.3
+      ? `ЧИТАЄТЬСЯ КРИСТАЛОМ (поріг 30% на найслабшій парі, ${facets.length} граней).`
+      : profile.weakest >= 0.1
+        ? `МЕЖА: найслабша пара нижче 30% (${facets.length} граней).`
+        : `ЧИТАЄТЬСЯ ГЛАДКОЮ ФОРМОЮ (найслабша пара нижче 10%, ${facets.length} граней).`);
   }
+
   /*
    * ПЕРЕЛИВ ПРИ ОБЕРТАННІ (ADR-0161).
    *

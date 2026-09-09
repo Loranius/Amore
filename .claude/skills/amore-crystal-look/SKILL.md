@@ -30,14 +30,45 @@ Render the live portal, crop the monarch, scan a horizontal band across it, and 
 luminance profile. A crystal that reads as a crystal has **adjacent facets differing by
 30%+**; under ~10% it will look like a smooth shape no matter what else is right.
 
-**Read `boundaryMedian`, not `median`** (ADR-0122). `median` is the median step between
-adjacent *plateaus*, and one facet is not one plateau: a 60–85 px facet carries its own
-~20% internal gradient, so `findPlateaus` splits it into two or three. Most adjacent
-pairs are therefore *inside* one facet, and that number measures how smooth a facet is,
-not how different two facets are — it swung 6% → 47% between runs on an unchanged
-crystal. `boundaryMedian` takes only the steps that are larger than both neighbouring
-steps, which is what a facet edge is. The lab prints both plus the number of boundaries
-found; a median over one boundary is that boundary, so check the count before concluding.
+**Read the lab's `найслабша пара`** (ADR-0174). One command does the whole
+measurement and cannot quietly measure the wrong thing:
+
+```bash
+node scripts/lab/artifact.mjs --years=11 --theme=light --quality=high [--off=<term>]
+```
+
+It masks the body out of the frame, puts the band on the monarch's shaft by
+itself, cuts the shaft into facets at their **edges**, and prints the step
+between each neighbouring pair. The verdict takes the **weakest** pair, because
+one pair that coincides reads as one large plane however good the median is.
+
+Three earlier readings of this number were wrong, and all three were the
+instrument rather than the crystal:
+
+- **`median` between plateaus** measured how smooth one facet is, not how
+  different two are — one facet is not one plateau (ADR-0122).
+- **`boundaryMedian`** fixed that but was still read off a band that missed the
+  crystal: the default band sat below the shaft, on the geode's rubble, and
+  a column averaged sky and moss together with stone. Of twenty-three plateaus
+  in that band, two belonged to the crystal, and the "18%" every ablation was
+  compared against was the island (ADR-0174).
+- **`findPlateaus` cannot see a facet at all.** A facet has a ~20% gradient of
+  its own (ADR-0085) and carries sparks — one column 17–32% brighter than its
+  neighbours. It reported *zero* plateaus on a shaft where the eye sees six
+  facets separated by 33–43%.
+
+Two limits of the present instrument, both named rather than hidden:
+
+- The body is found by **hue** (285–345°, pink). The colour is earned
+  (ADR-0151), so `--gifts=shared` moves it out of that window and the tool
+  **stops with a message** instead of measuring the island. `--hue=from-to`
+  moves the window.
+- Two facets closer than **20%** merge into one. That is the edge threshold, and
+  it is above a facet's own internal gradient by necessity. The loss is visible
+  in the *facet count*: a shaft showing two facets instead of six is the flat
+  crystal, whatever the steps between them say.
+
+If you need the raw frames rather than the verdict:
 
 1. Start Vite on 5199. Log in headless with playwright-core and the Chromium at
    `/opt/pw-browsers/chromium-1194/chrome-linux/chrome`, flags
@@ -75,6 +106,39 @@ not lit.**
 This agrees with the measurement from the opposite direction: switching the key light off
 entirely moves the monarch's facets by about 3%. Lighting was never going to separate
 them. Anything that must survive is a property of the surface.
+
+## The crystal had no dark side
+
+2026-09-09, the owner: *«візуал ще дуже сирий»*. Every facet number was healthy
+— the shaft's weakest neighbouring pair measured 33% and its median 40%, above
+the threshold on this page. The separation was never the problem.
+
+**Measure the level and the saturation, not only the step between facets.** In
+HSV, off the same band:
+
+| | before | after |
+|---|---|---|
+| value | 0.75–0.93 | 0.58–0.84 |
+| saturation | 0.23–0.38 | 0.30–0.46 |
+
+Every face sat between 75% and 93% brightness — the body had no dark side at
+all, and at that height on the ACES shoulder the couple's earned hue washes
+toward white. That is what "raw" was: not flat facets, a flat *level*.
+
+Two things had to move together, and either one alone is worse than doing
+nothing:
+
+- `interiorLevel` (0.55) multiplies the outgoing colour, and because it is one
+  factor over the whole body it leaves every facet ratio exactly where it was —
+  the weakest pair went 33% → 33%.
+- **The rim is added after it.** A rim multiplied down along with the interior
+  gives a uniformly darker crystal, which reads as a silhouette. Dark interior
+  plus bright rim is the reference gems' entire construction.
+
+And the level does *not* belong in the tint set, however tempting: scaling
+`CRYSTAL_FACET_TINTS` by 0.55 produces the same picture and breaks the rule the
+tints exist under — they must vary around the earned colour, not shift it.
+`facets.test.ts` catches that on the first run, and it is right to.
 
 ## What we implemented from it, and how
 

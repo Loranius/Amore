@@ -167,19 +167,38 @@ export function pixelLuminance(r, g, b, { toneMapping, exposure }) {
   return 0.2126 * decode(r) + 0.7152 * decode(g) + 0.0722 * decode(b);
 }
 
-/** Середня яскравість кожного стовпця смуги. */
-export function scanBand(image, band, tone) {
+/**
+ * Середня яскравість кожного стовпця смуги.
+ *
+ * МАСКА — НЕ ПРИКРАСА, А УМОВА ТОГО, ЩО ВИМІР ВЗАГАЛІ ПРО КРИСТАЛ.
+ * ------------------------------------------------------------
+ * Без неї стовпець усереднює всю висоту смуги: небо над тілом, мох і
+ * брили під ним, і саме тіло — усе одним числом. Виміряно, скільки це
+ * коштує (ADR-0174): у смузі за замовчуванням із двадцяти трьох плато
+ * кристалові належали два, а «медіана меж 18%» описувала камінь острова.
+ * Три терми поспіль (`skyStrength`, `glassStrength`, `rimStrength`) дали
+ * при цьому число в число однаковий результат — не тому, що вони нічого
+ * не роблять, а тому, що прилад дивився не туди.
+ *
+ * `mask` — Uint8Array розміру `width * height` кадру, одиниця означає
+ * «цей піксель належить артефакту». Стовпець, у якому таких пікселів
+ * менше за `minSamples`, повертається як `NaN`: це не нуль і не темна
+ * грань, це «тут тіла немає», і плато крізь такий стовпець не тягнеться.
+ */
+export function scanBand(image, band, tone, { mask = null, minSamples = 8 } = {}) {
   const { width, channels, data } = image;
   const columns = [];
   for (let x = band.x0; x < band.x1; x += 1) {
     let total = 0;
     let count = 0;
     for (let y = band.y0; y < band.y1; y += 1) {
+      if (mask !== null && mask[y * width + x] !== 1) continue;
       const offset = (y * width + x) * channels;
       total += pixelLuminance(data[offset], data[offset + 1], data[offset + 2], tone);
       count += 1;
     }
-    columns.push(count > 0 ? total / count : 0);
+    if (mask !== null && count < minSamples) columns.push(Number.NaN);
+    else columns.push(count > 0 ? total / count : 0);
   }
   return columns;
 }
@@ -197,8 +216,13 @@ export function findPlateaus(columns, { minRun = 10, tolerance = 0.08 } = {}) {
   const plateaus = [];
   let index = 0;
   while (index < columns.length) {
+    // Порожній стовпець (`NaN`) — це діра в тілі, а не темна грань. Плато
+    // крізь неї не тягнеться: інакше два різні кристали, між якими видно
+    // небо, злились би в одне плато.
+    if (!Number.isFinite(columns[index])) { index += 1; continue; }
     let end = index + 1;
     while (end < columns.length) {
+      if (!Number.isFinite(columns[end])) break;
       let min = Infinity;
       let max = -Infinity;
       let total = 0;
@@ -221,6 +245,155 @@ export function findPlateaus(columns, { minRun = 10, tolerance = 0.08 } = {}) {
     }
   }
   return plateaus;
+}
+
+/**
+ * ГРАНІ — ВІДРІЗКИ МІЖ РЕБРАМИ, а не рівні пробіги.
+ *
+ * `findPlateaus` шукає пробіг, який тримається в межах 8% ЦІЛКОМ. На
+ * теперішньому кристалі таких пробігів нуль — і це не тому, що граней
+ * немає, а тому, що грань ними не є:
+ *
+ *  - грань завширшки 60–85 пікселів має власний перепад ~20% (ADR-0085),
+ *    тобто ширша за допуск сама по собі;
+ *  - по тілу розсипані іскри (§9 брифу), і одна іскра — це стовпець на
+ *    17–32% яскравіший за сусідні, тобто розрив будь-якого плато.
+ *
+ * Виміряно на живому кадрі (ADR-0174): у смузі стовбура монарха
+ * `findPlateaus` знайшов НУЛЬ плато там, де око бачить п'ять граней із
+ * кроками 37–45%. Прилад мовчав про кристал, який проходить поріг.
+ *
+ * Тут грань шукається з іншого боку — від РЕБРА. Ребро це стрибок; між
+ * стрибками лежить грань, якою б похилою вона не була всередині. Стовпці
+ * самого ребра не належать жодній грані: там світиться намальований обвід
+ * (`facetEdgeStrength`), і зарахувати його до грані означало б міряти
+ * обвід замість площини.
+ *
+ * ЯСКРАВІСТЬ ГРАНІ — МЕДІАНА, а не середнє: медіана не рухається від
+ * однієї іскри, середнє рухається.
+ */
+/*
+ * `minRun` — п'ять стовпців, і це виміряно, а не вибрано круглим.
+ *
+ * На стовбурі завширшки 53 пікселі є фаска в 5–6 стовпців. При шести вона
+ * то знаходилась, то ні — від кадру до кадру, — і коли випадала, прилад
+ * порівнював дві НЕ сусідні грані як сусідні: 0.518 проти 0.594, тобто
+ * «найслабша пара 13%» на кристалі, у якого найслабша пара 27%. Число
+ * помилялось не трохи, а знаком висновку.
+ *
+ * Нижче п'яти не варто: обвід грані має ширину 2–3 стовпці, і при трьох
+ * він сам почав би рахуватись гранню.
+ */
+/*
+ * `jump` — двадцять відсотків, і це НЕ запас міцності, а названа межа
+ * розрізнення приладу.
+ *
+ * Грань має власний перепад ~20% від краю до краю (ADR-0085), і на темній
+ * грані цей перепад між сусідніми стовпцями сягає 16%. При порозі 12%
+ * прилад від кадру до кадру то знаходив у стовбурі п'ять граней, то сім —
+ * і сьома пара звітувала «22%» там, де це був схил усередині однієї
+ * площини.
+ *
+ * ЦІНА: дві грані, що різняться менше ніж на 20%, зіллються в одну. Це
+ * втрата, і от як її видно — таких граней стає МЕНШЕ. Тому число граней
+ * друкується поруч із кроками: стовбур, у якому їх дві замість шести, —
+ * це і є «читається гладкою формою», хай які великі кроки між ними.
+ */
+export function findFacets(columns, { minRun = 5, jump = 0.2 } = {}) {
+  const facets = [];
+  let index = 0;
+  while (index < columns.length) {
+    if (!Number.isFinite(columns[index])) { index += 1; continue; }
+    let end = index;
+    while (end + 1 < columns.length && Number.isFinite(columns[end + 1])) end += 1;
+    facets.push(...splitRun(columns, index, end, minRun, jump));
+    index = end + 1;
+  }
+  return facets;
+}
+
+function splitRun(columns, from, to, minRun, jump) {
+  /*
+   * РЕБРА ШУКАЮТЬСЯ ПО ЗГЛАДЖЕНОМУ РЯДУ, і без цього не працює зовсім.
+   *
+   * Іскра (§9 брифу) — це один-два стовпці на 17–32% яскравіші за
+   * сусідні, тобто стрибок більший за поріг ребра. На живому кадрі перша
+   * редакція через це нарізала стовбур на дві грані замість п'яти: іскри
+   * порізали грані на шматки, коротші за `minRun`, і ті випали.
+   *
+   * Медіана п'яти сусідів прибирає одиничний сплеск і НЕ розмиває
+   * сходинку — саме тому медіана, а не середнє.
+   */
+  const smooth = [];
+  for (let x = from; x <= to; x += 1) {
+    const window = [];
+    for (let k = Math.max(from, x - 2); k <= Math.min(to, x + 2); k += 1) window.push(columns[k]);
+    window.sort((left, right) => left - right);
+    smooth[x] = window[window.length >> 1];
+  }
+
+  // Ребра: стовпці, на яких крок до наступного більший за поріг. Сусідні
+  // такі стовпці — одне ребро, а не кілька: обвід має ширину.
+  const edges = [];
+  for (let x = from; x < to; x += 1) {
+    const low = Math.min(smooth[x], smooth[x + 1]);
+    const high = Math.max(smooth[x], smooth[x + 1]);
+    if (high > 1e-9 && (high - low) / high >= jump) {
+      const last = edges[edges.length - 1];
+      if (last !== undefined && last.to === x - 1) last.to = x;
+      else edges.push({ from: x, to: x });
+    }
+  }
+
+  const facets = [];
+  let start = from;
+  const close = (end) => {
+    if (end - start + 1 < minRun) return;
+    const values = [];
+    for (let x = start; x <= end; x += 1) values.push(columns[x]);
+    values.sort((left, right) => left - right);
+    const middle = values.length >> 1;
+    facets.push({
+      from: start,
+      to: end,
+      luminance: values.length % 2 === 1
+        ? values[middle]
+        : (values[middle - 1] + values[middle]) / 2,
+    });
+  };
+  for (const edge of edges) {
+    close(edge.from);
+    start = edge.to + 1;
+  }
+  close(to);
+  return facets;
+}
+
+/**
+ * Крок між сусідніми гранями, у відсотках — те саме питання, що ставить
+ * `amore-crystal-look`: наскільки різні дві сусідні ПЛОЩИНИ.
+ *
+ * Без вибору «межа це чи схил»: між двома гранями завжди рівно один крок,
+ * бо ребро вже викинуте. Тому й читається найслабша пара, а не медіана:
+ * одна пара, що збіглася, читається оком як одна площина.
+ */
+export function facetProfile(facets) {
+  const steps = [];
+  for (let index = 1; index < facets.length; index += 1) {
+    const low = Math.min(facets[index - 1].luminance, facets[index].luminance);
+    const high = Math.max(facets[index - 1].luminance, facets[index].luminance);
+    steps.push(high > 1e-9 ? (high - low) / high : 0);
+  }
+  const sorted = [...steps].sort((left, right) => left - right);
+  const middle = sorted.length >> 1;
+  return {
+    steps,
+    weakest: sorted.length === 0 ? 0 : sorted[0],
+    median: sorted.length === 0
+      ? 0
+      : (sorted.length % 2 === 1 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2),
+    strongest: sorted.length === 0 ? 0 : sorted[sorted.length - 1],
+  };
 }
 
 /**
