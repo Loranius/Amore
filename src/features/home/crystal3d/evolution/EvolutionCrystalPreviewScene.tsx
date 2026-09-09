@@ -29,7 +29,7 @@ import {
 } from './EvolutionRuntimeProbe';
 import { isEvolutionDiagnosticsEnabled } from './featureFlag';
 import { buildStudioEnvMap } from '../render/envMap';
-import { describeGfx, gfxProfileFromLocation, isDefaultGfx } from '../render/gfxProfile';
+import { describeGfx, gfxProfileFromLocation, isGfxRequested } from '../render/gfxProfile';
 import { useEvolutionCrystalPipeline } from './useEvolutionCrystalPipeline';
 import './evolutionPreview.css';
 
@@ -126,12 +126,21 @@ export default function EvolutionCrystalPreviewScene() {
    * `useWorldFrameloop`.
    */
   /*
-   * Профіль читається ОДИН РАЗ при монтуванні: щоб його змінити, сторінку
+   * Адреса читається ОДИН РАЗ при монтуванні: щоб її змінити, сторінку
    * треба перезавантажити. Для діагностики з телефона це навіть краще —
    * кожен вимір починається з чистого контексту WebGL.
+   *
+   * А от сам ПРОФІЛЬ залежить іще й від якості сцени (ADR-0173), яку
+   * рушій називає вже після збірки конвеєра. Тому він рахується
+   * похідним: рядок сталий, профіль якості влягається один раз.
    */
-  const [gfx] = useState(() =>
-    gfxProfileFromLocation(typeof window === 'undefined' ? '' : window.location.search),
+  const [gfxSearch] = useState(() =>
+    typeof window === 'undefined' ? '' : window.location.search,
+  );
+  const gfxQuality = pipeline?.metrics.quality ?? 'balanced';
+  const gfx = useMemo(
+    () => gfxProfileFromLocation(gfxSearch, gfxQuality),
+    [gfxSearch, gfxQuality],
   );
   const envMap = useMemo(() => (gfx.env ? buildStudioEnvMap() : null), [gfx.env]);
   useEffect(() => () => envMap?.dispose(), [envMap]);
@@ -292,8 +301,13 @@ export default function EvolutionCrystalPreviewScene() {
           слові (`?gfx=blomo`), профіль мовчки вийде дефолтним, власник
           побачить сцену без білого фону й зробить ХИБНИЙ висновок, що
           Bloom безпечний. Значок показує, що РЕАЛЬНО ввімкнено.
+
+          Умова — «в адресі щось просили», а не «профіль не дефолтний»:
+          відколи Bloom у дефолті на потужних пристроях (ADR-0173),
+          `?gfx=bloom` дорівнює дефолту, і значок зник би рівно тоді,
+          коли він найпотрібніший.
         */}
-        {!isDefaultGfx(gfx) && (
+        {isGfxRequested(gfxSearch) && (
           <span className="crystal-gfx-badge" aria-label="Графічний профіль">
             {describeGfx(gfx)}
           </span>

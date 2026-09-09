@@ -21,7 +21,14 @@ import { buildBranches, SEEDS, type DataVolume } from './fixture';
 import { publishCrystal } from '../crystalPublication';
 import { buildBodyBatches, disposeBatches } from '../render/batchedBodies';
 import { bodyMaterialProps, materialSignature } from '../material/bodyMaterial';
-import { BARE_GFX, DEFAULT_GFX, parseGfxProfile } from '../render/gfxProfile';
+import {
+  BARE_GFX,
+  DEFAULT_GFX,
+  RICH_GFX,
+  defaultGfxFor,
+  isGfxRequested,
+  parseGfxProfile,
+} from '../render/gfxProfile';
 import { buildStudioEnvMap, STUDIO_COLORS } from '../render/envMap';
 import { applySkyReflection, skyReflectionSignature } from '../render/skyReflection';
 
@@ -34,8 +41,14 @@ describe('профіль графіки — інструмент бісекці�
     // обидва — той самий клас, що лишився під підозрою. Якщо колись
     // хтось увімкне їх у дефолті «щоб було красивіше», тест упаде і
     // нагадає, що діагноз ще не поставлений.
-    expect(DEFAULT_GFX.env, 'карта оточення в дефолті').toBe(false);
-    expect(DEFAULT_GFX.bloom, 'Bloom у дефолті').toBe(false);
+    /*
+     * ДЕФОЛТ ТЕПЕР ЗАЛЕЖИТЬ ВІД ПРОФІЛЮ ЯКОСТІ (ADR-0173). `DEFAULT_GFX`
+     * лишається дефолтом СЛАБКИХ пристроїв: обидва підозрювані вимкнені,
+     * бо повноекранний прохід і PMREM із HalfFloat render target — це
+     * вартість, якої слабкий пристрій платити не мусить.
+     */
+    expect(DEFAULT_GFX.env, 'карта оточення в дефолті слабких').toBe(false);
+    expect(DEFAULT_GFX.bloom, 'Bloom у дефолті слабких').toBe(false);
     // …а «скло» — навпаки, увімкнене: воно безпечне й дає виміряний ефект
     // (середня дельта пікселя 6.7 проти «off»).
     expect(DEFAULT_GFX.glass).toBe(true);
@@ -223,5 +236,47 @@ describe('діагностична карта оточення', () => {
     };
     expect(luminanceOfRow(1), 'зеніт не яскравіший за надир').toBeGreaterThan(luminanceOfRow(height - 2));
     texture.dispose();
+  });
+});
+
+
+describe('дефолт за профілем якості (ADR-0173)', () => {
+  it('вмикає обидва підозрювані ЛИШЕ на потужному пристрої', () => {
+    /*
+     * 9 вересня власник провів бісекцію, якої бракувало з липня: ані
+     * карта оточення, ані Bloom не білять фон на його телефоні. Заборона
+     * трималась не на властивості коду, а на непоставленому діагнозі.
+     *
+     * Але один чистий вимір — не гарантія: липневий баг залежав від кута
+     * й був нестабільним. Тому вмикається лише там, де сцена й так може
+     * собі дозволити найдорожче, і більшість пристроїв лишається поза
+     * механізмом, що колись ламався.
+     */
+    expect(defaultGfxFor('high')).toEqual(RICH_GFX);
+    expect(RICH_GFX.bloom).toBe(true);
+    expect(RICH_GFX.env).toBe(true);
+    for (const quality of ['balanced', 'low', 'fallback'] as const) {
+      expect(defaultGfxFor(quality), quality).toEqual(DEFAULT_GFX);
+    }
+  });
+
+  it('«дефолт мінус» рахується від дефолту ЦЬОГО профілю якості', () => {
+    // Інакше `?gfx=-bloom` на потужному пристрої знімав би те, чого там
+    // немає, і лишав би ввімкненим те, що просили зняти.
+    expect(parseGfxProfile('-bloom', RICH_GFX)).toEqual({ ...RICH_GFX, bloom: false });
+    expect(parseGfxProfile('-env', RICH_GFX)).toEqual({ ...RICH_GFX, env: false });
+  });
+
+  it('значок показується за ПРОХАННЯМ в адресі, а не за відмінністю від дефолту', () => {
+    /*
+     * Відколи Bloom у дефолті на потужних пристроях, `?gfx=bloom`
+     * дорівнює дефолту — і значок, прив'язаний до «профіль не
+     * дефолтний», зник би рівно тоді, коли він найпотрібніший: під час
+     * діагностики.
+     */
+    expect(isGfxRequested('?gfx=bloom')).toBe(true);
+    expect(isGfxRequested('?gfx=off')).toBe(true);
+    expect(isGfxRequested('?theme=dark')).toBe(false);
+    expect(isGfxRequested('')).toBe(false);
   });
 });

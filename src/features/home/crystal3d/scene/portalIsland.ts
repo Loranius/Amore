@@ -1552,7 +1552,17 @@ export const PORTAL_HALO_SEGMENTS: Record<PortalQuality, number> = {
  * власника світло збирається дугами, а між ними майже гасне; саме це й
  * читається рухом світла, а не предметом.
  */
-export function buildPortalHaloGeometry(seed: number, segments: number): THREE.BufferGeometry {
+export function buildPortalHaloGeometry(
+  seed: number,
+  segments: number,
+  /**
+   * Чи класти диски світіння.
+   *
+   * Вони — заміна повноекранному проходу, а не доповнення до нього
+   * (ADR-0173). Там, де є справжній Bloom, вони дають подвійне сяйво.
+   */
+  withGlow = true,
+): THREE.BufferGeometry {
   const mesh = soup();
   if (segments < 3) return finish(mesh);
   /*
@@ -1636,7 +1646,7 @@ export function buildPortalHaloGeometry(seed: number, segments: number): THREE.B
    * пляма на гранях.
    */
   const ringTriangles = mesh.positions.length / 9;
-  for (const disc of HALO_GLOWS) {
+  for (const disc of (withGlow ? HALO_GLOWS : [])) {
     /*
      * ТРИ КІЛЬЦЯ, А НЕ ДВА, І ОБОВ'ЯЗКОВО ПО ДВА ТРИКУТНИКИ НА ЛАНКУ.
      *

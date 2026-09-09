@@ -93,6 +93,42 @@ export const DEFAULT_GFX: GfxProfile = Object.freeze({
   bloom: false,
 });
 
+/**
+ * Дефолт для ПОТУЖНИХ пристроїв (ADR-0173).
+ *
+ * 9 вересня власник провів бісекцію, якої бракувало з липня, і зняв
+ * обидва підозрювані з підозри: ані карта оточення, ані Bloom не білять
+ * фон на його телефоні. Заборона трималась не на властивості коду, а на
+ * непоставленому діагнозі.
+ *
+ * ЧОМУ ЛИШЕ НА `high`, І ЦЕ РІШЕННЯ ВЛАСНИКА. Один чистий вимір — не
+ * гарантія: липневий баг залежав від кута й був нестабільним. Профіль
+ * якості вже вирішує, скільки сцена може собі дозволити; повноекранний
+ * прохід і PMREM із HalfFloat render target — рівно та вартість, яку
+ * слабкий пристрій платити не мусить. Заразом це лишає більшість
+ * пристроїв поза механізмом, що колись ламався: якщо він повернеться,
+ * повернеться не всюди.
+ */
+export const RICH_GFX: GfxProfile = Object.freeze({
+  env: true,
+  iridescence: false,
+  glass: true,
+  bloom: true,
+});
+
+/** Профіль якості сцени — той самий ключ, що в решти лічильників. */
+export type GfxQuality = 'high' | 'balanced' | 'low' | 'fallback';
+
+/**
+ * Який дефолт належить цьому профілю якості.
+ *
+ * Єдине місце, де це вирішується. Поки таких місць було б два, вони
+ * розійшлися б того дня, коли хтось поворухне одне.
+ */
+export function defaultGfxFor(quality: GfxQuality): GfxProfile {
+  return quality === 'high' ? RICH_GFX : DEFAULT_GFX;
+}
+
 /** Профіль «як було до фази 11» — усе вимкнено. Потрібен, щоб власник міг
  *  порівняти з тим, що він уже бачив, і щоб тести мали базову лінію. */
 export const BARE_GFX: GfxProfile = Object.freeze({
@@ -130,14 +166,22 @@ const ALIASES: Readonly<Record<string, keyof GfxProfile>> = {
  * Невідоме слово ігнорується мовчки: адресний рядок телефона — не місце
  * для суворого синтаксису, а зламати ним рендер не можна.
  */
-export function parseGfxProfile(raw: string | null | undefined): GfxProfile {
-  if (raw === null || raw === undefined || raw.trim() === '') return DEFAULT_GFX;
+export function parseGfxProfile(
+  raw: string | null | undefined,
+  /**
+   * Від чого рахувати «дефолт». З ADR-0173 він залежить від профілю
+   * якості, тож `?gfx=-bloom` на потужному пристрої мусить знімати те,
+   * що там СПРАВДІ ввімкнено, а не те, що колись було дефолтом.
+   */
+  fallbackProfile: GfxProfile = DEFAULT_GFX,
+): GfxProfile {
+  if (raw === null || raw === undefined || raw.trim() === '') return fallbackProfile;
 
   const tokens = raw
     .toLowerCase()
     .split(/[,\s]+/)
     .filter((t) => t !== '');
-  if (tokens.length === 0) return DEFAULT_GFX;
+  if (tokens.length === 0) return fallbackProfile;
 
   if (tokens.includes('off') || tokens.includes('none')) return BARE_GFX;
   if (tokens.includes('all')) {
@@ -146,7 +190,7 @@ export function parseGfxProfile(raw: string | null | undefined): GfxProfile {
 
   // Відносний режим (+/-) працює від дефолту; абсолютний — від нуля.
   const relative = tokens.some((t) => t.startsWith('+') || t.startsWith('-'));
-  const base = relative ? DEFAULT_GFX : BARE_GFX;
+  const base = relative ? fallbackProfile : BARE_GFX;
   const out: GfxProfile = { ...base };
 
   for (const token of tokens) {
@@ -158,9 +202,25 @@ export function parseGfxProfile(raw: string | null | undefined): GfxProfile {
   return Object.freeze(out);
 }
 
-/** Профіль із поточного URL. Читається один раз при монтуванні сцени. */
-export function gfxProfileFromLocation(search: string): GfxProfile {
-  return parseGfxProfile(new URLSearchParams(search).get('gfx'));
+/** Профіль із поточного URL, від дефолту цього профілю якості. */
+export function gfxProfileFromLocation(
+  search: string,
+  quality: GfxQuality = 'high',
+): GfxProfile {
+  return parseGfxProfile(new URLSearchParams(search).get('gfx'), defaultGfxFor(quality));
+}
+
+/**
+ * Чи просив хтось діагностики в адресі.
+ *
+ * Значок показується САМЕ ЗА ЦИМ, а не за «профіль відрізняється від
+ * дефолтного». Відколи Bloom у дефолті на потужних пристроях, `?gfx=bloom`
+ * дорівнює дефолту — і значок зник би рівно тоді, коли він найпотрібніший
+ * (ADR-0173).
+ */
+export function isGfxRequested(search: string): boolean {
+  const raw = new URLSearchParams(search).get('gfx');
+  return raw !== null && raw.trim() !== '';
 }
 
 /** Чи це звичайний режим (нічого не діагностуємо). */
