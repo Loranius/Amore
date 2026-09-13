@@ -107,6 +107,38 @@ This agrees with the measurement from the opposite direction: switching the key 
 entirely moves the monarch's facets by about 3%. Lighting was never going to separate
 them. Anything that must survive is a property of the surface.
 
+## Measure every belt, not only the shaft
+
+The shaft is not the crystal. On the same frame that gave the shaft six facets
+separated by 33–43%, the **crown was a single flat surface** — one facet across
+39 columns, 0.21–0.23, no step at all (ADR-0176). The lab takes `--band=`, so
+scan the termination and the daughters too before concluding anything.
+
+What was wrong there is worth keeping, because it is not a bug in the key but a
+blind spot in the *set*:
+
+- Tone is handed out by a facet's **rank** around its belt, and the four-tone
+  set alternated light/dark. Steps between *neighbours* were excellent — 41%,
+  103%, 44%, 49% — and that is all ADR-0120 measured.
+- But a four-cycle has a second distance: pairs **two apart**, (0,2) and (1,3).
+  Under alternation those are two lights against two darks: 1.16 vs 1.38 is
+  16%, 0.68 vs 0.78 is 13%.
+- **The eye sees exactly that pair wherever every second facet is a sliver.**
+  The monarch's crown has ten faces alternating big and narrow (6–8 triangles
+  against 1–3), so the visible ones are ranks 1, 3, 5, 7, 9.
+- The `paintProbe` ablation cannot see this: with two tints every odd rank takes
+  the same one, so the probe reports the crown flat whatever the real set does.
+
+The fix is three tones, not a different order of four: on a 3-cycle the pairs
+two apart *are* the neighbouring pairs, so no stride of the eye can land on a
+coincidence. Four values pairwise 30% apart need a ratio of 2.92 and the earned
+colour's corridor (0.66…1.5) gives 2.27 — they do not fit.
+
+Result: shaft weakest pair 33% → 46%, crown 1 facet → 2 facets 21% apart. The
+crown stays under the threshold because its faces share a tilt and so catch
+almost the same light; the shaft's grazing angles amplify the same 30% of paint
+to 46–63%. That remainder is geometry, not paint.
+
 ## The crystal had no dark side
 
 2026-09-09, the owner: *«візуал ще дуже сирий»*. Every facet number was healthy

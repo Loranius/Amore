@@ -27,6 +27,39 @@ describe('тон грані береться рангом у колі', () => {
     }
   });
 
+  it('ранги ЧЕРЕЗ ОДИН теж ніколи не дають однаковий тон', () => {
+    /*
+     * Четверта поломка того самого ключа, і знайшов її кадр, а не тест
+     * (ADR-0176). Ранги сусідні — коли око бачить кожну грань. Але там,
+     * де кожна друга грань вузька, воно бачить кожну ДРУГУ, і в наборі з
+     * чотирьох чергованих тонів пара через одну — це два світлі або два
+     * темні: 16% і 13%.
+     *
+     * Виміряно: у вінці монарха (десять граней, велика й вузенька
+     * навпереміш) прилад знаходив ОДНУ грань на 39 стовпців із
+     * яскравістю 0.21–0.23, тоді як стовбур давав шість граней із
+     * кроками 33–43%.
+     */
+    for (let rank = 0; rank < 40; rank += 1) {
+      const here = facetTintForRank(CRYSTAL_FACET_TINTING, SEED, 'crystal:mother', rank);
+      const after = facetTintForRank(CRYSTAL_FACET_TINTING, SEED, 'crystal:mother', rank + 2);
+      expect(here.r, `ранги ${rank} і ${rank + 2}`).not.toBe(after.r);
+    }
+  });
+
+  it('найслабша пара тонів різниться щонайменше на 30%', () => {
+    // Поріг `amore-crystal-look` — про дві сусідні площини. Набір із трьох
+    // означає, що ця перевірка покриває ВСІ пари, а не лише сусідні.
+    const values = CRYSTAL_FACET_TINTING.tints.map((tint) => tint.r);
+    for (let left = 0; left < values.length; left += 1) {
+      for (let right = left + 1; right < values.length; right += 1) {
+        const low = Math.min(values[left]!, values[right]!);
+        const high = Math.max(values[left]!, values[right]!);
+        expect((high - low) / high, `${low} проти ${high}`).toBeGreaterThanOrEqual(0.29);
+      }
+    }
+  });
+
   it('той самий ранг завжди дає той самий тон', () => {
     // Детермінізм: артефакт пари не має мерехтіти між збірками.
     const first = facetTintForRank(CRYSTAL_FACET_TINTING, SEED, 'crystal:year:3', 7);
