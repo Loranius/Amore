@@ -107,6 +107,32 @@ This agrees with the measurement from the opposite direction: switching the key 
 entirely moves the monarch's facets by about 3%. Lighting was never going to separate
 them. Anything that must survive is a property of the surface.
 
+## A white rim on a saturated stone reads as a moulding seam
+
+Darkening the interior (above) created a defect of its own, and it took a second
+measurement to see it. The facet rim was drawn in the shared `rimColor` — light
+pink, saturation 0.14. While the body itself sat at 0.23 saturation nobody could
+tell; once the faces reached 0.43 the rim read as a white thread laid over the
+stone (ADR-0177).
+
+| | hue | saturation | value |
+|---|---|---|---|
+| faces | 314° | 0.43 | 0.68 |
+| rim (before) | 318° | **0.15** | 0.84 |
+
+The reference gems outline a facet **in the stone's own colour, brighter** — not
+in another material. `facetEdgeColor` is now `mix(baseColor, white, 0.3)`: hue
+untouched, value lifted. At 0.5 the saturation falls back to 0.22 and the white
+thread returns; 0.3 holds it near 0.39.
+
+It is a separate field from `rimColor` on purpose — that colour also drives the
+Fresnel and glass terms, which draw the **silhouette**, and a silhouette has to
+separate the body from the sky by brightness. Different job, different evidence.
+
+Side effect worth knowing: facet separation rose from 46% to 52% on its own. A
+near-white rim adds the same light to both neighbouring faces and so pulls them
+together.
+
 ## Measure every belt, not only the shaft
 
 The shaft is not the crystal. On the same frame that gave the shaft six facets

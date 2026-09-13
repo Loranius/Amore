@@ -133,3 +133,66 @@ describe('рівень нутра грані', () => {
     expect(keyOf(brighter)).not.toBe(keyOf(body));
   });
 });
+
+describe('колір обводу грані', () => {
+  /*
+   * ВИМОГА (ADR-0177): обвід — яскравіший ТОЙ САМИЙ камінь, а не біла
+   * нитка. Виміряно на кадрі: відколи нутро опущене (ADR-0175), грані
+   * тримають насиченість 0.43, а обвід брав спільний `rimColor` із
+   * насиченістю 0.15 — біла нитка по насиченому каменю читається як шов
+   * пластмасової форми.
+   */
+  const monarchOf = (quality: CrystalMaterialQuality) => {
+    const body = build(quality).bodies.find((entry) => entry.bodyId === 'crystal:mother');
+    expect(body, quality).toBeDefined();
+    return body!;
+  };
+
+  const saturationOf = (color: { r: number; g: number; b: number }) => {
+    const high = Math.max(color.r, color.g, color.b);
+    const low = Math.min(color.r, color.g, color.b);
+    return high <= 0 ? 0 : (high - low) / high;
+  };
+
+  it('несе колір тіла, а не сірий', () => {
+    for (const quality of ['high', 'balanced', 'low', 'fallback'] as const) {
+      const body = monarchOf(quality);
+      // Не сірий: у сірого насиченість нуль, і саме нею відрізняється
+      // «яскравіший камінь» від «білої нитки».
+      expect(saturationOf(body.shader.facetEdgeColor), quality).toBeGreaterThan(0.25);
+    }
+  });
+
+  it('світліший за сам камінь у кожному каналі', () => {
+    // Обвід додається до грані, тож він мусить бути світлішим — інакше
+    // ребро не читається як ребро. Але тільки світлішим: підняття до
+    // білого на третину не рухає тон (ADR-0004).
+    const body = monarchOf('high');
+    for (const channel of ['r', 'g', 'b'] as const) {
+      expect(body.shader.facetEdgeColor[channel]).toBeGreaterThanOrEqual(body.baseColor[channel]);
+    }
+    expect(saturationOf(body.shader.facetEdgeColor))
+      .toBeLessThan(saturationOf(body.baseColor));
+  });
+
+  it('малюється своїм кольором, а не кольором силуету', () => {
+    /*
+     * Той самий `rimColor` несуть френель і скло, тобто СИЛУЕТ. Якби
+     * обвід і далі брав його, насичення обводу тягло б за собою межу
+     * тіла з небом — іншу задачу з іншим виміром.
+     */
+    const fragment = fragmentOf(createThreeCrystalMaterial(monarchOf('high')));
+    expect(fragment).toContain('evolutionEdgePaint = uEvolutionFacetEdgeColor');
+    expect(fragment).not.toContain('evolutionEdgePaint = uEvolutionRimColor');
+  });
+
+  it('розводить по різних програмах тіла з різним обводом', () => {
+    const body = monarchOf('high');
+    const white = {
+      ...body,
+      shader: { ...body.shader, facetEdgeColor: { r: 1, g: 1, b: 1 } },
+    };
+    const keyOf = (source: typeof body) => createThreeCrystalMaterial(source).customProgramCacheKey();
+    expect(keyOf(white)).not.toBe(keyOf(body));
+  });
+});

@@ -37,6 +37,7 @@ function shaderKey(recipe: CrystalShaderRecipe): string {
     recipe.facetEdgeStrength.toFixed(6),
     recipe.facetEdgeWidth.toFixed(6),
     recipe.interiorLevel.toFixed(6),
+    rgbKey(recipe.facetEdgeColor),
     recipe.axialTintStrength.toFixed(6),
     rgbKey(recipe.footColor),
     recipe.innerFlowStrength.toFixed(6),
@@ -114,6 +115,7 @@ uniform float uEvolutionAuroraDepth;
 uniform float uEvolutionPhase;
 uniform float uEvolutionFacetEdgeStrength;
 uniform float uEvolutionInteriorLevel;
+uniform vec3 uEvolutionFacetEdgeColor;
 uniform float uEvolutionFacetEdgeWidth;
 uniform float uEvolutionAxialTintStrength;
 uniform vec3 uEvolutionFootColor;
@@ -331,7 +333,7 @@ const FRAGMENT_BODY = /* glsl */ `
     vec3 edgeWidth = max( fwidth( vEvolutionEdge ) * uEvolutionFacetEdgeWidth, vec3( 1e-5 ) );
     vec3 edgeFalloff = smoothstep( vec3( 0.0 ), edgeWidth, vEvolutionEdge );
     float evolutionRim = 1.0 - min( min( edgeFalloff.x, edgeFalloff.y ), edgeFalloff.z );
-    evolutionEdgePaint = uEvolutionRimColor * evolutionRim * uEvolutionFacetEdgeStrength;
+    evolutionEdgePaint = uEvolutionFacetEdgeColor * evolutionRim * uEvolutionFacetEdgeStrength;
   }
 
   // ── Перелив: у кімнати є СТОРОНИ ──────────────────────────
@@ -638,6 +640,7 @@ function applyEvolutionShader(material: THREE.MeshPhysicalMaterial, recipe: Crys
     shader.uniforms['uEvolutionPhase'] = { value: 0 };
     shader.uniforms['uEvolutionFacetEdgeStrength'] = { value: recipe.facetEdgeStrength };
     shader.uniforms['uEvolutionInteriorLevel'] = { value: recipe.interiorLevel };
+    shader.uniforms['uEvolutionFacetEdgeColor'] = { value: toColor(recipe.facetEdgeColor) };
     shader.uniforms['uEvolutionFacetPaintStrength'] = { value: 1 };
     shader.uniforms['uEvolutionFacetEdgeWidth'] = { value: recipe.facetEdgeWidth };
     shader.uniforms['uEvolutionAxialTintStrength'] = { value: recipe.axialTintStrength };

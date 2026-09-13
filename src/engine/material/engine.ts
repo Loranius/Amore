@@ -110,6 +110,7 @@ function materialSignature(body: Omit<CrystalBodyMaterial, 'signature'>): string
     // ніщо не переплутає. Але батч ділить один матеріал, і якщо колись
     // з'явиться тіло з іншим рівнем, воно не має світитись чужим.
     body.shader.interiorLevel,
+    rgbSignature(body.shader.facetEdgeColor),
     facetTintingSignature(body.facets),
   ].map((value) => typeof value === 'number' ? value.toFixed(6) : String(value)).join('|');
 }
@@ -373,6 +374,7 @@ function shaderRecipe(
   emphasized: boolean,
   emissiveColor: CrystalRgb,
   tint: readonly [number, number, number] | null,
+  baseColor: CrystalRgb,
 ): CrystalShaderRecipe {
   const preset = CRYSTAL_MATERIAL_QUALITY_PRESETS[input.config.quality];
   const pressures = input.species.pressures;
@@ -539,6 +541,13 @@ function shaderRecipe(
      * вимкнено сяйво, вуаль і перелив, тобто рівно ті терми, які
      * піднімали тіло вгору. Опустити нутро там ще потрібніше, ніж тут.
      */
+    /*
+     * Обвід — власний колір тіла, піднятий до білого на третину
+     * (ADR-0177). Третина, а не половина: при 0.5 насиченість обводу
+     * падає до 0.22 і біла нитка повертається, при 0.3 вона тримається
+     * коло 0.39 — тобто обвід лишається каменем, лише яскравішим.
+     */
+    facetEdgeColor: mixRgb(baseColor, { r: 1, g: 1, b: 1 }, 0.3),
     interiorLevel: 0.55,
     facetEdgeWidth: 1.4,
     // Gone. This was the foot-to-tip gradient, and it is the other half of the
@@ -778,7 +787,7 @@ function buildBodyMaterial(
       + pressures.luminosity * 0.3
       + state.luminosity * 0.15,
   ));
-  const shader = shaderRecipe(input, role, emphasized, emissiveColor, tint);
+  const shader = shaderRecipe(input, role, emphasized, emissiveColor, tint, baseColor);
   // How much light gets through. A clear couple's crystal is more glass than
   // stone; fracture and cloudiness close it up. The floor matters more than the
   // ceiling: below roughly two thirds the facets stop reading, because what
@@ -1073,6 +1082,9 @@ function buildSubstrateMaterial(
       // read from its edges. Weaker than the crystals', because stone catches
       // less on a fracture than quartz does on a grown face.
       facetEdgeStrength: 0.12,
+      // Камінь обводиться собою — так було й до ADR-0177, коли обвід брав
+      // `rimColor`, а `rimColor` підкладки і є її `baseColor`.
+      facetEdgeColor: baseColor,
       /*
        * Камінь лишається як був. Він і не вицвітав: жеода стоїть у тіні
        * кристала й міряється в межах 0.4–0.6 значення, а темніший камінь
