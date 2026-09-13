@@ -11,6 +11,7 @@ import {
   createThreeCrystalRenderBundle,
   setThreeCrystalBodyVisible,
 } from '@/engine/renderer/three';
+import { applyCrystalRefraction, crystalBodyWidth } from '../render/refraction';
 import { isCrystalTap, type CrystalPointerSample } from './tapGesture';
 
 export interface EvolutionCrystalObjectProps {
@@ -29,6 +30,15 @@ export interface EvolutionCrystalObjectProps {
    * будується тут.
    */
   envMap?: THREE.Texture | null;
+  /**
+   * Справжнє заломлення — ТІЛЬКИ ДІАГНОСТИКА (`?gfx=refraction`), ADR-0178.
+   *
+   * Приходить ззовні тією ж дорогою, що й карта оточення, і з тієї ж
+   * причини: рушій публікує `transmission: 0`, і це лишається правдою.
+   * Знімає заборону адаптер, і лише тоді, коли небо в сцені — інакше
+   * `three` заллє його місце білим.
+   */
+  refraction?: boolean;
 }
 
 /**
@@ -41,6 +51,7 @@ export function EvolutionCrystalObject({
   life,
   substrateVisible = true,
   envMap = null,
+  refraction = false,
 }: EvolutionCrystalObjectProps) {
   const pulseUntil = useRef(0);
   const pointerDown = useRef<CrystalPointerSample | null>(null);
@@ -82,6 +93,16 @@ export function EvolutionCrystalObject({
       material.needsUpdate = true;
     }
   }, [bundle, envMap]);
+
+  /*
+   * Ширина монарха у власних одиницях меша: `three` множить товщину на
+   * масштаб моделі, тож число мусить бути там, де стоїть геометрія, а не
+   * там, де її видно.
+   */
+  const bodyWidth = useMemo(() => crystalBodyWidth(geometry), [geometry]);
+  useEffect(() => {
+    applyCrystalRefraction(bundle.materials.values(), { on: refraction, width: bodyWidth });
+  }, [bundle, refraction, bodyWidth]);
 
   useEffect(() => () => bundle.dispose(), [bundle]);
   // The factory parents the cloud itself, next to the crystal batches and

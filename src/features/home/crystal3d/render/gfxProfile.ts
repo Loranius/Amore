@@ -66,6 +66,33 @@ export interface GfxProfile {
    * саме це, а не env, стоїть у дефолті.
    */
   glass: boolean;
+  /**
+   * СПРАВЖНЄ ЗАЛОМЛЕННЯ: небо в сцені + непрозоре полотно +
+   * `MeshPhysicalMaterial.transmission` (ADR-0178).
+   *
+   * Це не ще один відтінок «скла». `glass` вище дописує френелівський
+   * край у `outgoingLight` і нічого не заломлює; тіло лишається
+   * непрозорим. Тут тіло стає справді прозорим, і крізь нього видно
+   * острів.
+   *
+   * ЧОМУ ЦЕ ДОСІ БУЛО НЕМОЖЛИВО, і чому стало можливим саме так.
+   * `WebGLRenderer::renderTransmissionPass` жорстко ставить
+   * `setClearColor(0xffffff, 0.5)`, щойно `clearAlpha < 1`, а наше
+   * полотно прозоре — бо небо це CSS-градієнт ПІД полотном. Тому
+   * прозоре тіло малювало біле там, де перекривало небо.
+   *
+   * Рядком нижче в тому ж `three` стоїть `background.render( scene )`:
+   * замок відмикається зсередини. Небо переїжджає В СЦЕНУ
+   * (`PortalSky`), полотно стає непрозорим — і буфер заломлення містить
+   * небо з островом.
+   *
+   * Ціна названа: ще один повноекранний render target щокадру, +1 draw
+   * call на небо, і повернення сортування прозорих тіл (ADR-0007
+   * «непрозорий без винятків» доведеться переглядати, якщо це колись
+   * піде в дефолт). Тому — прапорцем, і тільки прапорцем, доки пристрій
+   * власника не скаже своє.
+   */
+  refraction: boolean;
   /** `<EffectComposer><Bloom/>` — повноекранний прохід. Найпідозріліший із
    *  тих, що лишились, тому в дефолт не потрапляє, доки пристрій не
    *  скаже, що це безпечно. */
@@ -87,6 +114,7 @@ export interface GfxProfile {
  * закінчується перевіркою на пристрої, а не «покращенням навмання».
  */
 export const DEFAULT_GFX: GfxProfile = Object.freeze({
+  refraction: false,
   env: false,
   iridescence: false,
   glass: true,
@@ -110,6 +138,7 @@ export const DEFAULT_GFX: GfxProfile = Object.freeze({
  * повернеться не всюди.
  */
 export const RICH_GFX: GfxProfile = Object.freeze({
+  refraction: false,
   env: true,
   iridescence: false,
   glass: true,
@@ -132,6 +161,7 @@ export function defaultGfxFor(quality: GfxQuality): GfxProfile {
 /** Профіль «як було до фази 11» — усе вимкнено. Потрібен, щоб власник міг
  *  порівняти з тим, що він уже бачив, і щоб тести мали базову лінію. */
 export const BARE_GFX: GfxProfile = Object.freeze({
+  refraction: false,
   env: false,
   iridescence: false,
   glass: false,
@@ -146,6 +176,11 @@ const ALIASES: Readonly<Record<string, keyof GfxProfile>> = {
   iridescence: 'iridescence',
   glass: 'glass',
   rim: 'glass',
+  refraction: 'refraction',
+  refract: 'refraction',
+  // «Скло» вже зайняте френелівським краєм, тож синонім називає те, що
+  // справді відбувається: крізь тіло видно острів.
+  through: 'refraction',
   bloom: 'bloom',
 };
 
@@ -185,7 +220,7 @@ export function parseGfxProfile(
 
   if (tokens.includes('off') || tokens.includes('none')) return BARE_GFX;
   if (tokens.includes('all')) {
-    return Object.freeze({ env: true, iridescence: true, glass: true, bloom: true });
+    return Object.freeze({ env: true, iridescence: true, glass: true, bloom: true, refraction: true });
   }
 
   // Відносний режим (+/-) працює від дефолту; абсолютний — від нуля.
@@ -228,6 +263,7 @@ export const isDefaultGfx = (p: GfxProfile): boolean =>
   p.env === DEFAULT_GFX.env &&
   p.iridescence === DEFAULT_GFX.iridescence &&
   p.glass === DEFAULT_GFX.glass &&
+  p.refraction === DEFAULT_GFX.refraction &&
   p.bloom === DEFAULT_GFX.bloom;
 
 /**
@@ -238,6 +274,6 @@ export const isDefaultGfx = (p: GfxProfile): boolean =>
  * видно одразу.
  */
 export function describeGfx(p: GfxProfile): string {
-  const on = (['env', 'iridescence', 'glass', 'bloom'] as const).filter((k) => p[k]);
+  const on = (['env', 'iridescence', 'glass', 'refraction', 'bloom'] as const).filter((k) => p[k]);
   return on.length === 0 ? 'gfx: off' : `gfx: ${on.join(' + ')}`;
 }

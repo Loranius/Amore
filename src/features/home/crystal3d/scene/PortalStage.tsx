@@ -12,6 +12,7 @@ import { OrbitControls } from '@react-three/drei';
 import { PORTAL_ORBIT_DAMPING, coarsePointerNow, portalOrbitRotateSpeed } from './portalOrbit';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
+import { PortalSky } from './PortalSky';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import { MANUAL_ZOOM_RANGE, type WorldMotionMode } from '@/features/world/sceneDirector';
 import {
@@ -78,6 +79,14 @@ export interface PortalStageProps {
    * Після вимкнення PortalCameraRig повертає канонічний кадр сцени.
    */
   freeCamera?: boolean | undefined;
+  /**
+   * Малювати небо В СЦЕНІ, а не лишати його CSS-градієнту під полотном.
+   *
+   * Вмикається разом із заломленням (`?gfx=refraction`) і тільки з ним:
+   * буфер `renderTransmissionPass` містить лише об'єкти сцени, тож без
+   * цього прозоре тіло показує білий прямокутник (ADR-0178).
+   */
+  sky?: boolean | undefined;
   children: ReactNode;
 }
 
@@ -95,6 +104,7 @@ export function PortalStage({
   motionMode,
   allowOrbit = true,
   freeCamera = false,
+  sky = false,
   children,
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
@@ -137,6 +147,7 @@ export function PortalStage({
 
   return (
     <>
+      {sky && <PortalSky theme={theme} />}
       {/* Одне домінантне джерело, решта — натяк.
           Було два майже рівні зустрічні прожектори (1.08 і 0.82) плюс
           ambient 0.26, point 0.34 і hemisphere 0.5. Сумарно заливка

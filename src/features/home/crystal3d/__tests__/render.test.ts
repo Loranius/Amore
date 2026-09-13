@@ -56,20 +56,44 @@ describe('профіль графіки — інструмент бісекці�
     // (0.5 дельти навіть на максимумі). Тест стереже саме це рішення:
     // якщо колись її ввімкнуть, спершу треба показати, що її видно.
     expect(DEFAULT_GFX.iridescence).toBe(false);
+    /*
+     * Заломлення — поза дефолтом на ВСІХ профілях, разом із `RICH_GFX`
+     * (ADR-0178). Воно коштує ще один повноекранний render target, +1
+     * draw call на небо й повертає сортування прозорих тіл, тобто
+     * переглядає ADR-0007. Доки пристрій власника не сказав своє, це
+     * діагностика, а не покращення.
+     */
+    expect(DEFAULT_GFX.refraction, 'заломлення в дефолті слабких').toBe(false);
+    expect(RICH_GFX.refraction, 'заломлення в дефолті потужних').toBe(false);
   });
 
   it('перелік без знаків вмикає РІВНО перелічене (ізоляція)', () => {
     const onlyEnv = parseGfxProfile('env');
-    expect(onlyEnv).toEqual({ env: true, iridescence: false, glass: false, bloom: false });
+    expect(onlyEnv).toEqual({ env: true, iridescence: false, glass: false, refraction: false, bloom: false });
     const onlyBloom = parseGfxProfile('bloom');
-    expect(onlyBloom).toEqual({ env: false, iridescence: false, glass: false, bloom: true });
+    expect(onlyBloom).toEqual({ env: false, iridescence: false, glass: false, refraction: false, bloom: true });
     // Обидва разом — теж без «зайвого» скла, щоб порівняння лишалось чистим.
     expect(parseGfxProfile('env,bloom')).toEqual({
       env: true,
       iridescence: false,
       glass: false,
+      refraction: false,
       bloom: true,
     });
+    /*
+     * Заломлення теж ізолюється — і це не формальність (ADR-0178). Воно
+     * тягне за собою ДВІ зміни сцени: небо переїжджає в сцену, полотно
+     * стає непрозорим. Якби `?gfx=refraction` вмикав заразом ще й скло чи
+     * Bloom, відповідь власника «побілів фон» не вказала б ні на що.
+     */
+    expect(parseGfxProfile('refraction')).toEqual({
+      env: false,
+      iridescence: false,
+      glass: false,
+      refraction: true,
+      bloom: false,
+    });
+    expect(parseGfxProfile('through')).toEqual(parseGfxProfile('refract'));
   });
 
   it('+/- працюють від дефолту, off/all — крайні точки', () => {
@@ -77,7 +101,10 @@ describe('профіль графіки — інструмент бісекці�
     expect(parseGfxProfile('+irid')).toEqual({ ...DEFAULT_GFX, iridescence: true });
     expect(parseGfxProfile('-glass')).toEqual({ ...DEFAULT_GFX, glass: false });
     expect(parseGfxProfile('off')).toEqual(BARE_GFX);
-    expect(parseGfxProfile('all')).toEqual({ env: true, iridescence: true, glass: true, bloom: true });
+    expect(parseGfxProfile('all')).toEqual({
+      env: true, iridescence: true, glass: true, refraction: true, bloom: true,
+    });
+    expect(parseGfxProfile('+refraction')).toEqual({ ...DEFAULT_GFX, refraction: true });
     // Порожнє/відсутнє — дефолт; сміття ігнорується, а не ламає рендер.
     expect(parseGfxProfile(null)).toEqual(DEFAULT_GFX);
     expect(parseGfxProfile('')).toEqual(DEFAULT_GFX);

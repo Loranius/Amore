@@ -237,8 +237,22 @@ outline than crystal.
 - **Any index formula of the form `floor(triangle / 2)` is stale.** It encodes the
   pre-ADR-0006 lathe. Polytope faces fan into a different triangle count each, and
   slivers are dropped. Publish the mapping from the pass that builds it.
-- **Transmission is permanently 0** — Three samples a render target the CSS sky is not
-  in. Alpha composites correctly; refraction is not available. Don't re-litigate it.
+- **Transmission is off by default, and the lock opens from the inside** (ADR-0178).
+  The proven cause is one line of three: `renderTransmissionPass` hard-sets
+  `setClearColor(0xffffff, 0.5)` whenever `clearAlpha < 1`, and the portal canvas
+  is transparent because the sky is a **CSS gradient underneath it**. The very
+  next line of that method is `background.render( scene )` — so putting the sky
+  *in* the scene and making the canvas opaque is all it takes. `?gfx=refraction`
+  does exactly that and is the way to look at it; the default stays opaque
+  (ADR-0007) until the owner's device has answered.
+
+  Two things measured there, worth keeping. A sky drawn as a **mesh in front of
+  the camera** is *not* the same sky — the warm band moved from 27% to 46% of
+  screen height and the gradient's range halved; use `scene.background`, which
+  three draws in screen space exactly as CSS stretches a gradient over an
+  element. And absorption tuned by eye eats the body: at `attenuationDistance`
+  = 1.15 × width the shaft went 30–40% darker on the dark theme, because what
+  the stone transmits at night is the **night sky**, not the island.
 - **Environment maps are off by decision**, not omission (`render/envMap.ts`): every
   route to one goes through a HalfFloat render target, the standing suspect for the white
   background on the owner's device. Reflection must be computed — Fresnel rim plus a

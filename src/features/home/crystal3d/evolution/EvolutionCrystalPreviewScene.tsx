@@ -230,7 +230,16 @@ export default function EvolutionCrystalPreviewScene() {
           // Точну дає PortalCameraRig із фактичного аспекту вже на першому
           // кадрі; тут вона потрібна лише щоб цей кадр не почався здалеку.
           camera={{ position: [0, 0.685, 7.1], fov: 42 }}
-          gl={{ alpha: true, antialias: metrics.quality !== 'fallback' }}
+          /*
+           * ПРОЗОРІСТЬ ПОЛОТНА — НЕ СТАЛА, і саме в ній був замок
+           * (ADR-0178). `renderTransmissionPass` заливає буфер білим,
+           * щойно `clearAlpha < 1`; тож заломлення вимагає непрозорого
+           * полотна, а непрозоре полотно вимагає неба В СЦЕНІ. Обидва
+           * приходять одним прапорцем і не можуть розійтись.
+           *
+           * Читається один раз при монтуванні — як і сам `?gfx=`.
+           */
+          gl={{ alpha: !gfx.refraction, antialias: metrics.quality !== 'fallback' }}
         >
           <PortalStage
             seed={pipeline.geometry.artifactSeed}
@@ -255,6 +264,7 @@ export default function EvolutionCrystalPreviewScene() {
             allowOrbit={region === 'centre'}
             freeCamera={freeCameraActive}
             motionMode={motionMode}
+            sky={gfx.refraction}
           >
             <EvolutionCrystalObject
               geometry={pipeline.geometry}
@@ -282,6 +292,7 @@ export default function EvolutionCrystalPreviewScene() {
                */
               substrateVisible
               envMap={envMap}
+              refraction={gfx.refraction}
             />
           </PortalStage>
           <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
