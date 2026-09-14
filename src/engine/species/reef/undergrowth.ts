@@ -110,6 +110,70 @@ const COLONY_KEEP_OUT = 0.85;
 const HEAD_BAND_LOW = 0.06;
 const HEAD_BAND_HIGH = 0.94;
 
+/** Скільки кроків у таблиці площі. 64 вистачає — див. `bandByArea`. */
+const AREA_TABLE_STEPS = 64;
+
+/**
+ * Смуга, розподілена за ПЛОЩЕЮ, а не рівномірно по дузі.
+ *
+ * ЧОМУ ЦЕ ВЗАГАЛІ ПОТРІБНО. Дрібнота бралась `radicalInverse2` прямо по
+ * `band`, тобто рівномірно по куту. Але площа на куполі по куту НЕ
+ * рівномірна: кільце біля основи широке, а біля маківки вироджується в
+ * точку. Виміряно на куполі четвертого року (R=0.632, H=0.451), кількість
+ * на одиницю площі:
+ *
+ *   смуга    0.0–0.2  0.2–0.4  0.4–0.6  0.6–0.8  0.8–1.0
+ *   штук          28       31       30       29       20
+ *   площа      0.562    0.547    0.481    0.337    0.122
+ *   щільність   49.8     56.6     62.3     86.1    164.5
+ *
+ * Тобто маківка втричі густіша за основу — при майже рівній кількості,
+ * бо площі різняться в 4.6 раза. А основа — це саме та велика передня
+ * грань, яка на кадрі й читалась голою.
+ *
+ * ЯК ВИПРАВЛЕНО. Площа кільця на куполі-півеліпсоїді:
+ *
+ *   dA/dφ = 2π·R·cos φ·√(R²sin²φ + H²cos²φ)
+ *
+ * Закритої оберненої функції в неї немає (R ≠ H), тож будується таблиця
+ * накопиченої площі й шукається двійковим пошуком. Шістдесят чотири
+ * кроки — межа, за якою число вже не рухається в четвертому знаку, а
+ * таблиця будується раз на риф.
+ *
+ * Детермінізму це не порушує: таблиця — чиста функція від R і H.
+ */
+function buildAreaTable(radius: number, rise: number): number[] {
+  const from = HEAD_BAND_LOW * (Math.PI / 2);
+  const to = HEAD_BAND_HIGH * (Math.PI / 2);
+  const step = (to - from) / AREA_TABLE_STEPS;
+  const table: number[] = [0];
+  let sum = 0;
+  for (let i = 0; i < AREA_TABLE_STEPS; i += 1) {
+    const phi = from + (i + 0.5) * step;
+    sum += Math.cos(phi) * Math.hypot(radius * Math.sin(phi), rise * Math.cos(phi)) * step;
+    table.push(sum);
+  }
+  // Нормуємо до одиниці: далі шукається частка, а не абсолютна площа.
+  const total = table[table.length - 1] || 1;
+  return table.map((value) => value / total);
+}
+
+/** Частка накопиченої площі `u` → смуга, у якій вона стоїть. */
+function bandByArea(table: readonly number[], u: number): number {
+  let low = 0;
+  let high = table.length - 1;
+  while (high - low > 1) {
+    const middle = (low + high) >> 1;
+    if (table[middle]! <= u) low = middle;
+    else high = middle;
+  }
+  // Лінійна вставка всередині кроку — без неї смуг було б лише 64.
+  const span = table[high]! - table[low]!;
+  const inside = span > 1e-12 ? (u - table[low]!) / span : 0;
+  const progress = (low + inside) / AREA_TABLE_STEPS;
+  return HEAD_BAND_LOW + (HEAD_BAND_HIGH - HEAD_BAND_LOW) * progress;
+}
+
 const GOLDEN_ANGLE_RAD = Math.PI * (3 - Math.sqrt(5));
 
 export interface ReefGrowth {
@@ -191,9 +255,13 @@ export function reefUndergrowth(
    * не лишитись узагалі, і без неї цикл не скінчився б.
    */
   const ATTEMPT_CEILING = onHead * 6;
+  const areaTable = buildAreaTable(radius, Math.max(1e-6, head.rise));
   for (let index = 0, placed = 0; placed < onHead && index < ATTEMPT_CEILING; index += 1) {
     const azimuth = index * GOLDEN_ANGLE_RAD;
-    const band = HEAD_BAND_LOW + (HEAD_BAND_HIGH - HEAD_BAND_LOW) * radicalInverse2(index);
+    // Ван дер Корпут дає рівномірну ЧАСТКУ ПЛОЩІ, а таблиця перекладає її
+    // у смугу. Низькорозбіжність при цьому зберігається: перетворення
+    // монотонне, тож порядок і рівномірність послідовності не псуються.
+    const band = bandByArea(areaTable, radicalInverse2(index));
     /*
      * СПРАВЖНЯ поверхня, а не ідеальний еліпсоїд.
      *

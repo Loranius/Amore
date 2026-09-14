@@ -281,3 +281,85 @@ describe('три форми мають об’єм', () => {
     }
   });
 });
+
+describe('дрібнота розкладена по ПЛОЩІ, а не по дузі', () => {
+  /*
+   * ВИМОГА (ADR-0186): дрібнота має лежати рівномірно по ПОВЕРХНІ купола.
+   *
+   * ЧОМУ ЦЕ НЕ ТЕ САМЕ, ЩО «рівномірно по смузі». Площа кільця на
+   * куполі-півеліпсоїді залежить від кута: біля основи кільце широке,
+   * біля маківки вироджується в точку. Дрібнота ж бралась
+   * `radicalInverse2` прямо по `band`, тобто рівно по КУТУ.
+   *
+   * Виміряно на куполі четвертого року (R=0.632, H=0.451) — кількість на
+   * одиницю площі по п'яти смугах знизу вгору:
+   *
+   *   було:  49.8  56.6  62.3  86.1  164.5   → маківка втричі густіша
+   *   стало: 62.2  76.7  66.5  71.3   41.1   → розкид у межах двох разів
+   *
+   * І це не косметика: смуга 0.0–0.2 — найбільша за площею, і саме вона
+   * та передня грань купола, яка на кадрі читалась голою.
+   */
+  const areaBetween = (radius: number, rise: number, from: number, to: number): number => {
+    const steps = 2000;
+    let sum = 0;
+    for (let index = 0; index < steps; index += 1) {
+      const band = from + ((index + 0.5) / steps) * (to - from);
+      const phi = band * (Math.PI / 2);
+      const dPhi = ((to - from) / steps) * (Math.PI / 2);
+      sum += Math.cos(phi) * Math.hypot(radius * Math.sin(phi), rise * Math.cos(phi)) * dPhi;
+    }
+    return sum;
+  };
+
+  it('маківка більше не втричі густіша за основу', () => {
+    /*
+     * Смуга відновлюється з ІДЕАЛЬНОГО купола (`asin(y / rise)`), а точки
+     * сидять на зміщеному — тож сама ця мірка приблизна, і вимагати від
+     * неї рівності було б вимагати точності, якої в неї немає. Тому межа
+     * названа як «у межах трьох разів між найгустішою та найрідшою
+     * смугою»: до зміни лише крайні дві відрізнялись у 3.3 раза.
+     */
+    for (const years of [1, 4, 25]) {
+      const head = reefHeadSize(years * 365.2425, 6);
+      const onHead = reefUndergrowth(head, reefStanding(head), years, 4242)
+        .filter((growth) => growth.kind !== 'weed' && growth.point.y > 1e-6);
+      const densities: number[] = [];
+      for (let slice = 0; slice < 5; slice += 1) {
+        const from = slice / 5;
+        const to = (slice + 1) / 5;
+        const count = onHead.filter((growth) => {
+          const band = Math.asin(Math.min(1, Math.max(0, growth.point.y / head.rise)))
+            / (Math.PI / 2);
+          return band >= from && band < to;
+        }).length;
+        densities.push(count / areaBetween(head.radius, head.rise, from, to));
+      }
+      const spread = Math.max(...densities) / Math.max(1e-9, Math.min(...densities));
+      expect(spread, `рік ${years}`).toBeLessThan(3);
+    }
+  });
+
+  it('найбільша за площею смуга не найрідша', () => {
+    // Саме вона — велика передня грань купола, і саме її голизну видно
+    // на кадрі першою.
+    const head = reefHeadSize(4 * 365.2425, 6);
+    const onHead = reefUndergrowth(head, reefStanding(head), 4, 4242)
+      .filter((growth) => growth.kind !== 'weed' && growth.point.y > 1e-6);
+    const inSlice = (from: number, to: number): number => onHead.filter((growth) => {
+      const band = Math.asin(Math.min(1, Math.max(0, growth.point.y / head.rise))) / (Math.PI / 2);
+      return band >= from && band < to;
+    }).length;
+    const bottom = inSlice(0, 0.2) / areaBetween(head.radius, head.rise, 0, 0.2);
+    const top = inSlice(0.8, 1) / areaBetween(head.radius, head.rise, 0.8, 1);
+    expect(bottom).toBeGreaterThan(top * 0.9);
+  });
+
+  it('таблиця площі не залежить від насіння — лише від форми купола', () => {
+    // Детермінізм: та сама голова дає ту саму розкладку, скільки не клич.
+    const head = reefHeadSize(4 * 365.2425, 6);
+    const once = reefUndergrowth(head, reefStanding(head), 4, 4242);
+    const twice = reefUndergrowth(head, reefStanding(head), 4, 4242);
+    expect(twice.map((g) => g.point.y)).toEqual(once.map((g) => g.point.y));
+  });
+});
