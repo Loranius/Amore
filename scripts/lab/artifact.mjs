@@ -52,8 +52,8 @@ function band(text) {
 }
 
 const species = arg('species', 'crystal');
-if (species !== 'crystal' && species !== 'tree') {
-  throw new Error(`--species приймає crystal або tree, не «${species}».`);
+if (species !== 'crystal' && species !== 'tree' && species !== 'reef') {
+  throw new Error(`--species приймає crystal, tree або reef, не «${species}».`);
 }
 const years = arg('years', '11');
 /*
@@ -132,6 +132,15 @@ const bearings = arg('az', '')
  * поки не вгадаєш смугу. Дерево на 380–520 стоїть кроною, тож там число
  * лишається тим, що було.
  */
+/*
+ * Смуга за замовчуванням — лише в дерева.
+ *
+ * У кристала вона рахується від тіла (ADR-0174), а РИФ не міряється
+ * смугою взагалі: його число — не розділення граней, а силует і покриття,
+ * і вони знімаються з ПЛАНУ (`reefSilhouetteProfile`), а не з пікселів.
+ * Тому для рифа цей скрипт робить рівно одне — знімає кадр; числа лежать
+ * в атрибутах кореня сцени, звідки їх і друкує розділ нижче.
+ */
 const DEFAULT_BAND = { tree: '380-520' };
 /*
  * СМУГА КРИСТАЛА БІЛЬШЕ НЕ ПРИБИТА ЧИСЛОМ, і це виправлення приладу, а не
@@ -150,7 +159,7 @@ const SHAFT_FROM = 0.22;
 const SHAFT_TO = 0.42;
 const explicitBand = arg('band', '');
 let rows = explicitBand === ''
-  ? (species === 'crystal' ? null : band(DEFAULT_BAND[species]))
+  ? (DEFAULT_BAND[species] === undefined ? null : band(DEFAULT_BAND[species]))
   : band(explicitBand);
 
 const server = await ensureServer(PORT, { silent: true });
@@ -194,6 +203,51 @@ try {
    */
   const shot = await portal.page.screenshot();
   writeFileSync(file, shot);
+
+  /*
+   * РИФ ВИХОДИТЬ ТУТ, і це не недоробка.
+   *
+   * Усе нижче — прилад для ГРАНЕЙ: маска тіла за відтінком, смуга
+   * пікселів, розділення сусідніх граней. У рифа граней немає, і його
+   * числа інші за природою — силует, покриття купола, стрункість тіла, —
+   * а знімаються вони з ПЛАНУ, а не з растру (`reefSilhouetteProfile`).
+   * Проганяти растрову мірку по рифу означало б надрукувати числа, які
+   * ні про що: рівно та помилка, якою цей файл уже хворів (ADR-0174).
+   *
+   * Тому для рифа скрипт робить дві речі — зберігає кадр і друкує те, що
+   * лабораторія вже порахувала й виклала в атрибути.
+   */
+  if (species === 'reef') {
+    const reef = await portal.page.evaluate(() => {
+      const stage = document.querySelector('[data-reef-coverage]');
+      const read = (name) => stage?.getAttribute(name) ?? '—';
+      return {
+        years: read('data-reef-years'),
+        breadth: read('data-reef-breadth'),
+        triangles: read('data-evolution-triangles'),
+        bodies: read('data-evolution-bodies'),
+        coverage: read('data-reef-coverage'),
+        coralShare: read('data-reef-coral-share'),
+        bodyAspect: read('data-reef-body-aspect'),
+        domeAspect: read('data-reef-dome-aspect'),
+        sizeSpread: read('data-reef-size-spread'),
+      };
+    });
+    const percent = (value) => (Number.isFinite(Number(value))
+      ? `${(Number(value) * 100).toFixed(1)}%`
+      : value);
+    console.log(`знімок       ${file}`);
+    console.log(`років        ${reef.years}, широта ${reef.breadth}`);
+    console.log(`тіл          ${reef.bodies}, трикутників ${reef.triangles}`);
+    console.log(`покриття     ${percent(reef.coverage)}`);
+    console.log(`корал у силуеті ${percent(reef.coralShare)}`);
+    console.log(`стрункість тіла ${reef.bodyAspect} (еталон 1.05)`);
+    console.log(`купол R/H    ${reef.domeAspect} (півкуля 1.00)`);
+    console.log(`розкид тіл   ${reef.sizeSpread}`);
+    await portal.close();
+    await server.stop?.();
+    process.exit(0);
+  }
 
   /*
    * ЧИ КРИСТАЛ УЗАГАЛІ НАМАЛЬОВАНИЙ — З ЛІЧИЛЬНИКА, А НЕ З ПІКСЕЛІВ.

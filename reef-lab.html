@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="uk" data-theme="dark" data-artifact="reef">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Лабораторія рифа</title>
+    <style>
+      html, body, #root { height: 100%; margin: 0; }
+      /* Жодного інтерфейсу: усе, що не риф, потрапило б у вимір.
+         Числа лінійки їдуть в атрибути кореня сцени, не на екран. */
+      #root > * { position: fixed; inset: 0; }
+
+      /*
+         КАДР НА ВЕСЬ ЕКРАН, і це виправлення, а не оздоба.
+
+         Сцена носить клас `.crystal-wrap`, а він у порталі —
+         `width: min(78vw, 320px); aspect-ratio: 1`, тобто картка на
+         головній. Перший прогін лабораторії саме таким і вийшов: риф
+         сидів квадратом угорі, а дві третини знімка були порожні.
+
+         Порожнеча в кадрі не просто негарна — вона отруює вимір: будь-яка
+         мірка яскравості усереднювала б її разом зі сценою, і число
+         вийшло б правдоподібним і безглуздим. Той самий рід помилки, що
+         ADR-0174. */
+      #root .crystal-wrap {
+        width: 100%;
+        height: 100%;
+        max-width: none;
+        aspect-ratio: auto;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/labs/reefLab.tsx"></script>
+  </body>
+</html>
