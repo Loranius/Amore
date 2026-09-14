@@ -42,6 +42,13 @@ export {
   type ReefPlan,
 } from './reefAssembly';
 
+// Мірка силуету: одна функція на еталон і на генератор (ADR-0182).
+export {
+  REEF_REFERENCE,
+  reefSilhouetteProfile,
+  type ReefSilhouette,
+} from './reefProfile';
+
 // Форма: купол голови, коралові тіла, риба.
 export { buildReefHeadMesh, type ReefMeshData } from './headMesh';
 export { buildReefColonyMesh } from './bodyMesh';

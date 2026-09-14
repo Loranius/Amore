@@ -1,0 +1,242 @@
+import { describe, expect, it } from 'vitest';
+import { buildReefPlan, type BuildReefPlanInput, type ReefHistoryEvent } from './reefAssembly';
+import { PORTAL_MODULES } from '../shared/relationshipYear';
+import { REEF_REFERENCE, reefSilhouetteProfile } from './reefProfile';
+
+/*
+ * ВИМОГА: у рифа з'явилась мірка силуету — перша в цьому виді (ADR-0182).
+ * Кристал і дерево мають свою (`crystalProfile.ts`, `crownProfile.ts`), риф
+ * не мав жодної, і через це про нього не можна було сказати нічого
+ * перевірюваного.
+ *
+ * Тести тут двох різних родів, і плутати їх не можна:
+ *
+ *   • ВЛАСТИВОСТІ МІРКИ — те, що має лишатись правдою завжди;
+ *   • ЗАПИСАНИЙ СТАН — числа сьогоднішнього рифа, зокрема ДВІ ЗНАЙДЕНІ
+ *     ВАДИ. Вони закріплені НЕ як правильні, а щоб зміна, яка їх
+ *     зрушить, зрушила й тест — і тоді довелось би сказати, куди саме.
+ */
+
+const SEED = 4242;
+
+/** Насичена історія: кожен рік має події з усіх модулів порталу. */
+function busyHistory(years: number): ReefHistoryEvent[] {
+  const out: ReefHistoryEvent[] = [];
+  for (let year = 0; year < years; year += 1) {
+    for (let m = 0; m < PORTAL_MODULES.length; m += 1) {
+      for (let k = 0; k < 4; k += 1) {
+        const month = String(1 + ((m + k) % 12)).padStart(2, '0');
+        out.push({ occurredAt: `${2023 + year}-${month}-1${k % 9}`, module: PORTAL_MODULES[m]! });
+      }
+    }
+  }
+  return out;
+}
+
+function planFor(years: number, events = busyHistory(years)) {
+  const input: BuildReefPlanInput = {
+    relationshipStartedAt: '2022-12-26',
+    asOf: `${2022 + years}-12-20`,
+    leapDayPolicy: 'feb-28',
+    seed: SEED,
+    events,
+    sharedDaysOff: [],
+    theme: 'dark',
+  };
+  return buildReefPlan(input);
+}
+
+describe('мірка силуету', () => {
+  it('порожній план не ділить на нуль і не вигадує чисел', () => {
+    // Нуль тут звичайний стан: пара, яка щойно відкрила портал.
+    const profile = reefSilhouetteProfile(planFor(0, []));
+    expect(Number.isFinite(profile.coverage)).toBe(true);
+    expect(Number.isFinite(profile.coralSilhouetteShare)).toBe(true);
+    expect(profile.coralSilhouetteShare).toBeGreaterThanOrEqual(0);
+  });
+
+  it('частки лишаються частками', () => {
+    const profile = reefSilhouetteProfile(planFor(4));
+    expect(profile.coralSilhouetteShare).toBeGreaterThan(0);
+    expect(profile.coralSilhouetteShare).toBeLessThan(1);
+    expect(profile.coverage).toBeGreaterThan(0);
+  });
+
+  it('мірка безрозмірна: той самий риф удвічі більший дає ті самі частки', () => {
+    /*
+     * Це і є причина, чому профіль у частках. Еталон лежить у своїх
+     * одиницях, риф пари росте з роками, і порівнювати можна лише те, що
+     * не залежить від розміру.
+     */
+    const plan = planFor(4);
+    const doubled = {
+      ...plan,
+      head: { radius: plan.head.radius * 2, rise: plan.head.rise * 2 },
+      colonies: plan.colonies.map((colony) => ({
+        ...colony,
+        size: { ...colony.size, radius: colony.size.radius * 2 },
+        bodies: colony.bodies.map((body) => ({
+          ...body,
+          radius: body.radius * 2,
+          height: body.height * 2,
+        })),
+      })),
+    };
+    const a = reefSilhouetteProfile(plan);
+    const b = reefSilhouetteProfile(doubled);
+    expect(b.coralSilhouetteShare).toBeCloseTo(a.coralSilhouetteShare, 6);
+    expect(b.coverage).toBeCloseTo(a.coverage, 6);
+    expect(b.bodyAspect).toBeCloseTo(a.bodyAspect, 6);
+    expect(b.domeAspect).toBeCloseTo(a.domeAspect, 6);
+  });
+});
+
+describe('форма ОДНОГО корала вже збігається з еталоном', () => {
+  it('стрункість тіла тримається біля еталонних 1.05', () => {
+    /*
+     * НАЙВАЖЛИВІШИЙ ТЕСТ ЦЬОГО ФАЙЛУ, і саме тому, що він проходить.
+     *
+     * Він каже: тіло корала правити НЕ ТРЕБА. Кристал цей поворот уже
+     * пройшов — «медіана сказала справжню історію: маленькі кристали вже
+     * були праві», — і риф повторює його один в один. Якщо колись
+     * з'явиться спокуса витягнути корали вгору заради силуету, цей тест
+     * має впасти першим: він сторожить те, що вже правильне.
+     */
+    for (const years of [1, 4, 10, 25]) {
+      const profile = reefSilhouetteProfile(planFor(years));
+      expect(Math.abs(profile.bodyAspect - REEF_REFERENCE.bodyAspect)).toBeLessThan(0.2);
+    }
+  });
+});
+
+describe('ЗАПИСАНИЙ СТАН: дві вади, знайдені міркою', () => {
+  it('ВАДА 1 — купол лишається каменем, на якому щось наросло', () => {
+    /*
+     * Частка найвищого корала в повній висоті рифа СТАЛА в часі:
+     * ~28% і на першому році, і на двадцять п'ятому. Тобто характер
+     * силуету не росте взагалі — риф на 25-му році читається так само
+     * камінно, як на першому.
+     *
+     * Це той самий діагноз, який кристал отримав словами власника
+     * («просто стовп рожевого кольору»), і там він коштував перебудови
+     * пропорцій. Тут він записаний числом ДО скарги.
+     */
+    const shares = [1, 4, 10, 25].map((y) => reefSilhouetteProfile(planFor(y)).coralSilhouetteShare);
+    for (const share of shares) {
+      expect(share).toBeGreaterThan(0.24);
+      expect(share).toBeLessThan(0.32);
+    }
+    // Стала, а не зростає: різниця між першим і двадцять п'ятим роком
+    // менша за три відсоткові пункти.
+    expect(Math.abs(shares[shares.length - 1]! - shares[0]!)).toBeLessThan(0.03);
+  });
+
+  it('ВАДА 2 — покриття купола, зменшена вужчим куполом, але не закрита', () => {
+    /*
+     * СМУГА ОНОВЛЕНА РАЗОМ ІЗ `HEAD_BREADTH_GAIN` 0.40 → 0.15 (ADR-0182),
+     * і це семантична зміна, а не підгонка під новий результат.
+     *
+     * Було: 7.1% на першому році, 22.4% на четвертому, 49.1% на
+     * десятому — чотири п'ятих кадру гола порода саме тоді, коли пара
+     * дивиться.
+     * Стало: 10.6% / 33.2% / 72.8%.
+     *
+     * Що саме зрушило. Радіус колонії прив'язаний до МАСШТАБУ голови, а
+     * не до її радіуса, тож єдиний дометний важіль покриття — наскільки
+     * широта життя розширює купол. Власник обрав «купол вужчий за
+     * колонії»; вимір по діапазону (0.40/0.25/0.15/0.05 → 22.4/28.1/
+     * 33.2/39.8% на четвертому році) назвав 0.15 як точку, де правило
+     * «широта розширює голову» ще живе.
+     *
+     * ЧОГО ЦЕ НЕ ЗАКРИЛО, і тому тест лишається в розділі вад: на
+     * ПЕРШОМУ році покриття все одно лише десята частина купола. Причина
+     * структурна й важелем не береться — купол росте за 25-річним
+     * годинником (`HEAD_FULL_TERM_YEARS`), а колоній стільки, скільки
+     * прожито років.
+     */
+    expect(reefSilhouetteProfile(planFor(1)).coverage).toBeLessThan(0.13);
+    const atFour = reefSilhouetteProfile(planFor(4)).coverage;
+    expect(atFour).toBeGreaterThan(0.30);
+    expect(atFour).toBeLessThan(0.36);
+    expect(reefSilhouetteProfile(planFor(10)).coverage).toBeGreaterThan(0.65);
+  });
+
+  it('купол став ближчим до півкулі, якою його й описує власний коментар', () => {
+    /*
+     * `HEAD_RISE_SHARE` у `colonyFormations.ts` пише: «живий масив ближчий
+     * до півкулі, ніж до тарілки». Півкуля — це радіус на висоту 1.00.
+     * Було 1.71, стало 1.40: не півкуля, але вже не тарілка, і напрямок
+     * тепер збігається з тим, що код про себе каже.
+     */
+    const profile = reefSilhouetteProfile(planFor(4));
+    expect(profile.domeAspect).toBeGreaterThan(1.3);
+    expect(profile.domeAspect).toBeLessThan(1.5);
+  });
+
+  it('ВАДА 2б — із ШОСТОГО року шапки колоній перетинаються', () => {
+    /*
+     * Зворотний бік тієї самої арифметики, і вже не про смак.
+     * `colonyBodies.ts` пише: «оголошений радіус колонії ... саме на
+     * нього спирається зазор між сусідніми роками». З шостого року цього
+     * зазору НЕМАЄ: позиції розсіюються як 1/N, а радіуси ростуть як √t,
+     * тож вони зустрічаються.
+     *
+     * ЧИСЛО ВИМІРЯНЕ ПОРІК, І ПЕРША ВЕРСІЯ ЦЬОГО ТЕСТУ БУЛА НЕПРАВИЛЬНА.
+     * Я написав «з десятого», бо прогін міряв 4, 10, 15, 25 — і роки
+     * 5–9 просто не перевірялись. Насправді перший перетин з'являється
+     * на ШОСТОМУ (запас −0.018), на восьмому зазор ненадовго
+     * повертається (+0.013), а далі росте вже тільки вглиб. Пара сьогодні
+     * на четвертому році, тобто до вади їй два роки, а не шість.
+     *
+     * Полагодити це рухом колоній НЕ МОЖНА: місце року залежить лише від
+     * його номера (заморозка минулого), і це правило сильніше за зазор.
+     * Тому тут записана МЕЖА, а не виправлення — щоб число було видно
+     * тому, хто вирішуватиме.
+     */
+    const collisions = (years: number): number => {
+      const colonies = planFor(years).colonies;
+      let hits = 0;
+      for (let i = 0; i < colonies.length; i += 1) {
+        for (let j = i + 1; j < colonies.length; j += 1) {
+          const a = colonies[i]!.anchor.point;
+          const b = colonies[j]!.anchor.point;
+          const distance = Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
+          if (distance < colonies[i]!.size.radius + colonies[j]!.size.radius) hits += 1;
+        }
+      }
+      return hits;
+    };
+    // До п'ятого року включно зазор ще є — саме тому пара його не бачить.
+    for (const clean of [1, 2, 3, 4, 5]) expect(collisions(clean)).toBe(0);
+    // З шостого вже немає.
+    expect(collisions(6)).toBeGreaterThan(0);
+    expect(collisions(10)).toBeGreaterThan(0);
+    expect(collisions(25)).toBeGreaterThan(collisions(15));
+    /*
+     * НАЗВАНА ЦІНА вужчого купола (ADR-0182): він зводить колонії ближче
+     * одна до одної, а їхні радіуси не змінюються. Перетинів стало
+     * більше — на десятому році 3 → 4, на двадцять п'ятому 32 → 43, —
+     * але ПЕРШИЙ рік із перетином лишився шостим в усьому діапазоні
+     * 0.05…0.40. Тобто зміна цю ваду не вносить і не лікує: вона її
+     * поглиблює там, де пара буде ще нескоро.
+     */
+    expect(collisions(25)).toBeGreaterThan(35);
+  });
+});
+
+describe('числа еталона', () => {
+  it('записані так, як їх друкує `scripts/models/measure-reef.mjs`', () => {
+    /*
+     * Константи мають збігатися з тим, що скрипт дістає з GLB. Інакше
+     * вони — моє слово, а не вимір; саме так у цьому проєкті вже
+     * народжувались числа, які потім доводилось забирати з ADR.
+     */
+    expect(REEF_REFERENCE.bodyAspect).toBeCloseTo(1.05, 2);
+    expect(REEF_REFERENCE.bodyTriangles).toBe(760);
+    // Один колір на тіло — головне, що каже еталон: його не освітлюють,
+    // його фарбують, і фарбують ПЛОСКО.
+    expect(REEF_REFERENCE.coloursPerBody).toBe(1);
+    expect(REEF_REFERENCE.hues).toHaveLength(8);
+    expect([...REEF_REFERENCE.hues].sort((a, b) => a - b)).toEqual([...REEF_REFERENCE.hues]);
+  });
+});
