@@ -13,7 +13,7 @@
 import { useMemo } from 'react';
 import { Color } from 'three';
 import type { ReefPlan } from '@/engine/species/reef/reefAssembly';
-import type { ReefTheme } from '@/engine/species/reef/coralPalette';
+import { reefColonyTint, type ReefTheme } from '@/engine/species/reef/coralPalette';
 import type { ReefMeshes } from './useReefMeshes';
 
 /**
@@ -66,6 +66,16 @@ export function ReefColonies({ plan, meshes, theme, lift }: ReefColoniesProps): 
     return stone.multiplyScalar(HEAD_DARKEN[theme]);
   }, [theme, tint]);
 
+  /*
+   * Колір колонії за наповненістю її року. `useCallback` тут зайвий:
+   * колоній одиниці, а `Color` усе одно створюється новий на кожен
+   * рендер — важить те, щоб арифметика була ОДНА й лежала в палітрі.
+   */
+  const colonyColour = (fill: number): Color => {
+    const bleached = reefColonyTint(plan.tint, fill);
+    return new Color(bleached.rgb[0], bleached.rgb[1], bleached.rgb[2]);
+  };
+
   return (
     <group position={[0, lift, 0]}>
       <mesh geometry={meshes.head} castShadow receiveShadow>
@@ -75,11 +85,19 @@ export function ReefColonies({ plan, meshes, theme, lift }: ReefColoniesProps): 
         <mesh key={colony.id} geometry={colony.geometry} castShadow receiveShadow>
           {/*
             * Наповненіший рік — насиченіший колір. Той самий відтінок
-            * пари, але бідний рік читається вибіленим, як справжній
-            * корал під стресом. Ще одна вісь, якою видно, що роки різні.
+            * пари, але бідний рік читається ВИБІЛЕНИМ, як справжній корал
+            * під стресом. Ще одна вісь, якою видно, що роки різні.
+            *
+            * Арифметика кольору живе в палітрі, а не тут, і це не
+            * охайність. Доти цей рядок множив RGB на скаляр —
+            * `multiplyScalar(0.55 + 0.45 * fill)`, — що лишає насиченість
+            * недоторканою й знижує лише яскравість. Тобто бідний рік
+            * ставав ТЕМНИМ, а не блідим, і зливався з головою, яка теж
+            * темна: контраст 1.58 у темній темі й 1.06 у світлій. Числа
+            * й спосіб вибілювання — у шапці `reefColonyTint`.
             */}
           <meshStandardMaterial
-            color={tint.clone().multiplyScalar(0.55 + 0.45 * colony.fill)}
+            color={colonyColour(colony.fill)}
             roughness={0.78}
             metalness={0}
             flatShading
