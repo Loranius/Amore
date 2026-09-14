@@ -29,7 +29,13 @@
 // видно одразу.
 // ============================================================
 import { clamp01, round6, seededUnit } from './math';
-import { reefColonyLayout, type ReefColonyAnchor, type ReefHeadSize } from './colonyFormations';
+import {
+  REEF_HEAD_RADIUS_MAX,
+  REEF_HEAD_RADIUS_MIN,
+  reefColonyLayout,
+  type ReefColonyAnchor,
+  type ReefHeadSize,
+} from './colonyFormations';
 import { reefHeadSurfacePoint } from './headMesh';
 import type { ReefStanding } from './reefStaging';
 
@@ -59,9 +65,29 @@ export const REEF_PEBBLE_COLOUR: readonly [number, number, number] = [0.62, 0.63
 const WEED_MIN = 12;
 const WEED_MAX = 26;
 
-/** Скільки дрібноти на найменшому й найбільшому рифі. */
-const GROWTH_MIN = 96;
-const GROWTH_MAX = 230;
+/**
+ * Скільки дрібноти на найменшому й найбільшому рифі.
+ *
+ * ЩІЛЬНІСТЬ НЕ СТАЛА, І ЦЕ ТЕПЕР СКАЗАНО ЧЕСНО. Тут стояв коментар
+ * «щільність тримається сталою», а вимір показав протилежне — кількість
+ * на одиницю площі купола:
+ *
+ *   рік 1 → 126,  рік 4 → 70,  рік 10 → 41,  рік 25 → 20
+ *
+ * Тобто вона падає вшестеро, бо площа росте вчетверо з гаком, а
+ * кількість майже стоїть (81 на першому році й 81 на двадцять п'ятому).
+ *
+ * Але СТАЛА щільність і не потрібна, і в цьому суть: на старому рифі
+ * колонії вкривають купол самі (174% на двадцять п'ятому році за
+ * `reefSilhouetteProfile`), тож дрібнота там лише додає кольору. Потрібна
+ * вона рівно там, де голо, — на молодому рифі, де колонія одна.
+ *
+ * Тому правиться не крива, а її НИЖНІЙ край: 96 → 150. Це +42% дрібноти
+ * саме на першому році (81 → 115 на куполі) і майже нічого на двадцять
+ * п'ятому, де вона й не вирішує.
+ */
+const GROWTH_MIN = 150;
+const GROWTH_MAX = 260;
 
 /** Яка частка з них сидить на куполі, а не на піску. */
 const ON_HEAD_SHARE = 0.7;
@@ -114,8 +140,10 @@ function radicalInverse2(index: number): number {
 /**
  * Уся дрібнота цього рифа.
  *
- * Кількість росте з розміром голови, а не з історії: більша поверхня
- * має бути вкрита так само щільно, інакше старий риф лисіє.
+ * Кількість росте з розміром голови, а не з історії. Але щільність при
+ * цьому ПАДАЄ, і це не вада: на старому рифі купол вкривають самі
+ * колонії, а дрібнота потрібна там, де голо, — на молодому. Числа й
+ * причину див. у `GROWTH_MIN`.
  */
 export function reefUndergrowth(
   head: ReefHeadSize,
@@ -126,14 +154,44 @@ export function reefUndergrowth(
   const radius = Math.max(1e-6, head.radius);
   const colonies = reefColonyLayout(head, yearCount);
 
-  // Голова росте від 0.25 до 1.0 масштабу; щільність тримається сталою.
-  const spread = clamp01((radius - 0.25) / 1.15);
+  /*
+   * Де радіус купола стоїть між своїми краями, 0..1.
+   *
+   * МЕЖІ ВИВЕДЕНІ, А НЕ ПЕРЕПИСАНІ ЧИСЛОМ. Тут стояло
+   * `(radius - 0.25) / 1.15`, і 1.15 було рівно `1.4 - 0.25`, тобто
+   * старий `HEAD_BREADTH_GAIN` із сусіднього файлу. Щойно той став 0.15
+   * (ADR-0182), вираз перестав доходити до одиниці — на найбільшому рифі
+   * давав 0.783, — і дрібноти ставало менше, ніж задумано, тихо й без
+   * жодної помилки. Тепер обидва краї приходять звідти, де живуть.
+   */
+  const spread = clamp01(
+    (radius - REEF_HEAD_RADIUS_MIN) / (REEF_HEAD_RADIUS_MAX - REEF_HEAD_RADIUS_MIN),
+  );
   const total = Math.round(GROWTH_MIN + (GROWTH_MAX - GROWTH_MIN) * spread);
   const onHead = Math.round(total * ON_HEAD_SHARE);
 
   const growths: ReefGrowth[] = [];
 
-  for (let index = 0; index < onHead; index += 1) {
+  /*
+   * ВІДКИНУТИЙ КАНДИДАТ ЗАМІНЮЄТЬСЯ, А НЕ ЗНИКАЄ.
+   *
+   * Тут стояв простий цикл до `onHead`, і кандидат, що впав у зону
+   * колонії, просто губився. Наслідок був тихий і саме той, якого цей
+   * файл клявся не допустити: при ОДНОМУ Й ТОМУ САМОМУ куполі дрібноти
+   * виходило 217 на першому році й 162 на двадцять п'ятому, бо двадцять
+   * п'ять колоній відкидають більше кандидатів, ніж одна.
+   *
+   * Тобто дрібнота таки несла річний сигнал — слабкий, зворотний і
+   * ніким не задуманий. Тест «кількість не залежить від прожитих років»
+   * стояв поруч і пропускав це, бо мав смугу 25%, а вада сиділа рівно
+   * під нею.
+   *
+   * Тепер кількість задана: індекс іде далі, доки не набереться `onHead`.
+   * Стеля спроб потрібна, бо на дуже старому рифі вільного місця може
+   * не лишитись узагалі, і без неї цикл не скінчився б.
+   */
+  const ATTEMPT_CEILING = onHead * 6;
+  for (let index = 0, placed = 0; placed < onHead && index < ATTEMPT_CEILING; index += 1) {
     const azimuth = index * GOLDEN_ANGLE_RAD;
     const band = HEAD_BAND_LOW + (HEAD_BAND_HIGH - HEAD_BAND_LOW) * radicalInverse2(index);
     /*
@@ -159,6 +217,7 @@ export function reefUndergrowth(
       spinRad: round6(seededUnit(seed, `${salt}:spin`) * Math.PI * 2),
       colourIndex: index % REEF_LIFE_COLOURS.length,
     });
+    placed += 1;
   }
 
   /*

@@ -29,6 +29,16 @@ import { clamp01, round6, seededUnit } from './math';
 /** Скільки років голова росте, доки не насититься. */
 const HEAD_FULL_TERM_YEARS = 25;
 
+/**
+ * Найменший і найбільший масштаб голови — межі кривої `reefHeadScale`.
+ *
+ * Названі числами, бо на них спирається не лише сама крива: дрібнота
+ * (`undergrowth.ts`) рахує свою кількість від того, де радіус купола
+ * стоїть між цими краями.
+ */
+const HEAD_SCALE_MIN = 0.25;
+const HEAD_SCALE_MAX = 1;
+
 /** Частка розміру голови, якої річна колонія не переступає ніколи. */
 export const ANNUAL_HEAD_SHARE = 0.4;
 
@@ -82,6 +92,22 @@ export const ANNUAL_DENSITY_FLOOR = 0.35;
 const HEAD_BREADTH_GAIN = 0.15;
 
 /**
+ * Межі РАДІУСА купола — виведені, а не переписані числом.
+ *
+ * ЦЕ ВИПРАВЛЕННЯ ЗЧЕПЛЕННЯ, і знайшов його вимір, а не читання.
+ * `undergrowth.ts` рахував свою кількість виразом `(radius - 0.25) / 1.15`,
+ * де 1.15 — це рівно `1.4 - 0.25`, тобто СТАРИЙ `HEAD_BREADTH_GAIN`,
+ * переписаний числом у чужий файл. Щойно gain став 0.15 (ADR-0182), той
+ * вираз перестав доходити до одиниці: на найбільшому рифі він давав
+ * 0.783, тобто дрібноти ставало менше, ніж задумано, — тихо й без
+ * жодної помилки.
+ *
+ * Тепер межі експортуються звідси, і розійтись їм нема як.
+ */
+export const REEF_HEAD_RADIUS_MIN = HEAD_SCALE_MIN;
+export const REEF_HEAD_RADIUS_MAX = HEAD_SCALE_MAX * (1 + HEAD_BREADTH_GAIN);
+
+/**
  * Яку частку масштабу голова бере у висоту.
  *
  * Перша редакція мала 0.62, і при повній широті купол виходив 2.5:1 —
@@ -122,7 +148,7 @@ export function reefHeadScale(daysTogether: number): number {
   const progress = clamp01(years / HEAD_FULL_TERM_YEARS);
   // Квадратний корінь: ріст швидкий на початку й повільний потім — саме
   // так пара його й переживає.
-  return round6(0.25 + 0.75 * Math.sqrt(progress));
+  return round6(HEAD_SCALE_MIN + (HEAD_SCALE_MAX - HEAD_SCALE_MIN) * Math.sqrt(progress));
 }
 
 /**
