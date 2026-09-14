@@ -30,6 +30,7 @@ import {
 import { isEvolutionDiagnosticsEnabled } from './featureFlag';
 import { buildStudioEnvMap } from '../render/envMap';
 import { describeGfx, gfxProfileFromLocation, isGfxRequested } from '../render/gfxProfile';
+import { crystalRefractionRenderScale } from '../render/refraction';
 import { useEvolutionCrystalPipeline } from './useEvolutionCrystalPipeline';
 import './evolutionPreview.css';
 
@@ -225,21 +226,40 @@ export default function EvolutionCrystalPreviewScene() {
           // Render scale, not optics, is how a dense screen is paid for — see
           // crystalRenderScale. Kept in the engine so the tier and the scale
           // cannot drift apart.
-          dpr={[1, crystalRenderScale(metrics.quality, typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
+          /*
+           * Поки заломлення ввімкнене, щільність має стелю (ADR-0178 §7):
+           * буфер заломлення створюється розміром із цілий кадр, із
+           * чотириразовим MSAA й повним ланцюгом mip-рівнів, а ручки для
+           * його масштабу в `three` 0.170 немає. Розмір полотна — єдине,
+           * що на цю вартість впливає.
+           */
+          dpr={[1, crystalRefractionRenderScale(
+            crystalRenderScale(metrics.quality, typeof window === 'undefined' ? 2 : window.devicePixelRatio),
+            gfx.refraction,
+          )]}
           // Стартова позиція — приблизно кадр для вертикального телефона.
           // Точну дає PortalCameraRig із фактичного аспекту вже на першому
           // кадрі; тут вона потрібна лише щоб цей кадр не почався здалеку.
           camera={{ position: [0, 0.685, 7.1], fov: 42 }}
           /*
-           * ПРОЗОРІСТЬ ПОЛОТНА — НЕ СТАЛА, і саме в ній був замок
-           * (ADR-0178). `renderTransmissionPass` заливає буфер білим,
-           * щойно `clearAlpha < 1`; тож заломлення вимагає непрозорого
-           * полотна, а непрозоре полотно вимагає неба В СЦЕНІ. Обидва
-           * приходять одним прапорцем і не можуть розійтись.
+           * ПОЛОТНО ЛИШАЄТЬСЯ ПРОЗОРИМ, і це виправлення власної здогадки
+           * (ADR-0178 §7).
            *
-           * Читається один раз при монтуванні — як і сам `?gfx=`.
+           * Спершу тут стояло `alpha: !gfx.refraction`: мовляв, заломлення
+           * вимагає непрозорого полотна, бо `renderTransmissionPass`
+           * заливає буфер білим, щойно `clearAlpha < 1`. Виміряно на
+           * живому кадрі — і виявилось двоє:
+           *
+           *  • до контексту це не доходило взагалі: із прапорцем і без
+           *    нього `getContextAttributes().alpha` лишався `true`;
+           *  • і воно не потрібне. Рядком нижче за ту заливку `three`
+           *    малює тло сцени (`background.render( scene )`), а тло —
+           *    непрозора текстура на весь кадр. Біле стирається, не
+           *    встигнувши нічого зіпсувати.
+           *
+           * Достатня умова — саме НЕПРОЗОРЕ ТЛО СЦЕНИ, а не полотно.
            */
-          gl={{ alpha: !gfx.refraction, antialias: metrics.quality !== 'fallback' }}
+          gl={{ alpha: true, antialias: metrics.quality !== 'fallback' }}
         >
           <PortalStage
             seed={pipeline.geometry.artifactSeed}

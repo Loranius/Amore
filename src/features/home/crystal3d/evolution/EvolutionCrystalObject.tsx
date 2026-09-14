@@ -101,7 +101,14 @@ export function EvolutionCrystalObject({
    */
   const bodyWidth = useMemo(() => crystalBodyWidth(geometry), [geometry]);
   useEffect(() => {
-    applyCrystalRefraction(bundle.materials.values(), { on: refraction, width: bodyWidth });
+    /*
+     * Пари «тіло → матеріал», а не всі матеріали бандла: інакше склом
+     * ставав би й камінь підкладки (ADR-0178 §7).
+     */
+    applyCrystalRefraction(
+      [...bundle.meshes].map(([bodyId, mesh]) => [bodyId, mesh.material] as const),
+      { on: refraction, width: bodyWidth },
+    );
   }, [bundle, refraction, bodyWidth]);
 
   useEffect(() => () => bundle.dispose(), [bundle]);

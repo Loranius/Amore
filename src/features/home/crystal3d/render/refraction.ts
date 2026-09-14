@@ -15,7 +15,7 @@
 // непрозорим, і буфер заломлення нарешті містить те, що має.
 // ============================================================
 import * as THREE from 'three';
-import type { CrystalGeometryState } from '@/engine/geometry';
+import { CRYSTAL_SUBSTRATE_BODY_ID, type CrystalGeometryState } from '@/engine/geometry';
 
 export const CRYSTAL_REFRACTION = Object.freeze({
   /**
@@ -56,6 +56,34 @@ export const CRYSTAL_REFRACTION = Object.freeze({
    */
   attenuationShare: 3,
   /**
+   * Стеля щільності рендеру, поки заломлення ввімкнене.
+   *
+   * НЕ «щоб швидше», а тому що інших важелів у нашій версії `three` немає.
+   * Буфер заломлення створюється (перевірено в `three` 0.170,
+   * `renderTransmissionPass`) з `samples: 4`, `generateMipmaps: true`,
+   * `HalfFloatType` — і щокадру ставиться в РОЗМІР ВСЬОГО КАДРУ:
+   * `transmissionRenderTarget.setSize( activeViewport.z, activeViewport.w )`.
+   * Ручки, якою цей розмір масштабують, у 0.170 немає — її шукано grep'ом і
+   * не знайдено.
+   *
+   * Отже єдине, що впливає на вартість проходу, — це сам розмір полотна.
+   * На `high` стеля 2: 824 × 1830 = 1.5 Мп, і стільки ж коштує другий
+   * прохід із чотириразовим MSAA та повним ланцюгом mip-рівнів. При 1.4 —
+   * 577 × 1281 = 0.74 Мп, тобто **вдвічі менше пікселів** і в кадрі, і в
+   * буфері.
+   *
+   * ЦІНА НАЗВАНА: кадр стає м'якшим. Це видно на тонких лініях — обводах
+   * граней і травинках, — і саме тому стеля діє ЛИШЕ поки прапорець
+   * увімкнений.
+   *
+   * Чого тут НЕ виміряно: кадрів на секунду. Пісочниця рендерить через
+   * SwiftShader, де час іде приблизно у двадцять разів повільніше
+   * (`scripts/live/README.md`, пастка 7), тож будь-яке число про
+   * плавність звідси було б вигадкою. Скільки це дало насправді, може
+   * сказати тільки пристрій.
+   */
+  renderScaleCeiling: 1.4,
+  /**
    * Дисперсія вимкнена, і це вимірна вартість, а не смак: із нею `three`
    * бере ТРИ вибірки буфера заломлення замість однієї (`USE_DISPERSION`
    * у `transmission_pars_fragment`). Перш ніж її вмикати, треба знати, що
@@ -95,20 +123,30 @@ export function crystalBodyWidth(geometry: CrystalGeometryState): number {
 /**
  * Увімкнути або зняти заломлення на вже зібраних матеріалах.
  *
+ * ПРИЙМАЄ ПАРИ «тіло → матеріал», а не самі матеріали, і це виправлення
+ * власної вади. Перша редакція брала `bundle.materials.values()` — тобто
+ * геть усі фізичні матеріали артефакта, разом із **каменем підкладки**.
+ * Жеода через це ставала склом: камінь, крізь який видно острів, — це не
+ * те, про що просили, і платив за нього кадр найдорожче, бо підкладка
+ * займає широку смугу екрана й має 2 396 трикутників проти сотні в
+ * монарха.
+ *
  * Знімає ПОВНІСТЮ, а не лише `transmission`: `attenuationColor` і
  * `thickness` лишились би на матеріалі й чекали б, доки хтось увімкне
  * прозорість іншим шляхом, — тобто прапорець перестав би бути
  * перемикачем і став подорожжю в один бік.
  */
 export function applyCrystalRefraction(
-  materials: Iterable<THREE.Material>,
+  bodies: Iterable<readonly [string, THREE.Material]>,
   options: { on: boolean; width: number },
 ): void {
   const thickness = Math.max(1e-6, options.width) * CRYSTAL_REFRACTION.thicknessShare;
   const attenuation = Math.max(1e-6, options.width) * CRYSTAL_REFRACTION.attenuationShare;
-  for (const material of materials) {
+  for (const [bodyId, material] of bodies) {
     const physical = material as THREE.MeshPhysicalMaterial;
     if (physical.isMeshPhysicalMaterial !== true) continue;
+    // Камінь лишається каменем.
+    if (bodyId === CRYSTAL_SUBSTRATE_BODY_ID) continue;
     if (options.on) {
       physical.transmission = CRYSTAL_REFRACTION.transmission;
       physical.thickness = thickness;
@@ -126,4 +164,16 @@ export function applyCrystalRefraction(
     }
     material.needsUpdate = true;
   }
+}
+
+/**
+ * Щільність рендеру з урахуванням заломлення.
+ *
+ * Окремою функцією, а не `Math.min` на місці виклику: число має стояти
+ * поруч із причиною, через яку воно існує, інакше наступний, хто
+ * побачить «магічну 1.4» у файлі сцени, прибере її як зайву.
+ */
+export function crystalRefractionRenderScale(base: number, refraction: boolean): number {
+  if (!refraction) return base;
+  return Math.min(base, CRYSTAL_REFRACTION.renderScaleCeiling);
 }
