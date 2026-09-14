@@ -1,0 +1,156 @@
+/* ============================================================
+   Профіль у налаштуваннях.
+   ------------------------------------------------------------
+   Портрет угорі, поля під ним, і під кожним полем — рядок про те, КУДИ
+   воно піде. Саме цей рядок і є тут головним: форма, яка не каже
+   наслідку, змушує заповнювати навмання.
+   ============================================================ */
+
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-people { margin-bottom: 2px; }
+
+.profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Портрет ─────────────────────────────────────────────────── */
+
+.profile-portrait {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.profile-avatar {
+  position: relative;
+  flex: 0 0 auto;
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+  overflow: visible;
+  display: grid;
+  place-items: center;
+  /* Натиск, а не наведення: це кнопка, до якої торкаються пальцем. */
+  transition: transform 90ms ease-out;
+}
+
+.profile-avatar:active { transform: scale(0.97); }
+.profile-avatar:disabled { cursor: default; opacity: 0.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  .profile-avatar { transition: none; }
+  .profile-avatar:active { transform: none; }
+}
+
+.profile-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  object-fit: cover;
+  display: block;
+}
+
+/* Одна літера, а не дві: імена тут короткі й особисті, і «ДМ» читалось
+   би як абревіатура установи. */
+.profile-avatar-initial {
+  font-size: 30px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+/* Значок камери — на краю кружечка, як на будь-якому портреті, який
+   можна замінити. Заливка `--accent-strong`, бо під нею світлий значок
+   (The Two Accents Rule). */
+.profile-avatar-badge {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--radius-pill);
+  background: var(--accent-strong);
+  color: #fff;
+  border: 2px solid var(--surface);
+}
+
+.profile-portrait-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  max-width: 34ch;
+}
+
+/* Поле вибору файлу ховається, а не зникає: кнопкою є сам портрет, але
+   `display: none` забрав би його й у клавіатурної навігації. */
+.profile-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ── Поля ────────────────────────────────────────────────────── */
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.profile-field-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.profile-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+}
+
+.profile-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Підказка каже НАСЛІДОК, а помилка — проблему й вихід із неї. Обидві
+   стоять на одному місці, тож рядок не стрибає, коли з'являється друга. */
+.profile-hint {
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+  max-width: 60ch;
+}
+
+.profile-hint.is-problem { color: var(--danger); }
+
+.profile-actions {
+  display: flex;
+  justify-content: flex-end;
+}

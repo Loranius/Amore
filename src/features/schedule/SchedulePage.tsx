@@ -1,7 +1,7 @@
 import { HeartIcon } from '@/components/icons/NavIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useUsers } from '@/features/_shared/useUsers';
+import { usePeople } from '@/features/_shared/useUsers';
 import { currentYearMonth, daysInMonth, monthKeyOf, todayLocal, ymd } from '@/features/_shared/month';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useSchedule } from './useSchedule';
@@ -34,7 +34,7 @@ import { PageHeader } from '@/components/ui/PageHeader';
 
 export function SchedulePage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { data: users = [] } = useUsers();
+  const users = usePeople();
   const me = useCurrentUser();
   const [{ yr, mo }, setYm] = useState(() => initialYearMonth(searchParams));
   const [editMode, setEditMode] = useState(() => searchParams.get('edit') === '1');
@@ -254,7 +254,7 @@ export function SchedulePage() {
       {editMode ? (
         <div className="sched-edit-panel">
           <div className="sched-person-switcher" role="tablist" aria-label="Чий графік редагувати">
-            {users.map((user) => <button key={user.id} type="button" role="tab" aria-selected={activeEditUser?.id === user.id} className={activeEditUser?.id === user.id ? 'is-active' : ''} onClick={() => changeEditUser(user.id)}>{user.name}</button>)}
+            {users.map((user) => <button key={user.id} type="button" role="tab" aria-selected={activeEditUser?.id === user.id} className={activeEditUser?.id === user.id ? 'is-active' : ''} onClick={() => changeEditUser(user.id)}>{user.displayName}</button>)}
           </div>
           {activeEditUser && (
             <ScheduleEditor

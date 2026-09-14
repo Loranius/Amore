@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { daysInMonth, stepMonth, ymd } from '@/features/_shared/month';
-import type { AppUser } from '@/types';
+import type { Person } from '@/features/profile/profileModel';
 import {
   useSchedule,
   useScheduleBatchMutation,
@@ -31,7 +31,7 @@ export function ScheduleEditor({
   today,
   onPendingSelectionChange,
 }: {
-  user: AppUser;
+  user: Person;
   yr: number;
   mo: number;
   marks: MarksMap;

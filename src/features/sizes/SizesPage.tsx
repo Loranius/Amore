@@ -26,7 +26,7 @@ import { EmptyState } from '@/components/ui/EmptyState';
 import { ListIcon, PencilIcon, UserIcon } from '@/components/icons/UiIcon';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useToast } from '@/providers/ToastProvider';
-import { useUsers } from '@/features/_shared/useUsers';
+import { usePeople } from '@/features/_shared/useUsers';
 import { SizesForm } from './SizesForm';
 import {
   FEMALE_NAME,
@@ -41,7 +41,7 @@ import type { UserSizesRow } from '@/types';
 import './sizes.css';
 
 export function SizesPage() {
-  const { data: users = [] } = useUsers();
+  const users = usePeople();
   const me = useCurrentUser();
   const [chosenId, setChosenId] = useState<number | null>(null);
   const [editing, setEditing] = useState(false);
@@ -57,6 +57,9 @@ export function SizesPage() {
   );
   const activeId = chosenId ?? partnerId;
   const activeUser = users.find((one) => one.id === activeId);
+  // Розвилка — за ІМЕНЕМ-КЛЮЧЕМ, а не за підписом із профілю: набір
+  // жіночих замірів не має мінятися від того, як людину перейменували
+  // (ADR-0180).
   const isFemale = activeUser?.name === FEMALE_NAME;
   const { data: sizes = null, isPending } = useUserSizes(activeId);
 
@@ -93,7 +96,7 @@ export function SizesPage() {
               }}
             >
               <UserIcon size={14} />
-              <span>{one.name}</span>
+              <span>{one.displayName}</span>
             </button>
           ))}
         </div>

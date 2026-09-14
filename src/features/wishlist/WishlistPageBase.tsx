@@ -3,7 +3,7 @@
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useCurrentUser } from '@/providers/AuthProvider';
+import { useMePerson } from '@/features/_shared/useUsers';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useToast } from '@/providers/ToastProvider';
 import { Lightbox } from '@/components/ui/Lightbox';
@@ -150,7 +150,7 @@ export function WishlistPage() {
   // вішліст декорацією.
   const { webglSupported } = useArtifactWorld();
   const worldVisible = webglSupported;
-  const me = useCurrentUser();
+  const me = useMePerson();
   const toast = useToast();
   const {
     partner,
@@ -395,7 +395,7 @@ export function WishlistPage() {
     },
     {
       value: 'partner',
-      label: partnerGenitive(partner.name),
+      label: partnerGenitive(partner.displayName),
       ...(!partnerWishlistQuery.isPending && !partnerWishlistQuery.isError
         ? { count: partnerItems.length }
         : {}),
@@ -408,7 +408,7 @@ export function WishlistPage() {
   ];
 
   const partnerEmptyCopy = tab === 'partner' ? partnerEmptyState(partnerFilter) : null;
-  const sharedEmptyCopy = tab === 'shared' ? sharedEmptyState(sharedFilter, partner.name) : null;
+  const sharedEmptyCopy = tab === 'shared' ? sharedEmptyState(sharedFilter, partner.displayName) : null;
   // Виконані видно на всіх трьох вкладках.
   //
   // Раніше вкладка партнера архіву не мала, і подаровані спогади діставались
@@ -456,8 +456,8 @@ export function WishlistPage() {
       {!archiveOpen && !worldVisible && (
         <WishlistHero
           tab={tab}
-          meName={me.name}
-          partnerName={partner.name}
+          meName={me.displayName}
+          partnerName={partner.displayName}
           activeCount={isPending || isError ? null : items.length}
           stats={stats}
           busy={mutationBusy}
@@ -546,7 +546,7 @@ export function WishlistPage() {
           {tab === 'shared' && !worldVisible && !isPending && !isError && (
             <WishlistSharedToolbar
               value={sharedFilter}
-              partnerName={partner.name}
+              partnerName={partner.displayName}
               counts={sharedCounts}
               onChange={setSharedFilter}
             />

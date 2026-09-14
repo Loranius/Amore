@@ -25,7 +25,7 @@ describe('що виросло з минулого разу', () => {
   it('нічого нового — мовчить', () => {
     const summary = summariseGrowth([ev('a'), ev('b')], new Set(['a', 'b']));
     expect(summary.newCount).toBe(0);
-    expect(growthCaption(summary, { id: 2, name: 'Лєна' })).toBeNull();
+    expect(growthCaption(summary, { id: 2, displayName: 'Лєна' })).toBeNull();
   });
 
   it('рахує лише те, чого раніше не бачили', () => {
@@ -56,7 +56,7 @@ describe('підпис приросту', () => {
      * «від Лєни» на подіях, половину яких додав Діма, — це неправда,
      * сказана заради теплоти. Такі помічають найшвидше.
      */
-    const lena = { id: 2, name: 'Лєна' };
+    const lena = { id: 2, displayName: 'Лєна' };
     const onlyHers = summariseGrowth([ev('a', 2), ev('b', 2)], new Set());
     expect(growthCaption(onlyHers, lena)).toBe('У кристалі 2 нові миті · Лєна');
 
@@ -108,7 +108,7 @@ describe('підпис приросту', () => {
     // «додала»/«додав» залежать від роду, а рід партнера портал не
     // зберігає. Підпис мусить бути правдивим для обох.
     const summary = summariseGrowth([ev('a', 2), ev('b', 2)], new Set());
-    const caption = growthCaption(summary, { id: 2, name: 'Лєна' })!;
+    const caption = growthCaption(summary, { id: 2, displayName: 'Лєна' })!;
     expect(caption).not.toMatch(/додал[аи]?|принесл[аи]?/);
   });
 
@@ -133,7 +133,7 @@ describe('підпис приросту', () => {
      */
     for (const name of ['Лєна', 'Настя', 'Олег', 'Ілля']) {
       const summary = summariseGrowth([ev('a', 7)], new Set());
-      const caption = growthCaption(summary, { id: 7, name })!;
+      const caption = growthCaption(summary, { id: 7, displayName: name })!;
       expect(caption).toBe(`У кристалі 1 нова мить · ${name}`);
       expect(caption).not.toContain('від ');
     }

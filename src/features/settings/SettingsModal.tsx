@@ -1,26 +1,29 @@
 // ============================================================
-// SettingsModal — тема, вихід і фото полароїда
+// SettingsModal — профіль, історія, тема, вихід
 // ------------------------------------------------------------
-// Менеджер фото Storage-бакету family_photos (HEIC-normalize +
-// compress → upload/видалення). useSettings.ts інвалідує qk.photos()
-// на кожній зміні, тож грань «Фотографії» кристала на головній одразу
-// підхоплює нове.
+// Тепер це передусім ПРОФІЛЬ: ім'я, фото й дата народження людини —
+// тобто те, чим портал її називає й показує скрізь (ADR-0180).
 //
-// **РОЗМІРІВ ТУТ БІЛЬШЕ НЕМАЄ.** Вони стали окремим модулем «Заміри» в
-// «Ще», поруч із грою: налаштування відкривають, щоб щось ЗМІНИТИ, а
-// заміри — щоб ПОДИВИТИСЬ, здебільшого стоячи в магазині. Разом із ними
-// пішла й вкладка: коли вкладка лишається одна, вона перестає бути
-// вибором і стає зайвим рядком над вмістом.
+// **ЩО ЗВІДСИ ПІШЛО, і чому це не втрата.**
+//
+// *Розміри* стали окремим модулем «Заміри» в «Ще» (ADR-0179):
+// налаштування відкривають, щоб щось ЗМІНИТИ, а заміри — щоб
+// ПОДИВИТИСЬ, здебільшого стоячи в магазині.
+//
+// *Менеджер фото полароїда* прибраний на прохання власника. Разом із ним
+// пішла єдина дорога, якою в бакет `family_photos` потрапляли НОВІ фото;
+// вже завантажені лишились і далі годують грань «Фотографії» кристала
+// (`useHome.ts::usePhotoPool`). Це названо тут, а не сховано: сигнал
+// рушія тепер стоїть на місці, доки завантаження не з'явиться десь інде.
 // ============================================================
-import { useEffect, useState, type ChangeEvent, type DragEvent } from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Photo } from '@/components/ui/Photo';
 import { ModalClose } from '@/components/ui/ModalClose';
 import { useAuth } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
-import { MoonIcon, PlusIcon, SunIcon, TrashIcon } from '@/components/icons/UiIcon';
+import { MoonIcon, SunIcon } from '@/components/icons/UiIcon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { usePhotoManager, usePhotoMutations } from './useSettings';
+import { ProfileSection } from '@/features/profile/ProfileSection';
 
 interface SettingsModalProps {
   open: boolean;
@@ -28,7 +31,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
-  const { user, logout } = useAuth();
+  const { logout } = useAuth();
   const confirmDialog = useConfirm();
 
   const confirmLogout = async () => {
@@ -61,9 +64,14 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
       >
         <ModalClose onClose={onClose} />
         <h2 className="modal-title">Налаштування</h2>
-        {user && <p className="modal-sub">Профіль: {user.name}</p>}
 
-        <PhotosSection />
+        {/*
+          * Рядка «Профіль: Діма» тут більше немає: нижче стоїть сам
+          * профіль із іменем у полі вводу, тож підпис угорі повторював би
+          * те, що вже видно, і — після перейменування — суперечив би
+          * йому, бо брав ім'я-ключ.
+          */}
+        <ProfileSection />
 
         <div className="settings-divider" />
 
@@ -81,9 +89,6 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
             Заповнити минулі роки
           </Link>
         </section>
-
-        <div className="settings-divider" />
-
 
         <div className="settings-divider" />
 
@@ -147,137 +152,6 @@ function ThemeSection() {
           <MoonIcon size={18} />
           Темна
         </button>
-      </div>
-    </section>
-  );
-}
-
-// ============================================================
-// ФОТО ПОЛАРОЇДА
-// ============================================================
-
-function PhotosSection() {
-  const { data: photos = [], isPending } = usePhotoManager();
-  const { upload, remove } = usePhotoMutations();
-  const confirmDialog = useConfirm();
-  const [dragOver, setDragOver] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [deletingName, setDeletingName] = useState<string | null>(null);
-
-  const handleFiles = async (files: File[]) => {
-    if (!files.length) return;
-    setProgress({ done: 0, total: files.length });
-    for (const file of files) {
-      try {
-        await upload.mutateAsync(file);
-      } catch {
-        // Тост про помилку вже показано в onError мутації — переходимо далі.
-      }
-      setProgress((p) => (p ? { done: p.done + 1, total: p.total } : p));
-    }
-    setTimeout(() => setProgress(null), 1200);
-  };
-
-  const onInputChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = '';
-    void handleFiles(files);
-  };
-
-  const onDrop = (e: DragEvent<HTMLLabelElement>) => {
-    e.preventDefault();
-    setDragOver(false);
-    const files = Array.from(e.dataTransfer.files).filter(
-      (f) => f.type.startsWith('image/') || /\.(heic|heif)$/i.test(f.name),
-    );
-    void handleFiles(files);
-  };
-
-  const onDelete = async (name: string) => {
-    if (!(await confirmDialog('Видалити це фото з полароїда?'))) return;
-    setDeletingName(name);
-    try {
-      await remove.mutateAsync(name);
-    } catch {
-      // Тост про помилку вже показано в onError мутації.
-    } finally {
-      setDeletingName(null);
-    }
-  };
-
-  return (
-    <section className="settings-section">
-      {/* Назви секції немає: вкладка «Фото» вже двома рядками вище. */}
-      <p className="settings-section-desc">
-        Фото з&apos;являються на головному екрані. Рекомендований формат — квадрат.
-      </p>
-
-      <label
-        className={`photo-upload-zone${dragOver ? ' drag-over' : ''}`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={onDrop}
-      >
-        <span className="photo-upload-icon" aria-hidden="true"><PlusIcon size={22} /></span>
-        <span className="photo-upload-label">Додати фото</span>
-        <input
-          id="settings-photo-file"
-          name="photoFile"
-          type="file"
-          accept="image/*,.heic,.heif"
-          multiple
-          onChange={onInputChange}
-          style={{ display: 'none' }}
-        />
-      </label>
-
-      {progress && (
-        <div className="photo-upload-progress">
-          <div
-            className="photo-upload-bar"
-            style={{ width: `${Math.round((progress.done / progress.total) * 100)}%` }}
-          />
-          <span className="photo-upload-status">
-            {progress.done < progress.total
-              ? `Завантажується ${progress.done + 1} з ${progress.total}…`
-              : `Готово! Завантажено ${progress.done} з ${progress.total}`}
-          </span>
-        </div>
-      )}
-
-      <div className="photo-manager-grid">
-        {isPending ? (
-          <p className="photo-manager-loading">Завантаження…</p>
-        ) : photos.length === 0 ? (
-          <p className="empty-state">Фото ще немає. Додай перше!</p>
-        ) : (
-          photos.map((p) => (
-            <div
-              key={p.name}
-              className={`photo-manager-thumb${deletingName === p.name ? ' deleting' : ''}`}
-            >
-              {/*
-                * Сітка `auto-fill, minmax(84px, 1fr)` — тобто картка
-                * близько 84–110 CSS px. Сирий `<img src={p.url}>` тягнув
-                * сюди ОРИГІНАЛ: у пари це в середньому 416 КБ на знімок
-                * при 21 КБ, яких вистачає на цей розмір.
-                */}
-              <Photo src={p.url} cssWidth={110} alt="" loading="lazy" />
-              <button
-                type="button"
-                className="photo-manager-del"
-                aria-label="Видалити фото"
-                disabled={deletingName === p.name}
-                onClick={() => void onDelete(p.name)}
-              >
-                <TrashIcon size={14} />
-              </button>
-            </div>
-          ))
-        )}
       </div>
     </section>
   );

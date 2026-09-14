@@ -125,10 +125,15 @@ export function momentPhrase(count: number): string {
  *
  * Дієслів немає взагалі, і це теж не випадково: «додала»/«додав»
  * залежать від роду, а рід партнера портал не зберігає.
+ *
+ * Поле навмисно зветься `displayName`, а не `name`: шапка каже ПІДПИС
+ * із профілю, а не ім'я-ключ із `users` (ADR-0180). Обидва рядки, і
+ * якби поле звалось `name`, сюди роками ходило б не те — мовчки й
+ * правильно на вигляд.
  */
 export function growthCaption(
   summary: GrowthSummary,
-  partner: { id: number; name: string } | null,
+  partner: { id: number; displayName: string } | null,
 ): string | null {
   if (summary.firstVisit || summary.newCount === 0) return null;
 
@@ -137,5 +142,5 @@ export function growthCaption(
     && summary.actorIds.length === 1
     && summary.actorIds[0] === partner.id;
 
-  return onlyPartner ? `${base} · ${partner.name}` : base;
+  return onlyPartner ? `${base} · ${partner.displayName}` : base;
 }

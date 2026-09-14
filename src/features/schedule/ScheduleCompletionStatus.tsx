@@ -1,5 +1,5 @@
 import { CheckIcon } from '@/components/icons/UiIcon';
-import type { AppUser } from '@/types';
+import type { Person } from '@/features/profile/profileModel';
 import type { MarksMap } from './useSchedule';
 import './scheduleStabilization.css';
 
@@ -18,7 +18,7 @@ export function ScheduleCompletionStatus({
   onEditUser,
   onRemindUser,
 }: {
-  users: AppUser[];
+  users: Person[];
   marks: MarksMap;
   total: number;
   currentUserId: number | null;
@@ -44,7 +44,7 @@ export function ScheduleCompletionStatus({
         return (
           <article key={user.id} className={`sched-completion-card${complete ? ' is-complete' : ''}`}>
             <div className="sched-completion-copy">
-              <strong>{user.name}</strong>
+              <strong>{user.displayName}</strong>
               <span>{complete ? 'Графік заповнено' : filled === 0 ? 'Ще не заповнено' : `${filled} із ${total} днів`}</span>
             </div>
             <div className="sched-completion-value" aria-label={`${progress}%`}>{complete ? <CheckIcon size={15} /> : `${progress}%`}</div>

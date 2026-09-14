@@ -6,13 +6,14 @@
 import { useEffect, useRef } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import type { AppUser, WishlistItemRow } from '@/types';
+import type { WishlistItemRow } from '@/types';
+import type { Person } from '@/features/profile/profileModel';
 import { TogetherIcon } from '@/components/icons/WishIcon';
 import { InboxIcon, SwapIcon, UserIcon } from '@/components/icons/UiIcon';
 
 interface MoveWishModalProps {
   item: WishlistItemRow;
-  partner: AppUser | null;
+  partner: Person | null;
   saving: boolean;
   onClose: () => void;
   onMove: (owner: number, isShared: boolean) => Promise<void>;
@@ -42,7 +43,7 @@ export function MoveWishModal({ item, partner, saving, onClose, onMove }: MoveWi
     { key: 'me', label: 'Мені', Icon: InboxIcon, owner: me.id, isShared: false, possible: true },
     {
       key: 'partner',
-      label: `Для ${partner?.name ?? 'партнера'}`,
+      label: `Для ${partner?.displayName ?? 'партнера'}`,
       Icon: UserIcon,
       owner: partner?.id ?? me.id,
       isShared: false,

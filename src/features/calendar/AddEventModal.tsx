@@ -23,7 +23,7 @@
 import { useState } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
 import type { ReactNode } from 'react';
-import { useUsers } from '@/features/_shared/useUsers';
+import { usePeople } from '@/features/_shared/useUsers';
 import { useEvents } from '@/features/_shared/events';
 import { EventIcon, SparkIcon } from '@/components/icons/EventIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
@@ -112,7 +112,7 @@ export function AddEventModal({
   );
   const [personId, setPersonId] = useState<number | null>(event?.person_user_id ?? null);
   const [starColor, setStarColor] = useState<string | null>(event?.star_color ?? null);
-  const { data: users = [] } = useUsers();
+  const users = usePeople();
   const { data: allEvents = [] } = useEvents();
   const takenKeys = takenKeySignificance(allEvents, event);
 
@@ -300,7 +300,7 @@ export function AddEventModal({
                   className={`chip${personId === user.id ? ' active' : ''}`}
                   onClick={() => setPersonId(personId === user.id ? null : user.id)}
                 >
-                  {user.name}
+                  {user.displayName}
                 </button>
               ))}
               <button

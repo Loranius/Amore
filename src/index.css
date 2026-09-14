@@ -3345,84 +3345,11 @@ textarea::placeholder {
    кодом: класи називаються так само, і старий `.sizes-row` — рядок
    таблиці — сперечався б із новим `.sizes-row`, який тепер кнопка. */
 
-/* ── Фото полароїда: завантаження ────────────────────────────── */
-.photo-upload-zone {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 16px;
-  border: 2px dashed color-mix(in srgb, var(--text) 20%, transparent);
-  border-radius: var(--radius-md);
-  color: var(--muted);
-  cursor: pointer;
-  transition: border-color 0.2s ease, background 0.2s ease;
-}
-.photo-upload-zone.drag-over {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-.photo-upload-icon { display: grid; place-items: center; color: var(--accent); }
-.photo-upload-label { font-size: 13.5px; }
-
-.photo-upload-progress {
-  position: relative;
-  height: 26px;
-  border-radius: var(--radius-sm);
-  background: var(--bg);
-  overflow: hidden;
-}
-.photo-upload-bar {
-  position: absolute;
-  inset: 0 auto 0 0;
-  background: var(--accent);
-  transition: width 0.3s ease;
-}
-.photo-upload-status {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  font-size: 12px;
-  color: var(--text);
-}
-
-/* ── Фото полароїда: сітка ──────────────────────────────────── */
-.photo-manager-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
-  gap: 8px;
-}
-.photo-manager-loading { grid-column: 1 / -1; color: var(--muted); }
-.photo-manager-thumb {
-  position: relative;
-  aspect-ratio: 1;
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  background: var(--bg);
-}
-.photo-manager-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.photo-manager-thumb.deleting { opacity: 0.4; pointer-events: none; }
-.photo-manager-del {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  /* 30px, а не 22: це єдиний спосіб прибрати фото, і він був удвічі
-     менший за поріг дотику. */
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 50%;
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  font-size: 12px;
-  line-height: 1;
-  cursor: pointer;
-}
+/* Менеджер фото полароїда прибраний на прохання власника разом із його
+   стилями (`.photo-upload-*`, `.photo-manager-*`). Уже завантажені фото
+   лишились у бакеті й далі годують грань «Фотографії» кристала; нової
+   дороги в бакет із порталу наразі немає — див. шапку
+   `features/settings/SettingsModal.tsx`. */
 
 /* ── Розділ, що не відкрився ─────────────────────────────────
    Показує RouteErrorBoundary. Портал лишається на місці: нижня

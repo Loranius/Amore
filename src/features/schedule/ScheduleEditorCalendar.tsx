@@ -1,6 +1,6 @@
 import { CheckIcon } from '@/components/icons/UiIcon';
 import { DAYS_UA, daysInMonth, firstMondayOffset, ymd } from '@/features/_shared/month';
-import type { AppUser } from '@/types';
+import type { Person } from '@/features/profile/profileModel';
 import type { ScheduleMark } from './useSchedule';
 import { markLabel, normalizeMark } from './scheduleEditorModel';
 
@@ -16,7 +16,7 @@ export function ScheduleEditorCalendar({
   isPending,
   onDay,
 }: {
-  user: AppUser;
+  user: Person;
   yr: number;
   mo: number;
   today: string;
@@ -32,7 +32,7 @@ export function ScheduleEditorCalendar({
 
   return (
     <div className="card sched-board sched-board--editing">
-      <h3 className="sched-board-title">Графік: {user.name}</h3>
+      <h3 className="sched-board-title">Графік: {user.displayName}</h3>
       <p className="sched-editor-hint">
         {bulkMode
           ? `Обери дні, потім застосуй стан «${markLabel(selectedMark)}».`
