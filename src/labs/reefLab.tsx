@@ -19,9 +19,10 @@
 //
 // Сторінка не входить у збірку продукту: лише dev-сервер.
 // ============================================================
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { Canvas } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
+import { Vector3 } from 'three';
 import { REEF_CAMERA_FOV_DEG } from '@/engine/species/reef/reefStaging';
 import {
   buildReefPlan,
@@ -29,6 +30,7 @@ import {
   type ReefPlan,
 } from '@/engine/species/reef/reefAssembly';
 import { reefSilhouetteProfile } from '@/engine/species/reef/reefProfile';
+import { reefStanding } from '@/engine/species/reef/reefStaging';
 import { PORTAL_MODULES } from '@/engine/species/shared/relationshipYear';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import { ReefWorld } from '@/features/home/reef3d/world/ReefWorld';
@@ -154,6 +156,61 @@ function ReefLab(): React.JSX.Element | null {
 }
 
 /**
+ * Рамка купола НА ЕКРАНІ, у частках кадру.
+ *
+ * ЧОМУ ЦЕ ТУТ, А НЕ В МІРЦІ ПО ПІКСЕЛЯХ. Будь-яке вимірювання кольору
+ * впирається в те саме питання: які пікселі належать артефакту, а які —
+ * воді, піску й туману. Кристал відповідав на нього двічі й обидва рази
+ * помилився — спершу контрольним кадром (камера вписує коробку ВСІХ
+ * мешів, тож без артефакта вона під'їжджає, і «тілом» стала половина
+ * острова), потім вікном відтінку (воно ламається, щойно тіло змінює
+ * колір). Обидві історії записані в ADR-0174.
+ *
+ * Тут маска БЕРЕТЬСЯ З ПРАВДИ: вісім кутів коробки купола проєктуються
+ * тією самою камерою, якою малюється кадр. Здогадуватись більше нема про
+ * що — ні про колір, ні про те, куди поїхала камера.
+ *
+ * Рахується щокадру, бо камера ще їде зі згасанням, і знімок роблять
+ * через дев'ять секунд після готовності. Вісім точок на кадр — ціна, про
+ * яку нема що казати.
+ */
+function ReefScreenBox({
+  radius,
+  rise,
+  lift,
+  onBox,
+}: {
+  radius: number;
+  rise: number;
+  lift: number;
+  onBox: (box: readonly [number, number, number, number]) => void;
+}): null {
+  const camera = useThree((state) => state.camera);
+  useFrame(() => {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    for (let corner = 0; corner < 8; corner += 1) {
+      const point = new Vector3(
+        (corner & 1 ? 1 : -1) * radius,
+        lift + (corner & 2 ? rise : 0),
+        (corner & 4 ? 1 : -1) * radius,
+      ).project(camera);
+      // NDC (−1..1, вгору) → частка кадру (0..1, униз).
+      const x = (point.x + 1) / 2;
+      const y = (1 - point.y) / 2;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    }
+    onBox([minX, minY, maxX, maxY]);
+  });
+  return null;
+}
+
+/**
  * Готовий риф — окремим компонентом, як і в порталі.
  *
  * `useReefMeshes` не можна кликати після раннього повернення: гак,
@@ -163,9 +220,26 @@ function ReefLab(): React.JSX.Element | null {
 function ReefLabScene({ plan, theme }: { plan: ReefPlan; theme: ReefTheme }): React.JSX.Element {
   const meshes = useReefMeshes(plan);
   const profile = useMemo(() => reefSilhouetteProfile(plan), [plan]);
+  const standing = useMemo(() => reefStanding(plan.head), [plan.head]);
+  const [box, setBox] = useState<readonly [number, number, number, number] | null>(null);
+  const onBox = useCallback((next: readonly [number, number, number, number]) => {
+    setBox((current) => {
+      // Оновлюємо лише тоді, коли камера справді зрушила: інакше кожен
+      // кадр давав би новий стан і перемальовував би обгортку вічно.
+      if (current && current.every((value, index) => Math.abs(value - next[index]!) < 1e-4)) {
+        return current;
+      }
+      return next;
+    });
+  }, []);
 
   /*
    * Числа лінійки їдуть в АТРИБУТИ, а не на екран.
+   *
+   * Серед них `data-reef-screen-box` — рамка купола в частках кадру
+   * (`x0,y0,x1,y1`, початок у лівому верхньому куті). Саме вона й дає
+   * мірці по пікселях точну маску: без здогадів про колір і без
+   * контрольного кадру, на яких кристал обпікся двічі (ADR-0174).
    *
    * Напис поверх сцени потрапив би в кожен знімок і в кожен вимір
    * яскравості — саме тому `tree-lab.html` і пише «жодного інтерфейсу».
@@ -191,6 +265,7 @@ function ReefLabScene({ plan, theme }: { plan: ReefPlan; theme: ReefTheme }): Re
       data-reef-body-aspect={profile.bodyAspect.toFixed(4)}
       data-reef-dome-aspect={profile.domeAspect.toFixed(4)}
       data-reef-size-spread={profile.sizeSpread.toFixed(4)}
+      data-reef-screen-box={box ? box.map((value) => value.toFixed(4)).join(',') : ''}
     >
       <Canvas
         camera={{ position: [0, 1.2, 4.2], fov: REEF_CAMERA_FOV_DEG }}
@@ -202,6 +277,12 @@ function ReefLabScene({ plan, theme }: { plan: ReefPlan; theme: ReefTheme }): Re
           * жива — ні.
           */}
         <ReefWorld plan={plan} meshes={meshes} theme={theme} reduceMotion />
+        <ReefScreenBox
+          radius={plan.head.radius}
+          rise={plan.head.rise}
+          lift={standing.headLift}
+          onBox={onBox}
+        />
       </Canvas>
     </div>
   );
