@@ -16,7 +16,7 @@ import type { IconProps } from '@/components/icons/iconBase';
 import {
   CameraIcon, CartIcon, ClockIcon,
   FilmIcon, GamepadIcon, HeartIcon, MoreIcon, PlansIcon,
-  PotIcon, SettingsIcon, TicketIcon,
+  PotIcon, RulerIcon, SettingsIcon, TicketIcon,
 } from '@/components/icons/NavIcon';
 import { GiftIcon } from '@/components/icons/UiIcon';
 
@@ -92,6 +92,12 @@ export const MORE_GROUPS: NavGroup[] = [
     label: 'Інше',
     items: [
       { to: '/game', Icon: GamepadIcon, label: 'Гра' },
+      /*
+       * Заміри були вкладкою налаштувань, і це було не те місце:
+       * налаштування відкривають, щоб щось ЗМІНИТИ, а заміри — щоб
+       * ПОДИВИТИСЬ, стоячи в магазині.
+       */
+      { to: '/sizes', Icon: RulerIcon, label: 'Заміри' },
     ],
   },
 ];

@@ -51,6 +51,7 @@ const loadJourney = () => import('@/features/journey/JourneyPage');
 const loadPlanDetails = () => import('@/features/plans/PlanDetailsPage');
 const loadWhereTo = () => import('@/features/whereto/WhereToPage');
 const loadGame = () => import('@/features/game/GamePage');
+const loadSizes = () => import('@/features/sizes/SizesPage');
 const loadHistorySweep = () => import('@/features/onboarding/HistorySweepPage');
 
 const ShoppingPage = lazyRoute(loadShopping, (m) => m.ShoppingPage);
@@ -66,6 +67,7 @@ const JourneyPage = lazyRoute(loadJourney, (m) => m.JourneyPage);
 const PlanDetailsPage = lazyRoute(loadPlanDetails, (m) => m.PlanDetailsPage);
 const WhereToPage = lazyRoute(loadWhereTo, (m) => m.WhereToPage);
 const GamePage = lazyRoute(loadGame, (m) => m.GamePage);
+const SizesPage = lazyRoute(loadSizes, (m) => m.SizesPage);
 
 /**
  * Чанки, які варто прогріти, поки пара дивиться на головну.
@@ -157,6 +159,14 @@ export const router = createHashRouter([
           { path: 'map', element: <Navigate to="/memories" replace /> },
           { path: 'culinary', element: page(<CulinaryPage />) },
           { path: 'game', element: page(<GamePage />) },
+          /*
+           * «Заміри» стоять поруч із грою в «Ще» — і поруч у цьому файлі
+           * теж, щоб порядок роутів не розходився з порядком у меню.
+           *
+           * Окремим модулем, а не вкладкою налаштувань: налаштування
+           * відкривають, щоб щось ЗМІНИТИ, а заміри — щоб ПОДИВИТИСЬ.
+           */
+          { path: 'sizes', element: page(<SizesPage />) },
 
           // Заповнення історії: пара, яка разом давно, інакше отримує
           // однакові порожні роки. Окремий маршрут, а не модалка, бо це

@@ -609,6 +609,7 @@ textarea {
   outline-offset: 2px;
 }
 
+
 input::placeholder,
 textarea::placeholder {
   color: var(--muted);
@@ -3295,9 +3296,6 @@ textarea::placeholder {
   background: color-mix(in srgb, var(--danger) 10%, transparent);
 }
 
-/* Кнопка редагування — на всю ширину під таблицею, як єдина дія блоку. */
-.sizes-edit-btn { width: 100%; }
-
 /* ── Вибір теми ─────────────────────────────────────────────
    Жолоб зі скла й два сегменти — те саме, що на обох аркушах референсу.
    Активний не просто залитий, а світить: ореол — це те, чим «обрано»
@@ -3342,26 +3340,10 @@ textarea::placeholder {
 }
 .settings-section-desc { margin: -4px 0 0; color: var(--muted); font-size: 13px; }
 
-/* ── Розміри: перегляд ──────────────────────────────────────── */
-.sizes-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 10px;
-}
-.sizes-group {
-  background: var(--bg);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-.sizes-group-title { font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 2px; }
-.sizes-row { display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
-
-/* ── Розміри: редагування ───────────────────────────────────── */
-.sizes-edit { display: flex; flex-direction: column; gap: 14px; }
-.sizes-form-group { display: flex; flex-direction: column; gap: 8px; }
+/* Розміри звідси пішли разом із модулем «Заміри»
+   (`features/sizes/sizes.css`). Лишати їх тут було б гірше, ніж мертвим
+   кодом: класи називаються так само, і старий `.sizes-row` — рядок
+   таблиці — сперечався б із новим `.sizes-row`, який тепер кнопка. */
 
 /* ── Фото полароїда: завантаження ────────────────────────────── */
 .photo-upload-zone {

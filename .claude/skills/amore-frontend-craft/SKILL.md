@@ -46,17 +46,23 @@ Measured, so you do not waste a pass re-auditing:
   pattern (an `outline` in a `color-mix` of the module accent) rather than
   inventing one.
 
-## The gap nobody has closed
-
-**`::selection` is themed in exactly zero places.** Every screen in this portal
-hands text selection to the browser default — a blue that belongs to no design
-system and clashes with every violet surface we ship.
+## Browser surfaces
 
 Browser surfaces are the parts you did not draw but still ship: selection, the
 caret, scrollbars, focus rings, underline offset, tabular numerals. They are the
 cheapest signal that a page was *built* rather than assembled, and the one most
-reliably skipped. `caret-color` appears once; scrollbars are themed in eight
-places. Selection, nowhere.
+reliably skipped.
+
+**`::selection` used to be named here as the gap nobody had closed. It is closed**
+— one rule in `src/index.css`, under the «Поверхні браузера» comment, with its
+own measurement. That line stayed in this file after the fix and cost a round:
+a session read it, added a second `::selection` rule with a different token, and
+only a test caught the duplicate. Two rules on one selector do not clash
+visibly — the last one wins, and a one-token difference quietly ships portal-wide.
+
+So before adding a browser-surface rule, grep for the selector. `caret-color`
+appears once, scrollbars in eight places, selection in exactly one — and one is
+the right number for each.
 
 ## Token drift is the real defect here
 

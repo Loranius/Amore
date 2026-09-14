@@ -1,6 +1,5 @@
 // ============================================================
-// useSettings — фото-менеджер полароїда + розміри (порт даних
-// modules/settings.js)
+// useSettings — фото-менеджер полароїда (порт даних modules/settings.js)
 // ------------------------------------------------------------
 // Фото: HEIC-normalize + compress → Storage-бакет family_photos
 // (той самий бакет і фільтр розширень, що й usePhotoPool на
@@ -8,14 +7,14 @@
 // invalidateQueries({ queryKey: qk.photos() }) скидає і повний
 // менеджер-список, і пул для полароїд-хмарки одночасно.
 //
-// Розміри: user_sizes, один рядок на user_id (upsert onConflict).
+// Розміри звідси пішли разом із модулем «Заміри» (`features/sizes`):
+// дані живуть там, де живе екран, який їх показує.
 // ============================================================
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, publicUrl } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
 import { compress, normalize } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
-import type { InsertRow, UserSizesRow } from '@/types';
 import { randomToken } from '@/lib/entropy';
 
 const PHOTO_BUCKET = 'family_photos';
@@ -88,31 +87,3 @@ export function usePhotoMutations() {
 
 // ── Розміри (user_sizes) ─────────────────────────────────────
 
-export function useUserSizes(userId: number) {
-  return useQuery({
-    queryKey: qk.userSizes(userId),
-    queryFn: async (): Promise<UserSizesRow | null> => {
-      const { data, error } = await supabase
-        .from('user_sizes')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle();
-      if (error) throw error;
-      return data ?? null;
-    },
-  });
-}
-
-export function useSaveSizes() {
-  const client = useQueryClient();
-  const toast = useToast();
-  return useMutation({
-    mutationFn: async (patch: InsertRow<'user_sizes'>): Promise<void> => {
-      const { error } = await supabase.from('user_sizes').upsert(patch, { onConflict: 'user_id' });
-      if (error) throw error;
-    },
-    onSuccess: (_data, patch) =>
-      void client.invalidateQueries({ queryKey: qk.userSizes(patch.user_id) }),
-    onError: () => toast.show('Не вдалося зберегти розміри'),
-  });
-}

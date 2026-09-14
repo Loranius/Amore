@@ -1,0 +1,222 @@
+/* ============================================================
+   «Заміри» — сторінка на одну задачу: знайти число й прочитати його.
+   ------------------------------------------------------------
+   Режим Operate. Уся ієрархія тут двоступенева й навмисно груба:
+   підпис приглушений і дрібний, значення світле й на чверть більше.
+   Двох розмірів, що різняться на піксель, тут немає.
+   ============================================================ */
+
+.sizes-page {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Лічильник у рядку стану — тими самими цифрами, що й решта порталу. */
+.sizes-count { font-variant-numeric: tabular-nums; }
+
+.sizes-people { margin-top: -2px; }
+
+.sizes-edit-open { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Місце під вміст, поки він їде: без нього сторінка стрибає на висоту
+   всього списку рівно тоді, коли пара вже почала читати заголовок. */
+.sizes-loading { min-height: 220px; }
+
+.sizes-sheet {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── Один авторський рух на екран ─────────────────────────────
+   Перемикання людини — єдине, що тут анімується. Не поява сторінки й
+   не кожен блок окремо: рухається саме те, що змінилось, і рівно
+   стільки, щоб око встигло за підміною чисел.
+   180 мс — найчастіше значення шкали порталу. */
+@keyframes sizes-swap {
+  from { opacity: 0.55; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.sizes-sheet { animation: sizes-swap 180ms ease-out; }
+
+@media (prefers-reduced-motion: reduce) {
+  .sizes-sheet { animation: none; }
+}
+
+/* ── Ширина рядка на великому екрані ──────────────────────────
+   Виміряно знімком 1280×800: одна колонка розтягувала рядок до 948 px,
+   і між підписом ліворуч та числом праворуч лишалась порожня смуга на
+   пів екрана. Пара читає пару «підпис — значення», а не рядок тексту,
+   тож відстань між ними і є тим, що псує читабельність.
+
+   Дві колонки карток замість однієї довгої: рядок стає ~460 px, а
+   вільне місце йде під другу картку, а не під порожнечу. */
+@media (min-width: 900px) {
+  .sizes-sheet:not(.sizes-sheet--edit) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+    gap: 14px;
+  }
+  .sizes-sheet:not(.sizes-sheet--edit) .sizes-missing { grid-column: 1 / -1; }
+}
+
+.sizes-block {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  padding: 12px 14px 6px;
+}
+
+/* Над заголовком більше повітря, ніж під ним: підпис належить тому, що
+   стоїть НИЖЧЕ за нього, і відстань мусить це казати. */
+.sizes-block-title {
+  margin: 2px 0 8px;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.sizes-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sizes-item + .sizes-item { border-top: 1px solid var(--border); }
+
+/* Рядок — кнопка: його головна дія це «скопіювати». Тому він на всю
+   ширину картки й заввишки в палець (44 px — мінімум дотику). */
+.sizes-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 44px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: background 90ms ease-out;
+}
+
+/* Підсвітка на дотик і на миш — однакова, бо дія одна. */
+.sizes-row:hover,
+.sizes-row:active {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sizes-row { transition: none; }
+}
+
+.sizes-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.sizes-value {
+  flex: 0 0 auto;
+  font-size: 18px;
+  font-weight: 700;
+  /* Числа однакової ширини: інакше «168» і «111» стоять різними стовпцями
+     і список перестає скануватись згори вниз. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Одиниця тихіша за число: шукають «38», а не «38 см». */
+.sizes-value .sizes-unit {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* У ПІДПИСІ ФОРМИ — та сама одиниця, але тихіша за сам підпис.
+   Виміряно знімком: успадкувавши вигляд від значення, «см» ставало
+   напівжирним усередині й так уже приглушеного підпису — тобто
+   найгучнішою частиною рядка була одиниця, а не назва заміру. */
+.sizes-field-label .sizes-unit {
+  font-size: inherit;
+  font-weight: inherit;
+  opacity: 0.72;
+}
+
+/* ── Чого немає ───────────────────────────────────────────────
+   Одним рядком, а не стіною прочерків у таблиці. */
+.sizes-missing {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 68ch;
+}
+
+.sizes-missing-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+/* ── Форма ───────────────────────────────────────────────────── */
+
+.sizes-fields {
+  display: grid;
+  /* Одна колонка на телефоні: українські підписи довгі («Безіменний
+     палець»), і у вужчій колонці вони переносяться посеред слова. */
+  grid-template-columns: 1fr;
+  gap: 10px;
+  padding-bottom: 8px;
+}
+
+@media (min-width: 560px) {
+  .sizes-fields { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+}
+
+.sizes-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.sizes-field-label {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.sizes-input {
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+}
+
+.sizes-input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.sizes-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}

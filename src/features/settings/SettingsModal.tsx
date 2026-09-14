@@ -1,41 +1,35 @@
 // ============================================================
-// SettingsModal — тема, вихід, розміри й фото полароїда
+// SettingsModal — тема, вихід і фото полароїда
 // ------------------------------------------------------------
-// Порт modules/settings.js: розміри (user_sizes, per-user, upsert)
-// і менеджер фото Storage-бакету family_photos (HEIC-normalize +
+// Менеджер фото Storage-бакету family_photos (HEIC-normalize +
 // compress → upload/видалення). useSettings.ts інвалідує qk.photos()
 // на кожній зміні, тож грань «Фотографії» кристала на головній одразу
 // підхоплює нове.
+//
+// **РОЗМІРІВ ТУТ БІЛЬШЕ НЕМАЄ.** Вони стали окремим модулем «Заміри» в
+// «Ще», поруч із грою: налаштування відкривають, щоб щось ЗМІНИТИ, а
+// заміри — щоб ПОДИВИТИСЬ, здебільшого стоячи в магазині. Разом із ними
+// пішла й вкладка: коли вкладка лишається одна, вона перестає бути
+// вибором і стає зайвим рядком над вмістом.
 // ============================================================
 import { useEffect, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Photo } from '@/components/ui/Photo';
 import { ModalClose } from '@/components/ui/ModalClose';
-import { useAuth, useCurrentUser } from '@/providers/AuthProvider';
+import { useAuth } from '@/providers/AuthProvider';
 import { useConfirm } from '@/providers/ConfirmProvider';
-import { useUsers } from '@/features/_shared/useUsers';
-import { TabBar } from '@/components/ui/TabBar';
-import {
-  ImageIcon, ListIcon, MoonIcon, PencilIcon, PlusIcon, SunIcon, TrashIcon, UserIcon,
-} from '@/components/icons/UiIcon';
-import { EmptyState } from '@/components/ui/EmptyState';
+import { MoonIcon, PlusIcon, SunIcon, TrashIcon } from '@/components/icons/UiIcon';
 import { useTheme } from '@/providers/ThemeProvider';
-import { usePhotoManager, usePhotoMutations, useUserSizes, useSaveSizes } from './useSettings';
-import type { InsertRow, UserSizesRow } from '@/types';
+import { usePhotoManager, usePhotoMutations } from './useSettings';
 
 interface SettingsModalProps {
   open: boolean;
   onClose: () => void;
 }
 
-// Вкладки «Тема» більше немає: тема в порталі одна (див. `ThemeProvider`),
-// і перемикач, який нічого не перемикає, гірший за його відсутність.
-type Section = 'sizes' | 'photos';
-
 export function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { user, logout } = useAuth();
   const confirmDialog = useConfirm();
-  const [section, setSection] = useState<Section>('sizes');
 
   const confirmLogout = async () => {
     if (await confirmDialog('Вийти з порталу? Щоб повернутись, знадобиться PIN.')) logout();
@@ -69,17 +63,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         <h2 className="modal-title">Налаштування</h2>
         {user && <p className="modal-sub">Профіль: {user.name}</p>}
 
-        <TabBar<Section>
-          value={section}
-          onChange={setSection}
-          items={[
-            { value: 'sizes', label: 'Розміри', icon: <ListIcon size={15} /> },
-            { value: 'photos', label: 'Фото', icon: <ImageIcon size={15} /> },
-          ]}
-        />
-
-        {section === 'sizes' && <SizesSection />}
-        {section === 'photos' && <PhotosSection />}
+        <PhotosSection />
 
         <div className="settings-divider" />
 
@@ -129,7 +113,7 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
 }
 
 // ============================================================
-// РОЗМІРИ
+// ТЕМА
 // ============================================================
 
 /**
@@ -165,323 +149,6 @@ function ThemeSection() {
         </button>
       </div>
     </section>
-  );
-}
-
-function SizesSection() {
-  const { data: users = [] } = useUsers();
-  const me = useCurrentUser();
-  const [activeUserId, setActiveUserId] = useState(me.id);
-  const [editing, setEditing] = useState(false);
-
-  const activeUser = users.find((u) => u.id === activeUserId);
-  const isFemale = activeUser?.name === 'Лєна';
-  const { data: sizes } = useUserSizes(activeUserId);
-
-  return (
-    <section className="settings-section">
-      {/*
-        * Заголовка секції тут немає навмисно.
-        *
-        * Був рядок «Розміри 📏» — тобто те саме слово, що на активній
-        * вкладці двома рядками вище. Вкладка вже сказала, де ми.
-        */}
-      {users.length > 1 && (
-        <div className="chips">
-          {users.map((u) => (
-            <button
-              key={u.id}
-              type="button"
-              className={`chip${u.id === activeUserId ? ' active' : ''}`}
-              onClick={() => {
-                setActiveUserId(u.id);
-                setEditing(false);
-              }}
-            >
-              <UserIcon size={14} />
-              <span>{u.name}</span>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {editing ? (
-        <SizesEditForm
-          userId={activeUserId}
-          isFemale={isFemale}
-          sizes={sizes ?? null}
-          onDone={() => setEditing(false)}
-        />
-      ) : (
-        <SizesView sizes={sizes ?? null} isFemale={isFemale} onEdit={() => setEditing(true)} />
-      )}
-    </section>
-  );
-}
-
-function SizesView({
-  sizes,
-  isFemale,
-  onEdit,
-}: {
-  sizes: UserSizesRow | null;
-  isFemale: boolean;
-  onEdit: () => void;
-}) {
-  const v = (val: string | number | null | undefined, unit = ''): string =>
-    val !== null && val !== undefined && val !== '' ? `${val}${unit}` : '—';
-
-  /*
-   * Порожні розміри показуються порожнім станом, а не стіною прочерків.
-   *
-   * На знімку власника з дванадцяти значень сім були «—». Таблиця, у
-   * якій більшість рядків нічого не каже, — це не «ще не заповнено», це
-   * шум, крізь який треба шукати те одне, що заповнене.
-   */
-  const filled = [
-    sizes?.height, sizes?.chest, sizes?.waist, sizes?.hips,
-    sizes?.intl_size, sizes?.eu_size, sizes?.ua_size,
-    sizes?.insole_cm, sizes?.shoe_eu, sizes?.shoe_us,
-    sizes?.bra, sizes?.underwear, sizes?.ring_ring, sizes?.ring_index,
-  ].filter((one) => one !== null && one !== undefined && one !== '').length;
-
-  if (filled === 0) {
-    return (
-      <EmptyState
-        icon={<ListIcon size={26} />}
-        title="Розміри ще не заповнені"
-        hint="Зріст, одяг, взуття й каблучки — щоб не питати одне в одного перед подарунком."
-        action={(
-          <button type="button" className="btn" onClick={onEdit}>
-            Заповнити розміри
-          </button>
-        )}
-      />
-    );
-  }
-
-  return (
-    <>
-      <div className="sizes-grid">
-        <div className="sizes-group">
-          <div className="sizes-group-title">Габарити</div>
-          <div className="sizes-row"><span>Зріст</span><b>{v(sizes?.height, ' см')}</b></div>
-          <div className="sizes-row"><span>Груди</span><b>{v(sizes?.chest, ' см')}</b></div>
-          <div className="sizes-row"><span>Талія</span><b>{v(sizes?.waist, ' см')}</b></div>
-          <div className="sizes-row"><span>Стегна</span><b>{v(sizes?.hips, ' см')}</b></div>
-        </div>
-        <div className="sizes-group">
-          <div className="sizes-group-title">Одяг</div>
-          <div className="sizes-row"><span>Міжнар.</span><b>{v(sizes?.intl_size)}</b></div>
-          <div className="sizes-row"><span>EU</span><b>{v(sizes?.eu_size)}</b></div>
-          <div className="sizes-row"><span>UA</span><b>{v(sizes?.ua_size)}</b></div>
-        </div>
-        <div className="sizes-group">
-          <div className="sizes-group-title">Взуття</div>
-          <div className="sizes-row"><span>Устілка</span><b>{v(sizes?.insole_cm, ' см')}</b></div>
-          <div className="sizes-row"><span>EU</span><b>{v(sizes?.shoe_eu)}</b></div>
-          <div className="sizes-row"><span>US</span><b>{v(sizes?.shoe_us)}</b></div>
-        </div>
-        {isFemale && (
-          <div className="sizes-group">
-            <div className="sizes-group-title">Білизна</div>
-            <div className="sizes-row"><span>Бюстгальтер</span><b>{v(sizes?.bra)}</b></div>
-            <div className="sizes-row"><span>Труси</span><b>{v(sizes?.underwear)}</b></div>
-          </div>
-        )}
-        <div className="sizes-group">
-          <div className="sizes-group-title">Каблучки</div>
-          <div className="sizes-row"><span>Безіменний</span><b>{v(sizes?.ring_ring)}</b></div>
-          <div className="sizes-row"><span>Вказівний</span><b>{v(sizes?.ring_index)}</b></div>
-        </div>
-      </div>
-      <button type="button" className="btn btn-ghost sizes-edit-btn" onClick={onEdit}>
-        <PencilIcon size={15} />
-        <span>Редагувати розміри</span>
-      </button>
-    </>
-  );
-}
-
-interface SizesFormState {
-  height: string;
-  chest: string;
-  waist: string;
-  hips: string;
-  intl_size: string;
-  eu_size: string;
-  ua_size: string;
-  insole_cm: string;
-  shoe_eu: string;
-  shoe_us: string;
-  bra: string;
-  underwear: string;
-  ring_ring: string;
-  ring_index: string;
-}
-
-function toFormState(sizes: UserSizesRow | null): SizesFormState {
-  return {
-    height: sizes?.height?.toString() ?? '',
-    chest: sizes?.chest?.toString() ?? '',
-    waist: sizes?.waist?.toString() ?? '',
-    hips: sizes?.hips?.toString() ?? '',
-    intl_size: sizes?.intl_size ?? '',
-    eu_size: sizes?.eu_size ?? '',
-    ua_size: sizes?.ua_size ?? '',
-    insole_cm: sizes?.insole_cm?.toString() ?? '',
-    shoe_eu: sizes?.shoe_eu ?? '',
-    shoe_us: sizes?.shoe_us ?? '',
-    bra: sizes?.bra ?? '',
-    underwear: sizes?.underwear ?? '',
-    ring_ring: sizes?.ring_ring ?? '',
-    ring_index: sizes?.ring_index ?? '',
-  };
-}
-
-function numOrNull(s: string): number | null {
-  const n = parseFloat(s);
-  return Number.isNaN(n) ? null : n;
-}
-function strOrNull(s: string): string | null {
-  const t = s.trim();
-  return t || null;
-}
-
-function SizesEditForm({
-  userId,
-  isFemale,
-  sizes,
-  onDone,
-}: {
-  userId: number;
-  isFemale: boolean;
-  sizes: UserSizesRow | null;
-  onDone: () => void;
-}) {
-  const [form, setForm] = useState<SizesFormState>(() => toFormState(sizes));
-  const save = useSaveSizes();
-
-  const set = (key: keyof SizesFormState) => (e: ChangeEvent<HTMLInputElement>) =>
-    setForm((f) => ({ ...f, [key]: e.target.value }));
-
-  const submit = () => {
-    const patch: InsertRow<'user_sizes'> = {
-      user_id: userId,
-      height: numOrNull(form.height),
-      chest: numOrNull(form.chest),
-      waist: numOrNull(form.waist),
-      hips: numOrNull(form.hips),
-      intl_size: strOrNull(form.intl_size),
-      eu_size: strOrNull(form.eu_size),
-      ua_size: strOrNull(form.ua_size),
-      insole_cm: numOrNull(form.insole_cm),
-      shoe_eu: strOrNull(form.shoe_eu),
-      shoe_us: strOrNull(form.shoe_us),
-      bra: isFemale ? strOrNull(form.bra) : null,
-      underwear: isFemale ? strOrNull(form.underwear) : null,
-      ring_ring: strOrNull(form.ring_ring),
-      ring_index: strOrNull(form.ring_index),
-    };
-    save.mutate(patch, { onSuccess: onDone });
-  };
-
-  return (
-    <div className="sizes-edit">
-      <div className="sizes-form-group">
-        <div className="sizes-group-title">Габарити</div>
-        <label className="form-field">
-          <span>Зріст (см)</span>
-          <input id="sz-height" name="height" type="number" value={form.height} onChange={set('height')} />
-        </label>
-        <label className="form-field">
-          <span>Груди (см)</span>
-          <input id="sz-chest" name="chest" type="number" value={form.chest} onChange={set('chest')} />
-        </label>
-        <label className="form-field">
-          <span>Талія (см)</span>
-          <input id="sz-waist" name="waist" type="number" value={form.waist} onChange={set('waist')} />
-        </label>
-        <label className="form-field">
-          <span>Стегна (см)</span>
-          <input id="sz-hips" name="hips" type="number" value={form.hips} onChange={set('hips')} />
-        </label>
-      </div>
-
-      <div className="sizes-form-group">
-        <div className="sizes-group-title">Одяг</div>
-        <label className="form-field">
-          <span>Міжнар.</span>
-          <input id="sz-intl" name="intlSize" type="text" value={form.intl_size} onChange={set('intl_size')} />
-        </label>
-        <label className="form-field">
-          <span>EU</span>
-          <input id="sz-eu" name="euSize" type="text" value={form.eu_size} onChange={set('eu_size')} />
-        </label>
-        <label className="form-field">
-          <span>UA</span>
-          <input id="sz-ua" name="uaSize" type="text" value={form.ua_size} onChange={set('ua_size')} />
-        </label>
-      </div>
-
-      <div className="sizes-form-group">
-        <div className="sizes-group-title">Взуття</div>
-        <label className="form-field">
-          <span>Устілка (см)</span>
-          <input
-            id="sz-insole"
-            name="insoleCm"
-            type="number"
-            step="0.5"
-            value={form.insole_cm}
-            onChange={set('insole_cm')}
-          />
-        </label>
-        <label className="form-field">
-          <span>EU</span>
-          <input id="sz-shoe-eu" name="shoeEu" type="text" value={form.shoe_eu} onChange={set('shoe_eu')} />
-        </label>
-        <label className="form-field">
-          <span>US</span>
-          <input id="sz-shoe-us" name="shoeUs" type="text" value={form.shoe_us} onChange={set('shoe_us')} />
-        </label>
-      </div>
-
-      {isFemale && (
-        <div className="sizes-form-group">
-          <div className="sizes-group-title">Білизна</div>
-          <label className="form-field">
-            <span>Бюстгальтер</span>
-            <input id="sz-bra" name="bra" type="text" value={form.bra} onChange={set('bra')} />
-          </label>
-          <label className="form-field">
-            <span>Труси</span>
-            <input id="sz-underwear" name="underwear" type="text" value={form.underwear} onChange={set('underwear')} />
-          </label>
-        </div>
-      )}
-
-      <div className="sizes-form-group">
-        <div className="sizes-group-title">Каблучки</div>
-        <label className="form-field">
-          <span>Безіменний</span>
-          <input id="sz-ring" name="ringRing" type="text" value={form.ring_ring} onChange={set('ring_ring')} />
-        </label>
-        <label className="form-field">
-          <span>Вказівний</span>
-          <input id="sz-ring-idx" name="ringIndex" type="text" value={form.ring_index} onChange={set('ring_index')} />
-        </label>
-      </div>
-
-      <div className="modal-actions">
-        <button type="button" className="btn btn-ghost" onClick={onDone}>
-          Скасувати
-        </button>
-        <button type="button" className="btn" onClick={submit} disabled={save.isPending}>
-          {save.isPending ? 'Зберігаю…' : 'Зберегти'}
-        </button>
-      </div>
-    </div>
   );
 }
 
