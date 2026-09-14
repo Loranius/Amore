@@ -31,6 +31,7 @@ import { FoldedMapIcon } from '@/components/icons/ViewIcon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CameraIcon } from '@/components/icons/NavIcon';
+import { PolaroidSheet } from '@/features/polaroid/PolaroidSheet';
 import { MemoryCard } from './MemoryCard';
 import { MomentComposer } from './MomentComposer';
 import { useMoments } from './useMoments';
@@ -54,6 +55,7 @@ export function MemoriesPage() {
   const { data, isPending, isError, refetch, isFetching } = useMoments();
   const [composing, setComposing] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [polaroidOpen, setPolaroidOpen] = useState(false);
   /** Місце, з яким відкрити композер після вибору точки на карті. */
   const [fromMap, setFromMap] = useState<{ pinId: number | null; value: PlaceCandidate } | null>(null);
   // Хуки ДО ранніх виходів нижче: порядок виклику хуків між рендерами
@@ -126,11 +128,26 @@ export function MemoriesPage() {
 
   return (
     <section className="memories">
+      {/* Полароїд входить ДІЄЮ ЗАГОЛОВКА, а не третьою плаваючою кнопкою.
+          Внизу їх рівно дві й вони дзеркальні — карта ліворуч, «+»
+          праворуч; третя зламала б саме ту симетрію, якою екран читається
+          з одного погляду. `PageHeader` тримає рівно одну дію, і в
+          «Спогадах» вона доти була вільна. */}
       <PageHeader
         title="Спогади"
         meta={moments.length === 0
           ? 'Тут буде ваш фотощоденник'
           : `${moments.length} · ${data?.photoCount ?? 0} фото · від ${earliest?.slice(0, 4) ?? ''}`}
+        action={(
+          <button
+            type="button"
+            className="btn btn-ghost mm-polaroid-open"
+            onClick={() => setPolaroidOpen(true)}
+          >
+            <CameraIcon size={15} />
+            <span>Полароїд</span>
+          </button>
+        )}
       />
 
       {moments.length === 0 ? (
@@ -174,6 +191,8 @@ export function MemoriesPage() {
       >
         <PlusIcon size={26} />
       </button>
+
+      {polaroidOpen && <PolaroidSheet onClose={() => setPolaroidOpen(false)} />}
 
       {mapOpen && (
         <Suspense fallback={null}>

@@ -29,18 +29,29 @@ const settings = read('features', 'settings', 'SettingsModal.tsx');
 const index = read('index.css');
 const shared = read('features', '_shared', 'useUsers.ts');
 
-describe('менеджер фото полароїда прибраний', () => {
+describe('менеджер фото полароїда пішов із НАЛАШТУВАНЬ', () => {
+  /*
+   * Назву цього блоку виправлено разом з ADR-0181: менеджер не
+   * «прибраний», а ПЕРЕЇХАВ у «Спогади». Перевірки лишились ті самі —
+   * вони й тоді стерегли не зникнення, а відсутність саме в
+   * налаштуваннях, — але назва казала більше, ніж вони перевіряють, і за
+   * місяць читалась би як «фото завантажити нíяк».
+   *
+   * Що полароїд має вхід, стереже `polaroid/polaroidEntry.test.ts`.
+   */
   it('модалка налаштувань про нього не знає', () => {
     expect(settings).not.toContain('PhotosSection');
     expect(settings).not.toContain('usePhotoManager');
     expect(settings).not.toContain('usePhotoMutations');
   });
 
-  it('хуків більше немає у дереві', () => {
+  it('хуків у модулі налаштувань більше немає', () => {
     // `useSettings.ts` після виносу «Замірів» і фото не тримав нічого,
     // крім цього менеджера. Файл, у якому лишились самі експорти, яких
     // ніхто не імпортує, — це запрошення повернути екран випадково.
+    // Самі хуки живі й переїхали в `features/polaroid/usePolaroid.ts`.
     expect(existsSync(join(SRC, 'features', 'settings', 'useSettings.ts'))).toBe(false);
+    expect(existsSync(join(SRC, 'features', 'polaroid', 'usePolaroid.ts'))).toBe(true);
   });
 
   it('стилі пішли разом із розміткою', () => {
@@ -53,6 +64,13 @@ describe('менеджер фото полароїда прибраний', () =
     expect(index).not.toContain('.photo-upload-zone {');
     expect(index).not.toContain('.photo-manager-grid {');
     expect(index).not.toContain('.photo-manager-thumb {');
+    /*
+     * І не повернулись у спільний файл разом із переїздом (ADR-0181):
+     * новий екран тримає свої стилі поруч із собою, тож вони зникнуть
+     * разом із ним, а не залишаться лежати тут удруге.
+     */
+    expect(index).not.toContain('.pl-drop {');
+    expect(index).not.toContain('.pl-grid {');
   });
 });
 
