@@ -1,11 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import { reefAnnualColonySize, reefColonyAnchor, reefHeadSize } from './colonyFormations';
 import { reefColonyBodies } from './colonyBodies';
-import { buildReefColonyMesh } from './bodyMesh';
+import { BODY_AZIMUTH_SEGMENTS, buildReefColonyMesh } from './bodyMesh';
 import type { ReefMeshData } from './headMesh';
 
-const VERTICES_PER_BODY = 42;
-const TRIANGLES_PER_BODY = 80;
+/*
+ * ЧИСЛА ТІЛА ВИВОДЯТЬСЯ З МЕША, А НЕ ПИШУТЬСЯ ВРУЧНУ (ADR-0193).
+ *
+ * Тут стояли 42 вершини й 80 трикутників, а нижче — цикли по «сегментах
+ * 0..8» і «8..16»: тест ходив кільцями вершин, знаючи їхню довжину
+ * напам'ять. Щойно тіло стало дванадцятигранним, ці зрізи почали
+ * захоплювати шматки РІЗНИХ кілець — і три перевірки цілісності впали,
+ * повідомляючи про ваду, якої немає.
+ *
+ * Найгірше в цьому те, що вони так само могли б і НЕ впасти: зріз по
+ * чужих вершинах — це вимір не того, і мовчазне «все гаразд» коштувало б
+ * дорожче за гучне падіння.
+ *
+ * П'ять кілець на тіло: затоплене, чотири профільні. Плюс маківка й
+ * центр кришки.
+ */
+const RINGS_PER_BODY = 5;
+const VERTICES_PER_BODY = RINGS_PER_BODY * BODY_AZIMUTH_SEGMENTS + 2;
+const TRIANGLES_PER_BODY = (RINGS_PER_BODY - 1) * BODY_AZIMUTH_SEGMENTS * 2
+  + BODY_AZIMUTH_SEGMENTS * 2;
 
 function colonyMesh(years: number, year: number, fill: number, seed: number): {
   mesh: ReefMeshData;
@@ -103,7 +121,7 @@ describe('основа схована в куполі, маківка — наз
           for (let year = 0; year < years; year += 1) {
           const { mesh, bodies, head } = colonyMesh(years, year, fill, seed);
           for (let body = 0; body < bodies.length; body += 1) {
-            for (let segment = 0; segment < 8; segment += 1) {
+            for (let segment = 0; segment < BODY_AZIMUTH_SEGMENTS; segment += 1) {
               const at = (body * VERTICES_PER_BODY + segment) * 3;
               expect(
                 domeValue(head, mesh.positions[at]!, mesh.positions[at + 1]!, mesh.positions[at + 2]!),
@@ -130,7 +148,11 @@ describe('основа схована в куполі, маківка — наз
       for (let year = 0; year < years; year += 1) {
         const { mesh, bodies, head } = colonyMesh(years, year, 1, 7);
         for (let body = 0; body < bodies.length; body += 1) {
-          for (let segment = 8; segment < 16; segment += 1) {
+          for (
+              let segment = BODY_AZIMUTH_SEGMENTS;
+              segment < BODY_AZIMUTH_SEGMENTS * 2;
+              segment += 1
+            ) {
             const at = (body * VERTICES_PER_BODY + segment) * 3;
             const x = mesh.positions[at]!;
             const y = mesh.positions[at + 1]!;
@@ -155,12 +177,26 @@ describe('основа схована в куполі, маківка — наз
     const { mesh, bodies } = colonyMesh(12, 4, 0.8, 31);
     for (let body = 0; body < bodies.length; body += 1) {
       const points: Array<[number, number, number]> = [];
-      for (let segment = 16; segment < 24; segment += 1) {
+      for (
+        let segment = BODY_AZIMUTH_SEGMENTS * 2;
+        segment < BODY_AZIMUTH_SEGMENTS * 3;
+        segment += 1
+      ) {
         const at = (body * VERTICES_PER_BODY + segment) * 3;
         points.push([mesh.positions[at]!, mesh.positions[at + 1]!, mesh.positions[at + 2]!]);
       }
+      /*
+       * Ділиться на КІЛЬКІСТЬ ТОЧОК, а не на вісім (ADR-0193). Тут стояла
+       * вісімка, і центр кільця з дванадцяти вершин виходив у півтора раза
+       * ближче до осі — радіуси ставали неправильні, а тест звітував про
+       * згладжений корал там, де ребра на місці.
+       */
       const centre = points.reduce(
-        (sum, p) => [sum[0] + p[0] / 8, sum[1] + p[1] / 8, sum[2] + p[2] / 8] as [number, number, number],
+        (sum, p) => [
+          sum[0] + p[0] / points.length,
+          sum[1] + p[1] / points.length,
+          sum[2] + p[2] / points.length,
+        ] as [number, number, number],
         [0, 0, 0] as [number, number, number],
       );
       const radii = points.map((p) => Math.hypot(p[0] - centre[0], p[1] - centre[1], p[2] - centre[2]));
@@ -174,7 +210,9 @@ describe('основа схована в куполі, маківка — наз
     for (const years of [1, 12, 25]) {
       const { mesh, bodies, head } = colonyMesh(years, Math.min(years - 1, 3), 0.6, 5);
       for (let body = 0; body < bodies.length; body += 1) {
-        const at = (body * VERTICES_PER_BODY + 40) * 3;
+        // Маківка йде одразу за п'ятьма кільцями — індекс виводиться, а не
+        // пишеться числом (ADR-0193).
+        const at = (body * VERTICES_PER_BODY + RINGS_PER_BODY * BODY_AZIMUTH_SEGMENTS) * 3;
         expect(
           domeValue(head, mesh.positions[at]!, mesh.positions[at + 1]!, mesh.positions[at + 2]!),
           `${years}р, тіло ${body}`,

@@ -1,3 +1,5 @@
+import { MANUAL_ZOOM_RANGE } from '@/features/world/sceneDirector';
+
 // ============================================================
 // Наскільки кристал слухається пальця.
 // ------------------------------------------------------------
@@ -84,3 +86,35 @@ export function coarsePointerNow(): boolean {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false;
   return window.matchMedia('(pointer: coarse)').matches;
 }
+
+/**
+ * Межі щипка для будь-якого виду — одні й ті самі, від його ж кадру.
+ *
+ * **ВИМОГА ВЛАСНИКА (ADR-0193): «додай можливість зуму на риф і дерево,
+ * як на кристалі».** Дослівно «як на кристалі» — тобто не свої числа для
+ * кожного виду, а ті самі ×5 в обидва боки, що вже названі в
+ * `MANUAL_ZOOM_RANGE` і що вже знає директор камери.
+ *
+ * Відлік іде від ВІДСТАНІ, на якій вид щойно закадрував свій артефакт, а
+ * не від сталої в одиницях сцени. Кадр їде за віком (кристал росте, риф
+ * ширшає, дерево тягнеться вгору), тож стала означала б, що на молодій
+ * парі «×5 назад» показує пів неба, а на дорослій — ледве відступ.
+ *
+ * `ceiling` — межа світу, за яку камеру пускати нема куди: у рифа це
+ * купол води, бо за ним нічого не намальовано. Без неї ×5 на молодому
+ * рифі вивів би камеру за воду й показав виворіт.
+ */
+export function portalHandZoomBounds(
+  anchorDistance: number,
+  ceiling = Number.POSITIVE_INFINITY,
+): { nearest: number; farthest: number } {
+  const anchor = Number.isFinite(anchorDistance) && anchorDistance > 0 ? anchorDistance : 1;
+  const safeCeiling = Number.isFinite(ceiling) && ceiling > 0 ? ceiling : Number.POSITIVE_INFINITY;
+  return {
+    nearest: anchor / MANUAL_ZOOM_RANGE,
+    farthest: Math.min(anchor * MANUAL_ZOOM_RANGE, safeCeiling),
+  };
+}
+
+/** Швидкість щипка — та сама, що на кристалі від самого початку. */
+export const PORTAL_ZOOM_SPEED = 0.78;

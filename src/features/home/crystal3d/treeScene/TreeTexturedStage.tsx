@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -6,7 +6,15 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import type { WorldCameraPose } from '@/features/world/crystalAtlas';
 import type { WorldMotionMode } from '@/features/world/sceneDirector';
 import { PortalCameraRig } from '../scene/PortalEnvironment';
+import {
+  PORTAL_ORBIT_DAMPING,
+  PORTAL_ZOOM_SPEED,
+  coarsePointerNow,
+  portalHandZoomBounds,
+  portalOrbitRotateSpeed,
+} from '../scene/portalOrbit';
 import { portalCameraFrame } from '../scene/portalScene';
+import { CRYSTAL_CENTRE_POSE } from '@/features/world/crystalAtlas';
 import { useTreeEnvironmentTextures } from './TreeEnvironmentTextures';
 import { metres } from './sceneScale';
 import {
@@ -194,6 +202,18 @@ export function TreeTexturedStage({
   const rocksRef = useRef<THREE.InstancedMesh>(null);
   const aspect = size.height > 0 ? size.width / size.height : 1;
   const frame = useMemo(() => portalCameraFrame(aspect, crownRadius, treeHeight), [aspect, crownRadius, treeHeight]);
+  // Питається РАЗ: миша не з'являється на телефоні посеред жесту.
+  const [coarsePointer] = useState(coarsePointerNow);
+  /*
+   * ЩИПОК НА ДЕРЕВІ — ТІ САМІ ×5, ЩО НА КРИСТАЛІ (ADR-0193), і рахуються
+   * вони так само: від відстані, на якій маршрут ЩОЙНО закадрував дерево.
+   * `PortalCameraRig` ставить камеру за тією ж позою, тож множник пози
+   * входить в опору — інакше межі жили б своїм життям.
+   */
+  const zoom = useMemo(
+    () => portalHandZoomBounds(frame.distance * (pose?.distance ?? CRYSTAL_CENTRE_POSE.distance)),
+    [frame.distance, pose?.distance],
+  );
   const palette = PALETTE[theme];
   const hillRadius = useMemo(
     () => treeMeadowRadius(soilRadius, crownRadius, treeHeight),
@@ -411,10 +431,27 @@ export function TreeTexturedStage({
       <OrbitControls
         ref={controls}
         enablePan={false}
-        enableZoom={false}
+        /*
+         * ЗУМ І ОБЕРТАННЯ — ЯК НА КРИСТАЛІ (ADR-0193).
+         *
+         * Тут стояло `dampingFactor={0.08}` — рівно те число, яке власник
+         * колись назвав «повільним і важким» на кристалі й яке там уже
+         * виміряне й замінене: згасання рахується НА КАДР, тож на телефоні
+         * з 30 кадрами 0.08 давало за 200 мс лише 39% жесту. Дерево
+         * лишалось із ним, бо правку робили в іншому файлі.
+         *
+         * Швидкості повороту тут не було взагалі, тобто палець і миша
+         * крутили однаково — а палець на високому вузькому екрані дає за
+         * той самий жест утричі менший поворот.
+         */
+        enableZoom
+        zoomSpeed={PORTAL_ZOOM_SPEED}
+        minDistance={zoom.nearest}
+        maxDistance={zoom.farthest}
         enableRotate={allowOrbit}
         enableDamping={!reduceMotion}
-        dampingFactor={0.08}
+        dampingFactor={PORTAL_ORBIT_DAMPING}
+        rotateSpeed={portalOrbitRotateSpeed(coarsePointer, false)}
         minPolarAngle={Math.PI * 0.2}
         maxPolarAngle={Math.PI * 0.48}
       />

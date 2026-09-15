@@ -43,16 +43,46 @@ describe('зум рукою', () => {
     expect(stage).toMatch(
       /const zoomAnchor = frame\.distance \* \(pose\?\.distance \?\? CRYSTAL_CENTRE_POSE\.distance\);/,
     );
-    expect(stage).toMatch(/zoomAnchor \/ MANUAL_ZOOM_RANGE/);
-    expect(stage).toMatch(/zoomAnchor \* MANUAL_ZOOM_RANGE/);
+    expect(stage).toMatch(/portalHandZoomBounds\(zoomAnchor\)/);
   });
 
   it('орбіта й директор тримають ОДНУ межу, а не дві однакові', () => {
     // Два числа розійшлись би, і між ними з'явилась би мертва зона: орбіта
     // вже спинилась, директор іще ні — палець тягне, камера стоїть.
-    const stage = read('PortalStage.tsx');
-    expect(stage).toContain("MANUAL_ZOOM_RANGE, type WorldMotionMode } from '@/features/world/sceneDirector'");
+    //
+    // Арифметика переїхала у `portalOrbit.ts` (ADR-0193), бо ті самі ×5
+    // тепер мають риф і дерево. Межа лишилась одна — просто тепер вона
+    // одна на ТРИ види, а не на один.
+    const orbit = read('portalOrbit.ts');
+    expect(orbit).toContain("import { MANUAL_ZOOM_RANGE } from '@/features/world/sceneDirector'");
+    expect(orbit).toMatch(/nearest: anchor \/ MANUAL_ZOOM_RANGE/);
+    expect(orbit).toMatch(/anchor \* MANUAL_ZOOM_RANGE/);
     expect(MANUAL_ZOOM_RANGE).toBe(5);
+  });
+
+  it('усі три види беруть межу з ОДНІЄЇ функції', () => {
+    /*
+     * **ВИМОГА ВЛАСНИКА (ADR-0193): «додай можливість зуму на риф і
+     * дерево, як на кристалі».** Дослівно «як на кристалі» — тобто не
+     * свої числа кожному виду.
+     *
+     * Тест дивиться в текст, бо саме поява ДРУГОЇ арифметики й була б
+     * вадою: три копії ×5 розійшлись би так само тихо, як розійшлись
+     * дванадцять копій приймального присуду дерева (ADR-0192 §3c).
+     */
+    const sources = {
+      кристал: read('PortalStage.tsx'),
+      дерево: readFileSync(join(scene, '../treeScene/TreeTexturedStage.tsx'), 'utf8'),
+      риф: readFileSync(
+        join(scene, '../../reef3d/world/ReefWorld.tsx'),
+        'utf8',
+      ),
+    };
+    for (const [species, source] of Object.entries(sources)) {
+      expect(source, species).toMatch(/portalHandZoomBounds\(/);
+      expect(source, species).toMatch(/zoomSpeed=\{PORTAL_ZOOM_SPEED\}/);
+      expect(source, species).not.toMatch(/enableZoom=\{false\}/);
+    }
   });
 
   it('директор питає камеру про відстань, а не лише про кути', () => {

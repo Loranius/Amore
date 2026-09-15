@@ -9,12 +9,18 @@
 import { useMemo, useRef, useState, type ReactNode } from 'react';
 import { useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { PORTAL_ORBIT_DAMPING, coarsePointerNow, portalOrbitRotateSpeed } from './portalOrbit';
+import {
+  PORTAL_ORBIT_DAMPING,
+  PORTAL_ZOOM_SPEED,
+  coarsePointerNow,
+  portalHandZoomBounds,
+  portalOrbitRotateSpeed,
+} from './portalOrbit';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
 import { PortalSky } from './PortalSky';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
-import { MANUAL_ZOOM_RANGE, type WorldMotionMode } from '@/features/world/sceneDirector';
+import type { WorldMotionMode } from '@/features/world/sceneDirector';
 import {
   PORTAL_KEY_LIGHT,
   PORTAL_PALETTES,
@@ -140,10 +146,16 @@ export function PortalStage({
    * пірнула в тіло) у режимі, де директор камеру не тримає взагалі.
    * Накинути на них ×5 означало б ВІДІБРАТИ 0.16.
    */
+  /*
+   * Ручні межі рахує спільна функція (ADR-0193): ті самі ×5 тепер мають
+   * риф і дерево, і три копії однієї арифметики розійшлись би — рівно
+   * так, як розійшлись дванадцять копій приймального присуду.
+   */
+  const handBounds = portalHandZoomBounds(zoomAnchor);
   const nearest = freeCamera
     ? Math.max(0.6, frame.distance * 0.16)
-    : zoomAnchor / MANUAL_ZOOM_RANGE;
-  const farthest = freeCamera ? frame.distance * 3.2 : zoomAnchor * MANUAL_ZOOM_RANGE;
+    : handBounds.nearest;
+  const farthest = freeCamera ? frame.distance * 3.2 : handBounds.farthest;
 
   return (
     <>
@@ -250,7 +262,7 @@ export function PortalStage({
          * дивитись у порожнє небо без способу повернутись; масштаб цього
          * зробити не може.
          */
-        zoomSpeed={0.78}
+        zoomSpeed={PORTAL_ZOOM_SPEED}
         panSpeed={0.68}
         screenSpacePanning={freeCamera}
         minDistance={handZoom ? nearest : 0}

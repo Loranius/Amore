@@ -14,7 +14,9 @@ import type { ReefPlan } from '@/engine/species/reef/reefAssembly';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import {
   PORTAL_ORBIT_DAMPING,
+  PORTAL_ZOOM_SPEED,
   coarsePointerNow,
+  portalHandZoomBounds,
   portalOrbitRotateSpeed,
 } from '../../crystal3d/scene/portalOrbit';
 import { ReefColonies } from './ReefColonies';
@@ -53,6 +55,23 @@ export function ReefWorld({ plan, meshes, theme, reduceMotion }: ReefWorldProps)
    * Камера ставиться ОДИН раз на кожен новий кадр-план, а не щокадру:
    * інакше вона щоразу відкидала б те, куди її повернула пара пальцем.
    */
+  /*
+   * ЩИПОК НА РИФІ — ТІ САМІ ×5, ЩО НА КРИСТАЛІ (ADR-0193).
+   *
+   * Відлік від справжньої відстані камери до цілі, а не від
+   * `frame.distance`: камеру ставлять вище цілі на `distance * height`,
+   * тож пряма між ними довша за саме `distance` — і межі, взяті з
+   * нього, з'їхали б на цю різницю.
+   *
+   * Стеля — купол води (`sceneRadius * 7.5 * 3` у `ReefWater`), узята з
+   * запасом: за ним не намальовано нічого, і пустити туди камеру
+   * означало б показати парі виворіт неба.
+   */
+  const zoom = useMemo(() => portalHandZoomBounds(
+    frame.distance * Math.hypot(1, frame.height),
+    standing.rock.radius * 7.5 * 3 * 0.8,
+  ), [frame.distance, frame.height, standing.rock.radius]);
+
   const placed = useRef<string>('');
   const key = `${frame.distance}:${frame.target.y}`;
   if (placed.current !== key) {
@@ -109,7 +128,15 @@ export function ReefWorld({ plan, meshes, theme, reduceMotion }: ReefWorldProps)
         ref={controls}
         target={[frame.target.x, frame.target.y, frame.target.z]}
         enablePan={false}
-        enableZoom={false}
+        /*
+         * Зсув НЕ вмикається разом із масштабом — те саме рішення, що на
+         * кристалі: зсув зрушує точку прицілу й дозволяє вивести риф із
+         * кадру без способу повернутись; масштаб цього зробити не може.
+         */
+        enableZoom
+        zoomSpeed={PORTAL_ZOOM_SPEED}
+        minDistance={zoom.nearest}
+        maxDistance={zoom.farthest}
         enableDamping={!reduceMotion}
         /*
          * Ті самі числа, що в кристала, і з тієї самої причини: три
