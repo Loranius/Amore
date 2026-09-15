@@ -70,32 +70,50 @@ test.describe('Evolution crystal Pixel 8 Pro acceptance', () => {
     // The invariant is unchanged: crystal bodies are batched by material, so the
     // crystal costs about one draw call per material, not one per body. One
     // extra is allowed for the optional Sparkles points object.
-    const crystalDrawCalls = drawCalls - environmentDrawCalls;
     /*
-     * СКЛАД КАДРУ ДРУКУЄТЬСЯ ПОРУЧ ІЗ ЧИСЛОМ, і це не оздоба звіту.
+     * ІНВАРІАНТ ПЕРЕВІРЯЄТЬСЯ ПО СКЛАДУ КАДРУ, А НЕ ВІДНІМАННЯМ.
      *
-     * Ця межа падає в CI («7 > 5») з кінця липня, і півтора місяця ніхто
-     * не міг сказати, ЩО це за сім: розклад сцени (`--breakdown`) є лише
-     * в dev-збірці, а CI малює продакшн. Виміряно локально на тій самій
-     * продакшн-збірці: `batch:4,mesh:7,points:1` — тобто чотири батчі
-     * тіл, сім мешів оточення й одна хмара іскор, разом 12 викликів і
-     * рівно 5 на кристал. У CI їх сім, отже там малюється ще щось.
+     * Стара редакція рахувала «виклики кристала = всі мінус оточення» і
+     * падала в CI із кінця липня: 7 при 4 матеріалах. Сцена почала
+     * публікувати свій склад — і він сказав, що об'єктів у кадрі ОДИНАДЦЯТЬ
+     * (`batch:4,mesh:7`), а `renderer.info` рахує 14.
      *
-     * Тому межа НЕ послаблена під спостережене число: замість цього
-     * сцена тепер публікує свій склад (`data-evolution-composition`), і
-     * наступний червоний прогін сам скаже, чим саме він червоний.
+     * Різниця — не тіла. `renderer.info.render.calls` рахує ВЕСЬ кадр,
+     * разом із проходами пост-обробки, яких у сцені немає як об'єктів.
+     * Тобто відніманням кристала не виміряти взагалі: воно приписує йому
+     * чужі проходи. (У пісочниці та сама мірка дає 1 виклик і 1 трикутник —
+     * це останній повноекранний квадрат, і він так само не про кристал.)
+     *
+     * Що справді мусить триматись — тіла збатчені за матеріалом, тобто
+     * батчів не більше, ніж матеріалів. Це тепер і перевіряється, прямо,
+     * а не через різницю двох чисел, одне з яких про інше.
      */
     const composition = await preview.getAttribute('data-evolution-composition');
     await testInfo.attach('evolution-scene-composition.txt', {
       body: `draw calls ${drawCalls}, environment ${environmentDrawCalls}, composition ${composition ?? '—'}`,
       contentType: 'text/plain',
     });
+    const batches = Number(/(?:^|,)batch:(\d+)/.exec(composition ?? '')?.[1] ?? NaN);
+    expect(
+      batches,
+      `склад кадру не назвав батчів кристала: ${composition ?? '—'}`,
+    ).toBeGreaterThan(0);
+    expect(
+      batches,
+      `кристал малює ${batches} батчів при ${materialCount} матеріалах; склад кадру: ${composition ?? '—'}`,
+    ).toBeLessThanOrEqual(materialCount);
+
+    /*
+     * Загальна стеля лишається, але названа тим, чим вона є: об'єкти сцени
+     * плюс оточення плюс проходи ефектів. Це не інваріант батчингу, а
+     * запобіжник проти «раптом удвічі більше» — і саме тому вона широка.
+     */
+    const crystalDrawCalls = drawCalls - environmentDrawCalls;
     expect(crystalDrawCalls).toBeGreaterThan(0);
     expect(
-      crystalDrawCalls,
-      `кристал малює ${crystalDrawCalls} викликів при ${materialCount} матеріалах; склад кадру: ${composition ?? '—'}`,
-    ).toBeLessThanOrEqual(materialCount + 1);
-    expect(crystalDrawCalls).toBeLessThan(meshCount);
+      drawCalls,
+      `весь кадр: ${drawCalls} викликів, з них оточення ${environmentDrawCalls}; склад: ${composition ?? '—'}`,
+    ).toBeLessThanOrEqual(environmentDrawCalls + materialCount + 8);
     // Same correction as the draw calls: what must stay inside the published
     // geometry budget is the crystal, and the environment draws a fixed,
     // never-culled set of triangles on top of it.

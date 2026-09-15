@@ -68,10 +68,28 @@ function sceneComposition(scene: { traverseVisible: (fn: (node: unknown) => void
     counts.set(kind, (counts.get(kind) ?? 0) + 1);
   };
   scene.traverseVisible((node) => {
-    const object = node as { isMesh?: boolean; isPoints?: boolean; isLine?: boolean; name?: string };
+    const object = node as {
+      isMesh?: boolean; isPoints?: boolean; isLine?: boolean; isSprite?: boolean;
+      isInstancedMesh?: boolean; name?: string; type?: string;
+    };
     if (object.isPoints) bump('points');
+    else if (object.isSprite) bump('sprite');
     else if (object.isLine) bump('line');
+    else if (object.isInstancedMesh) bump('instanced');
     else if (object.isMesh) bump(object.name?.startsWith('Evolution crystal batch') ? 'batch' : 'mesh');
+    /*
+     * Усе інше, що може малюватись, — своїм типом і без здогадів.
+     *
+     * Перша редакція рахувала лише меші, точки й лінії, і CI одразу
+     * показав, чого цього замало: `batch:4,mesh:7` при 14 викликах
+     * `renderer.info`. Три виклики не мали жодного об'єкта в сцені —
+     * бо це проходи пост-обробки, які `traverseVisible` не бачить за
+     * визначенням. Мірка, яка мовчки не рахує частину кадру, — це та
+     * сама мірка, що ставить не те питання.
+     */
+    else if (object.type && object.type !== 'Object3D' && object.type !== 'Group') {
+      bump(`other-${object.type}`);
+    }
   });
   return [...counts.entries()]
     .sort(([left], [right]) => left.localeCompare(right))
