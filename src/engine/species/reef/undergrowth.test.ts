@@ -372,11 +372,17 @@ describe('тон грані: дрібнота перестає бути папе
     водорість: buildReefWeedMesh(),
   } as const;
 
-  it('тон є в кожного роду, і рівно на кожен трикутник', () => {
+  it('тон є в кожного роду, і рівно на кожну ВЕРШИНУ', () => {
+    /*
+     * **БУЛО НА ГРАНЬ, СТАЛО НА ВЕРШИНУ (ADR-0195, крок 3).** Тон на
+     * грані — це латка сталого кольору з твердим краєм, тобто клаптик
+     * паперу; на вершині те саме число інтерполюється між сусідами й
+     * ребра створити не може.
+     */
     for (const [name, mesh] of Object.entries(meshes)) {
-      expect(mesh.faceShade, name).toBeDefined();
-      expect(mesh.faceShade!.length, name).toBe(mesh.indices.length / 3);
-      for (const tone of mesh.faceShade!) {
+      expect(mesh.tint, name).toBeDefined();
+      expect(mesh.tint!.length, name).toBe(mesh.positions.length / 3);
+      for (const tone of mesh.tint!) {
         expect(Number.isFinite(tone), name).toBe(true);
         expect(tone, name).toBeGreaterThan(0.3);
         expect(tone, name).toBeLessThan(1.7);
@@ -384,29 +390,101 @@ describe('тон грані: дрібнота перестає бути папе
     }
   });
 
-  it('у кульки голка світліша за западину — це її форма, сказана кольором', () => {
-    const tones = buildReefTuftMesh().faceShade!;
+  it('кожен рід оголошує свій кут зламу, і камінь твердіший за живе', () => {
+    /*
+     * **ТВЕРДІСТЬ ПЕРЕЇХАЛА З МАТЕРІАЛУ У ФОРМУ (ADR-0195, крок 2).**
+     *
+     * Доти її задавав `flatShading` — один прапорець на весь матеріал
+     * дрібноти, тобто наказ зробити КОЖЕН трикутник пласкою плямою. Тепер
+     * кожен рід каже своє, і різниця між родами — не смак:
+     *
+     *   живе тіло згладжується цілком, бо в м'якого тіла ребер немає;
+     *   камінь лишається гранованим, бо камінь ламається по площинах, а
+     *   згладжена галька — це грудка.
+     *
+     * Тест стереже саме цей ПОРЯДОК, а не самі числа: щойно камінь стане
+     * м'якшим за живе, правило перевернулось, і це треба помітити.
+     */
+    expect(meshes.камінець.creaseAngleDeg, 'камінь').toBeLessThan(45);
+    for (const kind of ['кулька', 'стрічка', 'водорість'] as const) {
+      expect(meshes[kind].creaseAngleDeg, kind).toBeGreaterThan(90);
+      expect(meshes[kind].creaseAngleDeg, kind).toBeGreaterThan(meshes.камінець.creaseAngleDeg);
+    }
+    /*
+     * Сто вісімдесят заборонені всім: при них зварилися б і дві грані,
+     * спрямовані одна проти одної, а їхні нормалі в сумі дають нуль —
+     * тобто чорну пляму. У стрічки такі грані є за побудовою (лице й
+     * виворіт), і саме на цьому вже почорніли денця кульки й камінця,
+     * коли затінення вперше ввімкнули.
+     */
+    for (const mesh of Object.values(meshes)) {
+      expect(mesh.creaseAngleDeg).toBeLessThan(180);
+    }
+  });
+
+  it('у кульки гребінь світліший за борозну — це її форма, сказана кольором', () => {
+    /*
+     * Межа 1.3 була знята з тону на ГРАНІ, де стрибок між сусідами й був
+     * метою. Тепер це градієнт по вершинах, і той самий розмах він дає
+     * плавно: від найтемнішої борозни біля основи до найсвітлішого
+     * гребеня біля кінчика.
+     */
+    const tones = buildReefTuftMesh().tint!;
     expect(Math.max(...tones) / Math.min(...tones)).toBeGreaterThan(1.3);
+  });
+
+  it('тон кульки НІДЕ не стрибає між сусідніми вершинами', () => {
+    /*
+     * Пряма перевірка того, за що взявся цей зріз: на гладкому тілі не
+     * має бути жодного твердого краю в кольорі. Сусідніми тут вважаються
+     * вершини, що ділять ребро трикутника, — тобто саме ті пари, між
+     * якими колір інтерполюється на екрані.
+     */
+    const mesh = buildReefTuftMesh();
+    const tint = mesh.tint!;
+    let worst = 0;
+    for (let at = 0; at < mesh.indices.length; at += 3) {
+      for (let corner = 0; corner < 3; corner += 1) {
+        const a = tint[mesh.indices[at + corner]!]!;
+        const b = tint[mesh.indices[at + ((corner + 1) % 3)]!]!;
+        worst = Math.max(worst, Math.abs(a - b) / Math.max(a, b));
+      }
+    }
+    expect(worst, 'стрибок тону між сусідніми вершинами').toBeLessThan(0.3);
   });
 
   it('лице й виворіт стрічки тримають ОДИН тон', () => {
     /*
-     * Стрічка йде четвірками граней: дві лицьові, дві зворотні. Різні
-     * тони на боках однієї стрічки під течією дали б блимання —
+     * Різні тони на боках однієї стрічки під течією дали б блимання —
      * найгірший рід руху, бо він виглядає поломкою рендерера.
+     *
+     * Міряється по ПОЗИЦІЇ, а не по номеру вершини: лице й виворіт тепер
+     * мають різні вершини в тих самих точках (їхні нормалі протилежні й
+     * не можуть ділити одну). Саме тому перевірка стала змістовнішою —
+     * вона питає «чи однаковий тон у двох різних вершин однієї точки», а
+     * доти питала про ту саму вершину.
      */
-    const tones = buildReefBladeMesh().faceShade!;
-    for (let blade = 0; blade < tones.length; blade += 4) {
-      for (let at = 1; at < 4; at += 1) {
-        expect(tones[blade + at]).toBeCloseTo(tones[blade]!, 6);
-      }
+    const mesh = buildReefBladeMesh();
+    const byPoint = new Map<string, number[]>();
+    for (let vertex = 0; vertex < mesh.tint!.length; vertex += 1) {
+      const key = [
+        mesh.positions[vertex * 3], mesh.positions[vertex * 3 + 1], mesh.positions[vertex * 3 + 2],
+      ].join(',');
+      const bucket = byPoint.get(key);
+      if (bucket) bucket.push(mesh.tint![vertex]!);
+      else byPoint.set(key, [mesh.tint![vertex]!]);
     }
+    let shared = 0;
+    for (const tones of byPoint.values()) {
+      if (tones.length < 2) continue;
+      shared += 1;
+      for (const tone of tones) expect(tone).toBeCloseTo(tones[0]!, 6);
+    }
+    expect(shared, 'жодна точка не ділиться між лицем і виворотом').toBeGreaterThan(0);
   });
 
   it('сусідні стрічки в пучку різні — інакше пучок знову один клапоть', () => {
-    const tones = buildReefBladeMesh().faceShade!;
-    const perBlade = tones.filter((_, at) => at % 4 === 0);
-    expect(new Set(perBlade).size).toBeGreaterThan(2);
+    expect(new Set(buildReefBladeMesh().tint!).size).toBeGreaterThan(2);
   });
 });
 

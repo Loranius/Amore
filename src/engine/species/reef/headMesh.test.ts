@@ -60,14 +60,31 @@ describe('купол голови — замкнене тіло', () => {
      * Це і є «замкнене». Перевірка не на око: у відкритої чаші знайдеться
      * ребро з одним сусідом, і саме там камера побачила б порожнечу
      * зсередини, коли опуститься під рівень основи.
+     *
+     * **РЕБРА КЛЮЧУЮТЬСЯ ПОЗИЦІЄЮ, А НЕ НОМЕРОМ ВЕРШИНИ (ADR-0195).**
+     *
+     * Доти це було те саме число: кожна позиція мала рівно одну вершину.
+     * Відколи твердість ребра живе у формі, купол розводить вершини на
+     * справжніх складках — на сьогоднішньому куполі таких уступів сорок
+     * дев'ять, — і ребро вздовж уступу має ДВА номери на ту саму пару
+     * точок.
+     *
+     * Тобто по номерах тіло виглядає діряве, хоч жодної дірки в ньому
+     * немає. Міряти треба поверхню, а не буфер: замкненість — властивість
+     * геометрії, а розщеплення вершини — властивість затінення.
      */
+    const keyOf = (vertex: number): string => [
+      mesh.positions[vertex * 3], mesh.positions[vertex * 3 + 1], mesh.positions[vertex * 3 + 2],
+    ].join(',');
     const edges = new Map<string, number>();
     for (let at = 0; at < mesh.indices.length; at += 3) {
-      const triangle = [mesh.indices[at]!, mesh.indices[at + 1]!, mesh.indices[at + 2]!];
+      const triangle = [
+        keyOf(mesh.indices[at]!), keyOf(mesh.indices[at + 1]!), keyOf(mesh.indices[at + 2]!),
+      ];
       for (let corner = 0; corner < 3; corner += 1) {
         const a = triangle[corner]!;
         const b = triangle[(corner + 1) % 3]!;
-        const key = a < b ? `${a}:${b}` : `${b}:${a}`;
+        const key = a < b ? `${a}|${b}` : `${b}|${a}`;
         edges.set(key, (edges.get(key) ?? 0) + 1);
       }
     }
@@ -265,57 +282,97 @@ describe('тон грані: купол перестає читатись кар
    */
   const mesh = buildReefHeadMesh(head, 12345);
 
-  it('тон є на кожен трикутник, і жодного зайвого', () => {
-    expect(mesh.faceShade).toBeDefined();
-    expect(mesh.faceShade!.length).toBe(mesh.indices.length / 3);
+  it('тон є на кожну ВЕРШИНУ, і жодного зайвого', () => {
+    /*
+     * **БУЛО НА ГРАНЬ, СТАЛО НА ВЕРШИНУ (ADR-0195, крок 3).**
+     *
+     * Довжина мусить збігатися з кількістю вершин, а не трикутників, і це
+     * не перейменування: тон на грані — це латка сталого кольору з
+     * твердим краєм, тобто клаптик паперу. На вершині те саме число
+     * інтерполюється між сусідами й ребра створити не може.
+     */
+    expect(mesh.tint).toBeDefined();
+    expect(mesh.tint!.length).toBe(mesh.positions.length / 3);
   });
 
   it('тон лишається множником, а не вимикає тіло', () => {
-    // Нуль дав би чорну грань, а від'ємне — сміття в буфері кольору.
-    for (const tone of mesh.faceShade!) {
+    // Нуль дав би чорну вершину, а від'ємне — сміття в буфері кольору.
+    for (const tone of mesh.tint!) {
       expect(Number.isFinite(tone)).toBe(true);
       expect(tone).toBeGreaterThan(0.3);
       expect(tone).toBeLessThan(1.7);
     }
   });
 
-  it('сусідні грані справді різняться — інакше вся робота дарма', () => {
+  it('тон іде за РЕЛЬЄФОМ, а не сиплеться на тіло плямами', () => {
     /*
-     * Міра тут та сама, що й на екрані: наскільки тон сусідів
-     * розходиться. Виміряно на сьогоднішньому куполі — **15.8% медіани**
-     * самого лише тону; на екрані до нього додається світло, і разом
-     * вони дають **37%** після згладження (32% до нього, 6% до тону).
+     * **МЕЖУ ПЕРЕВЕРНУТО, І ОСЬ ЧИМ ЦЕ ПЛАЧЕНО.**
      *
-     * Поріг нижчий за виміряне навмисно: тест стереже, щоб тон не з'їхав
-     * назад у нуль, а не фіксує саме число — інакше кожне дотикання
-     * шуму ламало б його без жодної змістовної причини.
+     * Тут стояло «сусідні латки мусять різнитись більше ніж на 12%», і
+     * воно було слушним, поки затінення було ПЛАСКИМ: тоді різниця тону
+     * читалась граністю. ADR-0190 і ADR-0191 піднімали це число навмисно.
+     *
+     * Затінення більше не пласке (ADR-0195, крок 2), і лінійка твердості
+     * краю виміряла наслідок: на голій породі гладке затінення ЗБІЛЬШИЛО
+     * щільність твердих сходинок — 5.38 → 6.15 на сто пікселів. Латка,
+     * яка доти видавала себе за грань, стала тим, чим є: клаптем паперу.
+     *
+     * Тому вимога тепер протилежна за формою й та сама за суттю: тон
+     * мусить ЙТИ ЗА ФОРМОЮ. Точка, що виступає з ідеального купола,
+     * світліша; западина темніша. Це перевіряється кореляцією тону з
+     * відстанню вершини від центру, а не різницею сусідів — бо сусіди на
+     * гладкому тілі й МУСЯТЬ бути схожими.
      */
-    /*
-     * МІРЯЮТЬСЯ СУСІДНІ ЛАТКИ, А НЕ СУСІДНІ ГРАНІ (ADR-0193).
-     *
-     * Латка тепер завширшки дві грані, тож половина пар сусідів однакова
-     * ЗА ЗАДУМОМ — вони всередині однієї плями. Міряти всі пари поспіль
-     * означало б рахувати цю однаковість за ваду й вимагати, щоб пляма
-     * розпалась назад на крупу.
-     *
-     * Крок у чотири трикутники — це рівно одна латка (дві грані по колу,
-     * два трикутники на грань), тож кожна пара тут перетинає межу.
-     */
-    const shade = mesh.faceShade!;
-    const patch = 4;
-    const diffs: number[] = [];
-    for (let face = 0; face + patch < shade.length; face += patch) {
-      const a = shade[face]!;
-      const b = shade[face + patch]!;
-      diffs.push(Math.abs(a - b) / Math.max(a, b));
+    const tint = mesh.tint!;
+    const radii: number[] = [];
+    for (let vertex = 0; vertex < tint.length; vertex += 1) {
+      const at = vertex * 3;
+      radii.push(Math.hypot(
+        mesh.positions[at]! / head.radius,
+        mesh.positions[at + 1]! / head.rise,
+        mesh.positions[at + 2]! / head.radius,
+      ));
     }
-    diffs.sort((left, right) => left - right);
-    expect(diffs[Math.floor(diffs.length / 2)]!).toBeGreaterThan(0.12);
+    // Беремо лише бічні вершини: центр основи й вісь мають радіус нуль і
+    // рельєфу не несуть.
+    const pairs = radii
+      .map((radius, at) => ({ radius, tone: tint[at]! }))
+      .filter((pair) => pair.radius > 0.5);
+    expect(pairs.length, 'бічних вершин').toBeGreaterThan(100);
+    const meanRadius = pairs.reduce((sum, p) => sum + p.radius, 0) / pairs.length;
+    const meanTone = pairs.reduce((sum, p) => sum + p.tone, 0) / pairs.length;
+    let cov = 0; let varR = 0; let varT = 0;
+    for (const pair of pairs) {
+      cov += (pair.radius - meanRadius) * (pair.tone - meanTone);
+      varR += (pair.radius - meanRadius) ** 2;
+      varT += (pair.tone - meanTone) ** 2;
+    }
+    const correlation = cov / Math.sqrt(Math.max(1e-12, varR * varT));
+    expect(correlation, 'тон не йде за рельєфом').toBeGreaterThan(0.9);
   });
 
-  it('та сама пара бачить ті самі плями, інша — інші', () => {
+  it('тон ніде не стрибає між СУСІДНІМИ вершинами', () => {
+    /*
+     * Пряма перевірка того, за що взявся цей зріз: на гладкому тілі не
+     * має бути жодного твердого краю в кольорі. Сусідніми тут вважаються
+     * вершини, що ділять ребро трикутника, — тобто саме ті пари, між
+     * якими колір інтерполюється на екрані.
+     */
+    const tint = mesh.tint!;
+    let worst = 0;
+    for (let at = 0; at < mesh.indices.length; at += 3) {
+      for (let corner = 0; corner < 3; corner += 1) {
+        const a = tint[mesh.indices[at + corner]!]!;
+        const b = tint[mesh.indices[at + ((corner + 1) % 3)]!]!;
+        worst = Math.max(worst, Math.abs(a - b) / Math.max(a, b));
+      }
+    }
+    expect(worst, 'стрибок тону між сусідніми вершинами').toBeLessThan(0.35);
+  });
+
+  it('та сама пара бачить той самий рельєф, інша — інший', () => {
     // Детермінізм: тон іде з насіння пари, а не з випадковості.
-    expect(buildReefHeadMesh(head, 12345).faceShade).toEqual(mesh.faceShade);
-    expect(buildReefHeadMesh(head, 99).faceShade).not.toEqual(mesh.faceShade);
+    expect(buildReefHeadMesh(head, 12345).tint).toEqual(mesh.tint);
+    expect(buildReefHeadMesh(head, 99).tint).not.toEqual(mesh.tint);
   });
 });

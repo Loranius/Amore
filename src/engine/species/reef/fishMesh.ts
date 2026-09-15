@@ -17,7 +17,24 @@
 // по дотичній до її кола, тож ця вісь — частина контракту, а не смак.
 // ============================================================
 import { round6 } from './math';
+import { weldCreased } from './surfaceNormals';
 import type { ReefMeshData } from './headMesh';
+
+/**
+ * Кут зламу риби (ADR-0195).
+ *
+ * `flatShading` пішов з УСІХ матеріалів рифа, тож твердість риби теж
+ * мусить бути сказана тут, у формі. Спершу тут стояв нуль — «нічого не
+ * згладжувати», тобто точна копія старого вигляду; вимір показав ціну:
+ * нуль розводить кожну грань на власні три вершини, і в ока риби їх
+ * виходило сорок вісім замість шістнадцяти.
+ *
+ * Сто двадцять згладжує веретено тіла й лишає роздільними ті пари, що
+ * дивляться одна проти одної, — обидва боки хвоста й обидва ока. Риба на
+ * екрані заввишки в чотири пікселі, тож різниці між гранованим і гладким
+ * веретеном там немає; різниця є в кількості вершин.
+ */
+const FISH_CREASE_DEG = 120;
 
 /** Напіввисота й напівширина — у частках довжини риби. */
 const BODY_HALF_HEIGHT = 0.19;
@@ -126,11 +143,19 @@ export function buildReefFishMesh(): ReefMeshData {
   indices.push(tailBase, forkNotch, forkTop);
   indices.push(tailBase, forkTop + 1, forkNotch);
 
+  /*
+   * Зварювання з нульовим кутом означає «нічого не згладжувати», тобто
+   * рівно те, що робив `flatShading` на матеріалі зграї. Прапорець пішов
+   * з усіх матеріалів рифа (ADR-0195), і риба мусить лишитись такою, як
+   * була, — тому закон сказано тут, у формі, а не там.
+   */
+  const welded = weldCreased(positions, indices, { creaseAngleDeg: FISH_CREASE_DEG });
   return {
-    positions,
-    normals,
-    indices,
+    positions: welded.positions,
+    normals: welded.normals,
+    indices: welded.indices,
     baseCapTriangleCount: 0,
+    creaseAngleDeg: FISH_CREASE_DEG,
     bounds: {
       min: { x: -BODY_HALF_WIDTH, y: -TAIL_SPREAD, z: -0.5 },
       max: { x: BODY_HALF_WIDTH, y: TAIL_SPREAD, z: 0.5 },
@@ -172,11 +197,19 @@ export function buildReefFishEyeMesh(): ReefMeshData {
     }
   }
 
+  /*
+   * Зварювання з нульовим кутом означає «нічого не згладжувати», тобто
+   * рівно те, що робив `flatShading` на матеріалі зграї. Прапорець пішов
+   * з усіх матеріалів рифа (ADR-0195), і риба мусить лишитись такою, як
+   * була, — тому закон сказано тут, у формі, а не там.
+   */
+  const welded = weldCreased(positions, indices, { creaseAngleDeg: FISH_CREASE_DEG });
   return {
-    positions,
-    normals,
-    indices,
+    positions: welded.positions,
+    normals: welded.normals,
+    indices: welded.indices,
     baseCapTriangleCount: 0,
+    creaseAngleDeg: FISH_CREASE_DEG,
     bounds: {
       min: { x: -BODY_HALF_WIDTH, y: EYE_LIFT - EYE_RADIUS, z: 0.5 - EYE_AT - EYE_RADIUS },
       max: { x: BODY_HALF_WIDTH, y: EYE_LIFT + EYE_RADIUS, z: 0.5 - EYE_AT + EYE_RADIUS },

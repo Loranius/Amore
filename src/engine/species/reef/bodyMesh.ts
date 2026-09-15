@@ -43,6 +43,7 @@ import { round6, seededUnit } from './math';
 import type { ReefHeadSize, ReefColonyAnchor } from './colonyFormations';
 import type { ReefCoralBody } from './colonyBodies';
 import type { ReefMeshData } from './headMesh';
+import { weldCreased } from './surfaceNormals';
 
 /**
  * Скільки граней по колу в одного тіла.
@@ -92,6 +93,28 @@ const PROFILE: ReadonlyArray<readonly [number, number]> = [
  * Тон іде ЧИСЛОМ у рушій і кольором лише в рендерері: тут вирішується
  * не «який колір», а «наскільки це місце вигоріле».
  */
+/**
+ * Кут зламу коралового тіла: зламів немає зовсім.
+ *
+ * М'який корал — це тіло без жодного справжнього ребра: бік, що
+ * заокруглюється в маківку.
+ *
+ * Сто п'ятдесят, а не сто вісімдесят: при 180° зварювалось би БУДЬ-ЩО, що
+ * стоїть в одній точці, — включно з двома гранями, спрямованими одна
+ * проти одної. Їхні нормалі в сумі дають нуль, а нуль на екрані — чорна
+ * пляма. Це та сама вада, що почорнила денця кульки й камінця, тільки
+ * зайшла б із протилежного боку.
+ *
+ * Шістдесят тут стояли півгодини й були зняті ВИМІРОМ: при них рівно одна
+ * вершина на колонію розщеплювалась — маківка тіла, де віяло сходиться під
+ * гострішим кутом, — і тіло отримувало голчастий кінчик. Це рівно та
+ * «гострота», через яку весь цей зріз і робиться.
+ *
+ * Кришка основи зламу не потребує: вона затоплена в купол і позначена
+ * схованою (`hiddenFaces`), тож у зварюванні не бере участі взагалі.
+ */
+const BODY_CREASE_DEG = 150;
+
 const TIP_PALE = 0.34;
 const BODY_TONE_JITTER = 0.16;
 
@@ -202,7 +225,13 @@ export function buildReefColonyMesh(
   const positions: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];
-  const faceShade: number[] = [];
+  const tint: number[] = [];
+  /*
+   * Номери трикутників кришок. Вони лежать не в кінці, а вперемішку — по
+   * одній кришці на тіло, одразу за його маківкою, — тож межею їх не
+   * задати, і збирати їх треба там, де вони й пишуться.
+   */
+  const capFaces = new Set<number>();
   let baseCapTriangleCount = 0;
 
   const anchorNormal = normalized(anchor.normal);
@@ -256,7 +285,21 @@ export function buildReefColonyMesh(
       return added(added(foot, scaled(axis, along)), scaled(outward, width * rib));
     };
 
+    /*
+     * Тон тепер лежить на ВЕРШИНІ, а не на грані (ADR-0195, крок 3).
+     *
+     * Він і доти був градієнтом по висоті — `ringTone` рахує блідість від
+     * частки висоти, — але лягав сталим числом на пояс між двома кільцями.
+     * Тобто плавний за задумом градієнт нарізався на смуги сталого кольору
+     * з твердим краєм: рівно те, чим складають аплікацію.
+     *
+     * На вершині те саме число інтерполюється між кільцями, і смуг немає
+     * за побудовою.
+     */
+    let ringIndex = 0;
     const pushRing = (along: number, width: number, buried: boolean): void => {
+      const ringValue = round6(ringTone(ringIndex, PROFILE.length + 1));
+      ringIndex += 1;
       for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
         const theta = (segment / AZIMUTH_SEGMENTS) * Math.PI * 2;
         const raw = ringPoint(theta, along, width);
@@ -276,6 +319,7 @@ export function buildReefColonyMesh(
           : raw;
         positions.push(round6(point.x), round6(point.y), round6(point.z));
         normals.push(round6(outward.x), round6(outward.y), round6(outward.z));
+        tint.push(ringValue);
       }
     };
 
@@ -288,13 +332,10 @@ export function buildReefColonyMesh(
     for (let ring = 0; ring < ringCount - 1; ring += 1) {
       const low = firstVertex + ring * AZIMUTH_SEGMENTS;
       const high = low + AZIMUTH_SEGMENTS;
-      // Тон пояса між двома кільцями — середнє їхніх часток висоти.
-      const tone = round6((ringTone(ring, ringCount) + ringTone(ring + 1, ringCount)) / 2);
       for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
         const next = (segment + 1) % AZIMUTH_SEGMENTS;
         indices.push(low + segment, low + next, high + segment);
         indices.push(low + next, high + next, high + segment);
-        faceShade.push(tone, tone);
       }
     }
 
@@ -303,12 +344,11 @@ export function buildReefColonyMesh(
     const tip = added(foot, scaled(axis, body.height * (1 + TIP_RISE)));
     positions.push(round6(tip.x), round6(tip.y), round6(tip.z));
     normals.push(round6(axis.x), round6(axis.y), round6(axis.z));
+    tint.push(round6(ringTone(ringCount, ringCount)));
     const topRing = firstVertex + (ringCount - 1) * AZIMUTH_SEGMENTS;
-    const tipTone = round6(ringTone(ringCount, ringCount));
     for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
       const next = (segment + 1) % AZIMUTH_SEGMENTS;
       indices.push(topRing + segment, topRing + next, apex);
-      faceShade.push(tipTone);
     }
 
     // Кришка основи: затоплена, але замкнена.
@@ -316,30 +356,38 @@ export function buildReefColonyMesh(
     const capPoint = added(foot, scaled(domeNormal(head, foot), -sink));
     positions.push(round6(capPoint.x), round6(capPoint.y), round6(capPoint.z));
     normals.push(round6(-axis.x), round6(-axis.y), round6(-axis.z));
+    // Кришка затоплена в купол: її тон дорівнює тону основи, щоб на
+    // випадковому проблиску не було стрибка кольору.
+    tint.push(round6(ringTone(0, ringCount)));
     for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
       const next = (segment + 1) % AZIMUTH_SEGMENTS;
+      capFaces.add(indices.length / 3);
       indices.push(capCentre, firstVertex + next, firstVertex + segment);
-      // Кришка затоплена в купол; тон їй ні до чого, але довжина масиву
-      // мусить збігатися з кількістю трикутників.
-      faceShade.push(1);
     }
     baseCapTriangleCount += AZIMUTH_SEGMENTS;
   });
 
+  const welded = weldCreased(positions, indices, {
+    creaseAngleDeg: BODY_CREASE_DEG,
+    tint,
+    hiddenFaces: capFaces,
+  });
+
   let minX = Infinity; let minY = Infinity; let minZ = Infinity;
   let maxX = -Infinity; let maxY = -Infinity; let maxZ = -Infinity;
-  for (let at = 0; at < positions.length; at += 3) {
-    minX = Math.min(minX, positions[at]!); maxX = Math.max(maxX, positions[at]!);
-    minY = Math.min(minY, positions[at + 1]!); maxY = Math.max(maxY, positions[at + 1]!);
-    minZ = Math.min(minZ, positions[at + 2]!); maxZ = Math.max(maxZ, positions[at + 2]!);
+  for (let at = 0; at < welded.positions.length; at += 3) {
+    minX = Math.min(minX, welded.positions[at]!); maxX = Math.max(maxX, welded.positions[at]!);
+    minY = Math.min(minY, welded.positions[at + 1]!); maxY = Math.max(maxY, welded.positions[at + 1]!);
+    minZ = Math.min(minZ, welded.positions[at + 2]!); maxZ = Math.max(maxZ, welded.positions[at + 2]!);
   }
-  const empty = positions.length === 0;
+  const empty = welded.positions.length === 0;
 
   return {
-    positions,
-    normals,
-    indices,
-    faceShade,
+    positions: welded.positions,
+    normals: welded.normals,
+    indices: welded.indices,
+    tint: welded.tint,
+    creaseAngleDeg: BODY_CREASE_DEG,
     baseCapTriangleCount,
     bounds: {
       min: { x: empty ? 0 : round6(minX), y: empty ? 0 : round6(minY), z: empty ? 0 : round6(minZ) },

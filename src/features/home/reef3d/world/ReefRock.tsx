@@ -113,7 +113,7 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
         * видно порожнечу.
         */}
       <mesh geometry={geometry} position={[0, seabed.lowest - 0.001, 0]} receiveShadow>
-        <meshStandardMaterial color={palette.stone} roughness={0.95} metalness={0} flatShading />
+        <meshStandardMaterial color={palette.stone} roughness={0.95} metalness={0} />
       </mesh>
       <mesh geometry={seabed.geometry} receiveShadow>
         <meshStandardMaterial

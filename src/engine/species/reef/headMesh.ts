@@ -19,6 +19,7 @@
 // лишались однією архітектурою.
 // ============================================================
 import { round6, seededUnit } from './math';
+import { weldCreased } from './surfaceNormals';
 import type { ReefHeadSize } from './colonyFormations';
 
 export interface ReefMeshData {
@@ -28,18 +29,38 @@ export interface ReefMeshData {
   normals: number[];
   indices: number[];
   /**
-   * Тон КОЖНОГО ТРИКУТНИКА — множник яскравості навколо 1.0.
+   * Тон КОЖНОЇ ВЕРШИНИ — множник яскравості навколо 1.0.
    *
-   * Необов'язковий навмисно: меш, який його не публікує (риба, дрібнота),
-   * малюється рівно кольором свого матеріалу, як і досі. Це не «тихий
-   * запас», а окремий канал: тіло, у якого є рельєф, має що сказати про
-   * свою поверхню; у пласкої стрічки трави такого немає.
+   * **БУЛО НА ГРАНІ, СТАЛО НА ВЕРШИНІ (ADR-0195, крок 3), і це не
+   * перенесення, а виправлення.** Тон на грані — це латка сталого кольору
+   * з твердим краєм, тобто клаптик паперу; заради нього геометрію ще й
+   * доводилось розшивати так, щоб жодна вершина не ділилась між гранями.
+   * Поки затінення було пласким, латки видавали себе за грані. Виміряно на
+   * голій породі: щойно затінення стало гладким, щільність твердих
+   * сходинок ЗРОСЛА (5.38 → 6.15 на 100 px) — тон лишився єдиним, що їх
+   * робило.
    *
-   * Число, а не колір. Рушій не вирішує, ЯКИЙ це колір — він каже лише,
-   * наскільки ця грань виступає з тіла; у колір це перекладає рендерер
-   * (`reefGeometryOf`), де й живе решта матеріалу.
+   * На вершині тон інтерполюється між сусідами, тобто **не може створити
+   * ребра за побудовою**. Це та сама вимога, що кристал колись вивів для
+   * своїх поверхневих полів: візерунок, який перетинає ребро, каже оку, що
+   * дві площини — одна поверхня.
+   *
+   * Число, а не колір. Рушій каже лише, наскільки ця точка тіла світліша
+   * за основний тон; у колір це перекладає рендерер (`reefGeometryOf`).
    */
-  faceShade?: number[];
+  tint?: number[];
+  /**
+   * Кут МІЖ ГРАНЯМИ, за яким ребро лишається твердим (градуси).
+   *
+   * Твердість — властивість форми, а не матеріалу. Доти її задавав
+   * `flatShading` на матеріалі, тобто наказ рендереру зробити КОЖЕН
+   * трикутник пласкою плямою; власник назвав результат «аплікацією дитини
+   * з гострими кутками».
+   *
+   * Живі тіла (купол, корал, водорість) гладкі; камінь і камінець
+   * лишаються гранованими, бо камінь ламається по площинах.
+   */
+  creaseAngleDeg: number;
   /** Скільки трикутників у нижній кришці — вони дивляться в камінь. */
   baseCapTriangleCount: number;
   bounds: {
@@ -112,37 +133,45 @@ const SETTLE = 0.08;
  * граней рівно ні на скільки. Поверхню треба МАЛЮВАТИ, як малюють її
  * референси рифа (ADR-0182 §2: «референс не освітлюють, його малюють»).
  *
- * Дві складові, і кожна робить своє:
- * - `RELIEF` — грань, що виступає з ідеального купола, світліша; западина
+ * **ЗАЛИШИЛАСЬ ОДНА СКЛАДОВА З ДВОХ (ADR-0195, крок 3).**
+ *
+ * - `RELIEF` — точка, що виступає з ідеального купола, світліша; западина
  *   темніша. Тон іде за формою, а не сиплеться на неї: це той самий
- *   принцип «колір заробляється», що й у кристала.
- * - `MOTTLE` — дрібна плямистість, не прив'язана до форми. Без неї на
- *   рівних ділянках сусіди знову однакові, а саме рівні ділянки й
- *   читались картоном.
+ *   принцип «колір заробляється», що й у кристала. Рельєф уже лежить у
+ *   кожній ВЕРШИНІ (масив `relief` нижче), тож тон із нього виходить
+ *   гладким полем, яке не може створити ребра.
+ * - `MOTTLE` — **прибрано.** Це була плямистість, кинута на латку з
+ *   кількох граней, тобто рівно те, з чого складають аплікацію: сталий
+ *   колір із твердим краєм. Поки затінення було пласким, вона видавала
+ *   себе за граністість; лінійка твердості краю (крок 0) показала, що на
+ *   голій породі при гладкому затіненні вона ЄДИНА й лишається джерелом
+ *   сходинок — 5.38 → 6.15 на сто пікселів.
+ *
+ *   Те, для чого її додавали («на рівних ділянках сусіди однакові»),
+ *   тепер робить поверхня каменю картами (крок 4): нормаль і шорсткість
+ *   дають дрібну нерівність, не малюючи жодної плями.
  */
-const FACE_RELIEF = 1.9;
-const FACE_MOTTLE = 0.5;
+const RELIEF_TINT = 1.9;
 
 /**
- * Пляма — не одна грань, а КІЛЬКА, і це різниця між обростанням і шумом.
+ * Кут зламу купола — і купол, і камінь під ним будуються цією функцією.
  *
- * Тон, кинутий незалежно на кожну грань, дає рівномірну крупу: сусіди
- * різняться завжди й однаково, тобто поверхня читається шумом, а не
- * тілом. Обростання на живому кораловому масиві йде латками — кілька
- * граней однакові, а через дві-три все інше.
+ * ЦЕ КАМІНЬ, А НЕ ЖИВЕ ТІЛО, і в цьому вся різниця з коралом. Корал
+ * згладжується цілком (`BODY_CREASE_DEG` = 180), бо в м'якого тіла ребер
+ * немає. Камінь ламається по площинах — згладжений камінь стає грудкою, і
+ * це записано в `amore-crystal-look` про брилу під кристалом.
  *
- * Латка — дві грані по колу на одне кільце по висоті. Тобто межі латок
- * падають рівно на ребра, ніколи не перетинаючи грань. Це той самий
- * закон, що й у кристала: візерунок, який перетинає ребро, каже оку, що
- * дві площини — одна поверхня.
+ * Тому поріг стоїть МІЖ двома масштабами нерівності купола: сусідні грані
+ * рівної ділянки розходяться на ~7° (ADR-0193 §1) і зливаються в суцільну
+ * поверхню, а складки, які шум робить зміщенням до ±30% радіуса,
+ * лишаються справжніми уступами.
  *
- * **1 → 2 разом зі згладженням (ADR-0193).** Сітка стала вдвічі
- * густішою, і латка в одну грань разом із нею здрібніла до крупи:
- * плямистість читалась шумом, а не обростанням. Дві грані на латку
- * повертають плямі той самий розмір НА ЕКРАНІ, який вона мала до
- * згладження, — тобто число змінене, щоб картинка лишилась тією самою.
+ * Нижня кришка в зварюванні не бере участі зовсім: вона схована в камені
+ * (`hiddenFaces`). Інакше її нормаль, спрямована строго вниз, потягнула б
+ * нижнє кільце донизу й поклала б на основу темну смугу, якої на тілі
+ * немає.
  */
-const PATCH_SEGMENTS = 2;
+const HEAD_CREASE_DEG = 35;
 
 /** Наскільки радіус у точці відходить від ідеального купола. */
 function surfaceNoise(seed: number, azimuth: number, band: number): number {
@@ -266,21 +295,6 @@ export function buildReefHeadMesh(head: ReefHeadSize, seed: number): ReefMeshDat
     }
   }
 
-  /*
-   * Тон грані рахується ТУТ, де ще відомі її кільце й сегмент: латка
-   * визначена саме ними, а з голих індексів її довелось би відновлювати
-   * зворотним рахунком — тобто вдруге знати те, що вже знаєш.
-   */
-  const faceShade: number[] = [];
-  const patchTone = (ring: number, segment: number): number => seededUnit(
-    seed,
-    `reef:head:patch:${ring}:${Math.floor(segment / PATCH_SEGMENTS)}`,
-  ) - 0.5;
-  const pushFaceShade = (ring: number, segment: number, corners: readonly number[]): void => {
-    const mean = corners.reduce((sum, at) => sum + (relief[at] ?? 0), 0) / corners.length;
-    faceShade.push(round6(1 + mean * FACE_RELIEF + patchTone(ring, segment) * FACE_MOTTLE));
-  };
-
   for (let ring = 0; ring < HEIGHT_RINGS - 1; ring += 1) {
     const low = ring * AZIMUTH_SEGMENTS;
     const high = (ring + 1) * AZIMUTH_SEGMENTS;
@@ -288,8 +302,6 @@ export function buildReefHeadMesh(head: ReefHeadSize, seed: number): ReefMeshDat
       const next = (segment + 1) % AZIMUTH_SEGMENTS;
       indices.push(low + segment, low + next, high + segment);
       indices.push(low + next, high + next, high + segment);
-      pushFaceShade(ring, segment, [low + segment, low + next, high + segment]);
-      pushFaceShade(ring, segment, [low + next, high + next, high + segment]);
     }
   }
 
@@ -303,7 +315,6 @@ export function buildReefHeadMesh(head: ReefHeadSize, seed: number): ReefMeshDat
   for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
     const next = (segment + 1) % AZIMUTH_SEGMENTS;
     indices.push(topRing + segment, topRing + next, apex);
-    pushFaceShade(HEIGHT_RINGS - 1, segment, [topRing + segment, topRing + next, apex]);
   }
 
   // Нижня кришка: центр основи плюс віяло на перше кільце.
@@ -314,25 +325,45 @@ export function buildReefHeadMesh(head: ReefHeadSize, seed: number): ReefMeshDat
   for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
     const next = (segment + 1) % AZIMUTH_SEGMENTS;
     indices.push(capCenter, next, segment);
-    // Кришка дивиться в камінь: тон їй ні до чого, але масив мусить
-    // лишитись однієї довжини з трикутниками — інакше рендерер поїде.
-    faceShade.push(1);
   }
   const baseCapTriangleCount = AZIMUTH_SEGMENTS;
 
+  /*
+   * ЗВАРЮВАННЯ Й ТОН — В ОДНОМУ МІСЦІ, І ПОРЯДОК ТУТ НЕ ДОВІЛЬНИЙ.
+   *
+   * Тон береться з `relief`, тобто з ТІЄЇ САМОЇ величини, якою зміщена
+   * сама вершина. Він іде на вхід зварювання, бо після зварювання вершин
+   * уже не ті: там, де ребро лишилось твердим, одна вхідна вершина
+   * породжує кілька вихідних.
+   *
+   * Нормалі, пораховані вище з рівняння еліпсоїда, зварювання ЗАМІНЮЄ — і
+   * це виправлення, а не втрата: меш зміщений шумом до ±30% радіуса, тож
+   * ідеальна нормаль дивиться не туди, куди дивиться справжня поверхня.
+   */
+  const tintPerVertex = relief.map((value) => round6(1 + value * RELIEF_TINT));
+  const welded = weldCreased(positions, indices, {
+    creaseAngleDeg: HEAD_CREASE_DEG,
+    tint: tintPerVertex,
+    hiddenFaces: new Set(Array.from(
+      { length: baseCapTriangleCount },
+      (_v, at) => indices.length / 3 - baseCapTriangleCount + at,
+    )),
+  });
+
   let minX = Infinity; let minY = Infinity; let minZ = Infinity;
   let maxX = -Infinity; let maxY = -Infinity; let maxZ = -Infinity;
-  for (let at = 0; at < positions.length; at += 3) {
-    minX = Math.min(minX, positions[at]!); maxX = Math.max(maxX, positions[at]!);
-    minY = Math.min(minY, positions[at + 1]!); maxY = Math.max(maxY, positions[at + 1]!);
-    minZ = Math.min(minZ, positions[at + 2]!); maxZ = Math.max(maxZ, positions[at + 2]!);
+  for (let at = 0; at < welded.positions.length; at += 3) {
+    minX = Math.min(minX, welded.positions[at]!); maxX = Math.max(maxX, welded.positions[at]!);
+    minY = Math.min(minY, welded.positions[at + 1]!); maxY = Math.max(maxY, welded.positions[at + 1]!);
+    minZ = Math.min(minZ, welded.positions[at + 2]!); maxZ = Math.max(maxZ, welded.positions[at + 2]!);
   }
 
   return {
-    positions,
-    normals,
-    indices,
-    faceShade,
+    positions: welded.positions,
+    normals: welded.normals,
+    indices: welded.indices,
+    tint: welded.tint,
+    creaseAngleDeg: HEAD_CREASE_DEG,
     baseCapTriangleCount,
     bounds: {
       min: { x: round6(minX), y: round6(minY), z: round6(minZ) },

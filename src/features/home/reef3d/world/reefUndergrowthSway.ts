@@ -101,7 +101,6 @@ export function createReefGrowthMaterial(
     roughness: kind === 'pebble' ? 0.95 : 0.72,
     side: kind === 'weed' || kind === 'blade' ? THREE.DoubleSide : THREE.FrontSide,
     metalness: 0,
-    flatShading: true,
     /*
      * ТОН ГРАНІ (ADR-0191) і колір інстанса живуть разом, не замість.
      * Three множить їх в один `vColor`: відтінок приходить ззовні, на

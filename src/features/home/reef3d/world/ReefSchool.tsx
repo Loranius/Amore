@@ -100,7 +100,7 @@ export function ReefSchool({ plan, lift, reduceMotion }: ReefSchoolProps): React
   return (
     <group>
       <instancedMesh ref={bodies} args={[bodyGeometry, undefined, school.length]}>
-        <meshStandardMaterial roughness={0.55} metalness={0} flatShading />
+        <meshStandardMaterial roughness={0.55} metalness={0} />
       </instancedMesh>
       <instancedMesh ref={eyes} args={[eyeGeometry, undefined, school.length]}>
         {/* Крапка має лишатись чорною при будь-якому світлі: це око, а

@@ -83,7 +83,20 @@ describe('риба — силует, а не модель', () => {
     // Ціна зграї — це ціна риби, помножена на двадцять два. Двісті
     // трикутників на рибу означали б, що зграя дорожча за весь риф.
     expect(fish.indices.length / 3).toBeLessThanOrEqual(30);
-    expect(fish.positions.length / 3).toBeLessThanOrEqual(16);
+    /*
+     * **СТЕЛЯ ВЕРШИН ПІДНЯТА 16 → 24 (ADR-0195), і ось за що.**
+     *
+     * Доти хвіст був двобічний ДАРМА: обидва боки ділили ті самі
+     * вершини, а різними їх робив `flatShading` на матеріалі зграї.
+     * Відколи затінення справжнє, дві грані, спрямовані одна проти одної,
+     * не можуть ділити вершину — їхні нормалі в сумі дали б нуль, тобто
+     * чорну пляму.
+     *
+     * Ціна названа числом: п'ять вершин на рибу. Трикутників — рівно
+     * стільки ж, а саме вони й коштують, бо це вони малюються двадцять
+     * два рази.
+     */
+    expect(fish.positions.length / 3).toBeLessThanOrEqual(24);
   });
 
   it('стиснута з боків, а не кругла', () => {
@@ -113,10 +126,22 @@ describe('риба — силует, а не модель', () => {
      * зграї на кожному кадрі світила б порожнечею — і це читалось би
      * вадою рендерера, а не форми.
      */
+    /*
+     * **КЛЮЧ — ПОЗИЦІЯ, А НЕ НОМЕР ВЕРШИНИ (ADR-0195).**
+     *
+     * Доти це було те саме число. Відколи затінення справжнє, лице й
+     * виворіт хвоста мають РІЗНІ вершини в тих самих точках — інакше їхні
+     * протилежні нормалі усереднились би в нуль. По номерах двобічність
+     * тепер не видно зовсім, хоч у геометрії вона на місці.
+     */
+    const keyOf = (vertex: number): string => [
+      fish.positions[vertex * 3], fish.positions[vertex * 3 + 1], fish.positions[vertex * 3 + 2],
+    ].join(',');
     const seen = new Map<string, number>();
     for (let at = 0; at < fish.indices.length; at += 3) {
-      const key = [fish.indices[at]!, fish.indices[at + 1]!, fish.indices[at + 2]!]
-        .slice().sort((left, right) => left - right).join(':');
+      const key = [
+        keyOf(fish.indices[at]!), keyOf(fish.indices[at + 1]!), keyOf(fish.indices[at + 2]!),
+      ].slice().sort((left, right) => (left < right ? -1 : left > right ? 1 : 0)).join('|');
       seen.set(key, (seen.get(key) ?? 0) + 1);
     }
     expect([...seen.values()].filter((count) => count === 2).length).toBe(2);

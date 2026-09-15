@@ -89,7 +89,6 @@ export function ReefColonies({ plan, meshes, theme, lift }: ReefColoniesProps): 
           vertexColors
           roughness={0.92}
           metalness={0}
-          flatShading
         />
       </mesh>
       {meshes.colonies.map((colony) => (
@@ -112,7 +111,6 @@ export function ReefColonies({ plan, meshes, theme, lift }: ReefColoniesProps): 
             vertexColors
             roughness={0.78}
             metalness={0}
-            flatShading
           />
         </mesh>
       ))}
