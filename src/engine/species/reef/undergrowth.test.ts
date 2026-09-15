@@ -11,6 +11,8 @@ import {
   buildReefPebbleMesh,
   buildReefTuftMesh,
   buildReefWeedMesh,
+  TUFT_RINGS,
+  TUFT_SIDES,
 } from './undergrowthMesh';
 
 const HEAD = reefHeadSize(12 * 365, 6);
@@ -230,6 +232,74 @@ describe('три форми мають об’єм', () => {
     expect(widestGap / height, 'силует без боку: одна довга грань').toBeLessThan(0.25);
     const width = tuft.bounds.max.x - tuft.bounds.min.x;
     expect(height / width).toBeGreaterThan(0.8);
+  });
+
+  it('ребро кульки йде ВЗДОВЖ тіла, а не зиґзаґом через кільця', () => {
+    /*
+     * **РЕГРЕСІЯ ADR-0194.** Тут стояло `(side + ring) % 2`: радіус
+     * стрибав через вершину і по колу, і по кільцях, тобто зсув ішов
+     * діагоналлю в обидва боки. Це буквально схема, якою складають
+     * папір, — і на живому порталі кульки лежали на камені зіжмаканими
+     * обгортками.
+     *
+     * Виміряно зануленням по одному терму: тон у нуль кадру не змінив,
+     * `TUFT_SPIKE` у нуль прибрав папір повністю. Тобто винна була саме
+     * форма, і саме її діагональ.
+     *
+     * Міряється не глибина ребра, а те, що зламалось: чи однаковий
+     * профіль радіуса на КОЖНОМУ кільці. У губки, актинії та їжака
+     * борозни тягнуться від основи до маківки; щойно профіль почне
+     * залежати від кільця — тіло знову згорнеться папером.
+     *
+     * Сусідній тест «у кульки є БІК» цього НЕ ловив: він міряє висоти
+     * вершин, а діагональ їх навіть згущує — саме тому він і проходив
+     * усі ці місяці на зіжмаканому тілі.
+     */
+    const tuft = buildReefTuftMesh();
+    // Кільця йдуть підряд від основи; маківка й денце — дві останні
+    // вершини, тож їх треба відкинути, інакше «кільце» захопить їх.
+    const points = Array.from({ length: tuft.positions.length / 3 }, (_v, index) => ({
+      x: tuft.positions[index * 3]!,
+      y: tuft.positions[index * 3 + 1]!,
+      z: tuft.positions[index * 3 + 2]!,
+    }));
+    /*
+     * Довжина кільця береться З МЕША, а не рахується тут. Зріз, що знає
+     * розмір напам'ять, після першої ж зміни сітки міряє шматки РІЗНИХ
+     * кілець — і мовчки проходить (ADR-0193 §4).
+     */
+    const rings: number[][] = [];
+    for (let ring = 0; ring < TUFT_RINGS; ring += 1) {
+      const slice = points.slice(ring * TUFT_SIDES, (ring + 1) * TUFT_SIDES);
+      expect(slice, `кільце ${ring} неповне`).toHaveLength(TUFT_SIDES);
+      // Маківка й денце стоять на осі: якщо котрась із них потрапила в
+      // зріз, кільця поїхали, і міряти далі немає сенсу.
+      for (const point of slice) {
+        expect(Math.hypot(point.x, point.z), `кільце ${ring} захопило вісь`).toBeGreaterThan(0);
+      }
+      rings.push(slice.map((point) => Math.hypot(point.x, point.z)));
+    }
+
+    const profile = (ring: readonly number[]): number[] => {
+      const mean = ring.reduce((sum, value) => sum + value, 0) / ring.length;
+      return ring.map((value) => value / mean);
+    };
+    const first = profile(rings[0]!);
+    for (let ring = 1; ring < rings.length; ring += 1) {
+      const here = profile(rings[ring]!);
+      for (let side = 0; side < TUFT_SIDES; side += 1) {
+        expect(
+          here[side]!,
+          `кільце ${ring}, сторона ${side}: профіль радіуса розійшовся з нижнім кільцем`,
+          /*
+           * П'ять знаків, а не шість: координати мешу записані через
+           * `round6`, тож частка радіуса розходиться на ~5e-7 самим
+           * округленням. Діагональ, проти якої стоїть цей тест, дає
+           * розбіжність близько 0.2 — на п'ять порядків більшу.
+           */
+        ).toBeCloseTo(first[side]!, 5);
+      }
+    }
   });
 
   it('камінець приплюснутий — інакше він не камінець', () => {
