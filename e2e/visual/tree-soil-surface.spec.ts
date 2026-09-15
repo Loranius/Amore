@@ -1,22 +1,6 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
+import { expectTreeAcceptancePass } from './treeAcceptance';
 
-/**
- * Приймальний статус разом із причиною в одному повідомленні.
- *
- * Окрема перевірка «немає порушень» перед «статус pass» виглядала слушно й
- * була ненадійною: поки конвеєр прогрівається, статус — «warming», а список
- * порушень порожній, тож перевірка проходила саме в ту мить і причину все
- * одно ховала. Тут статус і причина читаються разом і разом же чекають:
- * «очікували pass, дістали fail build-ms» — це вже готова відповідь, а не
- * привід іти в логи збірки.
- */
-async function expectTreeAcceptancePass(preview: Locator, timeout = 20_000) {
-  await expect(async () => {
-    const status = await preview.getAttribute('data-tree-lab-acceptance');
-    const violations = await preview.getAttribute('data-tree-lab-violations');
-    expect(`${status ?? '—'} ${violations ?? ''}`.trim()).toBe('pass');
-  }).toPass({ timeout });
-}
 
 
 const userName = process.env.VISUAL_USER_NAME ?? '';

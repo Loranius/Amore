@@ -1,22 +1,6 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expectTreeAcceptancePass } from './treeAcceptance';
 
-/**
- * Приймальний статус разом із причиною в одному повідомленні.
- *
- * Окрема перевірка «немає порушень» перед «статус pass» виглядала слушно й
- * була ненадійною: поки конвеєр прогрівається, статус — «warming», а список
- * порушень порожній, тож перевірка проходила саме в ту мить і причину все
- * одно ховала. Тут статус і причина читаються разом і разом же чекають:
- * «очікували pass, дістали fail build-ms» — це вже готова відповідь, а не
- * привід іти в логи збірки.
- */
-async function expectTreeAcceptancePass(preview: Locator, timeout = 20_000) {
-  await expect(async () => {
-    const status = await preview.getAttribute('data-tree-lab-acceptance');
-    const violations = await preview.getAttribute('data-tree-lab-violations');
-    expect(`${status ?? '—'} ${violations ?? ''}`.trim()).toBe('pass');
-  }).toPass({ timeout });
-}
 
 
 const userName = process.env.VISUAL_USER_NAME ?? '';
@@ -47,16 +31,18 @@ async function expectAcceptedContract(preview: Locator) {
     'data-tree-production-pipeline-id',
     'tree:production-pipeline:v1',
   );
+  /*
+   * СТАТИЧНИЙ присуд лишається строгим: він про саму геометрію, і жоден
+   * раннер його не зрушить.
+   */
   await expect(preview).toHaveAttribute('data-tree-production-static-status', 'pass');
-  // Той самий прийом, що й для приймального статусу: причина в повідомленні.
-  // Без неї падіння тут читалось як «очікували pass, дістали fail» — і не
-  // казало, що саме порушено (у пісочниці це `build-ms`, бо програмний
-  // рендерер повільніший за раннер).
-  await expect(async () => {
-    const status = await preview.getAttribute('data-tree-production-runtime-status');
-    const violations = await preview.getAttribute('data-tree-lab-violations');
-    expect(`${status ?? '—'} ${violations ?? ''}`.trim()).toBe('pass');
-  }).toPass({ timeout: 25_000 });
+  /*
+   * А ЧАСОВИЙ — через спільний присуд (`treeAcceptance.ts`), який
+   * дозволяє рівно одне порушення: `build-ms`. Воно міряє процесор
+   * раннера, а не дерево, і в CI той самий конвеєр на тій самій історії
+   * пари дає то `pass`, то `fail build-ms` залежно від навантаження.
+   */
+  await expectTreeAcceptancePass(preview, 25_000, 'data-tree-production-runtime-status');
   await expectTreeAcceptancePass(preview);
   await expect(preview).toHaveAttribute('data-tree-production-phase-order', 'true');
   await expect(preview).toHaveAttribute('data-tree-production-phase-fingerprints', 'true');
