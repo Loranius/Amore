@@ -218,7 +218,25 @@ async function expectLifeMetrics(preview: Locator, requireProfiles: boolean) {
   expect(motionScale).toBeLessThanOrEqual(1);
   expect(swayX).toBeGreaterThan(0);
   expect(swayZ).toBeGreaterThan(0);
-  expect(matrixUpdates).toBe(profiles);
+  /*
+   * НУЛЬ МАТРИЦЬ ЗА КАДР — І ЦЕ ПОСИЛЕННЯ ПЕРЕВІРКИ, А НЕ ПОСЛАБЛЕННЯ.
+   *
+   * Тут стояло `toBe(profiles)`, тобто «кожен листок коштує матрицю
+   * щокадру». Це була правда, поки хитання рахував процесор: рендер
+   * розкладав кватерніон кожного листка, збирав матрицю назад і слав
+   * увесь буфер на відео — 651 листок за кадр, єдина покадрова витрата
+   * всієї сцени дерева.
+   *
+   * Відколи хитання рахує вершинний шейдер, за кадр змінюються рівно два
+   * однострої, а матриці інстансів статичні (`engine/treeLife/treeLife.ts`
+   * пише це просто над самим числом). Закон хитання при цьому не
+   * змінився — `treeLeafSwayAt` спільна для процесора й GLSL.
+   *
+   * Тобто тест вимагав повернути покадрову витрату, якої свідомо
+   * позбулись. Тепер він стереже здобуток: нуль і жодного зайвого
+   * виклику малювання.
+   */
+  expect(matrixUpdates).toBe(0);
   expect(extraDrawCalls).toBe(0);
   await expect(preview).toHaveAttribute('data-tree-lab-life-reduced-motion', 'false');
 }
