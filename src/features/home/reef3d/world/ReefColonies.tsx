@@ -78,8 +78,19 @@ export function ReefColonies({ plan, meshes, theme, lift }: ReefColoniesProps): 
 
   return (
     <group position={[0, lift, 0]}>
+      {/*
+        * `vertexColors` тут — ТОН ГРАНІ, а не другий колір: у буфері
+        * лежить сірий множник навколо 1.0, тож основний колір лишається
+        * тим самим, а грані навколо нього розходяться (ADR-0190).
+        */}
       <mesh geometry={meshes.head} castShadow receiveShadow>
-        <meshStandardMaterial color={headColour} roughness={0.92} metalness={0} flatShading />
+        <meshStandardMaterial
+          color={headColour}
+          vertexColors
+          roughness={0.92}
+          metalness={0}
+          flatShading
+        />
       </mesh>
       {meshes.colonies.map((colony) => (
         <mesh key={colony.id} geometry={colony.geometry} castShadow receiveShadow>
@@ -98,6 +109,7 @@ export function ReefColonies({ plan, meshes, theme, lift }: ReefColoniesProps): 
             */}
           <meshStandardMaterial
             color={colonyColour(colony.fill)}
+            vertexColors
             roughness={0.78}
             metalness={0}
             flatShading

@@ -63,6 +63,27 @@ const PROFILE: ReadonlyArray<readonly [number, number]> = [
 ];
 
 /**
+ * ТОН ГРАНІ КОРАЛА: маківка бліда, основа темна, і кожне тіло трохи своє.
+ *
+ * Власник: «корал робимо більш кораловим і менш картонним». Виміряно
+ * перед правками (`--profile`, світла тема): сусідні грані колонії
+ * різнились на 10% медіани — тобто колонія читалась однією литою масою
+ * кольору, а не купкою окремих коралів.
+ *
+ * Два спостереження про справжній корал, обидва тут і обидва даром:
+ * - **точка росту бліда.** Живий корал світлішає до кінчика, бо там
+ *   молода тканина без водоростей. Це та сама «вертикальна градація
+ *   кольору», яку набір еталонів кристала носить у кожному самоцвіті.
+ * - **сусідні тіла ніколи не однакові.** Одне насінням світліше, друге
+ *   темніше — і купка перестає читатись однією відлитою формою.
+ *
+ * Тон іде ЧИСЛОМ у рушій і кольором лише в рендерері: тут вирішується
+ * не «який колір», а «наскільки це місце вигоріле».
+ */
+const TIP_PALE = 0.34;
+const BODY_TONE_JITTER = 0.16;
+
+/**
  * Наскільки маківка підіймається над верхнім кільцем, у частках висоти.
  *
  * Мало — і це головне. Перша редакція звужувала верхнє кільце до 0.36 і
@@ -169,6 +190,7 @@ export function buildReefColonyMesh(
   const positions: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];
+  const faceShade: number[] = [];
   let baseCapTriangleCount = 0;
 
   const anchorNormal = normalized(anchor.normal);
@@ -200,6 +222,13 @@ export function buildReefColonyMesh(
     const girth = body.radius
       * (1 + (seededUnit(seed, `reef:mesh:girth:${salt}`) - 0.5) * GIRTH_JITTER);
     const ribPhase = seededUnit(seed, `reef:mesh:rib:${salt}`) * Math.PI * 2;
+    /* Своє світло кожному тілу: купка не має читатись однією відливкою. */
+    const bodyTone = 1 + (seededUnit(seed, `reef:mesh:tone:${salt}`) - 0.5) * BODY_TONE_JITTER;
+    /* Частка висоти → блідість. Кільця йдуть знизу вгору, тож індекс
+       кільця і є висотою; затоплене кільце рахується за нульове. */
+    const ringTone = (ring: number, ringCount: number): number => (
+      bodyTone * (1 + TIP_PALE * (ring / Math.max(1, ringCount - 1)))
+    );
     // Найменший радіус кривини півеліпсоїда — на екваторі, H²/R.
     const curvature = (head.rise * head.rise) / Math.max(1e-6, head.radius);
     const sink = Math.min(girth * SINK_OF_RADIUS, curvature * SINK_CURVATURE_SHARE);
@@ -247,10 +276,13 @@ export function buildReefColonyMesh(
     for (let ring = 0; ring < ringCount - 1; ring += 1) {
       const low = firstVertex + ring * AZIMUTH_SEGMENTS;
       const high = low + AZIMUTH_SEGMENTS;
+      // Тон пояса між двома кільцями — середнє їхніх часток висоти.
+      const tone = round6((ringTone(ring, ringCount) + ringTone(ring + 1, ringCount)) / 2);
       for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
         const next = (segment + 1) % AZIMUTH_SEGMENTS;
         indices.push(low + segment, low + next, high + segment);
         indices.push(low + next, high + next, high + segment);
+        faceShade.push(tone, tone);
       }
     }
 
@@ -260,9 +292,11 @@ export function buildReefColonyMesh(
     positions.push(round6(tip.x), round6(tip.y), round6(tip.z));
     normals.push(round6(axis.x), round6(axis.y), round6(axis.z));
     const topRing = firstVertex + (ringCount - 1) * AZIMUTH_SEGMENTS;
+    const tipTone = round6(ringTone(ringCount, ringCount));
     for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
       const next = (segment + 1) % AZIMUTH_SEGMENTS;
       indices.push(topRing + segment, topRing + next, apex);
+      faceShade.push(tipTone);
     }
 
     // Кришка основи: затоплена, але замкнена.
@@ -273,6 +307,9 @@ export function buildReefColonyMesh(
     for (let segment = 0; segment < AZIMUTH_SEGMENTS; segment += 1) {
       const next = (segment + 1) % AZIMUTH_SEGMENTS;
       indices.push(capCentre, firstVertex + next, firstVertex + segment);
+      // Кришка затоплена в купол; тон їй ні до чого, але довжина масиву
+      // мусить збігатися з кількістю трикутників.
+      faceShade.push(1);
     }
     baseCapTriangleCount += AZIMUTH_SEGMENTS;
   });
@@ -290,6 +327,7 @@ export function buildReefColonyMesh(
     positions,
     normals,
     indices,
+    faceShade,
     baseCapTriangleCount,
     bounds: {
       min: { x: empty ? 0 : round6(minX), y: empty ? 0 : round6(minY), z: empty ? 0 : round6(minZ) },

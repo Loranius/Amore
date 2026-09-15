@@ -40,7 +40,7 @@ const HEAD_SCALE_MIN = 0.25;
 const HEAD_SCALE_MAX = 1;
 
 /** Частка розміру голови, якої річна колонія не переступає ніколи. */
-export const ANNUAL_HEAD_SHARE = 0.4;
+export const ANNUAL_HEAD_SHARE = 0.5;
 
 /** Найменша частка — рік, у якому не було нічого, все одно читається колонією. */
 const ANNUAL_MIN_SHARE = 0.16;
