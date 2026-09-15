@@ -232,10 +232,31 @@ test.describe('Tree Species Pixel 8 Pro preview', () => {
     await expect(preview).toHaveAttribute('data-tree-lab-source', 'fixture');
     await expect(preview).toHaveAttribute('data-tree-lab-lod', 'medium');
     await expect(preview).toHaveAttribute('data-tree-lab-stage', 'young');
-    await expect(preview).toHaveAttribute('data-tree-lab-annual-instructions', '2');
-    await expect(preview).toHaveAttribute('data-tree-lab-event-instructions', '8');
+    /*
+     * БАЗОВІ ЧИСЛА ФІКСТУРИ ОНОВЛЕНІ, І ЗМІНА СЕМАНТИЧНА, А НЕ ПІДГОНКА.
+     *
+     * Подія більше НЕ СТАЄ ГІЛКОЮ. `instructions.ts` каже це прямо в
+     * діагностиці: «гілками вони більше не стають, і лишити стару назву
+     * зі старим змістом означало б брехати діагностикою», тож
+     * `eventInstructionCount` там тепер константний нуль. Гілку робить
+     * РІК, а події живлять його товщину й крону.
+     *
+     * Тому:
+     *   подій-інструкцій   8 → 0   (їх більше не існує як роду)
+     *   річних інструкцій  2 → 3   (рік стосунків, включно з поточним)
+     *   атракторів        15 → 12  (наслідок перших двох)
+     *
+     * Нормалізованих подій і далі 8: рушій їх бачить, просто дерево
+     * будує з них інше.
+     *
+     * Числа СТАЛІ, хоч і виміряні сьогодні: у фікстури `asOf` прибитий
+     * (`data-tree-production-as-of-policy: fixed-fixture`, 2026-07-29),
+     * тож рік на них не наростає.
+     */
+    await expect(preview).toHaveAttribute('data-tree-lab-annual-instructions', '3');
+    await expect(preview).toHaveAttribute('data-tree-lab-event-instructions', '0');
     await expect(preview).toHaveAttribute('data-tree-lab-normalized-events', '8');
-    await expect(preview).toHaveAttribute('data-tree-lab-attractors', '15');
+    await expect(preview).toHaveAttribute('data-tree-lab-attractors', '12');
     await expect(preview).toHaveAttribute('data-tree-lab-truncated', '0');
     await expectTreeAcceptancePass(preview, 20_000);
     await expect(preview).toHaveAttribute('data-tree-lab-violations', '');

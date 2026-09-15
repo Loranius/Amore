@@ -114,131 +114,42 @@ test.describe('Amore mobile visual preview', () => {
     await page.getByRole('button', { name: 'Закрити деталі мрії' }).click();
     await expect(sphereSheet).toBeHidden();
 
-    // Вигляд перемикається в аркуші навігації — у світі панелі пріоритетів
-    // немає, і саме тому решта цього тесту раніше мовчки пропускалась.
-    const openWorldNav = async () => {
-      await page.locator('.wl-world-nav-toggle').click();
-      await expect(page.locator('.wl-world-sheet')).toBeVisible();
+    /*
+     * ВИГЛЯД ПЕРЕМИКАЄТЬСЯ В АКОРДЕОНІ ФІЛЬТРІВ, і селектори в нього
+     * інші, ніж були: `.wl-world-nav-toggle` і `.wl-world-sheet`
+     * перейменовані у `wl-top-filter-*`, коли аркуш переїхав порталом
+     * усередину `.wl-wishlist-controls` — саме щоб старі
+     * fixed/absolute правила не витягували його в кут екрана.
+     *
+     * Тест лишився на старих іменах і півтора місяця падав у CI по
+     * таймауту, чекаючи на кнопку, якої немає. Разом із ним мовчки
+     * помер і весь хвіст цього файлу.
+     */
+    const openFilters = async () => {
+      await page.locator('.wl-top-filter-toggle').click();
+      await expect(page.locator('.wl-top-filter-sheet')).toBeVisible();
     };
     const chooseView = async (label: string) => {
-      await openWorldNav();
-      await page.locator('.wl-world-sheet').getByRole('button', { name: label, exact: true }).click();
-      await page.locator('.wl-world-scrim').click({ position: { x: 10, y: 10 } });
-      await expect(page.locator('.wl-world-sheet')).toBeHidden();
+      await openFilters();
+      const sheet = page.locator('.wl-top-filter-sheet');
+      await sheet.getByRole('button', { name: label, exact: true }).click();
+      await page.locator('.wl-top-filter-toggle').click();
+      await expect(sheet).toBeHidden();
     };
 
+    /*
+     * ВИДІВ ДВА, А НЕ ТРИ. Полароїдного вигляду у вішлісті більше немає:
+     * полароїд переїхав у «Спогади» (ADR-0181), і тест, який його тут
+     * шукав, стеріг би функцію, якої свідомо позбулись.
+     */
     await chooseView('Список');
     {
-      const feed = page.locator('.wl-feed-view');
-      await expect(feed).toBeVisible();
-      await feed.screenshot({ path: testInfo.outputPath('06-wishlist-feed.png') });
-    }
-
-    await chooseView('Полароїд');
-    {
-      const polaroids = page.locator('.wl-polaroid-view');
-      await expect(polaroids).toBeVisible();
-      await polaroids.screenshot({ path: testInfo.outputPath('08-wishlist-polaroids.png') });
+      const grid = page.locator('.wl-grid-view');
+      await expect(grid).toBeVisible();
+      await grid.screenshot({ path: testInfo.outputPath('06-wishlist-grid.png') });
     }
 
     await chooseView('Кристали');
     await expect(sphereField).toBeVisible();
-
-    // Нижче — детальні перевірки карток списку й полароїдів. Вони тримаються
-    // за панель пріоритетів, тобто працюють на шляху без WebGL; у світі цей
-    // блок пропускається, як і пропускався досі.
-    if (await priorityToggle.isVisible()) {
-      await priorityToggle.click();
-      const feedOption = page.locator('.wl-board-view-option[data-view="feed"]');
-      await expect(feedOption).toBeVisible();
-      await feedOption.click();
-      await priorityToggle.click();
-      await expect(page.locator('.wl-board-toolbar-panel')).toBeHidden();
-
-      const feed = page.locator('.wl-feed-view');
-      await expect(feed).toBeVisible();
-      await feed.scrollIntoViewIfNeeded();
-
-      const firstFeedCard = page.locator('.wl-feed-card').first();
-      if (await firstFeedCard.count()) {
-        await expect(firstFeedCard.locator('.wl-feed-card__title')).not.toBeEmpty();
-        await expect(firstFeedCard.locator('.wl-feed-card__description')).not.toBeEmpty();
-        await expect(firstFeedCard.locator('.wl-feed-card__priority')).not.toBeEmpty();
-        await expect(firstFeedCard.locator('.wl-feed-card__price')).not.toBeEmpty();
-
-        const layout = await firstFeedCard.evaluate((card) => {
-          const trigger = card.querySelector<HTMLElement>('.wl-feed-card__trigger');
-          const media = card.querySelector<HTMLElement>('.wl-feed-card__media');
-          const title = card.querySelector<HTMLElement>('.wl-feed-card__title');
-          const description = card.querySelector<HTMLElement>('.wl-feed-card__description');
-          if (!trigger || !media || !title || !description) {
-            throw new Error('Wishlist feed card structure is incomplete.');
-          }
-
-          const triggerRect = trigger.getBoundingClientRect();
-          const mediaRect = media.getBoundingClientRect();
-          const titleRect = title.getBoundingClientRect();
-          const descriptionRect = description.getBoundingClientRect();
-          return {
-            titleInside: titleRect.left >= triggerRect.left && titleRect.right <= triggerRect.right,
-            descriptionInside:
-              descriptionRect.left >= triggerRect.left && descriptionRect.right <= triggerRect.right,
-            copyAfterMedia: titleRect.left > mediaRect.right,
-          };
-        });
-
-        expect(layout).toEqual({
-          titleInside: true,
-          descriptionInside: true,
-          copyAfterMedia: true,
-        });
-
-        await firstFeedCard.locator('.wl-feed-card__trigger').click();
-        const detailsSheet = page.locator('.wl-cloud-sheet');
-        await expect(detailsSheet).toBeVisible();
-        await expect(detailsSheet.locator('.wl-cloud-sheet-title')).not.toBeEmpty();
-        await detailsSheet.screenshot({
-          path: testInfo.outputPath('07-wishlist-details-sheet.png'),
-        });
-        await page.getByRole('button', { name: 'Закрити деталі мрії' }).click();
-        await expect(detailsSheet).toBeHidden();
-      }
-
-      await feed.screenshot({
-        path: testInfo.outputPath('06-wishlist-feed.png'),
-      });
-
-      await priorityToggle.click();
-      const polaroidOption = page.locator('.wl-board-view-option[data-view="polaroid"]');
-      await expect(polaroidOption).toBeVisible();
-      await polaroidOption.click();
-      await priorityToggle.click();
-      await expect(page.locator('.wl-board-toolbar-panel')).toBeHidden();
-
-      const polaroidView = page.locator('.wl-polaroid-view');
-      await expect(polaroidView).toBeVisible();
-      await polaroidView.scrollIntoViewIfNeeded();
-
-      const firstPolaroid = polaroidView.locator('.wl-polaroid-card').first();
-      if (await firstPolaroid.count()) {
-        await expect(firstPolaroid.locator('.wl-polaroid-card__title')).not.toBeEmpty();
-        await expect(firstPolaroid.locator('.wl-polaroid-card__priority')).not.toBeEmpty();
-        await expect(firstPolaroid.locator('.wl-cloud-bubble')).toHaveCount(0);
-        await expect(firstPolaroid.locator('[data-wish-title]')).toHaveCount(0);
-
-        const structure = await firstPolaroid.evaluate((card) => ({
-          parentIsPolaroidView: card.parentElement?.classList.contains('wl-polaroid-view') ?? false,
-          hasLegacyBoardClass: card.classList.contains('wl-board-view-item'),
-        }));
-        expect(structure).toEqual({
-          parentIsPolaroidView: true,
-          hasLegacyBoardClass: false,
-        });
-      }
-
-      await polaroidView.screenshot({
-        path: testInfo.outputPath('08-wishlist-polaroids.png'),
-      });
-    }
   });
 });

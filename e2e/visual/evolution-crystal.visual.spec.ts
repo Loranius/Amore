@@ -71,8 +71,30 @@ test.describe('Evolution crystal Pixel 8 Pro acceptance', () => {
     // crystal costs about one draw call per material, not one per body. One
     // extra is allowed for the optional Sparkles points object.
     const crystalDrawCalls = drawCalls - environmentDrawCalls;
+    /*
+     * СКЛАД КАДРУ ДРУКУЄТЬСЯ ПОРУЧ ІЗ ЧИСЛОМ, і це не оздоба звіту.
+     *
+     * Ця межа падає в CI («7 > 5») з кінця липня, і півтора місяця ніхто
+     * не міг сказати, ЩО це за сім: розклад сцени (`--breakdown`) є лише
+     * в dev-збірці, а CI малює продакшн. Виміряно локально на тій самій
+     * продакшн-збірці: `batch:4,mesh:7,points:1` — тобто чотири батчі
+     * тіл, сім мешів оточення й одна хмара іскор, разом 12 викликів і
+     * рівно 5 на кристал. У CI їх сім, отже там малюється ще щось.
+     *
+     * Тому межа НЕ послаблена під спостережене число: замість цього
+     * сцена тепер публікує свій склад (`data-evolution-composition`), і
+     * наступний червоний прогін сам скаже, чим саме він червоний.
+     */
+    const composition = await preview.getAttribute('data-evolution-composition');
+    await testInfo.attach('evolution-scene-composition.txt', {
+      body: `draw calls ${drawCalls}, environment ${environmentDrawCalls}, composition ${composition ?? '—'}`,
+      contentType: 'text/plain',
+    });
     expect(crystalDrawCalls).toBeGreaterThan(0);
-    expect(crystalDrawCalls).toBeLessThanOrEqual(materialCount + 1);
+    expect(
+      crystalDrawCalls,
+      `кристал малює ${crystalDrawCalls} викликів при ${materialCount} матеріалах; склад кадру: ${composition ?? '—'}`,
+    ).toBeLessThanOrEqual(materialCount + 1);
     expect(crystalDrawCalls).toBeLessThan(meshCount);
     // Same correction as the draw calls: what must stay inside the published
     // geometry budget is the crystal, and the environment draws a fixed,

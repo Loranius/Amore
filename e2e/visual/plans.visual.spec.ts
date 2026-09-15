@@ -30,18 +30,21 @@ test.describe('Plans mobile visual preview', () => {
 
     const module = page.locator('.plans-module');
     await expect(module).toBeVisible();
-    await expect(module).toHaveAttribute('data-section', 'calendar');
 
-    const tabs = page.getByRole('tablist', { name: 'Розділи планів' });
-    await expect(tabs.getByRole('tab', { name: /Календар/ })).toHaveAttribute('aria-selected', 'true');
-    await expect(tabs.getByRole('tab', { name: /Події/ })).toBeVisible();
-
-    // The old overview/featured/upcoming widget system was removed when Plans
-    // and Calendar were unified. The month surface is now the primary module.
+    /*
+     * ТУТ СТОЯЛИ `data-section="calendar"` І ВКЛАДКИ «Розділи планів».
+     * Ні того, ні тих у модулі більше немає: плани й календар зведені в
+     * ОДИН сувій, де місяць угорі, а розділи під ним. Тест цього не
+     * помітив і півтора місяця падав у CI на атрибуті, якого ніхто не
+     * знімав, — а падаючий тест не стереже нічого.
+     *
+     * Тому перевіряється те, що справді визначає модуль сьогодні: місяць
+     * і аркуш під ним.
+     */
     await expect(page.locator('.pm-sheet')).toBeVisible();
     await expect(page.locator('.cal-month')).toBeVisible();
 
-    const addButton = page.locator('.pm-fab');
+    const addButton = page.locator('.plans-module .fab');
     await expect(addButton).toBeVisible();
     const addBox = await addButton.boundingBox();
     expect(addBox).not.toBeNull();
@@ -57,16 +60,19 @@ test.describe('Plans mobile visual preview', () => {
       fullPage: true,
     });
 
-    // Calendar's single CTA first asks whether the user wants a Plan or an
-    // Event. This chooser is part of the approved current interaction model.
+    /*
+     * ПЛЮС БІЛЬШЕ НЕ ПИТАЄ «План чи подія?» — і це не спрощення тесту, а
+     * рішення продукту, записане просто над кнопкою в `PlansPage.tsx`: у
+     * цьому модулі плюс завжди означає план, а календарна подія
+     * створюється контекстно, другим тапом по даті.
+     *
+     * Тест іще питав вибір і падав на заголовку «Що створюємо?».
+     */
     await addButton.click();
     const createSheet = page.locator('.plan-create-sheet');
     await expect(createSheet).toBeVisible();
-    await expect(createSheet.getByRole('heading', { name: 'Що створюємо?' })).toBeVisible();
-    await createSheet.screenshot({ path: testInfo.outputPath('plans-create-chooser.png') });
-
-    await createSheet.getByRole('button', { name: /^План(?:\s|$)/ }).click();
     await expect(createSheet.getByRole('heading', { name: 'Що хочете зробити разом?' })).toBeVisible();
+    await createSheet.screenshot({ path: testInfo.outputPath('plans-create-composer.png') });
 
     await createSheet.getByRole('button', { name: /Обкладинка плану/ }).click();
     await expect(createSheet.locator('.plan-create-photo-picker')).toBeVisible();

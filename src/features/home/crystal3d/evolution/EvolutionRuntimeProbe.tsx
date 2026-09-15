@@ -7,6 +7,21 @@ export interface EvolutionRuntimeMetrics {
   triangles: number;
   points: number;
   lines: number;
+  /**
+   * ХТО САМЕ малює — коротким рядком, наприклад `batch:4,points:1,mesh:7`.
+   *
+   * З'явилось не для краси. Приймальний тест бюджету кристала рахує його
+   * виклики як «усі мінус оточення» й уже півтора місяця падає в CI на
+   * `7 > 5`, а сказати, ЩО це за сім, не може ніхто: розклад сцени
+   * (`--breakdown`) є лише в dev-збірці, а CI малює продакшн.
+   *
+   * Це той самий урок, що й із бюджетом дерева: питання «на що витрачені
+   * виклики» без обходу сцени доводиться відповідати арифметикою на
+   * папері — і саме там і жила помилка.
+   *
+   * Діагностика й нічого більше: у хеші, рішення чи геометрію це не йде.
+   */
+  composition: string;
 }
 
 /**
@@ -36,6 +51,33 @@ export const EVOLUTION_SCENE_HANDLE = '__amoreEvolutionScene';
  * полотні це вимикає, і жодного попередження при цьому не буде.
  */
 export const EVOLUTION_TONE_HANDLE = '__amoreEvolutionTone';
+
+/**
+ * Хто малюється в цьому кадрі, згрупований за родом.
+ *
+ * Рід беремо з ІМЕНІ об'єкта, а не з його типу: батч кристала й меш
+ * острова — обидва `Mesh`, і різниця між ними саме в тому, чим вони є,
+ * а не з чого зроблені. Батчі підписані в `bundle.ts`, іскри — в
+ * `innerSparks.ts`; усе інше лишається просто мешем.
+ *
+ * Невидиме не рахується: об'єкт із `visible = false` не коштує виклику.
+ */
+function sceneComposition(scene: { traverseVisible: (fn: (node: unknown) => void) => void }): string {
+  const counts = new Map<string, number>();
+  const bump = (kind: string): void => {
+    counts.set(kind, (counts.get(kind) ?? 0) + 1);
+  };
+  scene.traverseVisible((node) => {
+    const object = node as { isMesh?: boolean; isPoints?: boolean; isLine?: boolean; name?: string };
+    if (object.isPoints) bump('points');
+    else if (object.isLine) bump('line');
+    else if (object.isMesh) bump(object.name?.startsWith('Evolution crystal batch') ? 'batch' : 'mesh');
+  });
+  return [...counts.entries()]
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([kind, count]) => `${kind}:${count}`)
+    .join(',');
+}
 
 export function EvolutionRuntimeProbe({
   onMetrics,
@@ -80,12 +122,14 @@ export function EvolutionRuntimeProbe({
       triangles: gl.info.render.triangles,
       points: gl.info.render.points,
       lines: gl.info.render.lines,
+      composition: sceneComposition(scene),
     };
     const signature = [
       metrics.drawCalls,
       metrics.triangles,
       metrics.points,
       metrics.lines,
+      metrics.composition,
     ].join(':');
     if (signature === lastRef.current) return;
     lastRef.current = signature;

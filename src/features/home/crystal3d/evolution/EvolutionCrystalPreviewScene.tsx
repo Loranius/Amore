@@ -219,6 +219,10 @@ export default function EvolutionCrystalPreviewScene() {
         data-evolution-build-ms={metrics.buildMs}
         data-evolution-runtime={runtime ? 'ready' : 'warming'}
         data-evolution-draw-calls={runtime?.drawCalls ?? ''}
+        /* Хто саме малює — див. `EvolutionRuntimeProbe`. Діагностика для
+           приймального тесту бюджету: «сім викликів» без цього рядка не
+           можна ні пояснити, ні спростувати. */
+        data-evolution-composition={runtime?.composition ?? ''}
         data-evolution-rendered-triangles={runtime?.triangles ?? ''}
         data-portal-environment-draw-calls={PORTAL_ENVIRONMENT_DRAW_CALLS}
         data-portal-environment-triangles={PORTAL_ENVIRONMENT_TRIANGLES}

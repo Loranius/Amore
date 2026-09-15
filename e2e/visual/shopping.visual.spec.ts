@@ -37,12 +37,23 @@ test.describe('Shopping mobile visual preview', () => {
       fullPage: true,
     });
 
-    await page.locator('.shopping-hero').screenshot({
-      path: testInfo.outputPath('shopping-hero.png'),
+    /*
+     * ТУТ СТОЯЛИ `.shopping-hero` І `.shopping-composer`. Обох немає:
+     * шапку модуля робить спільний `PageHeader`, а поле вводу живе в
+     * доці внизу екрана (`.shopping-dock`), куди воно й переїхало разом
+     * із полицею шаблонів.
+     *
+     * Тест чекав на `.shopping-hero` дві хвилини й падав по таймауту —
+     * тобто модуль півтора місяця не мав жодного знімка в CI.
+     */
+    await page.locator('.shopping-page .page-head').screenshot({
+      path: testInfo.outputPath('shopping-header.png'),
     });
 
-    await page.locator('.shopping-composer').screenshot({
-      path: testInfo.outputPath('shopping-composer.png'),
+    const dock = page.locator('.shopping-dock');
+    await expect(dock).toBeVisible();
+    await dock.screenshot({
+      path: testInfo.outputPath('shopping-dock.png'),
     });
 
     const firstGroup = page.locator('.shopping-group').first();

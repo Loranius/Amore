@@ -117,19 +117,23 @@ test.describe('Tree Production Acceptance Pixel 8 Pro', () => {
   });
 
   test('keeps portal history or its explicit fixture fallback production-safe after reload', async ({ page }) => {
-  // Очікуване падіння, і воно навмисно лишається видимим.
-  //
-  // На РЕАЛЬНІЙ історії пари дерево виходить за опублікований мобільний
-  // бюджет: `data-tree-lab-violations` каже «triangles,build-ms» (виміряно
-  // локально; вершин 11 251 із 12 000 — вони в межах, трикутники ні). На
-  // фікстурі той самий конвеєр проходить, тож це не поламаний тест, а знайдена
-  // вада виду «дерево».
-  //
-  // Дерево — не той артефакт, яким користується пара, і оптимізація виду є
-  // окремою роботою. Тому тест не вимикається й не послаблюється: він
-  // виконується далі, а Playwright доповість «unexpected pass» тієї миті, коли
-  // дерево впишеться в бюджет — і цей маркер треба буде зняти.
-  test.fail();
+  /*
+   * МАРКЕР `test.fail()` ЗНЯТО — рівно так, як він сам це й приписував.
+   *
+   * Він стояв тут із написом: «Playwright доповість „unexpected pass"
+   * тієї миті, коли дерево впишеться в бюджет — і цей маркер треба буде
+   * зняти». Та мить настала: CI звітує «Expected to fail, but passed».
+   *
+   * Перевірено на РЕАЛЬНІЙ історії пари, а не на фікстурі
+   * (`?engine=tree-lab&treeSource=portal&treeLod=medium`, сьогодні):
+   *   `data-tree-lab-violations`             порожньо
+   *   `data-tree-production-static-status`   pass
+   *   `data-tree-production-runtime-status`  pass
+   *   трикутників 17 390, вершин 7 374, викликів малювання 4
+   *
+   * Тобто вада, яку маркер стеріг, закрита роботою над кроною — і тепер
+   * тест стереже, щоб вона не повернулась.
+   */
     await login(page, '?engine=tree-lab&treeSource=portal&treeLod=medium#/login');
     const preview = page.locator('[data-tree-lab-preview="ready"]');
     await expectAcceptedContract(preview);
