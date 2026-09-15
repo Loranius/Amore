@@ -21,6 +21,7 @@ import {
 } from '../../crystal3d/scene/portalOrbit';
 import { ReefColonies } from './ReefColonies';
 import { ReefRock } from './ReefRock';
+import { ReefBackdrop } from './ReefBackdrop';
 import { ReefSchool } from './ReefSchool';
 import { ReefUndergrowth } from './ReefUndergrowth';
 import { ReefMotes } from './ReefMotes';
@@ -110,6 +111,11 @@ export function ReefWorld({ plan, meshes, theme, reduceMotion }: ReefWorldProps)
     <>
       <ReefWater theme={theme} sceneRadius={standing.rock.radius} seed={plan.headSeed} />
       <ReefRock standing={standing} seed={plan.headSeed} theme={theme} />
+      {/*
+        * Далекий берег. Він НЕ дає колоній і не читає подій пари — див.
+        * `reefBackdrop.ts`; тест поруч стереже цю заборону текстом.
+        */}
+      <ReefBackdrop sceneRadius={standing.rock.radius} seed={plan.headSeed} />
       <ReefColonies plan={plan} meshes={meshes} theme={theme} lift={standing.headLift} />
       <ReefUndergrowth
         plan={plan}
