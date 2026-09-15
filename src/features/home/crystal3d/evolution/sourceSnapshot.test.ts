@@ -1,10 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import type { MemoriesArchive } from '@/features/memories/useMemories';
 import type { WishlistEvolutionArchiveItem } from '@/features/wishlist/wishlistEvolutionArchive';
-import type { EventRow, MapPinRow, PlanRow } from '@/types';
+import { portalSnapshotFromRows } from '@/features/world/portalSources';
 import {
   buildEvolutionMemoryLinks,
-  buildEvolutionSourceSnapshot,
   evolutionWishlistFromPairArchive,
   resolveCrystalColorPartners,
   stableEvolutionCoupleId,
@@ -64,79 +64,51 @@ describe('Evolution real-data snapshot mapping', () => {
   });
 
   it('maps current Amore rows without leaking presentation-only fields', () => {
-    const archive: MemoriesArchive = {
-      photos: [{
+    /*
+     * ВИМОГА: у Blueprint не потрапляє нічого презентаційного — ні
+     * підписи, ні адреси фото. Рушій рахує з того, що ТРАПИЛОСЬ, і зайве
+     * поле в знімку означало б, що воно поїде далі в хеш і в публікацію.
+     *
+     * Перевірка дісталась у спадок від видаленого другого перекладу
+     * (ADR-0189) і тепер стереже той, що лишився, — `portalSnapshotFromRows`
+     * у `portalSources.ts`. Саме тому вона не зникла разом із кодом: вона
+     * стосується не файлу, а гарантії.
+     */
+    const snapshot = portalSnapshotFromRows({
+      events: [{
+        id: 1,
+        date: '2025-02-14',
+        type: 'anniversary',
+        yearly: false,
+        is_milestone: true,
+      }],
+      plans: [{
+        id: 4,
+        category: 'trip',
+        status: 'done',
+        start_date: '2025-03-01',
+        end_date: '2025-03-04',
+        completed_at: '2025-03-04T18:00:00Z',
+        created_at: '2025-02-20T10:00:00Z',
+      }],
+      wishlistItems: evolutionWishlistFromPairArchive([archiveItem(6)]),
+      pins: [{
+        id: 7,
+        category: 'visited',
+        visited_at: '2025-03-02',
+        created_at: '2025-03-05T10:00:00Z',
+        rating: 5,
+        city: 'Львів',
+        country: 'Україна',
+      }],
+      memories: [{
         id: 30,
-        photo_url: 'https://example.test/memory.webp',
-  moment_id: null,
-        storage_bucket: null,
-        storage_path: null,
         memory_date: '2025-04-03',
         date_precision: 'day',
         taken_at: null,
-        caption: 'Не потрапляє у Blueprint',
-        uploaded_by: 1,
-        sort_order: 0,
         created_at: '2025-04-04T09:00:00Z',
       }],
-      links: { 30: ['place'] },
-      linkIds: { 30: { place: 7 } },
-      days: { '2025-04-03': 'Опис дня' },
-    };
-
-    const snapshot = buildEvolutionSourceSnapshot({
-      events: [{
-        id: 1,
-        title: 'Пропозиція',
-        description: null,
-        date: '2025-02-14',
-        created_by: 1,
-        type: 'anniversary',
-        yearly: false,
-        metadata: null,
-        is_milestone: true,
-        person_user_id: null,
-      } as EventRow],
-      plans: [{
-        id: 4,
-        title: 'Подорож',
-        description: null,
-        category: 'trip',
-        status: 'done',
-        cover_url: null,
-        url: null,
-        start_date: '2025-03-01',
-        end_date: '2025-03-04',
-        start_time: null,
-        date_precision: 'day',
-        location_name: null,
-        place_id: null,
-        budget: null,
-        proposed_by: null,
-        confirmed: true,
-        created_by: 1,
-        created_at: '2025-02-20T10:00:00Z',
-        updated_at: '2025-03-04T18:00:00Z',
-        completed_at: '2025-03-04T18:00:00Z',
-      } as PlanRow],
-      wishlist: evolutionWishlistFromPairArchive([archiveItem(6)]),
-      pins: [{
-        id: 7,
-        title: 'Львів',
-        note: null,
-        category: 'visited',
-        lat: 49.8,
-        lng: 24.0,
-        photo_url: null,
-        rating: 5,
-        review: null,
-        city: 'Львів',
-        country: 'Україна',
-        created_by: 1,
-        created_at: '2025-03-05T10:00:00Z',
-        visited_at: '2025-03-02',
-      } as MapPinRow],
-      archive,
+      memoryLinkIds: { 30: { place: 7 } },
       media: [{
         id: 9,
         status: 'done',
@@ -165,8 +137,28 @@ describe('Evolution real-data snapshot mapping', () => {
     expect(snapshot.media[0]).toEqual({
       id: 9, status: 'done', createdAt: '2025-04-05T12:00:00Z', finishedAt: null,
     });
-    expect(JSON.stringify(snapshot)).not.toContain('Не потрапляє у Blueprint');
-    expect(JSON.stringify(snapshot)).not.toContain('example.test');
+  });
+
+  it('портал має РІВНО ОДИН переклад рядків у знімок', () => {
+    /*
+     * **ВИМОГА (ADR-0189), знайдена підписом на головній.** Перекладів
+     * було два: цей файл обслуговував кристал і дерево, `portalSources.ts`
+     * — риф. Того самого дня вони дали 328 і 435 подій: другий бачив
+     * домішку «сказаних» чисел онбордингу, перший — ні.
+     *
+     * Тест дивиться в текст, бо саме поява ДРУГОЇ такої функції і є вадою;
+     * жодна перевірка поведінки одного знімка її не спіймає.
+     */
+    const files = [
+      'src/features/home/crystal3d/evolution/useEvolutionCrystalPipeline.ts',
+      'src/features/home/crystal3d/treeLab/useTreeLabPortalPreview.ts',
+      'src/features/home/reef3d/world/useReefPlan.ts',
+    ];
+    for (const file of files) {
+      const source = readFileSync(join(process.cwd(), file), 'utf8');
+      expect(source).toMatch(/usePortalSources\(/);
+      expect(source).not.toMatch(/buildEvolutionSourceSnapshot/);
+    }
   });
 
   it('derives the same couple id regardless of user order or duplicates', () => {

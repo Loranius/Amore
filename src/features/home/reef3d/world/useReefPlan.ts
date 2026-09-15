@@ -24,8 +24,8 @@ import {
   COUPLE_TIME_ZONE,
   ENGINE_VERSION,
   useCoupleDay,
-  useReefPortalSources,
-} from './reefPortalSources';
+  usePortalSources,
+} from '@/features/world/usePortalSources';
 
 export interface UseReefPlanResult {
   plan: ReefPlan | null;
@@ -51,7 +51,7 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
   const me = useCurrentUser();
   const asOf = useCoupleDay();
   const { enabled: sandboxEnabled, values: sandboxValues } = useEvolutionSandbox();
-  const sources = useReefPortalSources(me.id, asOf);
+  const sources = usePortalSources('reef', me.id, asOf);
 
   return useMemo<UseReefPlanResult>(() => {
     const data = sources.data;

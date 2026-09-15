@@ -1,14 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useEvents } from '@/features/_shared/events';
-import { useUsers } from '@/features/_shared/useUsers';
-import { useMapPins } from '@/features/memories/useMapPins';
-import { useFinishedMedia } from '@/features/media/useMedia';
-import { useMemories } from '@/features/memories/useMemories';
-import { usePlans } from '@/features/plans/usePlans';
-import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
-import { qk } from '@/lib/queryKeys';
-import { supabase } from '@/lib/supabase';
+import { useMemo, useState } from 'react';
+import { useCurrentUser } from '@/providers/AuthProvider';
+import { usePortalSources } from '@/features/world/usePortalSources';
 import {
   buildArtifactFromSnapshot,
   type AdapterDiagnostic,
@@ -17,14 +9,10 @@ import type { OrganicMeshLod } from '@/engine/labs/organic';
 import { resolveTreeProductionAsOf } from '@/engine/productionAcceptance';
 import {
   applyEvolutionSandboxSources,
-  relationshipDaysBetween,
   useEvolutionSandbox,
 } from '@/features/home/evolutionSandbox';
-import {
-  buildEvolutionSourceSnapshot,
-  evolutionWishlistFromPairArchive,
-  stableEvolutionCoupleId,
-} from '../evolution/sourceSnapshot';
+import { stableEvolutionCoupleId } from '../evolution/sourceSnapshot';
+import type { GrowthEvent } from '@/features/home/growthSinceLastVisit';
 import {
   buildTreeLabPreviewFromArtifact,
   type TreeLabPreviewBuild,
@@ -38,28 +26,14 @@ export interface TreeLabPortalPreview {
   build: TreeLabPreviewBuild;
   diagnostics: AdapterDiagnostic[];
   normalizedEventCount: number;
+  /** Події рушія для каналу приросту — див. `growthChannel.ts`. */
+  growthEvents: readonly GrowthEvent[];
 }
 
 export interface UseTreeLabPortalPreviewResult {
   preview: TreeLabPortalPreview | null;
   isPending: boolean;
   error: Error | null;
-}
-
-function useRelationshipStartDate() {
-  return useQuery({
-    queryKey: [...qk.settings(), 'relationship_start_date'],
-    staleTime: 60 * 60_000,
-    queryFn: async (): Promise<string | null> => {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'relationship_start_date')
-        .maybeSingle();
-      if (error) throw error;
-      return typeof data?.value === 'string' && data.value.trim() ? data.value : null;
-    },
-  });
 }
 
 /**
@@ -71,75 +45,20 @@ function useRelationshipStartDate() {
 export function useTreeLabPortalPreview(
   lod: OrganicMeshLod,
 ): UseTreeLabPortalPreviewResult {
-  const startDateQuery = useRelationshipStartDate();
-  const users = useUsers();
-  const events = useEvents();
-  const plans = usePlans();
-  const pins = useMapPins();
-  const archive = useMemories();
-  const finishedMedia = useFinishedMedia();
-  const wishlistArchive = useQuery({
-    queryKey: ['wishlist', 'evolution-archive', 'pair'],
-    queryFn: fetchPairWishlistEvolutionArchive,
-    staleTime: 5 * 60_000,
-  });
+  const me = useCurrentUser();
   const [asOf] = useState(() => resolveTreeProductionAsOf(new Date(), COUPLE_TIME_ZONE));
-  const {
-    enabled: sandboxEnabled,
-    values: sandboxValues,
-    registerBaseline,
-  } = useEvolutionSandbox();
+  /*
+   * ЗНІМОК ПОРТАЛУ ОДИН НА ВСІ ВИДИ (ADR-0189). Тут стояли сім окремих
+   * запитів і власний збирач знімка — третій у порталі. Він, як і
+   * кристалів, не бачив домішки «сказаних» чисел онбордингу, тож дерево
+   * росло з коротшої історії, ніж риф, на тих самих даних.
+   */
+  const sources = usePortalSources('tree', me.id, asOf);
+  const { enabled: sandboxEnabled, values: sandboxValues } = useEvolutionSandbox();
 
-  const userIds = useMemo(
-    () => (users.data ?? []).map((user) => user.id).sort((left, right) => left - right),
-    [users.data],
-  );
-  const wishlist = useMemo(
-    () => evolutionWishlistFromPairArchive(wishlistArchive.data ?? []),
-    [wishlistArchive.data],
-  );
+  const isPending = sources.isPending;
 
-  useEffect(() => {
-    if (!startDateQuery.data) return;
-    registerBaseline('tree', {
-      relationshipDays: relationshipDaysBetween(startDateQuery.data, asOf),
-      calendarEvents: (events.data ?? []).length,
-      completedPlans: (plans.data ?? []).filter((plan) => plan.status === 'done').length,
-      fulfilledWishes: wishlist.filter((wish) => wish.fulfilled).length,
-      visitedPlaces: (pins.data ?? []).filter((pin) => Boolean(pin.visited_at)).length,
-      memories: archive.data?.photos.length ?? 0,
-      finishedMedia: (finishedMedia.data ?? []).length,
-      sharedDaysOff: 0,
-    });
-  }, [
-    archive.data,
-    asOf,
-    events.data,
-    finishedMedia.data,
-    pins.data,
-    plans.data,
-    registerBaseline,
-    startDateQuery.data,
-    wishlist,
-  ]);
-
-  const isPending = startDateQuery.isPending
-    || users.isPending
-    || events.isPending
-    || plans.isPending
-    || pins.isPending
-    || archive.isPending
-    || finishedMedia.isPending
-    || wishlistArchive.isPending;
-
-  const queryError = startDateQuery.error
-    ?? users.error
-    ?? events.error
-    ?? plans.error
-    ?? pins.error
-    ?? archive.error
-    ?? finishedMedia.error
-    ?? wishlistArchive.error;
+  const queryError = sources.error;
 
   return useMemo<UseTreeLabPortalPreviewResult>(() => {
     if (queryError) {
@@ -150,14 +69,7 @@ export function useTreeLabPortalPreview(
       };
     }
     if (isPending) return { preview: null, isPending: true, error: null };
-    if (!startDateQuery.data) {
-      return {
-        preview: null,
-        isPending: false,
-        error: new Error('Tree portal preview requires relationship_start_date.'),
-      };
-    }
-    if (userIds.length === 0 || !archive.data) {
+    if (!sources.data) {
       return {
         preview: null,
         isPending: false,
@@ -166,23 +78,15 @@ export function useTreeLabPortalPreview(
     }
 
     try {
-      const sourceSnapshot = buildEvolutionSourceSnapshot({
-        events: events.data ?? [],
-        plans: plans.data ?? [],
-        wishlist,
-        pins: pins.data ?? [],
-        archive: archive.data,
-        media: finishedMedia.data ?? [],
-      });
       const effectiveSources = applyEvolutionSandboxSources({
         enabled: sandboxEnabled,
         values: sandboxValues,
         asOf,
-        relationshipStartedAt: startDateQuery.data,
-        snapshot: sourceSnapshot,
+        relationshipStartedAt: sources.data.relationshipStartedAt,
+        snapshot: sources.data.snapshot,
       });
       const artifactResult = buildArtifactFromSnapshot({
-        coupleId: stableEvolutionCoupleId(userIds),
+        coupleId: stableEvolutionCoupleId(sources.data.userIds),
         asOf,
         snapshot: effectiveSources.snapshot,
         engineConfig: {
@@ -205,6 +109,16 @@ export function useTreeLabPortalPreview(
           build,
           diagnostics: artifactResult.adapterDiagnostics,
           normalizedEventCount: artifactResult.blueprint.events.length,
+          /*
+           * Події для каналу приросту — те саме `artifact.events`, з якого
+           * рахують кристал і риф (ADR-0189). Вони тут уже зібрані, і доти
+           * просто викидались: дерево було єдиним видом, над яким пара не
+           * бачила відповіді на питання «чи змінилось наше життя».
+           */
+          growthEvents: artifactResult.blueprint.events.map((event): GrowthEvent => ({
+            id: event.id,
+            actorId: event.attribution?.actorId ?? null,
+          })),
         },
         isPending: false,
         error: null,
@@ -217,19 +131,12 @@ export function useTreeLabPortalPreview(
       };
     }
   }, [
-    archive.data,
     asOf,
-    events.data,
     isPending,
     lod,
-    pins.data,
-    plans.data,
     queryError,
-    finishedMedia.data,
     sandboxEnabled,
     sandboxValues,
-    startDateQuery.data,
-    userIds,
-    wishlist,
+    sources.data,
   ]);
 }

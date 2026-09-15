@@ -1,13 +1,5 @@
-import type { MemoriesArchive } from '@/features/memories/useMemories';
 import type { WishlistEvolutionArchiveItem } from '@/features/wishlist/wishlistEvolutionArchive';
 import type {
-  EventRow,
-  MapPinRow,
-  MediaItemRow,
-  PlanRow,
-} from '@/types';
-import type {
-  EvolutionSourceSnapshot,
   MemoryLinkSource,
   WishlistSource,
 } from '@/engine/evolution/adapters';
@@ -94,67 +86,17 @@ export function buildEvolutionMemoryLinks(
   );
 }
 
-/** The columns the engine reads; see `useFinishedMedia`. */
-export type MediaRowsForEvolution =
-  Pick<MediaItemRow, 'id' | 'status' | 'created_at' | 'finished_at'>;
-
-export interface EvolutionSnapshotRows {
-  events: readonly EventRow[];
-  plans: readonly PlanRow[];
-  wishlist: readonly WishlistSource[];
-  pins: readonly MapPinRow[];
-  archive: MemoriesArchive;
-  media: readonly MediaRowsForEvolution[];
-}
-
-export function buildEvolutionSourceSnapshot(
-  input: EvolutionSnapshotRows,
-): EvolutionSourceSnapshot {
-  return {
-    calendarEvents: input.events.map((event) => ({
-      id: event.id,
-      date: event.date,
-      type: event.type,
-      yearly: event.yearly,
-      isMilestone: event.is_milestone,
-    })),
-    plans: input.plans.map((plan) => ({
-      id: plan.id,
-      category: plan.category,
-      status: plan.status,
-      startDate: plan.start_date,
-      endDate: plan.end_date,
-      completedAt: plan.completed_at,
-      createdAt: plan.created_at,
-    })),
-    wishlistItems: [...input.wishlist],
-    mapPlaces: input.pins.map((pin) => ({
-      id: pin.id,
-      category: pin.category,
-      visitedAt: pin.visited_at,
-      createdAt: pin.created_at,
-      rating: pin.rating,
-      city: pin.city,
-      country: pin.country,
-    })),
-    memories: input.archive.photos.map((memory) => ({
-      id: memory.id,
-      memoryDate: memory.memory_date,
-      datePrecision: memory.date_precision,
-      takenAt: memory.taken_at,
-      createdAt: memory.created_at,
-    })),
-    memoryLinks: buildEvolutionMemoryLinks(
-      input.archive.linkIds as Record<number, Partial<Record<string, number>>>,
-    ),
-    media: input.media.map((item) => ({
-      id: item.id,
-      status: item.status,
-      createdAt: item.created_at,
-      finishedAt: item.finished_at,
-    })),
-  };
-}
+/*
+ * Тут стояв `buildEvolutionSourceSnapshot` — ДРУГИЙ переклад рядків бази
+ * у знімок рушія (ADR-0189). Ним користувались кристал і дерево, поки риф
+ * ходив у `portalSources.ts`, і два переклади того самого розійшлись на
+ * 107 подій: цей не бачив домішки «сказаних» чисел онбордингу.
+ *
+ * Помітив розбіжність не тест, а підпис на головній — «У кристалі 328»
+ * проти «У рифі 435» того самого дня. Переклад лишився один
+ * (`portalSnapshotFromRows`), і гарантія «презентаційні поля не течуть у
+ * Blueprint» переїхала разом із ним, а не зникла.
+ */
 
 export function stableEvolutionCoupleId(userIds: readonly number[]): string {
   const normalized = [...new Set(userIds)]

@@ -100,8 +100,8 @@ describe('канал приросту', () => {
   });
 
   it('зміна артефакта скидає підпис', () => {
-    // Конвеєр дерева ще не звітує; підпис від кристала, що лишився б
-    // висіти над деревом, був би рядком про об'єкт, якого немає.
+    // Види монтуються по черзі, і підпис від попереднього, що лишився б
+    // висіти над наступним, був би рядком про об'єкт, якого вже немає.
     const world = stripComments(read('world/ArtifactWorld.tsx'));
     expect(world).toMatch(/setGrowth\(null\);\s*\n\s*\}, \[artifact\]\)/);
   });
@@ -162,5 +162,45 @@ describe('канал приросту: риф', () => {
     const crystal = stripComments(read('home/crystal3d/evolution/EvolutionCrystalPreviewScene.tsx'));
     expect(crystal).toMatch(/return \(\) => reportGrowth\(null\)/);
     expect(scene).toMatch(/return \(\) => reportGrowth\(null\)/);
+  });
+});
+
+describe('канал приросту: дерево', () => {
+  /*
+   * ВИМОГА (ADR-0189): дерево було ОСТАННІМ видом, над яким пара не
+   * бачила жодної відповіді на питання «чи змінилось наше життя з
+   * минулого разу». Канал стояв готовий від самого початку — під'єднати
+   * бракувало лише подій, які конвеєр дерева й так тримав у руках.
+   */
+  const scene = stripComments(read('home/crystal3d/evolution/EvolutionTreePreviewScene.tsx'));
+
+  it('сцена дерева звітує про приріст своїм іменем', () => {
+    expect(scene).toMatch(/useGrowthSinceLastVisit\(preview\?\.growthEvents \?\? null, 'tree'\)/);
+    expect(scene).toMatch(/reportGrowth\(growth === null \? null : \{ species: 'tree'/);
+  });
+
+  it('звіт рахується з подій рушія, а не з власного підрахунку', () => {
+    const preview = stripComments(read('home/crystal3d/treeLab/useTreeLabPortalPreview.ts'));
+    expect(preview).toMatch(/artifactResult\.blueprint\.events\.map/);
+    expect(preview).toMatch(/attribution\?\.actorId/);
+  });
+
+  it('гаки приросту стоять до ранніх виходів сцени', () => {
+    const hook = scene.indexOf('useGrowthSinceLastVisit(');
+    const reporter = scene.indexOf('useWorldGrowthReporter(');
+    const firstReturn = scene.indexOf('if (isPending)');
+    expect(hook).toBeGreaterThan(-1);
+    expect(reporter).toBeGreaterThan(-1);
+    expect(firstReturn).toBeGreaterThan(-1);
+    expect(hook).toBeLessThan(firstReturn);
+    expect(reporter).toBeLessThan(firstReturn);
+  });
+
+  it('усі три види знімають за собою підпис', () => {
+    const crystal = stripComments(read('home/crystal3d/evolution/EvolutionCrystalPreviewScene.tsx'));
+    const reef = stripComments(read('home/reef3d/world/ReefWorldScene.tsx'));
+    for (const source of [crystal, reef, scene]) {
+      expect(source).toMatch(/return \(\) => reportGrowth\(null\)/);
+    }
   });
 });

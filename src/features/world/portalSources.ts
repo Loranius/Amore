@@ -65,6 +65,98 @@ export function coupleDay(date: Date, timeZone: string): string {
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
 
+/** Рядки порталу так, як їх повертає база, — вхід чистого перекладу нижче. */
+export interface PortalSnapshotRows {
+  events: readonly {
+    id: number;
+    date: string;
+    type: EvolutionSourceSnapshot['calendarEvents'][number]['type'];
+    yearly: boolean;
+    is_milestone: boolean;
+  }[];
+  plans: readonly {
+    id: number;
+    category: EvolutionSourceSnapshot['plans'][number]['category'];
+    status: EvolutionSourceSnapshot['plans'][number]['status'];
+    start_date: string | null; end_date: string | null;
+    completed_at: string | null; created_at: string;
+  }[];
+  wishlistItems: EvolutionSourceSnapshot['wishlistItems'];
+  pins: readonly {
+    id: number;
+    category: EvolutionSourceSnapshot['mapPlaces'][number]['category'];
+    visited_at: string | null; created_at: string;
+    rating: number | null; city: string | null; country: string | null;
+  }[];
+  memories: readonly {
+    id: number; memory_date: string;
+    date_precision: EvolutionSourceSnapshot['memories'][number]['datePrecision'];
+    taken_at: string | null; created_at: string;
+  }[];
+  memoryLinkIds: Record<number, Partial<Record<string, number>>>;
+  media: readonly {
+    id: number; status: string; created_at: string | null; finished_at: string | null;
+  }[];
+}
+
+/**
+ * Рядки бази → знімок рушія. Чисто, без мережі й годинника.
+ *
+ * **Це ЄДИНИЙ переклад у порталі (ADR-0189).** Другий жив у
+ * `sourceSnapshot.ts` і обслуговував кристал із деревом, поки риф ходив
+ * сюди. Два переклади того самого розійшлись на 107 подій, і помітив це
+ * не тест, а підпис на головній.
+ *
+ * Функція винесена з `fetchPortalSources` окремо саме для того, щоб її
+ * можна було перевірити тестом: мережеву обгортку перевірити нічим, а
+ * гарантія «презентаційні поля не течуть у Blueprint» мусить лишатись
+ * під сторожем — вона дісталась у спадок від видаленого перекладу.
+ */
+export function portalSnapshotFromRows(rows: PortalSnapshotRows): EvolutionSourceSnapshot {
+  return {
+    calendarEvents: rows.events.map((event) => ({
+      id: event.id,
+      date: event.date,
+      type: event.type,
+      yearly: event.yearly,
+      isMilestone: event.is_milestone,
+    })),
+    plans: rows.plans.map((plan) => ({
+      id: plan.id,
+      category: plan.category,
+      status: plan.status,
+      startDate: plan.start_date,
+      endDate: plan.end_date,
+      completedAt: plan.completed_at,
+      createdAt: plan.created_at,
+    })),
+    wishlistItems: [...rows.wishlistItems],
+    mapPlaces: rows.pins.map((pin) => ({
+      id: pin.id,
+      category: pin.category,
+      visitedAt: pin.visited_at,
+      createdAt: pin.created_at,
+      rating: pin.rating,
+      city: pin.city,
+      country: pin.country,
+    })),
+    memories: rows.memories.map((memory) => ({
+      id: memory.id,
+      memoryDate: memory.memory_date,
+      datePrecision: memory.date_precision,
+      takenAt: memory.taken_at,
+      createdAt: memory.created_at,
+    })),
+    memoryLinks: buildEvolutionMemoryLinks(rows.memoryLinkIds),
+    media: rows.media.map((item) => ({
+      id: item.id,
+      status: item.status,
+      createdAt: item.created_at,
+      finishedAt: item.finished_at,
+    })),
+  };
+}
+
 export async function fetchPortalSources(): Promise<PortalSources> {
   const [
     startDateResult,
@@ -173,48 +265,15 @@ export async function fetchPortalSources(): Promise<PortalSources> {
     entry[row.source_type] ??= row.source_id;
   }
 
-  const snapshot: EvolutionSourceSnapshot = {
-    calendarEvents: (eventsResult.data ?? []).map((event) => ({
-      id: event.id,
-      date: event.date,
-      type: event.type,
-      yearly: event.yearly,
-      isMilestone: event.is_milestone,
-    })),
-    plans: (plansResult.data ?? []).map((plan) => ({
-      id: plan.id,
-      category: plan.category,
-      status: plan.status,
-      startDate: plan.start_date,
-      endDate: plan.end_date,
-      completedAt: plan.completed_at,
-      createdAt: plan.created_at,
-    })),
+  const snapshot = portalSnapshotFromRows({
+    events: eventsResult.data ?? [],
+    plans: plansResult.data ?? [],
     wishlistItems: evolutionWishlistFromPairArchive(wishlistArchive),
-    mapPlaces: (pinsResult.data ?? []).map((pin) => ({
-      id: pin.id,
-      category: pin.category,
-      visitedAt: pin.visited_at,
-      createdAt: pin.created_at,
-      rating: pin.rating,
-      city: pin.city,
-      country: pin.country,
-    })),
-    memories: (memoriesResult.data ?? []).map((memory) => ({
-      id: memory.id,
-      memoryDate: memory.memory_date,
-      datePrecision: memory.date_precision,
-      takenAt: memory.taken_at,
-      createdAt: memory.created_at,
-    })),
-    memoryLinks: buildEvolutionMemoryLinks(linkIds),
-    media: (mediaResult.data ?? []).map((item) => ({
-      id: item.id,
-      status: item.status,
-      createdAt: item.created_at,
-      finishedAt: item.finished_at,
-    })),
-  };
+    pins: pinsResult.data ?? [],
+    memories: memoriesResult.data ?? [],
+    memoryLinkIds: linkIds,
+    media: mediaResult.data ?? [],
+  });
 
   /*
    * ДОМІШКА СКАЗАНОГО — ОСТАННІМ КРОКОМ, ПІСЛЯ ВСЬОГО СПРАВЖНЬОГО.

@@ -1,15 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { useEvents } from '@/features/_shared/events';
+import { useMemo, useState } from 'react';
+import { useCurrentUser } from '@/providers/AuthProvider';
 import { useUsers } from '@/features/_shared/useUsers';
-import { useMapPins } from '@/features/memories/useMapPins';
-import { useFinishedMedia } from '@/features/media/useMedia';
-import { useMemories } from '@/features/memories/useMemories';
-import { useScheduleTogetherness } from '@/features/schedule/useSharedDaysOff';
-import { usePlans } from '@/features/plans/usePlans';
-import { fetchPairWishlistEvolutionArchive } from '@/features/wishlist/wishlistEvolutionArchive';
-import { qk } from '@/lib/queryKeys';
-import { supabase } from '@/lib/supabase';
+import { usePortalSources } from '@/features/world/usePortalSources';
 import type { ArtifactBlueprint } from '@/engine/evolution';
 import type { AdapterDiagnostic } from '@/engine/evolution/adapters';
 import type { CrystalSpeciesBlueprint } from '@/engine/species/crystal';
@@ -22,12 +14,9 @@ import { resolveCrystalRendererQuality } from '@/engine/renderer';
 import { buildCrystalPipelineStates } from './crystalPipeline';
 import {
   applyEvolutionSandboxSources,
-  relationshipDaysBetween,
   useEvolutionSandbox,
 } from '@/features/home/evolutionSandbox';
 import {
-  buildEvolutionSourceSnapshot,
-  evolutionWishlistFromPairArchive,
   resolveCrystalColorPartners,
   stableEvolutionCoupleId,
 } from './sourceSnapshot';
@@ -96,22 +85,6 @@ function readQuality(): CrystalMaterialQuality {
  * differ between devices without changing what the couple's crystal *is*.
  */
 
-function useEvolutionStartDate() {
-  return useQuery({
-    queryKey: [...qk.settings(), 'relationship_start_date'],
-    staleTime: 60 * 60_000,
-    queryFn: async (): Promise<string | null> => {
-      const { data, error } = await supabase
-        .from('settings')
-        .select('value')
-        .eq('key', 'relationship_start_date')
-        .maybeSingle();
-      if (error) throw error;
-      return typeof data?.value === 'string' && data.value.trim() ? data.value : null;
-    },
-  });
-}
-
 /**
  * Client orchestration only. Every engine layer below remains pure and receives
  * explicit source rows, clock, time zone and versioned configs.
@@ -119,84 +92,43 @@ function useEvolutionStartDate() {
 export function useEvolutionCrystalPipeline(
   reducedMotion: boolean,
 ): UseEvolutionCrystalPipelineResult {
-  const startDateQuery = useEvolutionStartDate();
+  const me = useCurrentUser();
   const users = useUsers();
-  const events = useEvents();
-  const plans = usePlans();
-  const pins = useMapPins();
-  const archive = useMemories();
-  const finishedMedia = useFinishedMedia();
-  const togetherness = useScheduleTogetherness();
-  const wishlistArchive = useQuery({
-    queryKey: ['wishlist', 'evolution-archive', 'pair'],
-    queryFn: fetchPairWishlistEvolutionArchive,
-    staleTime: 5 * 60_000,
-  });
   const [asOf] = useState(() => new Date().toISOString());
+  /*
+   * ЗНІМОК ПОРТАЛУ ОДИН НА ВСІ ВИДИ (ADR-0189).
+   *
+   * Тут стояли вісім окремих запитів і власний збирач знімка. Вони давали
+   * ІНШЕ число, ніж риф: 328 подій проти 435 того самого дня. Різниця —
+   * домішка «сказаних» чисел онбордингу, яку додає `fetchPortalSources`,
+   * а цей збирач не бачив. Тобто пара, яка назвала числом тридцять
+   * фотографій першого року, бачила їх у рифі й не бачила в кристалі.
+   *
+   * `asOf` лишився повним ISO-штампом, а не днем пари: його читає рушій,
+   * і зміна формату була б окремою зміною артефакта, якої ніхто не
+   * просив.
+   */
+  const sources = usePortalSources('crystal', me.id, asOf);
   const [quality] = useState(readQuality);
-  const {
-    enabled: sandboxEnabled,
-    values: sandboxValues,
-    registerBaseline,
-  } = useEvolutionSandbox();
+  /*
+   * Базові значення пісочниці реєструє сам запит (`usePortalSources`):
+   * це побічна дія ЗНІМКА, а не того, хто його читає. Доти кожен вид
+   * рахував їх по-своєму зі своїх запитів — три підрахунки того самого.
+   */
+  const { enabled: sandboxEnabled, values: sandboxValues } = useEvolutionSandbox();
 
-  const userIds = useMemo(
-    () => (users.data ?? []).map((user) => user.id).sort((left, right) => left - right),
-    [users.data],
-  );
+  /*
+   * Кольорові партнери — єдине, заради чого тут лишився `users`: знімок
+   * порталу несе лише `userIds`, а ADR-0004 фарбує рік за тим, хто кому
+   * подарував, і йому потрібні самі рядки.
+   */
   const colorPartners = useMemo(
     () => resolveCrystalColorPartners(users.data ?? []),
     [users.data],
   );
-  const wishlist = useMemo(
-    () => evolutionWishlistFromPairArchive(wishlistArchive.data ?? []),
-    [wishlistArchive.data],
-  );
 
-  useEffect(() => {
-    if (!startDateQuery.data) return;
-    registerBaseline('crystal', {
-      relationshipDays: relationshipDaysBetween(startDateQuery.data, asOf),
-      calendarEvents: (events.data ?? []).length,
-      completedPlans: (plans.data ?? []).filter((plan) => plan.status === 'done').length,
-      fulfilledWishes: wishlist.filter((wish) => wish.fulfilled).length,
-      visitedPlaces: (pins.data ?? []).filter((pin) => Boolean(pin.visited_at)).length,
-      memories: archive.data?.photos.length ?? 0,
-      finishedMedia: (finishedMedia.data ?? []).length,
-      sharedDaysOff: (togetherness.data ?? []).length,
-    });
-  }, [
-    archive.data,
-    asOf,
-    events.data,
-    finishedMedia.data,
-    pins.data,
-    plans.data,
-    registerBaseline,
-    startDateQuery.data,
-    togetherness.data,
-    wishlist,
-  ]);
-
-  const isPending = startDateQuery.isPending
-    || users.isPending
-    || events.isPending
-    || plans.isPending
-    || pins.isPending
-    || archive.isPending
-    || finishedMedia.isPending
-    || togetherness.isPending
-    || wishlistArchive.isPending;
-
-  const queryError = startDateQuery.error
-    ?? users.error
-    ?? events.error
-    ?? plans.error
-    ?? pins.error
-    ?? archive.error
-    ?? finishedMedia.error
-    ?? togetherness.error
-    ?? wishlistArchive.error;
+  const isPending = sources.isPending || users.isPending;
+  const queryError = sources.error ?? users.error;
 
   return useMemo<UseEvolutionCrystalPipelineResult>(() => {
     if (queryError) {
@@ -207,14 +139,7 @@ export function useEvolutionCrystalPipeline(
       };
     }
     if (isPending) return { pipeline: null, isPending: true, error: null };
-    if (!startDateQuery.data) {
-      return {
-        pipeline: null,
-        isPending: false,
-        error: new Error('Evolution preview requires relationship_start_date.'),
-      };
-    }
-    if (userIds.length === 0 || !archive.data) {
+    if (!sources.data) {
       return {
         pipeline: null,
         isPending: false,
@@ -224,22 +149,14 @@ export function useEvolutionCrystalPipeline(
 
     try {
       const started = performance.now();
-      const coupleId = stableEvolutionCoupleId(userIds);
-      const sourceSnapshot = buildEvolutionSourceSnapshot({
-        events: events.data ?? [],
-        plans: plans.data ?? [],
-        wishlist,
-        pins: pins.data ?? [],
-        archive: archive.data,
-        media: finishedMedia.data ?? [],
-      });
+      const coupleId = stableEvolutionCoupleId(sources.data.userIds);
       const effectiveSources = applyEvolutionSandboxSources({
         enabled: sandboxEnabled,
         values: sandboxValues,
         asOf,
-        relationshipStartedAt: startDateQuery.data,
-        snapshot: sourceSnapshot,
-        sharedDaysOff: togetherness.data ?? [],
+        relationshipStartedAt: sources.data.relationshipStartedAt,
+        snapshot: sources.data.snapshot,
+        sharedDaysOff: sources.data.sharedDaysOff,
       });
       /*
        * Сам ланцюг живе в `crystalPipeline.ts` — його ділить лабораторія
@@ -295,22 +212,14 @@ export function useEvolutionCrystalPipeline(
       };
     }
   }, [
-    archive.data,
     asOf,
     colorPartners,
-    events.data,
-    finishedMedia.data,
-    togetherness.data,
     isPending,
-    pins.data,
-    plans.data,
     quality,
     queryError,
     reducedMotion,
     sandboxEnabled,
     sandboxValues,
-    startDateQuery.data,
-    userIds,
-    wishlist,
+    sources.data,
   ]);
 }
