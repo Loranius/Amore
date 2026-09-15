@@ -68,6 +68,43 @@ describe('лінійка твердості краю', () => {
     expect(dark[0].step).toBeCloseTo(light[0].step, 6);
   });
 
+  it('відрізняє ЛАТКУ від зерна — бо скарга була про латки', () => {
+    /*
+     * **ВИПРАВЛЕННЯ САМОЇ МІРКИ (ADR-0195, крок 4).** Перша редакція
+     * рахувала всі сходинки підряд, і на картах каменю спіткнулась: зерно
+     * додало сходинок (4.29 → 4.76), хоч на кадрі камінь став явно кращим.
+     *
+     * Прилад не брехав — він відповідав не на те питання. Скарга власника
+     * була про АПЛІКАЦІЮ, тобто про клапті завбільшки з десятки пікселів.
+     * Відрізняє їх розмір: латка має рівне поле обабіч, зерно не має.
+     *
+     * Тут це перевіряється кадром, у якому є і те, і те: ліва половина —
+     * дві широкі латки, права — часта крупа. Латок мусить знайтись рівно
+     * одна.
+     */
+    const width = 200;
+    const height = 12;
+    const data = new Uint8Array(width * height * 3);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        let value;
+        if (x < 50) value = 90;
+        else if (x < 100) value = 160;
+        else value = x % 4 < 2 ? 150 : 170;
+        const offset = (y * width + x) * 3;
+        data[offset] = value; data[offset + 1] = value; data[offset + 2] = value;
+      }
+    }
+    const image = { width, height, channels: 3, data };
+    const band = { y0: 0, y1: height, x0: 0, x1: width };
+    const tone = { toneMapping: TONE_MAPPING_NONE, exposure: 1 };
+    const result = edgeHardness(image, band, tone, { patchRun: 8 });
+    // Одна латка на двісті пікселів — це 0.5 на сто.
+    expect(result.patchesPer100).toBeCloseTo(0.5, 6);
+    // А сходинок разом із крупою — значно більше, і це теж правда про кадр.
+    expect(result.per100).toBeGreaterThan(5);
+  });
+
   it('рахує щільність на ТІЛІ, а не силует тіла з тлом', () => {
     /*
      * Найтвердіше ребро будь-якого кадру — це край самого тіла на тлі

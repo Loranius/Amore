@@ -12,7 +12,7 @@
 // доведено й про камінь.
 // ============================================================
 import { useEffect, useMemo, useRef } from 'react';
-import { AdditiveBlending, type MeshBasicMaterial } from 'three';
+import { AdditiveBlending, MeshStandardMaterial, type MeshBasicMaterial } from 'three';
 import { useFrame } from '@react-three/fiber';
 import { buildReefHeadMesh } from '@/engine/species/reef/headMesh';
 import type { ReefStanding } from '@/engine/species/reef/reefStaging';
@@ -20,6 +20,7 @@ import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import { reefGeometryOf } from './reefGeometry';
 import { buildReefSeabed } from './reefSeabed';
 import { buildReefCausticsTexture } from './reefCaustics';
+import { applyReefStoneSurface } from './reefStoneSurface';
 
 /*
  * ПІСОК СВІТЛИЙ, і це половина атмосфери референсів.
@@ -69,6 +70,26 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
   const palette = ROCK[theme];
 
   /*
+   * КАМІНЬ ОДЯГНЕНИЙ У КАРТИ, ЩО ЛЕЖАЛИ В РЕПОЗИТОРІЇ (ADR-0195, крок 4).
+   *
+   * Матеріал заводиться руками, а не `<meshStandardMaterial/>`, бо його
+   * треба пропатчити до компіляції; зерно береться триplanarно, тож UV
+   * мешу не потрібні зовсім.
+   *
+   * Зерно каменя ГРУБШЕ за зерно купола: камінь ширший у півтора раза й
+   * лежить далі від ока, а однакове число дало б на ньому дрібнішу крупу
+   * саме там, де її вже не роздивитись.
+   */
+  const stoneMaterial = useMemo(() => {
+    const material = new MeshStandardMaterial({
+      color: palette.stone, roughness: 0.95, metalness: 0,
+    });
+    applyReefStoneSurface(material, { scale: 4.5, strength: 0.9 });
+    return material;
+  }, [palette.stone]);
+  useEffect(() => () => stoneMaterial.dispose(), [stoneMaterial]);
+
+  /*
    * Дно — сітка з рельєфом, а не коло.
    *
    * Тридцять радіусів каменя, але сітка згущується до центру: далеке
@@ -113,7 +134,7 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
         * видно порожнечу.
         */}
       <mesh geometry={geometry} position={[0, seabed.lowest - 0.001, 0]} receiveShadow>
-        <meshStandardMaterial color={palette.stone} roughness={0.95} metalness={0} />
+        <primitive object={stoneMaterial} attach="material" />
       </mesh>
       <mesh geometry={seabed.geometry} receiveShadow>
         <meshStandardMaterial

@@ -10,11 +10,12 @@
 // решту сцени разом. Голова — ще один. Тобто на двадцятип'ятирічний
 // риф — двадцять шість викликів, а не чотириста.
 // ============================================================
-import { useMemo } from 'react';
-import { Color } from 'three';
+import { useEffect, useMemo } from 'react';
+import { Color, MeshStandardMaterial } from 'three';
 import type { ReefPlan } from '@/engine/species/reef/reefAssembly';
 import { reefColonyTint, type ReefTheme } from '@/engine/species/reef/coralPalette';
 import type { ReefMeshes } from './useReefMeshes';
+import { applyReefStoneSurface } from './reefStoneSurface';
 
 /**
  * Голова темніша й глухіша за колонії, і це не смак.
@@ -67,6 +68,29 @@ export function ReefColonies({ plan, meshes, theme, lift }: ReefColoniesProps): 
   }, [theme, tint]);
 
   /*
+   * КУПОЛ — ТЕЖ КАМІНЬ (ADR-0195, крок 4).
+   *
+   * Він і доти будувався тією самою функцією, що й виступ під ним
+   * (`buildReefHeadMesh`), бо це той самий обростений вапняк. Тепер він і
+   * носить те саме зерно — з карт, які сім тижнів лежали в репозиторії
+   * нечитаними.
+   *
+   * `vertexColors` лишається: у буфері сірий множник навколо 1.0, тобто
+   * рельєф купола, сказаний кольором (крок 3). Карта дає дрібну
+   * нерівність, якої геометрія не несе, і одне одному не заважає —
+   * градієнт по вершині працює на масштабі тіла, зерно на масштабі
+   * сантиметрів.
+   */
+  const headMaterial = useMemo(() => {
+    const material = new MeshStandardMaterial({
+      color: headColour, vertexColors: true, roughness: 0.92, metalness: 0,
+    });
+    applyReefStoneSurface(material, { scale: 6, strength: 0.85 });
+    return material;
+  }, [headColour]);
+  useEffect(() => () => headMaterial.dispose(), [headMaterial]);
+
+  /*
    * Колір колонії за наповненістю її року. `useCallback` тут зайвий:
    * колоній одиниці, а `Color` усе одно створюється новий на кожен
    * рендер — важить те, щоб арифметика була ОДНА й лежала в палітрі.
@@ -84,12 +108,7 @@ export function ReefColonies({ plan, meshes, theme, lift }: ReefColoniesProps): 
         * тим самим, а грані навколо нього розходяться (ADR-0190).
         */}
       <mesh geometry={meshes.head} castShadow receiveShadow>
-        <meshStandardMaterial
-          color={headColour}
-          vertexColors
-          roughness={0.92}
-          metalness={0}
-        />
+        <primitive object={headMaterial} attach="material" />
       </mesh>
       {meshes.colonies.map((colony) => (
         <mesh key={colony.id} geometry={colony.geometry} castShadow receiveShadow>

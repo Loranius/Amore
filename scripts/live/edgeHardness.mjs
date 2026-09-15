@@ -87,10 +87,44 @@ export function rowEdges(values, { jump = 0.06 } = {}) {
  * виявлявся б САМ СИЛУЕТ, тобто межа тіла з водою. Силует має бути
  * твердим; питання не про нього.
  */
-export function edgeHardness(image, band, tone, { mask = null, jump = 0.06, minRun = 24 } = {}) {
+/**
+ * ЛАТКИ — це сходинки, обабіч яких лежать ДОВГІ рівні пробіги.
+ *
+ * Перша редакція рахувала всі сходинки підряд, і на цьому спіткнулась: карти
+ * каменю (ADR-0195, крок 4) додали дрібне зерно, число зросло 4.29 → 4.76 —
+ * а на кадрі камінь став явно кращим. Прилад не брехав, він відповідав не на
+ * те питання: скарга власника була про АПЛІКАЦІЮ, тобто про клапті завбільшки
+ * з десятки пікселів, а не про зернистість поверхні.
+ *
+ * Відрізняє їх рівно розмір. Зерно — це сходинки через кожні два-три пікселі;
+ * латка — сходинка, обабіч якої тягнеться рівне поле. Тому тут рахуються лише
+ * ті сходинки, що мають із обох боків пробіг не коротший за `patchRun`.
+ *
+ * Це третій випадок у цьому проєкті, коли мірку довелось виправляти після
+ * того, як вона розійшлася з кадром (ADR-0174 міряла острів, ADR-0187 —
+ * дрібноту). Спільне в них: **мірка, яка ставить не те питання, дає числа
+ * схожого порядку й нічим не кричить.**
+ */
+function patchEdges(edges, patchRun, width) {
+  const kept = [];
+  for (let at = 0; at < edges.length; at += 1) {
+    const before = at === 0 ? edges[at].at : edges[at].at - edges[at - 1].at;
+    const after = at + 1 === edges.length ? width - edges[at].at : edges[at + 1].at - edges[at].at;
+    if (before >= patchRun && after >= patchRun) kept.push(edges[at]);
+  }
+  return kept;
+}
+
+export function edgeHardness(
+  image,
+  band,
+  tone,
+  { mask = null, jump = 0.06, minRun = 24, patchRun = 8 } = {},
+) {
   const { width, channels, data } = image;
   const rows = [];
   const allSteps = [];
+  const patchSteps = [];
   for (let y = band.y0; y < band.y1; y += 1) {
     const values = [];
     let inside = 0;
@@ -103,15 +137,32 @@ export function edgeHardness(image, band, tone, { mask = null, jump = 0.06, minR
     if (inside < minRun) continue;
     const edges = rowEdges(values, { jump });
     for (const edge of edges) allSteps.push(edge.step);
-    rows.push({ y, inside, edges: edges.length, per100: (edges.length / inside) * 100 });
+    const patches = patchEdges(edges, patchRun, values.length);
+    for (const edge of patches) patchSteps.push(edge.step);
+    rows.push({
+      y,
+      inside,
+      edges: edges.length,
+      per100: (edges.length / inside) * 100,
+      patchesPer100: (patches.length / inside) * 100,
+    });
   }
   return {
     rows: rows.length,
-    /** Головне число: сходинок на сто пікселів тіла, медіана по рядках. */
+    /**
+     * ГОЛОВНЕ ЧИСЛО: латок на сто пікселів тіла, медіана по рядках.
+     *
+     * Саме воно відповідає на скаргу «аплікація»: клапоть — це сходинка з
+     * рівним полем обабіч. Дрібне зерно поверхні сюди не входить.
+     */
+    patchesPer100: median(rows.map((row) => row.patchesPer100)),
+    /** Усі сходинки разом із зерном — довідка про те, наскільки живе тіло. */
     per100: median(rows.map((row) => row.per100)),
     /** Висота сходинки — довідка, а не мірка: скарга про кількість. */
     medianStep: median(allSteps),
+    patchStep: median(patchSteps),
     edges: allSteps.length,
+    patches: patchSteps.length,
   };
 }
 
@@ -148,7 +199,9 @@ if (import.meta.url === `file://${process.argv[1]}`) {
   });
   console.log(
     `${file}  смуга ${y0}-${y1} × ${x0}-${x1}\n`
-    + `  сходинок на 100 px тіла: ${result.per100.toFixed(2)}  (медіана по ${result.rows} рядках)\n`
-    + `  усього сходинок ${result.edges}, медіанна висота ${(result.medianStep * 100).toFixed(1)}%`,
+    + `  ЛАТОК на 100 px тіла: ${result.patchesPer100.toFixed(2)}`
+    + `  (медіана по ${result.rows} рядках, висота ${(result.patchStep * 100).toFixed(1)}%)\n`
+    + `  усіх сходинок на 100 px: ${result.per100.toFixed(2)}`
+    + `  (з зерном; усього ${result.edges}, висота ${(result.medianStep * 100).toFixed(1)}%)`,
   );
 }
