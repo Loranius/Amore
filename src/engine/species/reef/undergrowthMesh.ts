@@ -26,7 +26,7 @@
 // сюди грань, подивись у цю таблицю: вона рахує не форму, а форму
 // ПОМНОЖЕНУ на дві сотні.
 // ============================================================
-import { round6 } from './math';
+import { reefContactShade, round6 } from './math';
 import { weldCreased } from './surfaceNormals';
 
 /**
@@ -227,7 +227,8 @@ export function buildReefBladeMesh(): ReefMeshData {
     const push = (x: number, y: number, z: number): void => {
       parts.positions.push(round6(x), round6(y), round6(z));
       parts.normals.push(round6(-dirZ), 0, round6(dirX));
-      parts.tint.push(round6(tone));
+      // Дотик: корінь стрічки темніший за кінчик (ADR-0195, крок 6).
+      parts.tint.push(round6(tone * reefContactShade(y / height)));
     };
     push(-acrossX, 0, -acrossZ);
     push(acrossX, 0, acrossZ);
@@ -265,7 +266,10 @@ export function buildReefTuftMesh(): ReefMeshData {
    * інтерполюються й не можуть створити ребра (ADR-0195, крок 3).
    */
   const spikeTone = (angle: number, height: number): number => (
-    (1 + TUFT_RIDGE_TINT * Math.cos(angle * TUFT_RIDGES)) * (1 + TUFT_TIP_PALE * height)
+    (1 + TUFT_RIDGE_TINT * Math.cos(angle * TUFT_RIDGES))
+    * (1 + TUFT_TIP_PALE * height)
+    // Дотик (ADR-0195, крок 6): підошва темніша — кулька СИДИТЬ, а не лежить.
+    * reefContactShade(height)
   );
 
   const push = (x: number, y: number, z: number, tone: number): void => {
@@ -379,14 +383,15 @@ export function buildReefPebbleMesh(): ReefMeshData {
       const wobble = 0.82 + 0.18 * ((side * 5) % 3) / 2;
       push(
         Math.cos(angle) * across * wobble, height, Math.sin(angle) * across * wobble,
-        sideTone(side),
+        // Галька приплюснута, тож дотик береться від її ж висоти.
+        sideTone(side) * reefContactShade(height / 0.34),
       );
     }
   }
   const crown = parts.positions.length / 3;
   push(0, 0.34, 0, 1.08);
   const floor = crown + 1;
-  push(0, 0, 0, 1);
+  push(0, 0, 0, reefContactShade(0));
 
   const hidden = new Set<number>();
   for (let side = 0; side < SIDES; side += 1) {
@@ -449,7 +454,7 @@ export function buildReefWeedMesh(): ReefMeshData {
       const along = joint / WEED_JOINTS;
       const bend = curve * along * along;
       const width = WEED_WIDTH * (1 - 0.6 * along);
-      const tone = strandTone * (1 + 0.3 * along);
+      const tone = strandTone * (1 + 0.3 * along) * reefContactShade(along);
       for (const side of [-1, 1]) {
         parts.positions.push(
           round6(dirX * bend + acrossX * side * width),

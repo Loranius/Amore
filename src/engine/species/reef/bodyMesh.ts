@@ -39,7 +39,7 @@
 //    будується: незамкнена оболонка дає діри в тіні й ламає будь-яке
 //    подальше злиття мешів.
 // ============================================================
-import { round6, seededUnit } from './math';
+import { reefContactShade, round6, seededUnit } from './math';
 import type { ReefHeadSize, ReefColonyAnchor } from './colonyFormations';
 import type { ReefCoralBody } from './colonyBodies';
 import type { ReefMeshData } from './headMesh';
@@ -267,9 +267,15 @@ export function buildReefColonyMesh(
     const bodyTone = 1 + (seededUnit(seed, `reef:mesh:tone:${salt}`) - 0.5) * BODY_TONE_JITTER;
     /* Частка висоти → блідість. Кільця йдуть знизу вгору, тож індекс
        кільця і є висотою; затоплене кільце рахується за нульове. */
-    const ringTone = (ring: number, ringCount: number): number => (
-      bodyTone * (1 + TIP_PALE * (ring / Math.max(1, ringCount - 1)))
-    );
+    const ringTone = (ring: number, ringCount: number): number => {
+      const along = ring / Math.max(1, ringCount - 1);
+      /*
+       * ДОТИК (ADR-0195, крок 6). Підошва тіла темніша за середину, бо в
+       * щілину між тілом і куполом світло не заходить. Без цього корал
+       * лежить на куполі наклеєним, хай яка гладка в нього поверхня.
+       */
+      return bodyTone * (1 + TIP_PALE * along) * reefContactShade(along);
+    };
     // Найменший радіус кривини півеліпсоїда — на екваторі, H²/R.
     const curvature = (head.rise * head.rise) / Math.max(1e-6, head.radius);
     const sink = Math.min(girth * SINK_OF_RADIUS, curvature * SINK_CURVATURE_SHARE);

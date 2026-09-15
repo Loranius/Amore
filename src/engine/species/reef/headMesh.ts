@@ -18,7 +18,7 @@
 // дзеркалить кристалову (позиції, нормалі, індекси), щоб два види
 // лишались однією архітектурою.
 // ============================================================
-import { round6, seededUnit } from './math';
+import { reefContactShade, round6, seededUnit } from './math';
 import { weldCreased } from './surfaceNormals';
 import type { ReefHeadSize } from './colonyFormations';
 
@@ -340,7 +340,17 @@ export function buildReefHeadMesh(head: ReefHeadSize, seed: number): ReefMeshDat
    * це виправлення, а не втрата: меш зміщений шумом до ±30% радіуса, тож
    * ідеальна нормаль дивиться не туди, куди дивиться справжня поверхня.
    */
-  const tintPerVertex = relief.map((value) => round6(1 + value * RELIEF_TINT));
+  /*
+   * ДОТИК (ADR-0195, крок 6): підошва купола темніша за бік.
+   *
+   * Купол сидить у камені, камінь — у піску, і в обох випадках у щілину
+   * світло не заходить. Частка висоти береться з самої вершини, тож
+   * закон той самий, що в корала й дрібноти, — один на всі тіла рифа.
+   */
+  const top = Math.max(1e-6, rise);
+  const tintPerVertex = relief.map((value, vertex) => round6(
+    (1 + value * RELIEF_TINT) * reefContactShade((positions[vertex * 3 + 1] ?? 0) / top),
+  ));
   const welded = weldCreased(positions, indices, {
     creaseAngleDeg: HEAD_CREASE_DEG,
     tint: tintPerVertex,
