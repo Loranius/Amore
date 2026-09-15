@@ -54,23 +54,39 @@ describe('дно має рельєф і розчиняється у воді', (
     expect(lowest).toBeLessThan(0);
   });
 
-  it('край дна згасає в нуль', () => {
+  it('у вершинах лишився ТІЛЬКИ тон дюн — серпанок переїхав у піксель', () => {
     /*
-     * Згасання пишеться у ВЕРШИНИ, бо каустика малюється додаванням:
-     * туман на ній не гасить, а додає свій колір, і дно вдалині
-     * засвічувалось у білу стіну.
+     * **СЕМАНТИЧНА ЗМІНА (ADR-0195, крок 6).** Доти тут перевірялось, що
+     * край дна згасає в нуль У ВЕРШИНАХ. Саме там згасання й було вадою:
+     * сітка радіальна з `RADIAL_BIAS`, тож у зоні найкрутішого згасання
+     * кільця стоять найрідше — і плавна величина, покладена в такі
+     * вершини, інтерполювалась великими трикутниками в **бліду
+     * багатокутну терасу навколо рифа**. Вона видна на кадрах від першого
+     * дня цієї роботи.
+     *
+     * Сама вимога не змінилась: дно ОДНАКОВО мусить згасати у воду,
+     * інакше каустика вдалині зробить білу стіну. Змінилось місце — тепер
+     * це рахує піксель (`applyReefHaze`), а межі експортує цей же модуль,
+     * щоб пісок і каустика не розійшлись.
+     *
+     * Тому тут перевіряється те, що лишилось у вершинах: тон дюн, і
+     * НІЧОГО, що залежить від відстані. Якби серпанок тихо повернувся,
+     * далекі вершини знову стали б темнішими за ближні.
      */
     const { geometry } = seabed();
     const positions = geometry.getAttribute('position').array;
     const colours = geometry.getAttribute('color').array;
-    let nearest = 1; let farthest = 0;
+    let near = 0; let nearCount = 0;
+    let far = 0; let farCount = 0;
     for (let index = 0; index < colours.length / 3; index += 1) {
       const away = Math.hypot(positions[index * 3]!, positions[index * 3 + 2]!) / RADIUS;
-      if (away < 0.05) nearest = Math.min(nearest, colours[index * 3]!);
-      if (away > 0.9) farthest = Math.max(farthest, colours[index * 3]!);
+      if (away < 0.05) { near += colours[index * 3]!; nearCount += 1; }
+      if (away > 0.9) { far += colours[index * 3]!; farCount += 1; }
     }
-    expect(nearest, 'дно під рифом уже пригашене').toBeGreaterThan(0.5);
-    expect(farthest, 'край дна не згас').toBeLessThan(0.01);
+    expect(nearCount, 'вершин під рифом').toBeGreaterThan(0);
+    expect(farCount, 'вершин на краю').toBeGreaterThan(0);
+    // Тон дюн гуляє навколо 0.95; від відстані він не залежить ніяк.
+    expect(far / farCount).toBeCloseTo(near / nearCount, 1);
   });
 
   it('розгортка є — інакше каустиці нема на що лягти', () => {

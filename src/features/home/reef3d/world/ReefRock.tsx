@@ -11,16 +11,16 @@
 // (замкнений, без вироджених трикутників, з невидимою кришкою),
 // доведено й про камінь.
 // ============================================================
-import { useEffect, useMemo, useRef } from 'react';
-import { AdditiveBlending, MeshStandardMaterial, type MeshBasicMaterial } from 'three';
+import { useEffect, useMemo } from 'react';
+import { AdditiveBlending, MeshBasicMaterial, MeshStandardMaterial } from 'three';
 import { useFrame } from '@react-three/fiber';
 import { buildReefHeadMesh } from '@/engine/species/reef/headMesh';
 import type { ReefStanding } from '@/engine/species/reef/reefStaging';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import { reefGeometryOf } from './reefGeometry';
-import { buildReefSeabed } from './reefSeabed';
+import { buildReefSeabed, HAZE_FROM, HAZE_TO } from './reefSeabed';
 import { buildReefCausticsTexture } from './reefCaustics';
-import { applyReefStoneSurface } from './reefStoneSurface';
+import { applyReefHaze, applyReefStoneSurface } from './reefStoneSurface';
 
 /*
  * ПІСОК СВІТЛИЙ, і це половина атмосфери референсів.
@@ -49,6 +49,15 @@ const ROCK: Readonly<Record<ReefTheme, { stone: string; sand: string; caustic: s
 
 /** Наскільки яскрава сітка світла на дні. */
 const CAUSTIC_STRENGTH: Readonly<Record<ReefTheme, number>> = { dark: 0.55, light: 0.38 };
+
+/**
+ * У скільки разів дно ширше за камінь.
+ *
+ * Стояло числом просто у виклику; тепер його читають ще й межі серпанку,
+ * і дві копії розійшлись би тихо — серпанок почав би згасати не там, де
+ * дно закінчується.
+ */
+const SEABED_SPREAD = 13;
 
 /** Скільки разів каустика вкладається в дно і як швидко пливе. */
 const CAUSTIC_TILES = 13;
@@ -80,6 +89,25 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
    * лежить далі від ока, а однакове число дало б на ньому дрібнішу крупу
    * саме там, де її вже не роздивитись.
    */
+  /*
+   * Пісок і каустика згасають у воду ОДНИМ законом, порахованим у пікселі
+   * (ADR-0195, крок 6). Межі — в одиницях сцени, тобто у відстані від осі
+   * рифа: дно тягнеться на 13 радіусів каменя, згасання починається на
+   * 0.16 і завершується на 0.55 цієї відстані.
+   */
+  const seabedRadius = standing.rock.radius * SEABED_SPREAD;
+  const hazeFrom = seabedRadius * HAZE_FROM;
+  const hazeTo = seabedRadius * HAZE_TO;
+
+  const sandMaterial = useMemo(() => {
+    const material = new MeshStandardMaterial({
+      color: palette.sand, vertexColors: true, roughness: 1, metalness: 0,
+    });
+    applyReefHaze(material, hazeFrom, hazeTo);
+    return material;
+  }, [hazeFrom, hazeTo, palette.sand]);
+  useEffect(() => () => sandMaterial.dispose(), [sandMaterial]);
+
   const stoneMaterial = useMemo(() => {
     const material = new MeshStandardMaterial({
       color: palette.stone, roughness: 0.95, metalness: 0,
@@ -97,8 +125,8 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
    * дев'ять десятих вершин.
    */
   const seabed = useMemo(
-    () => buildReefSeabed(standing.rock.radius, standing.rock.radius * 13),
-    [standing.rock.radius],
+    () => buildReefSeabed(standing.rock.radius, seabedRadius),
+    [seabedRadius, standing.rock.radius],
   );
   useEffect(() => () => seabed.geometry.dispose(), [seabed]);
 
@@ -108,7 +136,35 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
     return texture;
   }, []);
   useEffect(() => () => caustics?.dispose(), [caustics]);
-  const causticsMaterial = useRef<MeshBasicMaterial>(null);
+
+  /*
+   * Каустика згасає ТИМ САМИМ законом, що й пісок, і це важливо: доти
+   * обидва брали серпанок з одного масиву вершин, і розійтись не могли.
+   * Тепер закон рахує піксель, тож єдність тримається тим, що межі
+   * приходять з одного місця.
+   *
+   * `fog={false}` лишається обов'язковим: туман сцени на ДОДАВАЛЬНОМУ
+   * шарі не гасить його, а додає свій колір, і дно вдалині ставало білою
+   * стіною.
+   */
+  const causticsMaterial = useMemo(() => {
+    if (caustics === null) return null;
+    const material = new MeshBasicMaterial({
+      map: caustics,
+      color: palette.caustic,
+      fog: false,
+      transparent: true,
+      opacity: CAUSTIC_STRENGTH[theme],
+      depthWrite: false,
+      blending: AdditiveBlending,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+    });
+    applyReefHaze(material, hazeFrom, hazeTo);
+    return material;
+  }, [caustics, hazeFrom, hazeTo, palette.caustic, theme]);
+  useEffect(() => () => causticsMaterial?.dispose(), [causticsMaterial]);
+
 
   /*
    * Сітка світла ПЛИВЕ. Нерухома каустика — це візерунок на килимі;
@@ -119,10 +175,9 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
     if (!caustics) return;
     const time = state.clock.elapsedTime;
     caustics.offset.set(time * CAUSTIC_DRIFT, time * CAUSTIC_DRIFT * 0.62);
-    const material = causticsMaterial.current;
-    if (material) {
+    if (causticsMaterial) {
       // Дихання яскравості: хвиля нагорі не стоїть на місці.
-      material.opacity = CAUSTIC_STRENGTH[theme] * (0.78 + 0.22 * Math.sin(time * 0.45));
+      causticsMaterial.opacity = CAUSTIC_STRENGTH[theme] * (0.78 + 0.22 * Math.sin(time * 0.45));
     }
   });
 
@@ -137,12 +192,7 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
         <primitive object={stoneMaterial} attach="material" />
       </mesh>
       <mesh geometry={seabed.geometry} receiveShadow>
-        <meshStandardMaterial
-          color={palette.sand}
-          vertexColors
-          roughness={1}
-          metalness={0}
-        />
+        <primitive object={sandMaterial} attach="material" />
       </mesh>
       {/*
         * Каустика лягає на ТУ САМУ сітку, а не на площину над нею:
@@ -150,28 +200,8 @@ export function ReefRock({ standing, seed, theme }: ReefRockProps): React.JSX.El
         * прохід тією ж геометрією — один зайвий виклик малювання на
         * головну ознаку того, що це вода.
         */}
-      {caustics ? (
-        <mesh geometry={seabed.geometry} renderOrder={1}>
-          <meshBasicMaterial
-            ref={causticsMaterial}
-            map={caustics}
-            color={palette.caustic}
-            /*
-              * `vertexColors` тут гасить каустику вдалині тим самим
-              * серпанком, що й пісок, а `fog={false}` — обов'язковий:
-              * туман на ДОДАВАЛЬНОМУ шарі не гасить його, а додає свій
-              * колір, і дно вдалині ставало білою стіною.
-              */
-            vertexColors
-            fog={false}
-            transparent
-            opacity={CAUSTIC_STRENGTH[theme]}
-            depthWrite={false}
-            blending={AdditiveBlending}
-            polygonOffset
-            polygonOffsetFactor={-1}
-          />
-        </mesh>
+      {causticsMaterial ? (
+        <mesh geometry={seabed.geometry} renderOrder={1} material={causticsMaterial} />
       ) : null}
     </group>
   );

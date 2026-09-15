@@ -247,3 +247,78 @@ export function applyReefStoneSurface(
   material.needsUpdate = true;
   return true;
 }
+
+/*
+ * ============================================================
+ * СЕРПАНОК ДНА — той самий урок, що з тоном грані.
+ * ------------------------------------------------------------
+ * Дно згасає у воду на відстані, і це згасання писалось у ВЕРШИНИ: далекі
+ * вершини множились на нуль і зникали разом із каустикою. Причина була
+ * слушна — каустика малюється ДОДАВАННЯМ, і туман сцени на ній не гасить,
+ * а додає свій колір.
+ *
+ * Але сітка дна радіальна, з `RADIAL_BIAS`, тож саме там, де згасання
+ * найкрутіше, кільця стоять найрідше. Градієнт, записаний у такі вершини,
+ * інтерполюється великими трикутниками — і навколо рифа лягає **бліда
+ * багатокутна тераса з прямими краями**. Вона є на кадрах від першого дня
+ * цієї роботи; побачити її вдалось аж тоді, коли все решта перестало бути
+ * гранованим.
+ *
+ * Це та сама вада, що й тон на грані (крок 3), тільки на дні: **плавна
+ * величина, покладена в занадто рідкі вершини, стає сходинкою.** І
+ * виправлення те саме — перенести її туди, де вона неперервна за
+ * побудовою.
+ * ============================================================
+ */
+
+const HAZE_VERSION = 'reef-haze-1';
+
+export const REEF_HAZE_VERTEX_PARS = `
+varying vec2 vReefHazeGround;
+`;
+
+export const REEF_HAZE_VERTEX_BODY = `
+  vReefHazeGround = (modelMatrix * vec4(transformed, 1.0)).xz;
+`;
+
+export const REEF_HAZE_FRAGMENT_PARS = `
+uniform float uReefHazeFrom;
+uniform float uReefHazeTo;
+varying vec2 vReefHazeGround;
+`;
+
+export const REEF_HAZE_FRAGMENT_BODY = `
+  float reefHaze = 1.0 - smoothstep(uReefHazeFrom, uReefHazeTo, length(vReefHazeGround));
+  diffuseColor.rgb *= reefHaze;
+`;
+
+/**
+ * Згасання дна у воду, пораховане в пікселі.
+ *
+ * `from` і `to` — у тих самих одиницях сцени, що й позиції: відстань від
+ * осі рифа, а не частка радіуса. Так її видно на місці виклику без
+ * множення в голові.
+ */
+export function applyReefHaze(
+  material: THREE.Material & { onBeforeCompile?: THREE.Material['onBeforeCompile'] },
+  from: number,
+  to: number,
+): void {
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms['uReefHazeFrom'] = { value: from };
+    shader.uniforms['uReefHazeTo'] = { value: to };
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', `#include <common>\n${REEF_HAZE_VERTEX_PARS}`)
+      .replace('#include <begin_vertex>', `#include <begin_vertex>\n${REEF_HAZE_VERTEX_BODY}`);
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', `#include <common>\n${REEF_HAZE_FRAGMENT_PARS}`)
+      /*
+       * Після `color_fragment`, бо саме він домножує `diffuseColor` на
+       * колір вершини. Раніше — і серпанок затерся б тоном дюн; пізніше
+       * (в `map_fragment`) його не існує для матеріалів без карти.
+       */
+      .replace('#include <color_fragment>', `#include <color_fragment>\n${REEF_HAZE_FRAGMENT_BODY}`);
+  };
+  material.customProgramCacheKey = () => `${HAZE_VERSION}|${from}|${to}`;
+  material.needsUpdate = true;
+}
