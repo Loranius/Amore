@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildReefHeadMesh } from '@/engine/species/reef/headMesh';
 import { reefHeadSize } from '@/engine/species/reef/colonyFormations';
-import { buildReefBladeMesh } from '@/engine/species/reef/undergrowthMesh';
+import { buildReefFishMesh } from '@/engine/species/reef/fishMesh';
 import { reefGeometryOf } from './reefGeometry';
 
 /*
@@ -48,16 +48,18 @@ describe('меш рушія → геометрія Three', () => {
 
   it('меш без тону лишається таким, яким був — зі спільними вершинами', () => {
     /*
-     * Трава тону не публікує, і це не недогляд: у пласкої стрічки немає
-     * рельєфу, про який можна щось сказати. Вона має малюватись рівно
-     * кольором свого матеріалу, а не платити втричі більшим буфером за
-     * канал, якого в неї немає.
+     * Риба тону не публікує, і це не недогляд: вона завбільшки з ніготь,
+     * весь час рухається й ніколи не стоїть до ока рельєфом. Вона має
+     * малюватись рівно кольором свого матеріалу, а не платити втричі
+     * більшим буфером за канал, якого їй нема куди подіти.
+     *
+     * (Тут стояла трава — доти, доки ADR-0191 не дав тон і їй.)
      */
-    const blade = buildReefBladeMesh();
-    const geometry = reefGeometryOf(blade);
-    expect(blade.faceShade).toBeUndefined();
+    const fish = buildReefFishMesh();
+    const geometry = reefGeometryOf(fish);
+    expect(fish.faceShade).toBeUndefined();
     expect(geometry.getIndex()).not.toBeNull();
     expect(geometry.getAttribute('color')).toBeUndefined();
-    expect(geometry.getAttribute('position').count).toBe(blade.positions.length / 3);
+    expect(geometry.getAttribute('position').count).toBe(fish.positions.length / 3);
   });
 });

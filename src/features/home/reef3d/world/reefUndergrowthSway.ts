@@ -102,6 +102,14 @@ export function createReefGrowthMaterial(
     side: kind === 'weed' || kind === 'blade' ? THREE.DoubleSide : THREE.FrontSide,
     metalness: 0,
     flatShading: true,
+    /*
+     * ТОН ГРАНІ (ADR-0191) і колір інстанса живуть разом, не замість.
+     * Three множить їх в один `vColor`: відтінок приходить ззовні, на
+     * інстанс, а тон — із самої геометрії. Без цього прапорця атрибут
+     * кольору мовчки не потрапляє в шейдер, і дрібнота лишається
+     * пласкою, хоч тон і порахований.
+     */
+    vertexColors: true,
   });
   if (!sway) return { material, uniforms: null };
 

@@ -282,6 +282,64 @@ describe('три форми мають об’єм', () => {
   });
 });
 
+describe('тон грані: дрібнота перестає бути папером', () => {
+  /*
+   * **ВИМОГА (ADR-0191).** ADR-0190 дав тон куполу й коралам і чесно
+   * назвав, чого не зробив: «дрібнота досі читається папером». На кадрі
+   * це жовті й бірюзові клапті на камені — пласкі, кожен одного кольору
+   * на все тіло, бо колір у них приходив лише ззовні, на інстанс.
+   *
+   * Тепер кожен рід несе свій тон, і тон іде за ЙОГО формою: у кульки
+   * світлішають голки, у камінця різняться боки, у водорості блідне
+   * кінчик. Стрічка — виняток, і саме він тут під сторожем: усі чотири
+   * її грані (лице й виворіт) мусять мати ОДИН тон, інакше гойдання
+   * читалось би блиманням.
+   */
+  const meshes = {
+    стрічка: buildReefBladeMesh(),
+    кулька: buildReefTuftMesh(),
+    камінець: buildReefPebbleMesh(),
+    водорість: buildReefWeedMesh(),
+  } as const;
+
+  it('тон є в кожного роду, і рівно на кожен трикутник', () => {
+    for (const [name, mesh] of Object.entries(meshes)) {
+      expect(mesh.faceShade, name).toBeDefined();
+      expect(mesh.faceShade!.length, name).toBe(mesh.indices.length / 3);
+      for (const tone of mesh.faceShade!) {
+        expect(Number.isFinite(tone), name).toBe(true);
+        expect(tone, name).toBeGreaterThan(0.3);
+        expect(tone, name).toBeLessThan(1.7);
+      }
+    }
+  });
+
+  it('у кульки голка світліша за западину — це її форма, сказана кольором', () => {
+    const tones = buildReefTuftMesh().faceShade!;
+    expect(Math.max(...tones) / Math.min(...tones)).toBeGreaterThan(1.3);
+  });
+
+  it('лице й виворіт стрічки тримають ОДИН тон', () => {
+    /*
+     * Стрічка йде четвірками граней: дві лицьові, дві зворотні. Різні
+     * тони на боках однієї стрічки під течією дали б блимання —
+     * найгірший рід руху, бо він виглядає поломкою рендерера.
+     */
+    const tones = buildReefBladeMesh().faceShade!;
+    for (let blade = 0; blade < tones.length; blade += 4) {
+      for (let at = 1; at < 4; at += 1) {
+        expect(tones[blade + at]).toBeCloseTo(tones[blade]!, 6);
+      }
+    }
+  });
+
+  it('сусідні стрічки в пучку різні — інакше пучок знову один клапоть', () => {
+    const tones = buildReefBladeMesh().faceShade!;
+    const perBlade = tones.filter((_, at) => at % 4 === 0);
+    expect(new Set(perBlade).size).toBeGreaterThan(2);
+  });
+});
+
 describe('дрібнота розкладена по ПЛОЩІ, а не по дузі', () => {
   /*
    * ВИМОГА (ADR-0186): дрібнота має лежати рівномірно по ПОВЕРХНІ купола.

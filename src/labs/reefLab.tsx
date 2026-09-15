@@ -262,6 +262,7 @@ function ReefLabScene({ plan, theme }: { plan: ReefPlan; theme: ReefTheme }): Re
       data-reef-days-together={plan.daysTogether}
       data-reef-coverage={profile.coverage.toFixed(4)}
       data-reef-coral-share={profile.coralSilhouetteShare.toFixed(4)}
+      data-reef-coral-coverage={profile.coralCoverage.toFixed(4)}
       data-reef-body-aspect={profile.bodyAspect.toFixed(4)}
       data-reef-dome-aspect={profile.domeAspect.toFixed(4)}
       data-reef-size-spread={profile.sizeSpread.toFixed(4)}

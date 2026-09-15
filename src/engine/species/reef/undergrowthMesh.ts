@@ -37,13 +37,44 @@ const TUFT_RINGS = 4;
 const TUFT_SIDES = 7;
 const TUFT_SPIKE = 0.34;
 
-function emptyMesh(): { positions: number[]; normals: number[]; indices: number[] } {
-  return { positions: [], normals: [], indices: [] };
+/**
+ * ТОН ГРАНІ Й ТУТ (ADR-0191).
+ *
+ * ADR-0190 дав тон куполу й коралам і назвав, чого не зробив: «дрібнота
+ * досі читається папером». Це видно на кожному кадрі — жовті й бірюзові
+ * клапті на камені, пласкі, кожен одного кольору на все тіло.
+ *
+ * Причина та сама, що була в купола, і навіть гірша: у цих тіл по
+ * десятку граней, вони крихітні, і колір у них один на інстанс. Тобто
+ * все, чим одна кулька могла відрізнятись від сусідньої, — це відтінок,
+ * заданий ззовні.
+ *
+ * Тон іде за формою кожного роду окремо, і це не оздоба:
+ * - у **стрічки** тон СПІЛЬНИЙ на всі чотири її грані (лице й виворіт),
+ *   бо різні боки однієї стрічки — це блимання, а не рельєф;
+ * - у **кульки** світлішають голки, темнішають западини — саме вони й
+ *   роблять із неї актинію;
+ * - у **камінця** кожен бік свій, як у справжньої гальки;
+ * - у **водорості** блідне кінчик стрічки, як у живої рослини.
+ */
+interface MeshParts {
+  positions: number[];
+  normals: number[];
+  indices: number[];
+  faceShade: number[];
 }
 
-function finish(
-  parts: { positions: number[]; normals: number[]; indices: number[] },
-): ReefMeshData {
+function emptyMesh(): MeshParts {
+  return { positions: [], normals: [], indices: [], faceShade: [] };
+}
+
+/** Додати грань разом із її тоном — щоб довжини не розійшлись мовчки. */
+function face(parts: MeshParts, a: number, b: number, c: number, tone: number): void {
+  parts.indices.push(a, b, c);
+  parts.faceShade.push(round6(tone));
+}
+
+function finish(parts: MeshParts): ReefMeshData {
   let minX = Infinity; let minY = Infinity; let minZ = Infinity;
   let maxX = -Infinity; let maxY = -Infinity; let maxZ = -Infinity;
   for (let at = 0; at < parts.positions.length; at += 3) {
@@ -55,6 +86,7 @@ function finish(
     positions: parts.positions,
     normals: parts.normals,
     indices: parts.indices,
+    faceShade: parts.faceShade,
     baseCapTriangleCount: 0,
     bounds: {
       min: { x: round6(minX), y: round6(minY), z: round6(minZ) },
@@ -93,10 +125,16 @@ export function buildReefBladeMesh(): ReefMeshData {
     push(dirX * lean - acrossX * 0.25, height, dirZ * lean - acrossZ * 0.25);
     push(dirX * lean + acrossX * 0.25, height, dirZ * lean + acrossZ * 0.25);
 
-    parts.indices.push(base, base + 1, base + 2);
-    parts.indices.push(base + 1, base + 3, base + 2);
-    parts.indices.push(base + 2, base + 1, base);
-    parts.indices.push(base + 2, base + 3, base + 1);
+    /*
+     * Один тон на всю стрічку, і він різний у сусідів. Лице й виворіт
+     * мусять збігатись: різні боки однієї стрічки під гойданням читались
+     * би блиманням, а не рельєфом.
+     */
+    const tone = 0.82 + 0.36 * ((blade * 3) % BLADE_COUNT) / (BLADE_COUNT - 1);
+    face(parts, base, base + 1, base + 2, tone);
+    face(parts, base + 1, base + 3, base + 2, tone);
+    face(parts, base + 2, base + 1, base, tone);
+    face(parts, base + 2, base + 3, base + 1, tone);
   }
   return finish(parts);
 }
@@ -128,25 +166,35 @@ export function buildReefTuftMesh(): ReefMeshData {
   const apex = parts.positions.length / 3;
   push(0, 1.02, 0);
 
+  /*
+   * Тон іде за тим самим стрибком радіуса, яким зроблені голки: грань,
+   * що спирається на підняту вершину, світліша за ту, що лежить у
+   * западині. Це не другий візерунок поверх форми, це та сама форма,
+   * сказана кольором.
+   */
+  const spikeTone = (ring: number, side: number): number => (
+    (side + ring) % 2 === 0 ? 1.22 : 0.84
+  );
   for (let ring = 0; ring < TUFT_RINGS - 1; ring += 1) {
     const low = ring * TUFT_SIDES;
     const high = low + TUFT_SIDES;
     for (let side = 0; side < TUFT_SIDES; side += 1) {
       const next = (side + 1) % TUFT_SIDES;
-      parts.indices.push(low + side, low + next, high + side);
-      parts.indices.push(low + next, high + next, high + side);
+      face(parts, low + side, low + next, high + side, spikeTone(ring, side));
+      face(parts, low + next, high + next, high + side, spikeTone(ring, next));
     }
   }
   const top = (TUFT_RINGS - 1) * TUFT_SIDES;
   for (let side = 0; side < TUFT_SIDES; side += 1) {
-    parts.indices.push(top + side, top + ((side + 1) % TUFT_SIDES), apex);
+    face(parts, top + side, top + ((side + 1) % TUFT_SIDES), apex, spikeTone(TUFT_RINGS - 1, side));
   }
   // Денце: кулька сидить на поверхні, але камера рифа опускається, і
   // відкритий низ показав би порожнечу.
   const floor = parts.positions.length / 3;
   push(0, 0, 0);
   for (let side = 0; side < TUFT_SIDES; side += 1) {
-    parts.indices.push(floor, (side + 1) % TUFT_SIDES, side);
+    // Денце дивиться в пісок: тон йому ні до чого.
+    face(parts, floor, (side + 1) % TUFT_SIDES, side, 1);
   }
   return finish(parts);
 }
@@ -180,12 +228,19 @@ export function buildReefPebbleMesh(): ReefMeshData {
   const floor = crown + 1;
   push(0, 0, 0);
 
+  /*
+   * У гальки кожен бік свій — це та сама зернистість, якою камінь
+   * відрізняється від пластмаси. Візерунок іде від того ж числа, що й
+   * `wobble` форми, тож тон і форма не сперечаються.
+   */
+  const sideTone = (side: number): number => 0.8 + 0.4 * ((side * 5) % SIDES) / (SIDES - 1);
   for (let side = 0; side < SIDES; side += 1) {
     const next = (side + 1) % SIDES;
-    parts.indices.push(side, next, SIDES + side);
-    parts.indices.push(next, SIDES + next, SIDES + side);
-    parts.indices.push(SIDES + side, SIDES + next, crown);
-    parts.indices.push(floor, next, side);
+    face(parts, side, next, SIDES + side, sideTone(side));
+    face(parts, next, SIDES + next, SIDES + side, sideTone(next));
+    face(parts, SIDES + side, SIDES + next, crown, sideTone(side) * 1.08);
+    // Денце лежить на піску.
+    face(parts, floor, next, side, 1);
   }
   return finish(parts);
 }
@@ -241,12 +296,19 @@ export function buildReefWeedMesh(): ReefMeshData {
       }
     }
 
+    /*
+     * Кінчик блідніший за корінь, а кожна стрічка куща — трохи своя.
+     * Лице й виворіт одного коліна тримають ОДИН тон, з тієї ж причини,
+     * що й у стрічки трави.
+     */
+    const strandTone = 0.86 + 0.28 * ((strand * 3) % WEED_STRANDS) / (WEED_STRANDS - 1);
     for (let joint = 0; joint < WEED_JOINTS; joint += 1) {
       const low = base + joint * 2;
-      parts.indices.push(low, low + 1, low + 2);
-      parts.indices.push(low + 1, low + 3, low + 2);
-      parts.indices.push(low + 2, low + 1, low);
-      parts.indices.push(low + 2, low + 3, low + 1);
+      const tone = strandTone * (1 + 0.3 * ((joint + 0.5) / WEED_JOINTS));
+      face(parts, low, low + 1, low + 2, tone);
+      face(parts, low + 1, low + 3, low + 2, tone);
+      face(parts, low + 2, low + 1, low, tone);
+      face(parts, low + 2, low + 3, low + 1, tone);
     }
   }
   return finish(parts);

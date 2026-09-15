@@ -76,9 +76,22 @@ export interface ReefSilhouette {
   /**
    * Частка ПОВНОЇ висоти рифа, яку дає найвищий корал.
    *
-   * Головне число цього файлу. Воно відповідає на питання, на яке
-   * «скільки колоній» не відповідає: риф це корали, що ростуть на
-   * камені, чи камінь, на якому щось наросло. Нуль — гола брила.
+   * **ЩО ЦЕ ЧИСЛО НАСПРАВДІ КАЖЕ (виправлено в ADR-0191).** Воно довго
+   * стояло тут як «головне число файлу» й відповідь на питання «риф це
+   * корали на камені чи камінь, на якому щось наросло». Два роки ADR
+   * називали його сталість ВАДОЮ: 28% і на першому році, і на
+   * двадцять п'ятому.
+   *
+   * Лабораторія показала, що вада була в мірці. На кадрі перший рік —
+   * гола брила з одним кущиком, двадцять п'ятий — суцільний масив, у
+   * якому каменю майже не видно. Риф СТАЄ кораловішим, і ще й як.
+   *
+   * Стала тут не вада, а АРИФМЕТИКА: і висота корала, і висота купола
+   * ростуть від одного масштабу голови, тож їхня частка скорочується.
+   * Число каже «риф тримає свою ПРОПОРЦІЮ в будь-якому віці» — і це
+   * правда, яку варто стерегти, а не лікувати.
+   *
+   * На питання «скільки тут корала» відповідає `coralCoverage` нижче.
    */
   coralSilhouetteShare: number;
   /**
@@ -89,6 +102,21 @@ export interface ReefSilhouette {
    * гола порода між колоніями — це те, що око бачить першим.
    */
   coverage: number;
+  /**
+   * Яку частку площі купола вкривають самі КОРАЛОВІ ТІЛА.
+   *
+   * Різниця з `coverage` вище не педантична, і вона одного разу вже
+   * коштувала неправильного висновку. `coverage` — це заявка ШАПОК на
+   * площу: сума дисків колоній. Тіла всередині шапки стоять не щільно,
+   * тож частина заявленого — гола порода між ними.
+   *
+   * Це число рахує самі тіла, і саме воно відповідає на питання
+   * власника «чи стає риф кораловішим»: 14% на першому році проти 252%
+   * на двадцять п'ятому (більше за одиницю означає, що тіла стоять уже
+   * в кілька шарів). Сталість `coralSilhouetteShare` при цьому нічого
+   * не заперечує — вона про пропорцію, а не про кількість.
+   */
+  coralCoverage: number;
   /** Стрункість коралового тіла: висота / ширина. Медіана по всіх тілах. */
   bodyAspect: number;
   /** Найвище тіло, поділене на найнижче. */
@@ -102,6 +130,7 @@ const EMPTY: ReefSilhouette = {
   tallestCoral: 0,
   coralSilhouetteShare: 0,
   coverage: 0,
+  coralCoverage: 0,
   bodyAspect: 0,
   sizeSpread: 0,
 };
@@ -128,10 +157,12 @@ export function reefSilhouetteProfile(plan: ReefPlan): ReefSilhouette {
   const heights: number[] = [];
   const aspects: number[] = [];
   let colonyArea = 0;
+  let bodyArea = 0;
   for (const colony of plan.colonies) {
     colonyArea += Math.PI * colony.size.radius * colony.size.radius;
     for (const body of colony.bodies) {
       heights.push(body.height);
+      bodyArea += Math.PI * body.radius * body.radius;
       if (body.radius > 0) aspects.push(body.height / (2 * body.radius));
     }
   }
@@ -149,6 +180,7 @@ export function reefSilhouetteProfile(plan: ReefPlan): ReefSilhouette {
     tallestCoral: tallest,
     coralSilhouetteShare: tallest / (rise + tallest),
     coverage: colonyArea / (Math.PI * radius * radius),
+    coralCoverage: bodyArea / (Math.PI * radius * radius),
     bodyAspect: median(aspects),
     sizeSpread: smallest > 0 ? tallest / smallest : 0,
   };

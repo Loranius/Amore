@@ -228,6 +228,7 @@ try {
         bodies: read('data-evolution-bodies'),
         coverage: read('data-reef-coverage'),
         coralShare: read('data-reef-coral-share'),
+        coralCoverage: read('data-reef-coral-coverage'),
         bodyAspect: read('data-reef-body-aspect'),
         domeAspect: read('data-reef-dome-aspect'),
         sizeSpread: read('data-reef-size-spread'),
@@ -277,7 +278,18 @@ try {
     console.log(`років        ${reef.years}, широта ${reef.breadth}`);
     console.log(`тіл          ${reef.bodies}, трикутників ${reef.triangles}`);
     console.log(`покриття     ${percent(reef.coverage)}`);
-    console.log(`корал у силуеті ${percent(reef.coralShare)}`);
+    /*
+     * ДВА РІЗНІ ЧИСЛА ПРО КОРАЛ, І ПЛУТАТИ ЇХ КОШТУВАЛО ДОРОГО
+     * (ADR-0191). «У силуеті» — це ПРОПОРЦІЯ: висота найвищого корала в
+     * повній висоті рифа. Вона стала в часі, бо і корал, і купол ростуть
+     * від одного масштабу, — і два ADR називали цю сталість вадою, поки
+     * лабораторія не показала перший і двадцять п'ятий рік поруч.
+     *
+     * «Вкрито тілами» — це КІЛЬКІСТЬ: площа самих коралових тіл проти
+     * площі купола. Ось вона й росте, з 14% до 252%.
+     */
+    console.log(`корал у силуеті ${percent(reef.coralShare)} (пропорція, стала за побудовою)`);
+    console.log(`вкрито тілами ${percent(reef.coralCoverage)} (кількість — ось вона й росте)`);
     console.log(`стрункість тіла ${reef.bodyAspect} (еталон 1.05)`);
     console.log(`купол R/H    ${reef.domeAspect} (півкуля 1.00)`);
     console.log(`розкид тіл   ${reef.sizeSpread}`);
