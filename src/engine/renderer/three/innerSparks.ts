@@ -102,6 +102,9 @@ void main() {
 }
 `;
 
+/** Ім'я вузла хмари — за ним же вона й прибирається при перебудові. */
+const SPARKS_NAME = 'Amore Evolution monarch inner sparks';
+
 /**
  * Builds the cloud **and parents it**, rather than handing back a loose object
  * for the caller to place.
@@ -188,10 +191,32 @@ export function createThreeCrystalInnerSparks(
   });
 
   const points = new THREE.Points(bufferGeometry, material);
-  points.name = 'Amore Evolution monarch inner sparks';
+  points.name = SPARKS_NAME;
   points.frustumCulled = false;
   // After the crystal batches, so the additive pass lands on a finished shell.
   points.renderOrder = 10;
+
+  /*
+   * СПОЧАТКУ ПРИБРАТИ ПОПЕРЕДНЮ ХМАРУ, ЯКЩО ВОНА ЩЕ ТУТ.
+   *
+   * Ця функція ДОДАЄ об'єкт у сцену, а викликають її з `useMemo` —
+   * тобто побічна дія стоїть там, де React має право виконати тіло
+   * двічі й один результат викинути. У `StrictMode` (а він у нас
+   * увімкнений) саме це й відбувається: перша хмара лишається в
+   * `content` назавжди, бо `dispose` до неї вже ніхто не викличе.
+   *
+   * Наслідок не в пам'яті, а в ДОВІРІ ДО ВИМІРУ: dev-збірка малювала
+   * два `points` там, де продакшн малює один, і розклад сцени
+   * (`--breakdown`) через це показував не те, що бачить пара. Сьогодні
+   * ця розбіжність коштувала години пошуку неіснуючої вади бюджету
+   * (ADR-0192 §3).
+   *
+   * Тому функція ідемпотентна для свого вузла: у `content` не може
+   * лишитись двох хмар із цим іменем.
+   */
+  for (const stale of bundle.content.children.filter((child) => child.name === SPARKS_NAME)) {
+    stale.removeFromParent();
+  }
 
   // Beside the crystal batches, under the fit — never beside the fit.
   bundle.content.add(points);

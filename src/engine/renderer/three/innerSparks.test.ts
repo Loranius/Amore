@@ -262,4 +262,35 @@ describe('вогні тримають відношення до каменю, у
     expect(strengthOf(0)).toBeCloseTo(1.4 * 0.05, 6);
     expect(strengthOf(4)).toBeCloseTo(1.4, 6);
   });
+  it('двічі побудована хмара не лишає в сцені двох', () => {
+    /*
+     * **ВИМОГА (ADR-0192 §3), знайдена розбіжністю dev і продакшну.**
+     *
+     * Ця функція ДОДАЄ вузол у сцену, а викликають її з `useMemo` —
+     * тобто побічна дія стоїть там, де React має право виконати тіло
+     * двічі й один результат викинути. У `StrictMode` саме це й
+     * відбувається, і перша хмара лишалась у сцені назавжди: `dispose`
+     * до неї вже ніхто не кликав.
+     *
+     * Шкода не в пам'яті, а в ДОВІРІ ДО ВИМІРУ: dev малював два
+     * `points` там, де продакшн малює один, і розклад сцени показував не
+     * те, що бачить пара. Сьогодні це коштувало години пошуку
+     * неіснуючої вади бюджету кристала.
+     */
+    const { geometry, material, life } = build();
+    const bundle = createThreeCrystalRenderBundle(geometry, material);
+    const name = 'Amore Evolution monarch inner sparks';
+    const clouds = () => bundle.content.children.filter((child) => child.name === name).length;
+
+    const first = createThreeCrystalInnerSparks(bundle, geometry, life)!;
+    expect(clouds()).toBe(1);
+    // Друга побудова БЕЗ dispose першої — рівно те, що робить StrictMode.
+    const second = createThreeCrystalInnerSparks(bundle, geometry, life)!;
+    expect(clouds()).toBe(1);
+    expect(bundle.content.children).toContain(second.points);
+
+    first.dispose();
+    second.dispose();
+    expect(clouds()).toBe(0);
+  });
 });
