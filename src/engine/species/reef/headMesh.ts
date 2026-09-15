@@ -61,6 +61,15 @@ export interface ReefMeshData {
    * лишаються гранованими, бо камінь ламається по площинах.
    */
   creaseAngleDeg: number;
+  /**
+   * Де в буфері опинилась кожна вершина ҐРАТКИ, якщо в тіла є ґратка.
+   *
+   * Купол будується кільцями по `AZIMUTH_SEGMENTS`, але зварювання
+   * розщеплює вершини на справжніх складках — і крок у буфері перестає
+   * збігатися з кроком ґратки. Хто хоче обійти кільце, бере індекси
+   * звідси, а не рахує їх множенням (ADR-0195, крок 7).
+   */
+  latticeVertex?: number[];
   /** Скільки трикутників у нижній кришці — вони дивляться в камінь. */
   baseCapTriangleCount: number;
   bounds: {
@@ -88,7 +97,7 @@ export interface ReefMeshData {
  * тисячі понад неї) здешевлене піщане дно, деталь якого лежала за
  * серпанком і не бачив її ніхто.
  */
-const AZIMUTH_SEGMENTS = 36;
+export const AZIMUTH_SEGMENTS = 36;
 const HEIGHT_RINGS = 12;
 
 /**
@@ -101,6 +110,21 @@ const HEIGHT_RINGS = 12;
  */
 const LOBE_COUNT = 5;
 const LOBE_DEPTH = 0.13;
+
+/**
+ * ВЕЛИКА ЧАСТКА — те, що ламає буханець (ADR-0195, крок 7).
+ *
+ * П'ять рівних часток по ±13% дають хвилясту, але СИМЕТРИЧНУ опуклість:
+ * на екрані вона читається буханцем із посипкою, бо жоден бік масиву не
+ * відрізняється від протилежного. У природі коралова брила росте боком
+ * до течії й до світла — один її схил довгий, другий обривистий.
+ *
+ * Дві частки (`cos 2φ`) дають рівно це: масив витягується в один бік і
+ * підбирається з другого. Глибина більша за дрібні частки, бо це не
+ * нерівність поверхні, а сама форма тіла.
+ */
+const BULGE_COUNT = 2;
+const BULGE_DEPTH = 0.13;
 /*
  * Періодів хвилі менше, ніж дозволяє сітка, і це навмисно.
  *
@@ -178,6 +202,7 @@ function surfaceNoise(seed: number, azimuth: number, band: number): number {
   const lobePhase = seededUnit(seed, 'reef:head:lobe') * Math.PI * 2;
   const ripplePhase = seededUnit(seed, 'reef:head:ripple') * Math.PI * 2;
   const lobes = Math.sin(azimuth * LOBE_COUNT + lobePhase) * LOBE_DEPTH;
+  const bulge = Math.cos(azimuth * BULGE_COUNT + lobePhase * 0.5) * BULGE_DEPTH;
   // Хвиля ЗАКРУЧУЄТЬСЯ з висотою (`band * 4`), а частки — ні. Через це
   // візерунок на кожному рівні свій, і купол не читається профілем,
   // протягнутим угору. Тест на це дивиться порівнянням кілець.
@@ -194,7 +219,20 @@ function surfaceNoise(seed: number, azimuth: number, band: number): number {
    * квадратично, `2` повертає середині купола її колишню силу.
    */
   const belt = Math.sin(band * Math.PI) * (1 - band) * 2;
-  return 1 + (lobes + ripple) * belt - SETTLE * (1 - band);
+  /*
+   * ВЕЛИКА ЧАСТКА МАЄ СВІЙ ПОЯС, І ЦЕ ГОЛОВНЕ В КРОЦІ 7.
+   *
+   * Спільний пояс гасне в нуль при `band = 0`, тобто рівно біля основи —
+   * а основа і є те місце, де силует масиву зустрічається з піском.
+   * Через це обвід рифа лишався чистим еліпсом хай яка бурхлива була
+   * поверхня вище: **уся нерівність жила там, де силуету немає.**
+   *
+   * Власний пояс великої частки тримається при основі (0.55) і так само
+   * сходить на нуль на маківці — інакше корона сіла б у ямку, за що вже
+   * платили (див. абзац вище).
+   */
+  const bulgeBelt = (0.55 + 0.45 * Math.sin(band * Math.PI)) * (1 - band);
+  return 1 + (lobes + ripple) * belt + bulge * bulgeBelt - SETTLE * (1 - band);
 }
 
 /**
@@ -374,6 +412,7 @@ export function buildReefHeadMesh(head: ReefHeadSize, seed: number): ReefMeshDat
     indices: welded.indices,
     tint: welded.tint,
     creaseAngleDeg: HEAD_CREASE_DEG,
+    latticeVertex: welded.firstOf,
     baseCapTriangleCount,
     bounds: {
       min: { x: round6(minX), y: round6(minY), z: round6(minZ) },

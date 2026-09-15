@@ -38,6 +38,24 @@ export interface CreasedMesh {
   indices: number[];
   /** Перенесені значення для кожної ВИХІДНОЇ вершини, якщо їх давали. */
   tint?: number[];
+  /**
+   * Куди поділась кожна ВХІДНА вершина: індекс першої вихідної.
+   *
+   * НАВІЩО. Зварювання лишає вершину на місці, доки вона нікуди не
+   * розщепилась, — але щойно ребро лишається твердим, одна вхідна
+   * вершина дає кілька вихідних, і вони стають ПОРУЧ, зсуваючи все
+   * наступне. Тобто крок «тридцять шість вершин на кільце» після першого
+   * ж розщеплення перестає бути правдою.
+   *
+   * Це вже коштувало мовчазно неправильного виміру: перевірки купола
+   * ходили кільцями за кроком і після ADR-0195 почали брати шматки РІЗНИХ
+   * кілець. Вони при цьому проходили — число просто означало не те.
+   *
+   * Тому меш каже, де його ґратка, замість того щоб її вгадували. Та сама
+   * відповідь, що в ADR-0193 §4, тільки на рівень глибше: там довжину
+   * кільця експортували числом, тут — саму розкладку.
+   */
+  firstOf: number[];
 }
 
 /** Ключ зварювання: позиції вже округлені `round6`, тож рядок точний. */
@@ -325,7 +343,26 @@ export function weldCreased(
     outNormals[at + 2] = round6(outNormals[at + 2]! / length);
   }
 
+  /*
+   * Перша вихідна вершина кожної вхідної. Береться з тих самих таблиць,
+   * якими щойно видавались вершини, тож розійтись вони не можуть.
+   */
+  const firstOf: number[] = new Array(sourceCount).fill(-1);
+  for (let source = 0; source < sourceCount; source += 1) {
+    const key = positionKey(positions, source);
+    const byGroup = emitted.get(key);
+    const first = byGroup?.values().next();
+    if (first && !first.done && typeof first.value === 'number') firstOf[source] = first.value;
+    else firstOf[source] = hiddenVertexOf.get(key) ?? -1;
+  }
+
   return tint
-    ? { positions: outPositions, normals: outNormals, indices: outIndices, tint: outTint.map(round6) }
-    : { positions: outPositions, normals: outNormals, indices: outIndices };
+    ? {
+      positions: outPositions,
+      normals: outNormals,
+      indices: outIndices,
+      tint: outTint.map(round6),
+      firstOf,
+    }
+    : { positions: outPositions, normals: outNormals, indices: outIndices, firstOf };
 }
