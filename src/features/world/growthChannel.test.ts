@@ -37,8 +37,8 @@ describe('канал приросту', () => {
      * підпис знову існуватиме лише під час аварії.
      */
     const scene = stripComments(read('home/crystal3d/evolution/EvolutionCrystalPreviewScene.tsx'));
-    expect(scene).toMatch(/useGrowthSinceLastVisit\(growthEvents\)/);
-    expect(scene).toMatch(/reportGrowth\(growth\)/);
+    expect(scene).toMatch(/useGrowthSinceLastVisit\(growthEvents, 'crystal'\)/);
+    expect(scene).toMatch(/reportGrowth\(growth === null \? null : \{ species: 'crystal'/);
   });
 
   it('звіт рахується з подій рушія, а не з власного підрахунку', () => {
@@ -79,10 +79,88 @@ describe('канал приросту', () => {
     expect(world).toMatch(/aria-hidden="true"/);
   });
 
+  it('іменник підпису приходить ЗІ ЗВІТУ, а не з другого джерела', () => {
+    /*
+     * **ВИМОГА (ADR-0188), знайдена живим кадром.** Першою редакцією цієї
+     * зміни риф до каналу під'єднали, і шапка над рифом написала
+     * «У кристалі 435 нових митей»: іменник був зашитий у підпис, бо доти
+     * звітував один вид.
+     *
+     * Вид можна було б узяти з вибору артефакта поруч — `ArtifactWorld`
+     * скидає приріст при зміні виду, тож зазвичай вони збігаються. Але
+     * тоді ІМЕНЕМ розпоряджався б один файл, а ЧИСЛОМ інший, і розійтись
+     * вони могли б тихо. Тут їх каже один звіт.
+     */
+    const hero = stripComments(read('home/Hero.tsx'));
+    expect(hero).toMatch(/growthCaption\(growth\.summary, partner, growth\.species\)/);
+
+    const rules = stripComments(read('home/growthSinceLastVisit.ts'));
+    expect(rules).not.toMatch(/У кристалі/);
+    expect(rules).toMatch(/HOME_ARTIFACT_LOCATIVE\[species\]/);
+  });
+
   it('зміна артефакта скидає підпис', () => {
     // Конвеєр дерева ще не звітує; підпис від кристала, що лишився б
     // висіти над деревом, був би рядком про об'єкт, якого немає.
     const world = stripComments(read('world/ArtifactWorld.tsx'));
     expect(world).toMatch(/setGrowth\(null\);\s*\n\s*\}, \[artifact\]\)/);
+  });
+});
+
+describe('канал приросту: риф', () => {
+  /*
+   * ВИМОГА (ADR-0188): пара, яка обрала риф, бачить той самий рядок
+   * приросту, що й пара з кристалом.
+   *
+   * Доти `MODULE_STATUS.md` називав це межею: «приріст рифа рядком не
+   * звітує». Тобто на рифі не було ЖОДНОЇ відповіді на питання «чи
+   * змінилось наше життя з минулого разу» — а це те, заради чого
+   * артефакт і стоїть на головній.
+   *
+   * Перевірки тут ті самі, що в кристала, і з тієї самої причини: кожна
+   * з цих помилок тиха. Сцена без звіту виглядає робочою, а гак під
+   * раннім виходом дає «артефакт сьогодні чомусь простіший».
+   */
+  const scene = stripComments(read('home/reef3d/world/ReefWorldScene.tsx'));
+
+  it('сцена рифа звітує про приріст', () => {
+    // Вид передається В ГАК, бо він обирає ще й сховище бачених подій:
+    // у рифа воно своє (ADR-0188 — «різниця 107 не є приростом»).
+    expect(scene).toMatch(/useGrowthSinceLastVisit\(reef\.growthEvents \?\? null, 'reef'\)/);
+    expect(scene).toMatch(/reportGrowth\(growth === null \? null : \{ species: 'reef'/);
+  });
+
+  it('звіт рахується з подій РУШІЯ, а не з власного підрахунку', () => {
+    /*
+     * Друге визначення «що вважати подією пари» розійшлося б із рушієм
+     * тихо. Події беруться з того самого `artifact.events`, з якого
+     * рахує кристал, — план рифа їх лише переносить.
+     */
+    expect(scene).toMatch(/reef\.growthEvents/);
+    const plan = stripComments(read('home/reef3d/world/useReefPlan.ts'));
+    expect(plan).toMatch(/artifact\.events\.map/);
+    expect(plan).toMatch(/attribution\?\.actorId/);
+  });
+
+  it('гаки приросту стоять до ранніх виходів сцени', () => {
+    // Той самий регрес, що вже стався в кристала з `useWorldFrameloop`.
+    const hook = scene.indexOf('useGrowthSinceLastVisit(');
+    const reporter = scene.indexOf('useWorldGrowthReporter(');
+    const firstReturn = scene.indexOf('if (reef.isPending)');
+    expect(hook).toBeGreaterThan(-1);
+    expect(reporter).toBeGreaterThan(-1);
+    expect(firstReturn).toBeGreaterThan(-1);
+    expect(hook).toBeLessThan(firstReturn);
+    expect(reporter).toBeLessThan(firstReturn);
+  });
+
+  it('обидві сцени знімають за собою підпис', () => {
+    /*
+     * Перемикання виду не має лишати чужий рядок: кристал і риф
+     * монтуються по черзі, і той, що йде, мусить прибрати свій звіт.
+     */
+    const crystal = stripComments(read('home/crystal3d/evolution/EvolutionCrystalPreviewScene.tsx'));
+    expect(crystal).toMatch(/return \(\) => reportGrowth\(null\)/);
+    expect(scene).toMatch(/return \(\) => reportGrowth\(null\)/);
   });
 });

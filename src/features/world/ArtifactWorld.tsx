@@ -33,8 +33,8 @@ import {
   WorldGrowthContext,
   WorldGrowthReportContext,
   type GrowthReporter,
+  type WorldGrowth,
 } from './growthChannel';
-import type { GrowthSummary } from '../home/growthSinceLastVisit';
 import './artifactWorld.css';
 
 const CrystalScene = lazy(() => import('../home/crystal3d/CrystalSceneEntry'));
@@ -129,7 +129,7 @@ export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
    * підпис від кристала, що лишився б висіти над деревом, був би
    * рядком про об'єкт, якого на екрані немає.
    */
-  const [growth, setGrowth] = useState<GrowthSummary | null>(null);
+  const [growth, setGrowth] = useState<WorldGrowth | null>(null);
   const reportGrowth = useCallback<GrowthReporter>((next) => setGrowth(next), []);
   useEffect(() => {
     setGrowth(null);

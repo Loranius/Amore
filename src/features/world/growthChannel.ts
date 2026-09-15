@@ -17,11 +17,32 @@
 // ============================================================
 import { createContext, useContext } from 'react';
 import type { GrowthSummary } from '../home/growthSinceLastVisit';
+import type { HomeArtifact } from '../home/homeArtifact';
 
-export type GrowthReporter = (summary: GrowthSummary | null) => void;
+/**
+ * Звіт сцени: скільки виросло І В ЧОМУ.
+ *
+ * **Вид їде разом із числом, і це виправлення після живого екрана
+ * (ADR-0188).** Щойно риф під'єднали до каналу, шапка над рифом написала
+ * «У кристалі 435 нових митей»: іменник був зашитий у підпис, бо доти
+ * звітував рівно один вид. Число було правдиве, підмет — ні.
+ *
+ * Підмет міг би братись із вибору артефакта в шапці — `ArtifactWorld`
+ * скидає приріст при зміні виду, тож зазвичай вони збігаються. Але тоді
+ * ІМЕНЕМ розпоряджався б один файл, а ЧИСЛОМ інший, і розійтись вони
+ * могли б тихо. Тут їх каже одне джерело — та сцена, яка справді на
+ * екрані.
+ */
+export interface WorldGrowth {
+  /** Хто звітує: той вид, що зараз намальований. */
+  species: HomeArtifact;
+  summary: GrowthSummary;
+}
+
+export type GrowthReporter = (growth: WorldGrowth | null) => void;
 
 /** Що виросло з минулого візиту. `null` — конвеєр ще не сказав. */
-export const WorldGrowthContext = createContext<GrowthSummary | null>(null);
+export const WorldGrowthContext = createContext<WorldGrowth | null>(null);
 
 export const WorldGrowthReportContext = createContext<GrowthReporter | null>(null);
 
@@ -30,10 +51,10 @@ export const WorldGrowthReportContext = createContext<GrowthReporter | null>(nul
  *
  * `null` — цілком робочий стан, а не помилка: сцена могла ще не
  * зібратись, приросту могло не бути, або артефакт може бути тим, чий
- * конвеєр іще не звітує (дерево, риф). Шапка в усіх трьох випадках
- * просто мовчить.
+ * конвеєр іще не звітує (дерево). Шапка в усіх трьох випадках просто
+ * мовчить.
  */
-export function useWorldGrowth(): GrowthSummary | null {
+export function useWorldGrowth(): WorldGrowth | null {
   return useContext(WorldGrowthContext);
 }
 

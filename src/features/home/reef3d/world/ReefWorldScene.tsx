@@ -18,6 +18,8 @@ import { crystalRenderScale, resolveCrystalRendererQuality } from '@/engine/rend
 import type { CrystalMaterialQuality } from '@/engine/material/types';
 import { REEF_CAMERA_FOV_DEG } from '@/engine/species/reef/reefStaging';
 import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
+import { useWorldGrowthReporter } from '@/features/world/growthChannel';
+import { useGrowthSinceLastVisit } from '@/features/home/useGrowthSinceLastVisit';
 import { CrystalPlaceholder } from '../../CrystalPlaceholder';
 import {
   EvolutionRuntimeProbe,
@@ -64,6 +66,33 @@ export default function ReefWorldScene(): React.JSX.Element {
   const [quality] = useState(readQuality);
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const onMetrics = useCallback((next: EvolutionRuntimeMetrics) => setRuntime(next), []);
+
+  /*
+   * ПРИРІСТ — ТЕПЕР І В РИФА (ADR-0188).
+   *
+   * `MODULE_STATUS.md` називав це межею: «приріст рифа рядком не звітує;
+   * канал атрибуції належить конвеєру кристала, і риф до нього не
+   * під'єднаний». Тобто пара, яка обрала риф, не бачила ЖОДНОЇ відповіді
+   * на питання «чи змінилось наше життя з минулого разу» — а це те, заради
+   * чого артефакт і стоїть на головній.
+   *
+   * Під'єднати виявилось дешево: артефакт рушія тут уже зібраний (з нього
+   * береться історія рифа), і його події просто викидались.
+   *
+   * ГАКИ СТОЯТЬ ДО РАННІХ ВИХОДІВ, і це не стиль. У сусідньому файлі цей
+   * регрес уже стався одного разу з `useWorldFrameloop`: гак поставили
+   * нижче за `if (isPending)`, і на частині рендерів він не викликався
+   * зовсім. React каже «Rendered more hooks than during the previous
+   * render», але на екрані це виглядає не як помилка, а як «артефакт
+   * сьогодні чомусь простіший».
+   */
+  const growth = useGrowthSinceLastVisit(reef.growthEvents ?? null, 'reef');
+  const reportGrowth = useWorldGrowthReporter();
+  useEffect(() => {
+    reportGrowth(growth === null ? null : { species: 'reef', summary: growth });
+    // Знімаємо за собою: перемикання виду не має лишати чужий підпис.
+    return () => reportGrowth(null);
+  }, [growth, reportGrowth]);
 
   if (reef.isPending) return <CrystalPlaceholder />;
   if (reef.error || !reef.plan) {

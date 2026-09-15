@@ -18,6 +18,7 @@ import {
   type ReefPlan,
 } from '@/engine/species/reef/reefAssembly';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
+import type { GrowthEvent } from '@/features/home/growthSinceLastVisit';
 import { stableEvolutionCoupleId } from '../../crystal3d/evolution/sourceSnapshot';
 import {
   COUPLE_TIME_ZONE,
@@ -31,6 +32,17 @@ export interface UseReefPlanResult {
   asOf: string;
   coupleId: string | null;
   eventCount: number;
+  /**
+   * Події рушія для каналу приросту — те саме `artifact.events`, з якого
+   * рахує кристал.
+   *
+   * ЧОМУ ВОНИ ВИХОДЯТЬ ЗВІДСИ, А НЕ РАХУЮТЬСЯ НАНОВО. Артефакт тут уже
+   * зібраний — із нього береться історія рифа, — і його події просто
+   * викидались. Другий підрахунок «що вважати подією пари» розійшовся б
+   * із рушієм ТИХО: підпис казав би «+2», коли риф виріс на три. Кристал
+   * цю межу вже має, і `growthChannel.test.ts` її стереже.
+   */
+  growthEvents: readonly GrowthEvent[] | null;
   isPending: boolean;
   error: Error | null;
 }
@@ -50,6 +62,7 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
           asOf,
           coupleId: null,
           eventCount: 0,
+          growthEvents: null,
           isPending: false,
           error: sources.error instanceof Error
             ? sources.error
@@ -57,7 +70,7 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
         };
       }
       return {
-        plan: null, asOf, coupleId: null, eventCount: 0,
+        plan: null, asOf, coupleId: null, eventCount: 0, growthEvents: null,
         isPending: sources.isPending, error: null,
       };
     }
@@ -97,6 +110,10 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
         asOf,
         coupleId,
         eventCount: artifact.events.length,
+        growthEvents: artifact.events.map((event) => ({
+          id: event.id,
+          actorId: event.attribution?.actorId ?? null,
+        })),
         isPending: false,
         error: null,
       };
@@ -106,6 +123,7 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
         asOf,
         coupleId: null,
         eventCount: 0,
+        growthEvents: null,
         isPending: false,
         error: error instanceof Error ? error : new Error(String(error)),
       };

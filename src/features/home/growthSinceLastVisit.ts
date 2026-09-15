@@ -17,6 +17,7 @@
 // помилка тут не падає, а тихо бреше парі про її ж історію.
 // ============================================================
 import { plural } from '@/lib/plural';
+import { HOME_ARTIFACT_LOCATIVE, type HomeArtifact } from './homeArtifact';
 
 /** Подія рушія, звужена до того, що потрібно для «виросло». */
 export interface GrowthEvent {
@@ -108,7 +109,7 @@ export function momentPhrase(count: number): string {
  *
  * Друга редакція, «Кристал виріс на N шарів», підмет повернула, але
  * збрехала числом — див. `momentPhrase`. Ця говорить про вміст, а не
- * про форму: у кристалі справді стало на N подій більше.
+ * про форму: в артефакті справді стало на N подій більше.
  *
  * Партнер іменується лише тоді, коли ВЕСЬ приріст приніс саме він.
  * Змішаний внесок лишається без імені навмисно: назвати Лєну під
@@ -130,14 +131,23 @@ export function momentPhrase(count: number): string {
  * із профілю, а не ім'я-ключ із `users` (ADR-0180). Обидва рядки, і
  * якби поле звалось `name`, сюди роками ходило б не те — мовчки й
  * правильно на вигляд.
+ *
+ * **Вид називає той, хто звітував (ADR-0188).** Іменник тут був зашитий
+ * — «У кристалі» — і це трималось рівно доти, доки звітував один вид.
+ * Щойно риф під'єднали до каналу, живий кадр показав над рифом «У
+ * кристалі 435 нових митей»: число правдиве, підмет чужий. Та сама
+ * порода помилки, що й дві попередні редакції цього рядка (див. вище):
+ * підпис називав те, чого на екрані немає.
  */
 export function growthCaption(
   summary: GrowthSummary,
   partner: { id: number; displayName: string } | null,
+  species: HomeArtifact,
 ): string | null {
   if (summary.firstVisit || summary.newCount === 0) return null;
 
-  const base = `У кристалі ${summary.newCount} ${momentPhrase(summary.newCount)}`;
+  const where = HOME_ARTIFACT_LOCATIVE[species];
+  const base = `У ${where} ${summary.newCount} ${momentPhrase(summary.newCount)}`;
   const onlyPartner = partner !== null
     && summary.actorIds.length === 1
     && summary.actorIds[0] === partner.id;

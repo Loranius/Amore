@@ -46,8 +46,14 @@ export function Hero() {
    * `null` тут звичайний стан: перший візит, нічого нового, або
    * артефакт, чий конвеєр іще не звітує. У всіх трьох випадках шапка
    * мовчить, замість писати «+0».
+   *
+   * Вид беремо зі ЗВІТУ, а не з вибору артефакта поруч: іменник і число
+   * мусять приходити з одного джерела, інакше розійдуться тихо — саме
+   * так шапка над рифом одного разу написала «У кристалі» (ADR-0188).
    */
-  const growthLine = growth === null ? null : growthCaption(growth, partner);
+  const growthLine = growth === null
+    ? null
+    : growthCaption(growth.summary, partner, growth.species);
 
   const greeting = useMemo(() => {
     const pool = [...COMMON, ...(PERSONAL[me.name] ?? [])];

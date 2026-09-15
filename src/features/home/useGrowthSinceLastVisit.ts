@@ -9,11 +9,39 @@
 // спалаху процедурного кластера й зберігає ключі ГІЛОК; цей зберігає
 // ідентифікатори нормалізованих подій рушія. Спільний ключ означав би, що
 // один механізм тихо гасить інший.
+//
+// А ЩЕ ВІН СВІЙ У КОЖНОГО ВИДУ — і це виправлення, знайдене числом
+// (ADR-0188). Один ключ на весь портал здавався правильним, поки звітував
+// один вид. Щойно риф під'єднали до каналу, перший же живий кадр показав
+// над ним «435 нових митей» проти 328 у кристала того самого дня. Різниця
+// рівно 107 — і це не приріст, а ІНШИЙ ЗНІМОК ПОРТАЛУ: риф читає джерела
+// через `portalSources.ts`, який домішує «сказані» числа онбордингу
+// (29+3, 29+15, 15+16 = 107 на цій парі), а конвеєр кристала їх не бачить.
+//
+// Спільний ключ перетворював цю різницю на «нові миті»: перехід на риф
+// показав би 107 подій, яких пара не додавала. Ключ на вид робить перший
+// візит на риф ПЕРШИМ візитом — тобто мовчанням, рівно як і задумано
+// (`GrowthSummary.firstVisit`), а далі рахує вже справжній приріст.
 // ============================================================
 import { useEffect, useMemo, useState } from 'react';
 import { summariseGrowth, type GrowthEvent, type GrowthSummary } from './growthSinceLastVisit';
+import type { HomeArtifact } from './homeArtifact';
 
+/** Що пам'ятає кристал — ключ без суфікса, бо історія в ньому вже лежить. */
 export const GROWTH_SEEN_STORAGE_KEY = 'amore:evolutionSeenEventIds';
+
+/**
+ * Де лежать бачені події цього виду.
+ *
+ * Кристал лишається на старому ключі НЕ як виняток, а тому, що ключ
+ * містить саме його події: перейменувати означало б стерти парі пам'ять
+ * про візити й показати їй одне зайве мовчання замість підпису.
+ */
+export function growthSeenStorageKey(species: HomeArtifact): string {
+  return species === 'crystal'
+    ? GROWTH_SEEN_STORAGE_KEY
+    : `${GROWTH_SEEN_STORAGE_KEY}:${species}`;
+}
 
 /**
  * Скільки підпис лишається чесним, перш ніж візит зарахується.
@@ -42,10 +70,10 @@ export function parseSeenEventIds(raw: string | null): ReadonlySet<string> | nul
   }
 }
 
-function readSeen(): ReadonlySet<string> | null {
+function readSeen(key: string): ReadonlySet<string> | null {
   if (typeof window === 'undefined') return null;
   try {
-    return parseSeenEventIds(window.localStorage.getItem(GROWTH_SEEN_STORAGE_KEY));
+    return parseSeenEventIds(window.localStorage.getItem(key));
   } catch {
     // Приватний режим або заблоковане сховище: приросту не буде, і це
     // краще за вигаданий.
@@ -53,10 +81,10 @@ function readSeen(): ReadonlySet<string> | null {
   }
 }
 
-function persistSeen(ids: readonly string[]): void {
+function persistSeen(key: string, ids: readonly string[]): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(GROWTH_SEEN_STORAGE_KEY, JSON.stringify(ids));
+    window.localStorage.setItem(key, JSON.stringify(ids));
   } catch {
     /* сховище недоступне — наступного разу підпис просто не з'явиться */
   }
@@ -74,8 +102,10 @@ function persistSeen(ids: readonly string[]): void {
  */
 export function useGrowthSinceLastVisit(
   events: readonly GrowthEvent[] | null,
+  species: HomeArtifact,
 ): GrowthSummary | null {
-  const [seen] = useState(readSeen);
+  const key = growthSeenStorageKey(species);
+  const [seen] = useState(() => readSeen(key));
 
   const summary = useMemo(
     () => (events === null ? null : summariseGrowth(events, seen)),
@@ -85,10 +115,10 @@ export function useGrowthSinceLastVisit(
   useEffect(() => {
     if (events === null) return undefined;
     const timer = window.setTimeout(() => {
-      persistSeen(events.map((event) => event.id));
+      persistSeen(key, events.map((event) => event.id));
     }, GROWTH_SETTLE_MS);
     return () => window.clearTimeout(timer);
-  }, [events]);
+  }, [events, key]);
 
   return summary;
 }

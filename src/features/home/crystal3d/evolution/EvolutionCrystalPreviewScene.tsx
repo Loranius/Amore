@@ -154,12 +154,14 @@ export default function EvolutionCrystalPreviewScene() {
     })) ?? null,
     [events],
   );
-  const growth = useGrowthSinceLastVisit(growthEvents);
+  const growth = useGrowthSinceLastVisit(growthEvents, 'crystal');
   const reportGrowth = useWorldGrowthReporter();
   useEffect(() => {
-    reportGrowth(growth);
-    // Знімаємо за собою: аварійний рендерер і риф підпису не мають, і
-    // рядок про кристал не повинен їх пережити.
+    reportGrowth(growth === null ? null : { species: 'crystal', summary: growth });
+    // Знімаємо за собою: аварійний рендерер підпису не має, і рядок про
+    // кристал не повинен його пережити. Риф тепер звітує сам (ADR-0188),
+    // тож над ним чужий підпис мав би не лише зайве число, а й чужий
+    // іменник.
     return () => reportGrowth(null);
   }, [growth, reportGrowth]);
 
