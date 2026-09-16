@@ -97,9 +97,24 @@ varying vec3 vReefStonePosition;
 varying vec3 vReefStoneNormal;
 `;
 
+/*
+ * ІНСТАНС МАЄ ВЛАСНЕ МІСЦЕ У СВІТІ, і без цього зерно бреше.
+ *
+ * `transformed` — це об'єктні координати ДО інстансування: матрицю
+ * інстанса Three домножує аж у `project_vertex`. Тобто без цієї гілки всі
+ * двісті одиниць дрібноти брали б зерно з тієї самої точки текстури, і
+ * ADR-0195 §7 записав це названою межею («триплан у світових координатах
+ * для інстансів рахує не те»). Гілка закриває межу трьома рядками.
+ */
 export const REEF_STONE_VERTEX_BODY = `
-  vReefStonePosition = (modelMatrix * vec4(transformed, 1.0)).xyz;
-  vReefStoneNormal = normalize(mat3(modelMatrix) * objectNormal);
+  vec4 reefStoneLocal = vec4(transformed, 1.0);
+  vec3 reefStoneNormalLocal = objectNormal;
+  #ifdef USE_INSTANCING
+    reefStoneLocal = instanceMatrix * reefStoneLocal;
+    reefStoneNormalLocal = mat3(instanceMatrix) * reefStoneNormalLocal;
+  #endif
+  vReefStonePosition = (modelMatrix * reefStoneLocal).xyz;
+  vReefStoneNormal = normalize(mat3(modelMatrix) * reefStoneNormalLocal);
 `;
 
 export const REEF_STONE_FRAGMENT_PARS = `
@@ -194,18 +209,23 @@ export interface ReefStoneOptions {
  * тим, чим був, і сцена малюється рівним каменем. Це названа деградація,
  * а не мовчазний провал.
  */
-export function applyReefStoneSurface(
-  material: THREE.MeshStandardMaterial,
+/**
+ * Вшити зерно в УЖЕ наявний шейдер.
+ *
+ * Окремо від `applyReefStoneSurface`, бо `onBeforeCompile` у матеріалу
+ * ОДИН: дрібнота вже має там гойдання течії, і друге присвоєння просто
+ * стерло б перше. Композиція патчів мусить бути можливою, інакше два
+ * правильні ефекти виключають один одного.
+ */
+export function patchReefStoneShader(
+  shader: { vertexShader: string; fragmentShader: string; uniforms: Record<string, { value: unknown }> },
+  textures: ReefStoneTextures,
   options: ReefStoneOptions = {},
-): boolean {
-  const textures = reefStoneTextures();
-  if (textures === null) return false;
-
+): void {
   const scale = options.scale ?? 6;
   const strength = options.strength ?? 0.85;
   const roughness = options.roughness ?? 0.7;
-
-  material.onBeforeCompile = (shader) => {
+  {
     shader.uniforms['uReefStoneNormal'] = { value: textures.normal };
     shader.uniforms['uReefStoneRough'] = { value: textures.roughness };
     shader.uniforms['uReefStoneScale'] = { value: scale };
@@ -242,8 +262,29 @@ export function applyReefStoneSurface(
         '#include <roughnessmap_fragment>',
         `${REEF_STONE_SETUP_FRAGMENT}\n#include <roughnessmap_fragment>\n${REEF_STONE_ROUGHNESS_FRAGMENT}`,
       );
-  };
-  material.customProgramCacheKey = () => `${STONE_VERSION}|${scale}|${strength}|${roughness}`;
+  }
+}
+
+/** Ключ програми для матеріалу з зерном — щоб правка доїхала до екрана. */
+export function reefStoneCacheKey(options: ReefStoneOptions = {}): string {
+  return `${STONE_VERSION}|${options.scale ?? 6}|${options.strength ?? 0.85}|${options.roughness ?? 0.7}`;
+}
+
+/**
+ * Одягнути стандартний матеріал у камінь.
+ *
+ * Повертає `false`, якщо карт немає (немає DOM) — тоді матеріал лишається
+ * тим, чим був, і сцена малюється рівним каменем. Це названа деградація,
+ * а не мовчазний провал.
+ */
+export function applyReefStoneSurface(
+  material: THREE.MeshStandardMaterial,
+  options: ReefStoneOptions = {},
+): boolean {
+  const textures = reefStoneTextures();
+  if (textures === null) return false;
+  material.onBeforeCompile = (shader) => { patchReefStoneShader(shader, textures, options); };
+  material.customProgramCacheKey = () => reefStoneCacheKey(options);
   material.needsUpdate = true;
   return true;
 }

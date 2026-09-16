@@ -51,18 +51,27 @@ const RIBBON_CREASE_DEG = 120;
 const STONE_CREASE_DEG = 20;
 import type { ReefMeshData } from './headMesh';
 
-/** Скільки стрічок у пучку й наскільки вони розходяться. */
+/** Скільки стрічок у пучку, як вони розходяться, гнуться й тоншають. */
 /*
- * Стрічка ВУЗЬКА, і це виправлення зі знімка.
+ * СТРІЧКА ЧИТАЛАСЬ ГОЛКОЮ, І ВИННА БУЛА ПРЯМОТА, А НЕ ШИРИНА.
  *
- * Перша редакція мала ширину 0.13 при висоті 1 — на екрані такі
- * стрічки читались клаптями паперу, а не травою. Трава вузька: 0.05
- * при висоті понад одиницю дає силует, у якому видно окремі стрічки, а
- * не суцільну пляму.
+ * Перша редакція мала ширину 0.13 при висоті 1 — на екрані такі стрічки
+ * читались клаптями паперу, і їх звузили до 0.05. Але звуження вади не
+ * прибрало: при висоті 1.2 навіть 0.10 дає співвідношення 12:1, тобто
+ * пряму лінію. На кадрі пучок читався жменею хвої.
+ *
+ * Пряма стрічка не буває в воді ні в чому живому: течія гне все, що
+ * тонше за себе. Тому стрічка тепер має КОЛІНО — три рівні замість двох,
+ * — і гнеться квадратично, як водорість поруч. Коліно коштує чотири
+ * грані на стрічку, і заплачено за нього кількістю: п'ять гнутих замість
+ * семи прямих.
  */
-const BLADE_COUNT = 7;
+const BLADE_COUNT = 5;
+const BLADE_JOINTS = 2;
 const BLADE_LEAN = 0.46;
-const BLADE_WIDTH = 0.05;
+const BLADE_WIDTH = 0.075;
+/** Наскільки кінчик вужчий за основу. */
+const BLADE_TAPER = 0.35;
 
 /** Кулька: скільки кілець, скільки сторін, скільки ребер і як глибоко. */
 /*
@@ -110,7 +119,7 @@ const BLADE_WIDTH = 0.05;
 export const TUFT_RINGS = 4;
 export const TUFT_SIDES = 7;
 const TUFT_RIDGES = 2;
-const TUFT_SPIKE = 0.12;
+const TUFT_SPIKE = 0.28;
 
 /** Наскільки гребінь ребра світліший за борозну, і кінчик — за основу. */
 const TUFT_RIDGE_TINT = 0.19;
@@ -213,8 +222,8 @@ export function buildReefBladeMesh(): ReefMeshData {
     const dirX = Math.cos(angle);
     const dirZ = Math.sin(angle);
     // Стрічка стоїть упоперек власного напряму — так її видно збоку.
-    const acrossX = -dirZ * BLADE_WIDTH;
-    const acrossZ = dirX * BLADE_WIDTH;
+    const acrossX = -dirZ;
+    const acrossZ = dirX;
     const base = parts.positions.length / 3;
 
     /*
@@ -224,22 +233,32 @@ export function buildReefBladeMesh(): ReefMeshData {
      * нею, а не на грань.
      */
     const tone = 0.82 + 0.36 * ((blade * 3) % BLADE_COUNT) / (BLADE_COUNT - 1);
-    const push = (x: number, y: number, z: number): void => {
-      parts.positions.push(round6(x), round6(y), round6(z));
-      parts.normals.push(round6(-dirZ), 0, round6(dirX));
-      // Дотик: корінь стрічки темніший за кінчик (ADR-0195, крок 6).
-      parts.tint.push(round6(tone * reefContactShade(y / height)));
-    };
-    push(-acrossX, 0, -acrossZ);
-    push(acrossX, 0, acrossZ);
-    // Верх звужений і відхилений — стрічка не палиця.
-    push(dirX * lean - acrossX * 0.25, height, dirZ * lean - acrossZ * 0.25);
-    push(dirX * lean + acrossX * 0.25, height, dirZ * lean + acrossZ * 0.25);
 
-    face(parts, base, base + 1, base + 2);
-    face(parts, base + 1, base + 3, base + 2);
-    face(parts, base + 2, base + 1, base);
-    face(parts, base + 2, base + 3, base + 1);
+    for (let joint = 0; joint <= BLADE_JOINTS; joint += 1) {
+      const along = joint / BLADE_JOINTS;
+      // Квадратичний згин: біля основи стрічка стоїть, угорі лягає за
+      // течією. Лінійний дав би нахилену палицю, а не згин.
+      const bend = lean * along * along;
+      const width = BLADE_WIDTH * (1 - BLADE_TAPER * along);
+      for (const side of [-1, 1]) {
+        parts.positions.push(
+          round6(dirX * bend + acrossX * side * width),
+          round6(along * height),
+          round6(dirZ * bend + acrossZ * side * width),
+        );
+        parts.normals.push(round6(-dirZ), 0, round6(dirX));
+        // Дотик (ADR-0195, крок 6): корінь стрічки темніший за кінчик.
+        parts.tint.push(round6(tone * reefContactShade(along)));
+      }
+    }
+
+    for (let joint = 0; joint < BLADE_JOINTS; joint += 1) {
+      const low = base + joint * 2;
+      face(parts, low, low + 1, low + 2);
+      face(parts, low + 1, low + 3, low + 2);
+      face(parts, low + 2, low + 1, low);
+      face(parts, low + 2, low + 3, low + 1);
+    }
   }
   return finish(parts, RIBBON_CREASE_DEG);
 }

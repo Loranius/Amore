@@ -20,6 +20,25 @@
 // наслідок того, що робить `place`.
 // ============================================================
 import * as THREE from 'three';
+import {
+  patchReefStoneShader,
+  reefStoneCacheKey,
+  reefStoneTextures,
+  type ReefStoneOptions,
+} from './reefStoneSurface';
+
+/**
+ * Зерно кожного роду дрібноти, або його відсутність.
+ *
+ * **Камінець і кулька** — тіла з поверхнею, і зерно робить із них камінь
+ * та губку. **Стрічка й водорість** його НЕ беруть: у площини без товщини
+ * немає поверхні, яку можна вкрити, а триплан на ній дав би зерно, що
+ * повзе по стрічці при гойданні — рух, якого в рослини не буває.
+ */
+const REEF_GROWTH_GRAIN: Readonly<Record<string, ReefStoneOptions>> = {
+  tuft: { scale: 34, strength: 0.6, roughness: 0.5 },
+  pebble: { scale: 30, strength: 0.85, roughness: 0.8 },
+};
 
 export const REEF_SWAY_VERSION = 'reef-undergrowth-sway-v1';
 
@@ -110,10 +129,33 @@ export function createReefGrowthMaterial(
      */
     vertexColors: true,
   });
-  if (!sway) return { material, uniforms: null };
+  /*
+   * ЗЕРНО Й ДРІБНОТІ (ADR-0195 §7 закрито).
+   *
+   * ADR-0195 лишив це названою межею: «кулька й стрічка досі читаються
+   * кольоровими фішками». На знімку під сімкратним збільшенням це видно
+   * буквально — камінь поруч зернистий, а кулька гладка, як наліпка.
+   *
+   * Межа трималась на двох речах, і обидві тут зняті:
+   *  - триплан рахував світову точку з `transformed`, тобто ДО матриці
+   *    інстанса, і всі двісті одиниць брали зерно з тієї самої точки
+   *    текстури (виправлено в `REEF_STONE_VERTEX_BODY`);
+   *  - `onBeforeCompile` у матеріалу один, і друге присвоєння стерло б
+   *    гойдання течії — тому патч тепер компонується, а не привласнює.
+   *
+   * Масштаб зерна СВІЙ у кожного роду, і це не смак: тіло кульки
+   * завширшки 0.06 одиниці сцени проти 1.5 у купола, тож те саме число
+   * дало б на ній одну пляму на все тіло.
+   */
+  const stone = reefStoneTextures();
+  const grain = stone === null ? null : REEF_GROWTH_GRAIN[kind] ?? null;
 
-  const uniforms = createReefSwayUniforms(reefSwayAmplitude(kind));
+  if (!sway && grain === null) return { material, uniforms: null };
+
+  const uniforms = sway ? createReefSwayUniforms(reefSwayAmplitude(kind)) : null;
   material.onBeforeCompile = (shader) => {
+    if (stone !== null && grain !== null) patchReefStoneShader(shader, stone, grain);
+    if (uniforms === null) return;
     shader.uniforms['uReefSwayTime'] = uniforms.uReefSwayTime;
     shader.uniforms['uReefSwayAmplitude'] = uniforms.uReefSwayAmplitude;
     shader.vertexShader = shader.vertexShader
@@ -131,7 +173,9 @@ export function createReefGrowthMaterial(
         `#include <begin_vertex>\n${REEF_SWAY_VERTEX_BODY}`,
       );
   };
-  material.customProgramCacheKey = () => `${REEF_SWAY_VERSION}|${kind}`;
+  material.customProgramCacheKey = () => (
+    `${REEF_SWAY_VERSION}|${kind}|${grain === null ? 'plain' : reefStoneCacheKey(grain)}`
+  );
   return { material, uniforms };
 }
 
