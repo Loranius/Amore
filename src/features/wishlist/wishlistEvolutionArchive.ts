@@ -17,7 +17,18 @@ type RpcError = { message: string };
 type RpcResponse = Promise<{ data: unknown; error: RpcError | null }>;
 type RpcCaller = (fn: string, args?: Record<string, unknown>) => RpcResponse;
 
-const rpc = supabase.rpc.bind(supabase) as unknown as RpcCaller;
+/*
+ * Ліниво, а не `const rpc = supabase.rpc.bind(supabase)`.
+ *
+ * Те прив'язування читало властивість клієнта на ІМПОРТІ модуля, тобто
+ * будувало клієнт бази ще до першого запиту — і саме воно тримало
+ * CI червоним навіть після того, як сам `lib/supabase.ts` став лінивим
+ * (ADR-0199). Чотири файли мали цей рядок слово в слово.
+ *
+ * Тепер властивість береться в мить виклику. Прив'язування до клієнта
+ * робить за нас проксі в `lib/supabase.ts`.
+ */
+const rpc: RpcCaller = (fn, args) => (supabase.rpc as unknown as RpcCaller)(fn, args);
 
 function normalizeRows(data: unknown): WishlistEvolutionArchiveItem[] {
   if (!Array.isArray(data)) throw new Error('Evolution wishlist RPC returned an invalid payload');
