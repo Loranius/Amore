@@ -57,6 +57,17 @@ if (species !== 'crystal' && species !== 'tree' && species !== 'reef') {
 }
 const years = arg('years', '11');
 /*
+ * Скільки РІЗНИХ частин порталу веде синтетична пара — лише для рифа.
+ *
+ * Порожньо — ручку не крутили, лабораторія живе всіма шістьма. Саме
+ * такий кадр і не може посперечатися з прив'язкою кольору до модулів,
+ * бо показує єдиний із семи можливих рифів.
+ */
+const modules = arg('modules', '');
+if (modules !== '' && species !== 'reef') {
+  throw new Error('--modules є лише в рифа: кристал і дерево кольору від модулів не беруть.');
+}
+/*
  * Обнулити один доданок і перезняти — уся техніка цього проєкту. Різниця
  * в профілі і є внесок того доданка.
  */
@@ -176,6 +187,7 @@ try {
     + (lod ? `&lod=${lod}` : '')
     + (fill ? `&fill=${encodeURIComponent(fill)}` : '')
     + (gifts ? `&gifts=${encodeURIComponent(gifts)}` : '')
+    + (modules === '' ? '' : `&modules=${modules}`)
     + (cam ? `&cam=${cam}` : '')
     + (off === '' ? '' : `&off=${off}`);
   await portal.page.goto(url, { waitUntil: 'load', timeout: 60_000 });
@@ -189,7 +201,7 @@ try {
 
   mkdirSync(OUT, { recursive: true });
   const tag = off === '' ? 'base' : `off-${off.replace(/,/g, '+')}`;
-  const file = join(OUT, `${species}-lab-${years}y-${quality}${lod ? `-${lod}` : ''}${fill ? `-${fill}` : ''}${gifts ? `-${gifts}` : ''}-${theme}-${tag}.png`);
+  const file = join(OUT, `${species}-lab-${years}y-${quality}${lod ? `-${lod}` : ''}${fill ? `-${fill}` : ''}${gifts ? `-${gifts}` : ''}${modules === '' ? '' : `-m${modules}`}-${theme}-${tag}.png`);
   /*
    * ОДИН ЗНІМОК — І ЗБЕРЕЖЕНИЙ, І ВИМІРЯНИЙ.
    *
@@ -224,6 +236,8 @@ try {
       return {
         years: read('data-reef-years'),
         breadth: read('data-reef-breadth'),
+        modules: read('data-reef-modules'),
+        lifeHues: read('data-reef-life-hues'),
         triangles: read('data-evolution-triangles'),
         bodies: read('data-evolution-bodies'),
         coverage: read('data-reef-coverage'),
@@ -276,6 +290,7 @@ try {
 
     console.log(`знімок       ${file}`);
     console.log(`років        ${reef.years}, широта ${reef.breadth}`);
+    console.log(`модулі       ${reef.modules || '—'} → ${reef.lifeHues} відтінків дрібноти`);
     console.log(`тіл          ${reef.bodies}, трикутників ${reef.triangles}`);
     console.log(`покриття     ${percent(reef.coverage)}`);
     /*

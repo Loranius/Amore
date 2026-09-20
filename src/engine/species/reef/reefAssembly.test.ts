@@ -147,6 +147,35 @@ describe('широта життя й наповненість', () => {
     expect(wide.head.radius).toBeGreaterThan(narrow.head.radius);
   });
 
+  it('план віддає не лише СКІЛЬКИ частин життя, а й ЯКІ', () => {
+    /*
+     * `breadth` вистачало голові — ширина купола росте від кількості. А
+     * палітра життя (`REEF_MODULE_COLOUR`) іменна: їй потрібні самі
+     * модулі, бо колір у неї від того, ЧИМ модуль є.
+     *
+     * Порядок канонічний, із `PORTAL_MODULES`, а не той, у якому
+     * прийшли події: інакше два однакові набори подій у різній
+     * послідовності дали б два різні рифи.
+     */
+    const reef = plan({
+      events: events(
+        ['2023-05-01', 'media'], ['2023-03-01', 'plans'],
+        ['2023-04-01', 'plans'], ['2024-01-01', 'calendar'],
+      ),
+    });
+    expect(reef.livedModules).toEqual(['calendar', 'plans', 'media']);
+    expect(reef.livedModules.length).toBe(reef.breadth);
+  });
+
+  it('подія з майбутнього в палітру не потрапляє', () => {
+    // Той самий відбір, що й для `breadth`: риф — це сьогодні, а не
+    // все, що колись лежатиме в базі.
+    const reef = plan({
+      events: events(['2023-05-01', 'media'], ['2030-01-01', 'wishlist']),
+    });
+    expect(reef.livedModules).toEqual(['media']);
+  });
+
   it('спільні вихідні піднімають рік, який модулі описали бідно', () => {
     const alone = plan();
     const together = plan({

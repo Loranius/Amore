@@ -3,9 +3,13 @@ import { reefColonyLayout, reefHeadSize } from './colonyFormations';
 import { reefStanding } from './reefStaging';
 import {
   REEF_LIFE_COLOURS,
+  REEF_MODULE_COLOUR,
+  REEF_WEED_COLOURS,
+  reefLifePalette,
   reefUndergrowth,
   type ReefGrowth,
 } from './undergrowth';
+import { PORTAL_MODULES, type PortalModule } from '../shared/relationshipYear';
 import {
   buildReefBladeMesh,
   buildReefPebbleMesh,
@@ -138,10 +142,6 @@ describe('дрібнота — не літопис', () => {
     expect(oldCount).toBeGreaterThan(youngCount);
   });
 
-  it('усі кольори життя йдуть у діло', () => {
-    const used = new Set(grown().filter((g) => g.kind !== 'pebble').map((g) => g.colourIndex));
-    expect(used.size).toBe(REEF_LIFE_COLOURS.length);
-  });
 
   it('та сама пара — та сама шкіра', () => {
     expect(grown(4, 11)).toEqual(grown(4, 11));
@@ -580,5 +580,168 @@ describe('дрібнота розкладена по ПЛОЩІ, а не по д
     const once = reefUndergrowth(head, reefStanding(head), 4, 4242);
     const twice = reefUndergrowth(head, reefStanding(head), 4, 4242);
     expect(twice.map((g) => g.point.y)).toEqual(once.map((g) => g.point.y));
+  });
+});
+
+
+/*
+ * ВКАЗІВКА ВЛАСНИКА: «прив'язуй до росту від модулів».
+ *
+ * Дрібнота доти не читала з історії нічого. Тепер читає рівно одне —
+ * КОЛІР, — і ці тести стоять по обидва боки межі: що саме прив'язано і
+ * що прив'язаним не стало. Вимога `PRODUCT.md` §8 («час є валютою
+ * росту, активність його множить, але ніколи не є умовою») лишається
+ * тим, що тримає нижній край: пара без жодної події мусить мати живий
+ * риф.
+ */
+describe('колір дрібноти йде від прожитих модулів', () => {
+  function hues(modules: readonly PortalModule[], kind?: ReefGrowth['kind']): Set<number> {
+    return new Set(
+      reefUndergrowth(HEAD, STANDING, 4, 4242, modules)
+        .filter((growth) => (kind ? growth.kind === kind : growth.kind !== 'weed'))
+        .map((growth) => growth.colourIndex),
+    );
+  }
+
+  it('скільки частин життя — стільки відтінків', () => {
+    for (let count = 1; count <= PORTAL_MODULES.length; count += 1) {
+      const modules = PORTAL_MODULES.slice(0, count);
+      expect(hues(modules).size, `${count} модулів`).toBe(count);
+    }
+  });
+
+  it('кожен модуль приносить СВІЙ відтінок, а не наступний по списку', () => {
+    /*
+     * Таблиця іменна, тож один і той самий модуль має давати один і той
+     * самий колір, у якому б наборі не стояв. Перевірка саме на це:
+     * модуль поодинці й той самий модуль у повному наборі.
+     */
+    for (const module of PORTAL_MODULES) {
+      expect([...hues([module])]).toEqual([REEF_MODULE_COLOUR[module]]);
+    }
+    expect([...hues(PORTAL_MODULES)].sort((a, b) => a - b))
+      .toEqual(PORTAL_MODULES.map((module) => REEF_MODULE_COLOUR[module]).sort((a, b) => a - b));
+  });
+
+  it('порядок модулів не міняє рифа', () => {
+    // Події читаються в довільному порядку; риф від цього мінятись не має.
+    const forward = [...PORTAL_MODULES];
+    const backward = [...PORTAL_MODULES].reverse();
+    expect(reefLifePalette(forward)).toEqual(reefLifePalette(backward));
+    expect(reefUndergrowth(HEAD, STANDING, 4, 4242, forward))
+      .toEqual(reefUndergrowth(HEAD, STANDING, 4, 4242, backward));
+  });
+
+  it('пара без жодної події має живий риф, а не голий', () => {
+    const bare = reefUndergrowth(HEAD, STANDING, 4, 4242, []);
+    const full = reefUndergrowth(HEAD, STANDING, 4, 4242, PORTAL_MODULES);
+    expect(bare.length).toBe(full.length);
+    expect(hues([]).size).toBe(1);
+  });
+
+  it('КІЛЬКІСТЬ від модулів не залежить — лише колір', () => {
+    /*
+     * Межа, заради якої все це й писалось. Якби від модулів росла ще й
+     * кількість, дрібнота стала б другим літописом поруч із кільцем
+     * років — тим самим, який ADR-0185 уже одного разу виполов.
+     */
+    const counts = [0, 1, 2, 3, 4, 5, 6]
+      .map((count) => reefUndergrowth(HEAD, STANDING, 4, 7, PORTAL_MODULES.slice(0, count)));
+    for (const growths of counts) expect(growths.length).toBe(counts[0]!.length);
+    // І не лише кількість: місце, розмір та вид теж мусять збігтись.
+    for (const growths of counts) {
+      expect(growths.map((growth) => [growth.kind, growth.point, growth.size]))
+        .toEqual(counts[0]!.map((growth) => [growth.kind, growth.point, growth.size]));
+    }
+  });
+
+  it('водорість кольорів модулів не бере', () => {
+    /*
+     * Вертикаль кадру не належить нікому: на рифі однієї частини життя
+     * вона лишається зеленою, інакше такий риф став би одноколірним
+     * ЦІЛКОМ.
+     */
+    const weeds = hues([...PORTAL_MODULES], 'weed');
+    expect([...weeds].sort((a, b) => a - b)).toEqual([...REEF_WEED_COLOURS].sort((a, b) => a - b));
+    for (const module of PORTAL_MODULES) {
+      expect(weeds.has(REEF_MODULE_COLOUR[module]), `${module} зайняв колір водорості`)
+        .toBe(false);
+    }
+  });
+
+  it('усі відтінки палітри мають кому належати', () => {
+    // Жоден колір набору не лишається мертвим: шість модульних плюс два
+    // водоростевих — це рівно `REEF_LIFE_COLOURS`.
+    const claimed = new Set<number>([
+      ...PORTAL_MODULES.map((module) => REEF_MODULE_COLOUR[module]),
+      ...REEF_WEED_COLOURS,
+    ]);
+    expect(claimed.size).toBe(REEF_LIFE_COLOURS.length);
+    for (const index of claimed) expect(REEF_LIFE_COLOURS[index]).toBeDefined();
+  });
+});
+
+describe('колір лежить плямами, а не чергується через одну', () => {
+  /**
+   * Скільки РІЗНИХ кольорів у точці та восьми найближчих до неї сусідах,
+   * усереднено по всій дрібноті купола.
+   *
+   * Чому саме так: індекс тут іде золотим кутом, тож сусід по індексу
+   * стоїть на протилежному боці купола. Число, яке щось каже про
+   * ЗНІМОК, мусить рахувати сусідів по МІСЦЮ.
+   */
+  function neighbourHues(growths: ReefGrowth[], recolour?: (index: number) => number): number {
+    const points = onHead(growths);
+    const hue = points.map((growth, index) => (recolour ? recolour(index) : growth.colourIndex));
+    let sum = 0;
+    for (const centre of points) {
+      const near = points
+        .map((other, index) => ({
+          gap: Math.hypot(
+            centre.point.x - other.point.x,
+            centre.point.y - other.point.y,
+            centre.point.z - other.point.z,
+          ),
+          hue: hue[index]!,
+        }))
+        .sort((a, b) => a.gap - b.gap)
+        .slice(0, 9);
+      sum += new Set(near.map((item) => item.hue)).size;
+    }
+    return sum / points.length;
+  }
+
+  it('жменя дрібноти несе два кольори, а не п\'ять', () => {
+    /*
+     * ЗАПИСАНИЙ ВИМІР, риф шести модулів, 12 років, посів 4242:
+     *
+     *   чергування `index % 6` → 4.83 різних кольорів на жменю з дев'яти
+     *   ділянки Вороного      → 2.31
+     *
+     * Верхня межа тут 3.0, а не 2.31: число законно гуляє від посіву й
+     * від того, куди лягли опори. Але 4.83 воно перетнути не може ні за
+     * яких опор, і саме це відрізняє плями від шуму.
+     */
+    const growths = reefUndergrowth(HEAD, STANDING, 4, 4242, PORTAL_MODULES);
+    const patched = neighbourHues(growths);
+    const cycled = neighbourHues(growths, (index) => index % PORTAL_MODULES.length);
+    expect(cycled).toBeGreaterThan(4);
+    expect(patched).toBeLessThan(3);
+  });
+
+  it('пляма не з\'їдає жодного кольору', () => {
+    /*
+     * Ділянок більше, ніж відтінків, і це навмисно: при двох модулях
+     * шість ділянок дають клаптики обох кольорів, а не дві півкулі.
+     * Перевірка — що жоден відтінок не загубився на жодному наборі.
+     */
+    for (let count = 1; count <= PORTAL_MODULES.length; count += 1) {
+      const modules = PORTAL_MODULES.slice(0, count);
+      const used = new Set(
+        onHead(reefUndergrowth(HEAD, STANDING, 4, 4242, modules))
+          .map((growth) => growth.colourIndex),
+      );
+      expect(used.size, `${count} модулів на куполі`).toBe(count);
+    }
   });
 });

@@ -81,8 +81,10 @@ export function ReefUndergrowth({
   plan, standing, lift, reduceMotion,
 }: ReefUndergrowthProps): React.JSX.Element {
   const growths = useMemo(
-    () => reefUndergrowth(plan.head, standing, plan.colonies.length, plan.headSeed),
-    [plan.colonies.length, plan.head, plan.headSeed, standing],
+    () => reefUndergrowth(
+      plan.head, standing, plan.colonies.length, plan.headSeed, plan.livedModules,
+    ),
+    [plan.colonies.length, plan.head, plan.headSeed, plan.livedModules, standing],
   );
 
   const kinds = useMemo(() => ({

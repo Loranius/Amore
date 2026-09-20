@@ -16,6 +16,14 @@
 //   /reef-lab.html?years=10
 //   /reef-lab.html?years=25&fill=повна
 //   /reef-lab.html?years=1&theme=light
+//   /reef-lab.html?modules=2
+//
+// `modules` з'явився разом із прив'язкою кольору дрібноти до прожитих
+// частин порталу. Без нього лабораторія завжди живе ВСІМА шістьма —
+// історія тут синтетична й рівна, — тобто показує єдиний із семи
+// можливих рифів, і саме той, на якому прив'язку не видно. Це пастка №8
+// зі `scripts/live/README.md` у чистому вигляді: кадр, який не може з
+// тобою не погодитись.
 //
 // Сторінка не входить у збірку продукту: лише dev-сервер.
 // ============================================================
@@ -32,6 +40,7 @@ import {
 import { reefSilhouetteProfile } from '@/engine/species/reef/reefProfile';
 import { reefStanding } from '@/engine/species/reef/reefStaging';
 import { PORTAL_MODULES } from '@/engine/species/shared/relationshipYear';
+import { reefLifePalette } from '@/engine/species/reef/undergrowth';
 import type { ReefTheme } from '@/engine/species/reef/coralPalette';
 import { ReefWorld } from '@/features/home/reef3d/world/ReefWorld';
 import { useReefMeshes } from '@/features/home/reef3d/world/useReefMeshes';
@@ -65,13 +74,22 @@ type FillProfile = keyof typeof FILL_PROFILES;
 
 const THEMES: readonly ReefTheme[] = ['dark', 'light'];
 
-/** Історія синтетичної пари: рівні події в усіх модулях, кожен рік. */
-function historyFor(years: number, perModulePerYear: number): ReefHistoryEvent[] {
+/**
+ * Історія синтетичної пари: рівні події в перших `moduleCount` модулях,
+ * кожен рік.
+ *
+ * Модулі беруться з початку `PORTAL_MODULES`, а не випадкові: ручка має
+ * давати ТОЙ САМИЙ риф на тому самому числі, інакше два знімки поспіль
+ * порівнювати нема з чим.
+ */
+function historyFor(
+  years: number, perModulePerYear: number, moduleCount: number,
+): ReefHistoryEvent[] {
   const events: ReefHistoryEvent[] = [];
-  if (perModulePerYear <= 0) return events;
+  if (perModulePerYear <= 0 || moduleCount <= 0) return events;
   const startYear = Number(STARTED_AT.slice(0, 4));
   for (let year = 0; year < years; year += 1) {
-    for (let module = 0; module < PORTAL_MODULES.length; module += 1) {
+    for (let module = 0; module < moduleCount; module += 1) {
       for (let index = 0; index < perModulePerYear; index += 1) {
         /*
          * Дні розкидані по місяцях, а не складені в один: `yearFill`
@@ -104,7 +122,9 @@ function historyFor(years: number, perModulePerYear: number): ReefHistoryEvent[]
   return events;
 }
 
-function planFor(years: number, fill: FillProfile, theme: ReefTheme): ReefPlan {
+function planFor(
+  years: number, fill: FillProfile, theme: ReefTheme, moduleCount: number,
+): ReefPlan {
   return buildReefPlan({
     relationshipStartedAt: STARTED_AT,
     /*
@@ -122,7 +142,7 @@ function planFor(years: number, fill: FillProfile, theme: ReefTheme): ReefPlan {
     asOf: `${Number(STARTED_AT.slice(0, 4)) + years - 1}-11-20`,
     leapDayPolicy: 'feb-28',
     seed: 4242,
-    events: historyFor(years, FILL_PROFILES[fill]),
+    events: historyFor(years, FILL_PROFILES[fill], moduleCount),
     sharedDaysOff: [],
     theme,
   });
@@ -135,6 +155,15 @@ function ReefLab(): React.JSX.Element | null {
   const fillParam = params.get('fill') ?? '';
   const fill: FillProfile = (Object.keys(FILL_PROFILES) as FillProfile[])
     .includes(fillParam as FillProfile) ? (fillParam as FillProfile) : 'середня';
+  /*
+   * Скільки РІЗНИХ частин порталу пара веде, 0..6. Нуль — законне
+   * значення й окремий кадр: `PRODUCT.md` §8 обіцяє живий риф і парі,
+   * яка ще нічого не додала.
+   */
+  const moduleCount = Math.max(0, Math.min(
+    PORTAL_MODULES.length,
+    Number(params.get('modules') ?? String(PORTAL_MODULES.length)) || 0,
+  ));
   const themeParam = params.get('theme') ?? '';
   const theme: ReefTheme = THEMES.includes(themeParam as ReefTheme)
     ? (themeParam as ReefTheme)
@@ -143,17 +172,23 @@ function ReefLab(): React.JSX.Element | null {
   const [error, setError] = useState<string | null>(null);
   const plan = useMemo(() => {
     try {
-      return planFor(years, fill, theme);
+      return planFor(years, fill, theme, moduleCount);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       return null;
     }
-  }, [years, fill, theme]);
+  }, [years, fill, theme, moduleCount]);
 
   if (error !== null) return <pre style={{ color: '#f88', padding: 16 }}>{error}</pre>;
   if (plan === null) return null;
   return <ReefLabScene plan={plan} theme={theme} />;
 }
+
+/*
+ * `data-reef-modules` і `data-reef-life-hues` стоять поруч із
+ * `data-reef-breadth`, бо це РІЗНІ числа, які дуже легко сплутати на
+ * знімку: широта веде розмір купола, а палітра — колір дрібноти.
+ */
 
 /**
  * Рамка купола НА ЕКРАНІ, у частках кадру.
@@ -259,6 +294,8 @@ function ReefLabScene({ plan, theme }: { plan: ReefPlan; theme: ReefTheme }): Re
       data-evolution-triangles={meshes.triangles}
       data-reef-years={plan.colonies.length}
       data-reef-breadth={plan.breadth}
+      data-reef-modules={plan.livedModules.join(',')}
+      data-reef-life-hues={reefLifePalette(plan.livedModules).length}
       data-reef-days-together={plan.daysTogether}
       data-reef-coverage={profile.coverage.toFixed(4)}
       data-reef-coral-share={profile.coralSilhouetteShare.toFixed(4)}

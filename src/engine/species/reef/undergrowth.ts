@@ -7,10 +7,17 @@
 // брилою з чотирма колоніями, і жодне світло цього не рятувало.
 //
 // ЩО ЦЕ ТАКЕ І ЧИМ ВОНО НЕ Є. Дрібнота — не літопис. Вона не рахує
-// років, не міряє модулів і нічого не означає; вона робить поверхню
-// поверхнею. Річні колонії лишаються єдиним, що несе історію, і саме
-// тому дрібнота мусить бути дрібною: якби вона змагалась із ними за
-// увагу, кільце років перестало б читатись.
+// років і не росте з часом; вона робить поверхню поверхнею. Річні
+// колонії лишаються єдиним, що несе ЧАС, і саме тому дрібнота мусить
+// бути дрібною: якби вона змагалась із ними за увагу, кільце років
+// перестало б читатись.
+//
+// Одне вона таки каже — і це вказівка власника «прив'язуй до росту від
+// модулів». КОЛІР береться з тих частин порталу, якими пара живе
+// (`REEF_MODULE_COLOUR`), і лягає ПЛЯМАМИ (`HEAD_PATCHES`). Кількість,
+// розмір і розкладка при цьому лишаються глухими до історії — межа
+// проходить рівно між «скільки» і «яких»: перше було б другим,
+// нечітким літописом, друге каже те, чого на рифі не казав ніхто.
 //
 // Три види, і кожен узятий з референсів:
 //   `blade`  — пучок стрічок, що тягнуться вгору (трава й м'які корали);
@@ -38,6 +45,7 @@ import {
 } from './colonyFormations';
 import { reefHeadSurfacePoint } from './headMesh';
 import type { ReefStanding } from './reefStaging';
+import { PORTAL_MODULES, type PortalModule } from '../shared/relationshipYear';
 
 export type ReefGrowthKind = 'blade' | 'tuft' | 'pebble' | 'weed';
 
@@ -57,6 +65,76 @@ export const REEF_LIFE_COLOURS: ReadonlyArray<readonly [number, number, number]>
   [0.14, 0.44, 0.92],
   [0.96, 0.78, 0.16],
 ];
+
+/**
+ * ЯКИЙ МОДУЛЬ ЯКИМ КОЛЬОРОМ ЖИВЕ НА РИФІ.
+ *
+ * **ВКАЗІВКА ВЛАСНИКА: «прив'язуй до росту від модулів».** Доти дрібнота
+ * не читала з історії нічого: колір брався `index % 8`, тобто вся палітра
+ * світилась на будь-якому рифі — і на тому, де пара веде всі шість
+ * частин порталу, і на тому, де вона додала один спогад.
+ *
+ * ЩО САМЕ ПРИВ'ЯЗАНО, А ЩО НІ, і чому межа саме тут. Кількість дрібноти
+ * лишається вільною від історії — це інваріант із власним тестом
+ * (ADR-0185: коли кількість почала нести слабкий річний сигнал, вона
+ * стала другим, нечітким літописом поруч із кільцем колоній). А
+ * РІЗНОМАНІТТЯ історію нести може: воно не рахує років, не росте з
+ * часом і не змагається з колоніями — воно каже інше, чого на рифі не
+ * казав ніхто: **скільки різних частин життя пара сюди принесла.**
+ *
+ * Таблиця, а не алгоритм: шість модулів, шість відтінків, і кожен
+ * вибраний за тим, чим модуль є, а не за порядком у списку.
+ *
+ * ЗЕЛЕНІ В НІЙ НЕМАЄ, І ЦЕ ВИРІШИВ ЗНІМОК. Обидві зелені (0 і 5) пішли
+ * водоростям (`REEF_WEED_COLOURS`), а планам дісталось золото. Перша
+ * редакція давала водоростям пару «зелень + жовтий», і на кадрі
+ * передні кущі вийшли СОЛОМОЮ: жовтий [0.96,0.78,0.16] на високій
+ * стрічці читається сухою травою, а не рослиною під водою. Дві зелені
+ * поруч — це водорість; зелень і жовтий поруч — це сіно.
+ */
+export const REEF_MODULE_COLOUR: Readonly<Record<PortalModule, number>> = {
+  // Календар — бірюза мілини: те, що розмічає час, а не заповнює його.
+  calendar: 1,
+  // Плани — золото: те, що росте попереду, і єдине, чого ще немає.
+  plans: 7,
+  // Бажання — бузок: найменш буденний колір набору.
+  wishlist: 2,
+  // Карта — синій: вода між місцями.
+  map: 6,
+  // Спогади — коралово-червоне: єдиний теплий колір, який риф носить сам.
+  memories: 4,
+  // Медіа — охра: світло екрана в темній кімнаті.
+  media: 3,
+};
+
+/**
+ * Палітра рифа цієї пари: кольори тих модулів, якими вона живе.
+ *
+ * ПОРОЖНІЙ СПИСОК — НЕ ПОРОЖНІЙ РИФ. `PRODUCT.md` §8: час є валютою
+ * росту, активність його множить, але ніколи не є умовою. Пара, яка ще
+ * нічого не додала, мусить мати живий риф — просто одноколірний. Береться
+ * зелень водоростей: риф, який ще нічого не приніс, увесь того кольору,
+ * яким вода заростає сама.
+ */
+export function reefLifePalette(modules: readonly PortalModule[]): number[] {
+  const seen = new Set<number>();
+  // Порядок — із `PORTAL_MODULES`, а не з того, як їх передали: інакше
+  // риф міняв би розкладку кольорів від порядку читання подій.
+  for (const module of PORTAL_MODULES) {
+    if (modules.includes(module)) seen.add(REEF_MODULE_COLOUR[module]);
+  }
+  return seen.size === 0 ? [REEF_WEED_COLOURS[0]!] : [...seen];
+}
+
+/**
+ * Водорість не від модулів, і це межа, а не недогляд.
+ *
+ * Дрібнота на камені — те, що пара сюди принесла; водорість росте у воді
+ * навколо й не належить нікому. Якби вона теж брала колір із модулів,
+ * риф однієї частини життя став би одноколірним ЦІЛКОМ — разом із
+ * вертикаллю, заради якої водорість і стоїть у кадрі.
+ */
+export const REEF_WEED_COLOURS: readonly number[] = [0, 5];
 
 /** Камені кольору не мають — вони камені. */
 export const REEF_PEBBLE_COLOUR: readonly [number, number, number] = [0.62, 0.63, 0.6];
@@ -176,6 +254,77 @@ function bandByArea(table: readonly number[], u: number): number {
 
 const GOLDEN_ANGLE_RAD = Math.PI * (3 - Math.sqrt(5));
 
+/**
+ * КОЛІР ЛЕЖИТЬ ДІЛЯНКАМИ, А НЕ ЧЕРГУЄТЬСЯ ЧЕРЕЗ ОДНУ.
+ *
+ * Колір брався `palette[index % palette.length]`, тобто сусіди по
+ * індексу діставали сусідні відтінки. Але індекс тут іде золотим кутом:
+ * сусід по індексу стоїть на протилежному боці купола, а сусід ПО МІСЦЮ
+ * має індекс далекий і колір випадковий. Наслідок видно на знімку —
+ * серед ста сімдесяти кущиків будь-яка п'ядь купола несе всі відтінки
+ * одразу, і кольорова прив'язка до модулів перестає читатись: замість
+ * шести частин життя око бачить один строкатий шум.
+ *
+ * Виміряно на рифі шести модулів (12 років, посів 4242): скільки РІЗНИХ
+ * кольорів серед точки та восьми найближчих до неї сусідів — 4.83 із 6
+ * можливих. Тобто майже вся палітра в кожній жмені. З ділянками — 2.31.
+ *
+ * На референсах воно не так: риф заростає ПЛЯМАМИ, одна колонія — один
+ * вид — один колір, і саме межі між плямами роблять поверхню читаною.
+ *
+ * Тому ділянки: кілька опорних точок, розкиданих по куполу тим самим
+ * законом, що й сама дрібнота, і кожен кущик бере колір НАЙБЛИЖЧОЇ.
+ * Вийде Вороного по сфері — нерівні плями з ламаними межами, які й
+ * виглядають обростанням, а не візерунком.
+ *
+ * Ділянок більше, ніж відтінків, і навмисно: при двох модулях шість
+ * ділянок дають клаптики двох кольорів, а не дві півкулі.
+ */
+const HEAD_PATCHES = 12;
+const SAND_PATCHES = 6;
+
+interface PatchSeed { x: number; y: number; z: number }
+
+/** Напрям точки купола в нормованому просторі: одиничний вектор. */
+function domeDirection(azimuth: number, band: number): PatchSeed {
+  const phi = band * (Math.PI / 2);
+  const flat = Math.cos(phi);
+  return { x: flat * Math.cos(azimuth), y: Math.sin(phi), z: flat * Math.sin(azimuth) };
+}
+
+/**
+ * Опорні точки ділянок.
+ *
+ * Розкидані так само, як дрібнота: золотий кут по азимуту, ван дер
+ * Корпут крізь таблицю площі по висоті. Інакше опори збились би до
+ * маківки — тієї ж вади, яку `bandByArea` уже виправив для самої
+ * дрібноти.
+ *
+ * Зсув від посіву робить плями рифом ЦІЄЇ пари: без нього межі лягали б
+ * на однакові азимути в кожного.
+ */
+function buildPatchSeeds(
+  count: number, areaTable: readonly number[], seed: number,
+): PatchSeed[] {
+  const turn = seededUnit(seed, 'reef:patch:turn') * Math.PI * 2;
+  return Array.from({ length: count }, (_value, index) => domeDirection(
+    index * GOLDEN_ANGLE_RAD + turn,
+    bandByArea(areaTable, radicalInverse2(index)),
+  ));
+}
+
+/** Номер найближчої опори — вона ж номер ділянки. */
+function patchOf(seeds: readonly PatchSeed[], at: PatchSeed): number {
+  let best = 0;
+  let bestGap = Infinity;
+  for (let index = 0; index < seeds.length; index += 1) {
+    const seed = seeds[index]!;
+    const gap = (seed.x - at.x) ** 2 + (seed.y - at.y) ** 2 + (seed.z - at.z) ** 2;
+    if (gap < bestGap) { bestGap = gap; best = index; }
+  }
+  return best;
+}
+
 export interface ReefGrowth {
   kind: ReefGrowthKind;
   /** Точка на поверхні — купола або піску. */
@@ -208,13 +357,24 @@ function radicalInverse2(index: number): number {
  * цьому ПАДАЄ, і це не вада: на старому рифі купол вкривають самі
  * колонії, а дрібнота потрібна там, де голо, — на молодому. Числа й
  * причину див. у `GROWTH_MIN`.
+ *
+ * `modules` — частини порталу, якими пара жила за всю історію. Вони
+ * вирішують ПАЛІТРУ й нічого більше; порожній список дає живий
+ * одноколірний риф, а не голий.
  */
 export function reefUndergrowth(
   head: ReefHeadSize,
   standing: ReefStanding,
   yearCount: number,
   seed: number,
+  modules: readonly PortalModule[] = [],
 ): ReefGrowth[] {
+  /*
+   * Палітра — єдине, що дрібнота бере з історії пари (див.
+   * `REEF_MODULE_COLOUR`). Кількість, розмір і розкладка лишаються
+   * такими ж, якими були: інакше дрібнота стала б другим літописом.
+   */
+  const palette = reefLifePalette(modules);
   const radius = Math.max(1e-6, head.radius);
   const colonies = reefColonyLayout(head, yearCount);
 
@@ -256,6 +416,7 @@ export function reefUndergrowth(
    */
   const ATTEMPT_CEILING = onHead * 6;
   const areaTable = buildAreaTable(radius, Math.max(1e-6, head.rise));
+  const headPatches = buildPatchSeeds(HEAD_PATCHES, areaTable, seed);
   for (let index = 0, placed = 0; placed < onHead && index < ATTEMPT_CEILING; index += 1) {
     const azimuth = index * GOLDEN_ANGLE_RAD;
     // Ван дер Корпут дає рівномірну ЧАСТКУ ПЛОЩІ, а таблиця перекладає її
@@ -283,7 +444,9 @@ export function reefUndergrowth(
       normal: surface.normal,
       size: round6(radius * (0.075 + 0.075 * seededUnit(seed, `${salt}:size`))),
       spinRad: round6(seededUnit(seed, `${salt}:spin`) * Math.PI * 2),
-      colourIndex: index % REEF_LIFE_COLOURS.length,
+      colourIndex: palette[
+        patchOf(headPatches, domeDirection(azimuth, band)) % palette.length
+      ]!,
     });
     placed += 1;
   }
@@ -337,9 +500,21 @@ export function reefUndergrowth(
        */
       size: round6(radius * (0.42 + 0.34 * seededUnit(seed, `${salt}:size`))),
       spinRad: round6(seededUnit(seed, `${salt}:spin`) * Math.PI * 2),
-      colourIndex: index % 2 === 0 ? 0 : 5,
+      colourIndex: REEF_WEED_COLOURS[index % REEF_WEED_COLOURS.length]!,
     });
   }
+  /*
+   * Пісок має СВОЇ ділянки, а не продовжує куполові.
+   *
+   * Кільце пласке й тонке, тож ділянки на ньому виходять секторами — і
+   * їх менше: шість смуг по кільцю читаються плямами, дванадцять
+   * розсипались би назад у шум.
+   */
+  const sandTurn = seededUnit(seed, 'reef:patch:sand') * Math.PI * 2;
+  const sandPatches = Array.from(
+    { length: SAND_PATCHES },
+    (_value, index) => domeDirection(index * GOLDEN_ANGLE_RAD + sandTurn, 0),
+  );
   for (let index = 0; index < total - onHead; index += 1) {
     const azimuth = index * GOLDEN_ANGLE_RAD;
     const distance = inner + (outer - inner) * Math.sqrt(radicalInverse2(index));
@@ -358,7 +533,9 @@ export function reefUndergrowth(
       // читається валуном, а не галькою.
       size: round6(radius * (0.045 + 0.055 * seededUnit(seed, `${salt}:size`))),
       spinRad: round6(seededUnit(seed, `${salt}:spin`) * Math.PI * 2),
-      colourIndex: index % REEF_LIFE_COLOURS.length,
+      colourIndex: palette[
+        patchOf(sandPatches, domeDirection(azimuth, 0)) % palette.length
+      ]!,
     });
   }
 

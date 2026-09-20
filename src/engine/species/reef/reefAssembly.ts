@@ -91,6 +91,16 @@ export interface ReefPlan {
   colonies: ReefColonyPlan[];
   /** Скільки різних частин порталу жило за всю історію, 0..PORTAL_MODULES. */
   breadth: number;
+  /**
+   * ЯКІ САМЕ частини порталу жили — у порядку `PORTAL_MODULES`.
+   *
+   * `breadth` каже скільки, а це — які, і різниця не косметична: голові
+   * вистачає числа (ширина купола росте від кількості), а палітрі життя
+   * потрібні самі модулі, бо колір у неї іменний (`REEF_MODULE_COLOUR`).
+   * Порядок канонічний, а не порядок читання подій, інакше два однакові
+   * набори подій у різній послідовності дали б два різні рифи.
+   */
+  livedModules: PortalModule[];
   daysTogether: number;
 }
 
@@ -200,6 +210,7 @@ export function buildReefPlan(input: BuildReefPlanInput): ReefPlan {
     tint: reefCoupleTint(input.relationshipStartedAt, input.theme),
     colonies,
     breadth,
+    livedModules: PORTAL_MODULES.filter((module) => livedModules.has(module)),
     daysTogether,
   };
 }
