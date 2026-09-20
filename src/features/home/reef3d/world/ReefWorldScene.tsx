@@ -176,6 +176,21 @@ function ReefWorldReady({
         // риф уміщається в розрахунку й не вміщається на екрані.
         camera={{ position: [0, 1.2, 4.2], fov: REEF_CAMERA_FOV_DEG }}
         gl={{ alpha: false, antialias: quality !== 'fallback' }}
+        /*
+         * ТІНІ — ЗА РІВНЕМ ПРИСТРОЮ (ADR-0197).
+         *
+         * Доти в рифа не було тіней ЗОВСІМ: у спрямованого світла не
+         * стояв `castShadow`, тож прапорці на голові й колоніях не робили
+         * нічого, а коментар просто над тим світлом обіцяв, що «тіні від
+         * колоній мають лягати на голову». Намір описано, дії немає.
+         *
+         * Прохід карти тіней подає геометрію вдруге, і ціни цього в
+         * кадрах із пісочниці не виміряти (сьома пастка
+         * `scripts/live/README.md`). Тому він увімкнений там, де пристрій
+         * уже визнано спроможним, і вимкнений на двох нижніх рівнях —
+         * рівно як антизубчастість поруч.
+         */
+        shadows={quality === 'high' || quality === 'balanced'}
       >
         <ReefWorld plan={plan} meshes={meshes} theme={theme} reduceMotion={reduceMotion} />
         <EvolutionRuntimeProbe onMetrics={onMetrics} />

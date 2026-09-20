@@ -181,6 +181,7 @@ function GrowthInstances({
     <instancedMesh
       ref={mesh}
       args={[geometry, surface.material, items.length]}
+      castShadow
       receiveShadow
     />
   );
