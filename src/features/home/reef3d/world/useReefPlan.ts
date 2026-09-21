@@ -30,6 +30,19 @@ import {
 export interface UseReefPlanResult {
   plan: ReefPlan | null;
   asOf: string;
+  /**
+   * Перший день стосунків — той самий, з якого рушій рахував план.
+   *
+   * ВИХОДИТЬ ЗВІДСИ РАДИ ОДНОГО: щоб `daysTogether` можна було
+   * ПЕРЕВІРИТИ, а не лише прочитати. Без початку число в атрибуті ні з
+   * чим не звіряється, і зсув на одиницю виглядає рівно так само, як
+   * правильна відповідь. Лабораторія рифа вже двічі ловила такий зсув
+   * кадром (див. коментарі в `labs/reefLab.tsx`), і обидва рази його не
+   * бачив жоден тест.
+   *
+   * `null`, поки плану немає: вигадувати дату — гірше, ніж не мати її.
+   */
+  startedAt: string | null;
   coupleId: string | null;
   eventCount: number;
   /**
@@ -60,6 +73,7 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
         return {
           plan: null,
           asOf,
+          startedAt: null,
           coupleId: null,
           eventCount: 0,
           growthEvents: null,
@@ -70,7 +84,7 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
         };
       }
       return {
-        plan: null, asOf, coupleId: null, eventCount: 0, growthEvents: null,
+        plan: null, asOf, startedAt: null, coupleId: null, eventCount: 0, growthEvents: null,
         isPending: sources.isPending, error: null,
       };
     }
@@ -108,6 +122,7 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
           theme,
         }),
         asOf,
+        startedAt: artifact.relationshipStartedAt,
         coupleId,
         eventCount: artifact.events.length,
         growthEvents: artifact.events.map((event) => ({
@@ -121,6 +136,7 @@ export function useReefPlan(theme: ReefTheme): UseReefPlanResult {
       return {
         plan: null,
         asOf,
+        startedAt: null,
         coupleId: null,
         eventCount: 0,
         growthEvents: null,

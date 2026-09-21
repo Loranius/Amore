@@ -11,12 +11,13 @@
 // картинки, тобто на око. Спільний набір означає, що риф міряється тим
 // самим приладом, що й кристал.
 // ============================================================
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { useTheme } from '@/providers/ThemeProvider';
 import { crystalRenderScale, resolveCrystalRendererQuality } from '@/engine/renderer';
 import type { CrystalMaterialQuality } from '@/engine/material/types';
 import { REEF_CAMERA_FOV_DEG } from '@/engine/species/reef/reefStaging';
+import { reefSilhouetteProfile } from '@/engine/species/reef/reefProfile';
 import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
 import { useWorldGrowthReporter } from '@/features/world/growthChannel';
 import { useGrowthSinceLastVisit } from '@/features/home/useGrowthSinceLastVisit';
@@ -114,6 +115,7 @@ export default function ReefWorldScene(): React.JSX.Element {
   return <ReefWorldReady
     plan={reef.plan}
     asOf={reef.asOf}
+    startedAt={reef.startedAt}
     eventCount={reef.eventCount}
     theme={theme}
     quality={quality}
@@ -132,10 +134,11 @@ export default function ReefWorldScene(): React.JSX.Element {
  * гаків і забороняє. Тому будування мешів живе там, де план уже точно є.
  */
 function ReefWorldReady({
-  plan, asOf, eventCount, theme, quality, frameloop, reduceMotion, runtime, onMetrics,
+  plan, asOf, startedAt, eventCount, theme, quality, frameloop, reduceMotion, runtime, onMetrics,
 }: {
   plan: NonNullable<ReturnType<typeof useReefPlan>['plan']>;
   asOf: string;
+  startedAt: string | null;
   eventCount: number;
   theme: 'light' | 'dark';
   quality: CrystalMaterialQuality;
@@ -145,6 +148,24 @@ function ReefWorldReady({
   onMetrics: (metrics: EvolutionRuntimeMetrics) => void;
 }): React.JSX.Element {
   const meshes = useReefMeshes(plan);
+  /*
+   * СИЛУЕТ ЧИСЛАМИ — В АТРИБУТИ, І ЦЕ ДІАГНОСТИКА, А НЕ РІШЕННЯ.
+   *
+   * Лабораторія (`labs/reefLab.tsx`) публікувала ці числа від самого
+   * початку, портал — ні, і саме тому риф пройшов ADR-0182…0198 без
+   * жодної автоматичної перевірки СВОЄЇ ФОРМИ: бюджети трикутників і
+   * викликів малювання нічого не кажуть про те, чи риф лишився рифом, а
+   * не брилою з кущиком. Лабораторію ж CI не бачить — її сторінки немає
+   * у збірці продукту.
+   *
+   * Числа лише читаються (`e2e/visual/reef-production-acceptance.spec.ts`)
+   * і ні на що в сцені не впливають: `CLAUDE.md` — «Diagnostics and
+   * performance timing never affect authoritative hashes or decisions».
+   *
+   * `useMemo` по плану: профіль обходить усі тіла всіх колоній, і робити
+   * це щокадру не було б за що.
+   */
+  const silhouette = useMemo(() => reefSilhouetteProfile(plan), [plan]);
 
   return (
     <div
@@ -163,10 +184,17 @@ function ReefWorldReady({
       data-evolution-draw-calls={runtime?.drawCalls ?? ''}
       data-evolution-rendered-triangles={runtime?.triangles ?? ''}
       data-reef-as-of={asOf}
+      data-reef-started-at={startedAt ?? ''}
       data-reef-years={plan.colonies.length}
       data-reef-breadth={plan.breadth}
       data-reef-days-together={plan.daysTogether}
       data-reef-events={eventCount}
+      data-reef-coverage={silhouette.coverage.toFixed(4)}
+      data-reef-coral-coverage={silhouette.coralCoverage.toFixed(4)}
+      data-reef-coral-share={silhouette.coralSilhouetteShare.toFixed(4)}
+      data-reef-body-aspect={silhouette.bodyAspect.toFixed(4)}
+      data-reef-dome-aspect={silhouette.domeAspect.toFixed(4)}
+      data-reef-size-spread={silhouette.sizeSpread.toFixed(4)}
     >
       <Canvas
         frameloop={frameloop}
