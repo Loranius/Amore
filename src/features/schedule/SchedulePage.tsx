@@ -1,5 +1,5 @@
 import { HeartIcon } from '@/components/icons/NavIcon';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePeople } from '@/features/_shared/useUsers';
 import { currentYearMonth, daysInMonth, monthKeyOf, todayLocal, ymd } from '@/features/_shared/month';
@@ -8,7 +8,7 @@ import { useSchedule } from './useSchedule';
 import { useScheduleReminder } from './useScheduleReminder';
 import { useSharedDaysOff } from './useSharedDaysOff';
 import { usePlans } from '@/features/plans/usePlans';
-import { showsInCalendar } from '@/features/plans/planModel';
+import { plansOnDate } from '@/features/calendar/calendarPlans';
 import { ScheduleEditor } from './ScheduleEditor';
 import { ScheduleMonthNav } from './ScheduleMonthNav';
 import { ScheduleCompletionStatus } from './ScheduleCompletionStatus';
@@ -16,7 +16,6 @@ import { ScheduleMonthOverview } from './ScheduleMonthOverview';
 import { ScheduleUpcoming } from './ScheduleUpcoming';
 import { ScheduleDayDetails } from './ScheduleDayDetails';
 import { countdownLabel, dayStatus, fmtLongDate, type DayStatus } from './scheduleViewModel';
-import type { PlanRow } from '@/types';
 import './schedule.css';
 import './scheduleCompleteness.css';
 import './scheduleEditToggle.css';
@@ -117,18 +116,27 @@ export function SchedulePage() {
     return counts;
   }, [statusOf]);
 
-  // Лише плани з точною датою: «осінь 2026» не має де стояти в дні
-  // графіка — те саме правило, що в календарній сітці.
-  const plansByDate = useMemo(() => {
-    const map = new Map<string, PlanRow[]>();
-    for (const plan of allPlans) {
-      if (!showsInCalendar(plan) || !plan.start_date) continue;
-      const list = map.get(plan.start_date) ?? [];
-      list.push(plan);
-      map.set(plan.start_date, list);
-    }
-    return map;
-  }, [allPlans]);
+  /*
+   * «Те саме правило, що в календарній сітці» — і тепер це правда.
+   *
+   * Тут стояв власний прохід, який клав план ЛИШЕ на `start_date`, хоч
+   * коментар поруч обіцяв правило сітки «Планів». Через це один і той
+   * самий «Ремонт хати» малював риску під усіма тридцятьма днями вересня
+   * в «Планах» і під жодним тут (аудит §4.2). Четвертий за місяць
+   * коментар, що описував намір замість дії.
+   *
+   * Тепер обидва екрани питають одну функцію — `planOccupiesDate`, — і
+   * розійтись їм більше нема на чому.
+   *
+   * Функція, а не Map: «Найближчі спільні дні» дивляться на дати, які
+   * можуть лежати в ІНШОМУ місяці, ніж показана сітка. Map довелось би
+   * заздалегідь будувати на невідомий наперед набір місяців — і саме там
+   * зручно було б знову розійтись.
+   */
+  const plansOn = useCallback(
+    (iso: string) => plansOnDate(allPlans, iso),
+    [allPlans],
+  );
 
   const selectedStatus: DayStatus = selectedDate
     ? sharedDates.includes(selectedDate) ? 'both-off' : statusOf.get(selectedDate) ?? 'none'
@@ -270,12 +278,12 @@ export function SchedulePage() {
         </div>
       ) : (
         <>
-          <ScheduleMonthOverview yr={yr} mo={mo} today={today} usersCount={users.length} statusCounts={statusCounts} statusOf={statusOf} plansByDate={plansByDate} onSelectDate={setSelectedDate} />
-          <ScheduleUpcoming sharedDates={sharedDates} plansByDate={plansByDate} onSelectDate={setSelectedDate} onPlan={openPlans} />
+          <ScheduleMonthOverview yr={yr} mo={mo} today={today} usersCount={users.length} statusCounts={statusCounts} statusOf={statusOf} plansOn={plansOn} onSelectDate={setSelectedDate} />
+          <ScheduleUpcoming sharedDates={sharedDates} plansOn={plansOn} onSelectDate={setSelectedDate} onPlan={openPlans} />
         </>
       )}
 
-      {selectedDate && <ScheduleDayDetails date={selectedDate} status={selectedStatus} plans={plansByDate.get(selectedDate) ?? []} onClose={() => setSelectedDate(null)} onPlan={openPlans} />}
+      {selectedDate && <ScheduleDayDetails date={selectedDate} status={selectedStatus} plans={plansOn(selectedDate)} onClose={() => setSelectedDate(null)} onPlan={openPlans} />}
     </section>
   );
 }

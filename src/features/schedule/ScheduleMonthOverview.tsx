@@ -10,7 +10,7 @@ export function ScheduleMonthOverview({
   usersCount,
   statusCounts,
   statusOf,
-  plansByDate,
+  plansOn,
   onSelectDate,
 }: {
   yr: number;
@@ -19,7 +19,8 @@ export function ScheduleMonthOverview({
   usersCount: number;
   statusCounts: { both: number; lena: number; dima: number };
   statusOf: Map<string, DayStatus>;
-  plansByDate: Map<string, PlanRow[]>;
+  /** Плани, що ЗАЙМАЮТЬ цей день (`planOccupiesDate`). */
+  plansOn: (iso: string) => PlanRow[];
   onSelectDate: (date: string) => void;
 }) {
   const total = daysInMonth(yr, mo);
@@ -74,7 +75,7 @@ export function ScheduleMonthOverview({
             const day = index + 1;
             const date = ymd(yr, mo, day);
             const status = statusOf.get(date) ?? 'none';
-            const plans = plansByDate.get(date) ?? [];
+            const plans = plansOn(date);
             // Крапка «підтверджено» — про згоду партнера, а не про статус
             // підготовки: саме це питання ставлять, дивлячись на графік.
             const confirmed = plans.some((plan) => plan.confirmed);

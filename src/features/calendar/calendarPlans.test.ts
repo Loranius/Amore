@@ -6,7 +6,7 @@
 // вони відповідають лише на «чи випадає план на цей день».
 // ============================================================
 import { describe, expect, it } from 'vitest';
-import { planShowsInGrid, plansByDay } from './calendarPlans';
+import { planOccupiesDate, planShowsInGrid, plansByDay, plansOnDate } from './calendarPlans';
 import type { PlanRow } from '@/types';
 
 const plan = (over: Partial<PlanRow> = {}): PlanRow => ({
@@ -77,6 +77,91 @@ describe('plansByDay', () => {
     const a = plan({ id: 7 });
     const b = plan({ id: 3 });
     expect(plansByDay([a, b], 2026, 8).get(12)?.map((p) => p.id)).toEqual([3, 7]);
+  });
+});
+
+/*
+ * ЗВЕДЕННЯ ДВОХ КАЛЕНДАРІВ (ADR-0202, аудит §4.2).
+ *
+ * `/plans` ставив позначку на КОЖНОМУ дні діапазону, `/schedule` — лише
+ * на `start_date`. З одного рядка виходили дві протилежні картини: у
+ * «Планах» риска під усіма тридцятьма днями вересня, у «Графіку» — під
+ * жодним, і при цьому підпис «крапка в кутку дня — на нього вже є план».
+ *
+ * Правило тепер одне: позначка стоїть там, де план займає ДЕНЬ, а не
+ * ввесь місяць. Межа — сам місяць, одиниця, яку сітка показує; числа зі
+ * стелі («довший за N днів») тут немає навмисно.
+ */
+describe('позначка стоїть там, де план займає день, а не ввесь місяць', () => {
+  // Той самий план, що й на знімку аудиту.
+  const REPAIR = plan({
+    id: 42, title: 'Ремонт хати', date_precision: 'range',
+    start_date: '2026-07-01', end_date: '2028-01-01',
+  });
+
+  it('ремонт на 549 днів не займає в вересні жодного дня', () => {
+    // Він таки триває — але не займає ЖОДНОГО дня окремо: відповідь
+    // «усі тридцять» тотожна відповіді «жоден».
+    expect([...plansByDay([REPAIR], 2026, 9).keys()]).toEqual([]);
+    expect(plansOnDate([REPAIR], '2026-09-15')).toEqual([]);
+  });
+
+  it('…але свої краї показує, і саме в тих місяцях, де вони стоять', () => {
+    expect([...plansByDay([REPAIR], 2026, 7).keys()], 'початок у липні').toEqual([1]);
+    expect([...plansByDay([REPAIR], 2028, 1).keys()], 'кінець у січні').toEqual([1]);
+  });
+
+  it('обидва екрани дістають ту саму відповідь', () => {
+    /*
+     * Інваріант, заради якого все й робилось: сітка «Планів» питає по
+     * днях місяця, «Графік» — по ISO-даті, і це та сама функція.
+     */
+    for (const day of [1, 15, 30]) {
+      const iso = `2026-09-${String(day).padStart(2, '0')}`;
+      expect(plansByDay([REPAIR], 2026, 9).has(day))
+        .toBe(plansOnDate([REPAIR], iso).length > 0);
+    }
+  });
+
+  it('період, що накрив місяць рівно, лишає обидва краї', () => {
+    const month = plan({ date_precision: 'range', start_date: '2026-09-01', end_date: '2026-09-30' });
+    expect([...plansByDay([month], 2026, 9).keys()]).toEqual([1, 30]);
+  });
+
+  it('період, що почався в цьому місяці й пішов далі, лишає початок', () => {
+    const long = plan({ date_precision: 'range', start_date: '2026-09-01', end_date: '2026-12-31' });
+    expect([...plansByDay([long], 2026, 9).keys()]).toEqual([1]);
+    expect([...plansByDay([long], 2026, 10).keys()], 'жовтень накрито цілком').toEqual([]);
+  });
+
+  it('короткий похід нічого не втратив — правило його не чіпає', () => {
+    // Три дні не накривають серпня, тож усе, як було.
+    const trip = plan({ date_precision: 'range', start_date: '2026-08-12', end_date: '2026-08-14' });
+    expect([...plansByDay([trip], 2026, 8).keys()]).toEqual([12, 13, 14]);
+    expect(planOccupiesDate(trip, '2026-08-13')).toBe(true);
+  });
+
+  it('похід через межу місяця теж — жодного місяця він не накриває', () => {
+    const trip = plan({ date_precision: 'range', start_date: '2026-08-30', end_date: '2026-09-02' });
+    expect([...plansByDay([trip], 2026, 8).keys()]).toEqual([30, 31]);
+    expect([...plansByDay([trip], 2026, 9).keys()]).toEqual([1, 2]);
+  });
+
+  it('лютий короткий, і це не робить його особливим', () => {
+    // Межа — місяць, а не «тридцять днів»: у лютому 2027-го їх 28.
+    const feb = plan({ date_precision: 'range', start_date: '2027-02-01', end_date: '2027-02-28' });
+    expect([...plansByDay([feb], 2027, 2).keys()]).toEqual([1, 28]);
+  });
+
+  it('день поза планом не займає нічого', () => {
+    expect(planOccupiesDate(REPAIR, '2026-06-30'), 'до початку').toBe(false);
+    expect(planOccupiesDate(REPAIR, '2028-01-02'), 'після кінця').toBe(false);
+  });
+
+  it('порядок у дні сталий і в новій формі теж', () => {
+    const a = plan({ id: 7 });
+    const b = plan({ id: 3 });
+    expect(plansOnDate([a, b], '2026-08-12').map((p) => p.id)).toEqual([3, 7]);
   });
 });
 

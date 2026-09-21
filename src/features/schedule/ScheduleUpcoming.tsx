@@ -11,12 +11,13 @@ import { fmtLongDate } from './scheduleViewModel';
 
 export function ScheduleUpcoming({
   sharedDates,
-  plansByDate,
+  plansOn,
   onSelectDate,
   onPlan,
 }: {
   sharedDates: string[];
-  plansByDate: Map<string, PlanRow[]>;
+  /** Плани, що ЗАЙМАЮТЬ цей день (`planOccupiesDate`). */
+  plansOn: (iso: string) => PlanRow[];
   onSelectDate: (date: string) => void;
   /** Веде в «Плани»: заводити план у двох місцях не треба. */
   onPlan: () => void;
@@ -31,7 +32,7 @@ export function ScheduleUpcoming({
       </div>
       <div className="sched-upcoming-list">
         {sharedDates.slice(0, 3).map((date) => {
-          const plan = plansByDate.get(date)?.[0];
+          const plan = plansOn(date)[0];
           const parsed = new Date(`${date}T12:00:00`);
           return (
             <button key={date} type="button" className="sched-upcoming-row" onClick={() => onSelectDate(date)}>
