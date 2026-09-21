@@ -187,6 +187,12 @@ Required script is missing: format:check     ← вихід 1
 
 ### [A] 3.1 `memories_sync_source` відкрита світові й пише в спогади
 
+> **Закрито 21 вересня — ADR-0200.** `revoke execute … from public, anon,
+> authenticated`; права стали `{postgres, service_role}`. Перевірено: обидві
+> клієнтські ролі отримують `insufficient_privilege`, а шлях «пін на карті →
+> спогад» дає той самий результат, що й до зміни (1 спогад, 1 зв'язок).
+> Дані пари не змінились — усі проби в транзакціях із `rollback`.
+
 ```
 proname   : memories_sync_source
 grantees  : PUBLIC, postgres, anon, authenticated, service_role
@@ -219,8 +225,9 @@ REVOKE EXECUTE ON FUNCTION public.memories_sync_source(text,date,text,integer,te
   FROM PUBLIC, anon, authenticated;
 ```
 
-**Нічого не виконано.** Власник казав «нічого не писав добре» — і це
-стосується й `REVOKE`.
+~~**Нічого не виконано.** Власник казав «нічого не писав добре» — і це
+стосується й `REVOKE`.~~ — **виконано 21 вересня за прямою вказівкою
+власника «роби ревок меморіс сінк соурс» (ADR-0200).**
 
 ### Що перевірено й виявилось НЕ вадою
 
@@ -600,8 +607,8 @@ page.evaluate: Execution context was destroyed, most likely because of a navigat
    `src/lib/supabase.ts` не мусить кидати помилку на ІМПОРТІ — тоді жоден
    чистий тест не залежатиме від оточення. Перше лікує симптом за хвилину,
    друге прибирає причину.
-1. **[A]** Забрати грант `PUBLIC`/`anon` з `memories_sync_source` (§3.1).
-   Один `REVOKE`, схеми не чіпає. Потрібне слово власника.
+1. ~~**[A]** Забрати грант `PUBLIC`/`anon` з `memories_sync_source` (§3.1).~~
+   — **зроблено, ADR-0200.**
 2. **[B]** Навчити плани розрізняти «почався» й «скінчився» (§4.3):
    `overdue` має дивитись на `end_date`. Одна функція, один тест.
 3. **[B]** Звести дві відповіді про діапазон в одну (§4.2) — або обидва
