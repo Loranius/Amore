@@ -7,8 +7,8 @@
 // ============================================================
 import { describe, expect, it } from 'vitest';
 import {
-  daysUntilStart, hasPreciseDate, isClosed, nextPlan, nextTask, planDateLabel,
-  readiness, showsInCalendar, sortPlans,
+  daysUntilEnd, daysUntilStart, hasPreciseDate, isClosed, lastDayOf, nextPlan, nextTask,
+  planCountdown, planDateLabel, planPhase, readiness, showsInCalendar, sortPlans,
 } from './planModel';
 import type { PlanRow, PlanTaskRow } from '@/types';
 
@@ -199,5 +199,102 @@ describe('planDateLabel', () => {
 
   it('без дати підпису немає', () => {
     expect(planDateLabel(plan())).toBeNull();
+  });
+});
+
+
+/*
+ * РЕГРЕСІЯ: ПЛАН, ЩО ТРИВАЄ, БУВ ПОКАЗАНИЙ ПРОСТРОЧЕНИМ (ADR-0201).
+ *
+ * Аудит 2026-09-20 §4.3: на головній картці «Планів» стояв «Ремонт хати,
+ * 1 липня 2026 – 1 січня 2028» і поруч ЧЕРВОНЕ «81 дн. тому»
+ * (`color: var(--danger)`) — докір за план, до кінця якого ще шістнадцять
+ * місяців. Причина: `overdue` рахувався з `daysUntilStart`, тобто від
+ * ПОЧАТКУ, тоді як «минув чи ні» вирішує КІНЕЦЬ. Поле `end_date` було
+ * поруч і вже вживалось сусідньою `planDateLabel`.
+ *
+ * Наслідок був не разовий: БУДЬ-ЯКИЙ діапазон ставав «простроченим»
+ * назавтра після старту й лишався таким до кінця.
+ *
+ * Однакову арифметику при цьому тримали три компоненти (картка, плитка,
+ * сторінка плану), тож вада була в трьох місцях одразу. Тому відповідь
+ * тепер одна — `planCountdown`, — і перевіряється саме вона.
+ */
+describe('план, що триває, не є простроченим', () => {
+  // Той самий план, що й на знімку аудиту, з тією ж «сьогодні».
+  const REPAIR = plan({
+    id: 42, title: 'Ремонт хати', category: 'home',
+    start_date: '2026-07-01', end_date: '2028-01-01', date_precision: 'range',
+  });
+  const AUDIT_DAY = new Date(2026, 8, 20); // 20 вересня 2026
+
+  it('саме той випадок зі знімка більше не червоний', () => {
+    // 81 день від початку — і ще 468 до кінця.
+    expect(daysUntilStart(REPAIR, AUDIT_DAY)).toBe(-81);
+    expect(daysUntilEnd(REPAIR, AUDIT_DAY)).toBeGreaterThan(0);
+
+    const countdown = planCountdown(REPAIR, AUDIT_DAY);
+    expect(countdown?.phase, 'план у розпалі названо минулим').toBe('running');
+    expect(countdown?.label).toBe('триває');
+    expect(countdown?.label).not.toMatch(/тому/);
+  });
+
+  it('три фази періоду — до, під час і після', () => {
+    const range = plan({ start_date: '2026-08-10', end_date: '2026-08-20', date_precision: 'range' });
+    expect(planPhase(range, new Date(2026, 7, 1))).toBe('upcoming');
+    expect(planPhase(range, new Date(2026, 7, 10))).toBe('upcoming'); // перший день — ще попереду
+    expect(planPhase(range, new Date(2026, 7, 15))).toBe('running');
+    expect(planPhase(range, new Date(2026, 7, 20))).toBe('running');  // останній день ще триває
+    expect(planPhase(range, new Date(2026, 7, 21))).toBe('past');
+  });
+
+  it('минулий діапазон рахується від КІНЦЯ, а не від початку', () => {
+    /*
+     * Інакше похід «1–10 серпня» 11 серпня казав би «10 дн. тому» —
+     * число про день, коли він ПОЧАВСЯ, а не коли скінчився.
+     */
+    const trip = plan({ start_date: '2026-08-01', end_date: '2026-08-10', date_precision: 'range' });
+    const after = new Date(2026, 7, 11);
+    expect(daysUntilStart(trip, after)).toBe(-10);
+    expect(planCountdown(trip, after)).toEqual({ phase: 'past', label: '1 дн. тому' });
+  });
+
+  it('для точного дня нічого не змінилось — кінець і є початком', () => {
+    const day = plan({ start_date: '2026-08-12', date_precision: 'day' });
+    expect(lastDayOf(day)?.getDate()).toBe(12);
+    expect(planCountdown(day, new Date(2026, 7, 1))).toEqual({ phase: 'upcoming', label: 'через 1 тиж.' });
+    expect(planCountdown(day, new Date(2026, 7, 12))).toEqual({ phase: 'upcoming', label: 'Сьогодні!' });
+    expect(planCountdown(day, new Date(2026, 7, 13))).toEqual({ phase: 'past', label: '1 дн. тому' });
+  });
+
+  it('зіпсований діапазон читається як один день, а не як вічний', () => {
+    // Кінець раніше початку — дані бувають і такі; план від цього не має
+    // ставати таким, що «триває» завжди.
+    const broken = plan({ start_date: '2026-08-10', end_date: '2026-08-01', date_precision: 'range' });
+    expect(planPhase(broken, new Date(2026, 7, 15))).toBe('past');
+  });
+
+  it('період без кінця поводиться як точний день', () => {
+    const open = plan({ start_date: '2026-08-10', end_date: null, date_precision: 'range' });
+    expect(planPhase(open, new Date(2026, 7, 15))).toBe('past');
+  });
+
+  it('неточна дата відліку не дістає — правило `hasPreciseDate` не зсунулось', () => {
+    const season = plan({ start_date: '2026-09-01', date_precision: 'season' });
+    expect(planCountdown(season, AUDIT_DAY)).toBeNull();
+  });
+
+  it('той, що триває, не падає вниз списку разом із простроченими', () => {
+    /*
+     * Та сама вада, висловлена ПОРЯДКОМ: `sortPlans` вважав минулим усе
+     * з від'ємним початком, тож план у розпалі опинявся під майбутніми.
+     * Те, що відбувається зараз, і є найближчим.
+     */
+    const future = plan({ id: 1, start_date: '2026-10-01' });
+    const running = plan({
+      id: 2, start_date: '2026-07-01', end_date: '2028-01-01', date_precision: 'range',
+    });
+    const finished = plan({ id: 3, start_date: '2026-08-01', date_precision: 'day' });
+    expect(sortPlans([finished, future, running], AUDIT_DAY).map((p) => p.id)).toEqual([2, 1, 3]);
   });
 });

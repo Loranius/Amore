@@ -13,7 +13,10 @@
 import { localDateFromISO } from '@/lib/utils';
 import { daysInMonth } from '@/features/_shared/month';
 import { PLAN_STATUSES } from '@/features/plans/planConstants';
-import { showsInCalendar } from '@/features/plans/planModel';
+// `lastDayOf` жив тут приватним, і через це «коли план скінчиться» знав
+// календар, а модуль «Плани» — ні; на цьому й виросла вада з червоним
+// «81 дн. тому» (ADR-0201). Відповідь тепер одна, у моделі планів.
+import { lastDayOf, showsInCalendar } from '@/features/plans/planModel';
 import type { PlanRow } from '@/types';
 
 /**
@@ -27,16 +30,6 @@ import type { PlanRow } from '@/types';
 export function planShowsInGrid(plan: PlanRow): boolean {
   if (!showsInCalendar(plan)) return false;
   return plan.status !== 'cancelled' && plan.status !== 'postponed';
-}
-
-/** Останній день плану: для періоду — `end_date`, інакше сам початок. */
-function lastDayOf(plan: PlanRow): Date {
-  const start = localDateFromISO(plan.start_date!);
-  if (plan.date_precision !== 'range' || !plan.end_date) return start;
-  const end = localDateFromISO(plan.end_date);
-  // Зіпсований діапазон (кінець раніше початку) читаємо як один день, а
-  // не як порожній: план не має тихо зникати з календаря через це.
-  return Number.isNaN(end.getTime()) || end.getTime() < start.getTime() ? start : end;
 }
 
 /**
@@ -64,7 +57,7 @@ export function plansByDay(
     if (!planShowsInGrid(plan)) continue;
     const start = localDateFromISO(plan.start_date!);
     if (Number.isNaN(start.getTime())) continue;
-    const end = lastDayOf(plan);
+    const end = lastDayOf(plan) ?? start;
     if (end.getTime() < monthStart.getTime() || start.getTime() > monthEnd.getTime()) continue;
 
     const from = start.getTime() < monthStart.getTime() ? 1 : start.getDate();

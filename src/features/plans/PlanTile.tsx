@@ -1,9 +1,8 @@
 import { Link } from 'react-router-dom';
 import { ChevronRightIcon } from '@/components/icons/UiIcon';
 import { PlanCrystalEdge } from './PlanCrystalEdge';
-import { daysLabel } from '@/features/calendar/calendarUtils';
 import { PLAN_CATEGORIES, PLAN_STATUSES } from './planConstants';
-import { daysUntilStart, hasPreciseDate, isClosed, planDateLabel } from './planModel';
+import { isClosed, planCountdown, planDateLabel } from './planModel';
 import type { PlanRow } from '@/types';
 
 // ============================================================
@@ -35,9 +34,10 @@ export function PlanTile({ plan, onConfirm }: {
   const date = planDateLabel(plan);
   const closed = isClosed(plan);
   // Відлік лише для точної дати, і лише поки план у роботі: у виконаного
-  // «−9 днів» означало б докір за те, що вже зроблено.
-  const days = hasPreciseDate(plan) ? daysUntilStart(plan) : null;
-  const overdue = !closed && days !== null && days < 0;
+  // «−9 днів» означало б докір за те, що вже зроблено. Сам підпис і фазу
+  // рахує `planCountdown` — одна відповідь на всі місця показу.
+  const countdown = planCountdown(plan);
+  const overdue = !closed && countdown?.phase === 'past';
 
   return (
     <article
@@ -55,8 +55,8 @@ export function PlanTile({ plan, onConfirm }: {
 
       <span className="pm-tile-meta">
         {date ?? <span className="pm-tile-someday">колись</span>}
-        {days !== null && !closed && (
-          <span className={overdue ? 'pm-tile-overdue' : 'pm-tile-when'}>{daysLabel(days)}</span>
+        {countdown !== null && !closed && (
+          <span className={overdue ? 'pm-tile-overdue' : 'pm-tile-when'}>{countdown.label}</span>
         )}
         {closed && <span className="pm-tile-status"><status.Icon size={11} /> {status.label}</span>}
       </span>

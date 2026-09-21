@@ -39,7 +39,6 @@ import {
 import { CameraIcon, PiggyBankIcon } from '@/components/icons/NavIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
 import { TargetIcon } from '@/components/icons/PlanIcon';
-import { daysLabel } from '@/features/calendar/calendarUtils';
 import { fmtMoney } from '@/lib/money';
 import {
   PLAN_CATEGORIES,
@@ -48,10 +47,9 @@ import {
   PLAN_STATUS_ORDER,
 } from './planConstants';
 import {
-  daysUntilStart,
-  hasPreciseDate,
   isClosed,
   nextActiveStatus,
+  planCountdown,
   planDateLabel,
   readiness,
 } from './planModel';
@@ -147,7 +145,7 @@ export function PlanDetailsPage() {
   const cat = PLAN_CATEGORIES[plan.category];
   const status = PLAN_STATUSES[plan.status];
   const date = planDateLabel(plan);
-  const days = hasPreciseDate(plan) ? daysUntilStart(plan) : null;
+  const countdown = planCountdown(plan);
   const closed = isClosed(plan);
   const done = plan.status === 'done';
   const ready = readiness(tasks);
@@ -227,12 +225,14 @@ export function PlanDetailsPage() {
             ) : (
               <>
                 <span className="pmap-value">{date}</span>
-                {days !== null && (
+                {countdown !== null && (
                   <span
                     className="pmap-pill"
-                    data-tone={closed ? 'past' : days < 0 ? 'overdue' : undefined}
+                    data-tone={
+                      closed ? 'past' : countdown.phase === 'past' ? 'overdue' : undefined
+                    }
                   >
-                    {daysLabel(days)}
+                    {countdown.label}
                   </span>
                 )}
               </>

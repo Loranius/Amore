@@ -6,9 +6,8 @@
 // клікабельна. Той самий патерн, що в картці місця на карті.
 // ============================================================
 import { Link } from 'react-router-dom';
-import { daysLabel } from '@/features/calendar/calendarUtils';
 import { PLAN_CATEGORIES, PLAN_STATUSES } from './planConstants';
-import { daysUntilStart, hasPreciseDate, isClosed, planDateLabel } from './planModel';
+import { isClosed, planCountdown, planDateLabel } from './planModel';
 import type { PlanRow } from '@/types';
 
 export function PlanCard({ plan, onConfirm }: {
@@ -19,12 +18,13 @@ export function PlanCard({ plan, onConfirm }: {
   const cat = PLAN_CATEGORIES[plan.category];
   const status = PLAN_STATUSES[plan.status];
   const date = planDateLabel(plan);
-  // Відлік лише для точної дати: див. hasPreciseDate.
-  const days = hasPreciseDate(plan) ? daysUntilStart(plan) : null;
+  // Відлік, його підпис і фаза — одна відповідь на всі три місця, де це
+  // показують (`planCountdown`). Тут лишається саме рішення про показ.
+  const countdown = planCountdown(plan);
   const closed = isClosed(plan);
   // Прострочене показуємо лише поки план у роботі: у виконаного
   // «−9 днів» означало б докір за те, що вже зроблено.
-  const overdue = !closed && days !== null && days < 0;
+  const overdue = !closed && countdown?.phase === 'past';
 
   return (
     <article className={`plan-card${closed ? ' plan-card--closed' : ''}`}>
@@ -47,9 +47,9 @@ export function PlanCard({ plan, onConfirm }: {
         <div className="plan-card-meta">
           {date && <span>{date}</span>}
           {plan.location_name && <span>{plan.location_name}</span>}
-          {days !== null && !closed && (
+          {countdown !== null && !closed && (
             <span className={overdue ? 'plan-card-overdue' : 'plan-card-when'}>
-              {daysLabel(days)}
+              {countdown.label}
             </span>
           )}
         </div>
