@@ -53,8 +53,23 @@ async function rescueOversizedOriginal(url: string, targetPx: number): Promise<B
   if (!response.ok) return null;
   const source = await response.blob();
   const bitmap = await createImageBitmap(source, {
+    /*
+     * СТОРОНА ОДНА, І ЦЕ ВИПРАВЛЕННЯ.
+     *
+     * Тут стояли ОБИДВІ — `resizeWidth` і `resizeHeight` з тим самим
+     * числом, — а це не «вписати в квадрат», це «стиснути рівно в ці
+     * числа». Виміряно в справжньому Chromium на знімку 200×100:
+     * обидві сторони по 64 дають 64×64, тобто пропорції гинуть; сама
+     * лише ширина дає 64×32.
+     *
+     * Тобто кожне неквадратне фото, яке доходило до рятунку, лягало на
+     * екран розплющеним. Помітно це було рівно там, де рятунок і потрібен
+     * — на великих знімках у повний екран.
+     *
+     * Довгу сторону доводить до межі полотно нижче: до нього доїжджає вже
+     * маленький растр, тож це безкоштовно.
+     */
     resizeWidth: targetPx,
-    resizeHeight: targetPx,
     resizeQuality: 'medium',
     /*
      * ОРІЄНТАЦІЯ ЗАДАЄТЬСЯ ЯВНО, і це не педантизм.
@@ -72,12 +87,21 @@ async function rescueOversizedOriginal(url: string, targetPx: number): Promise<B
     imageOrientation: 'from-image',
   });
   try {
+    // Портретний знімок після `resizeWidth` лишається вищим за межу —
+    // доводимо довгу сторону тут.
+    let w = bitmap.width;
+    let h = bitmap.height;
+    if (h > targetPx) {
+      const r = targetPx / h;
+      w = Math.max(1, Math.round(w * r));
+      h = Math.max(1, Math.round(h * r));
+    }
     const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
+    canvas.width = w;
+    canvas.height = h;
     const ctx = canvas.getContext('2d');
     if (!ctx) return null;
-    ctx.drawImage(bitmap, 0, 0);
+    ctx.drawImage(bitmap, 0, 0, w, h);
     return await new Promise<Blob | null>((resolve) => {
       canvas.toBlob(resolve, 'image/jpeg', 0.82);
     });

@@ -191,6 +191,111 @@ export function jpegEquivalent(webpQuality: number): number {
   return Math.min(JPEG_CEILING, safe + JPEG_OVER_WEBP);
 }
 
+/** Полотно потрібного розміру → блоб. Спільний хвіст обох шляхів. */
+function encode(
+  draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
+  w: number,
+  h: number,
+  quality: number,
+): Promise<CompressResult> {
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return Promise.reject(new Error('canvas 2d context недоступний'));
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  draw(ctx, w, h);
+
+  const useWebp = supportsWebp();
+  const type = useWebp ? 'image/webp' : 'image/jpeg';
+  const ext = useWebp ? 'webp' : 'jpg';
+  const chosen = useWebp ? quality : jpegEquivalent(quality);
+  return new Promise<CompressResult>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve({ blob, ext, contentType: type }) : reject(new Error('toBlob failed'))),
+      type,
+      chosen,
+    );
+  });
+}
+
+/**
+ * ЗАПАСНИЙ ШЛЯХ ДЛЯ ВЕЛЕТНІВ: декодувати ОДРАЗУ в потрібний розмір.
+ *
+ * Головний шлях (нижче) читає файл у `<img>`, тобто розпаковує ВЕСЬ
+ * растр у пам'ять, щоб потім намалювати з нього кадр 1600 пікселів
+ * завширшки. На знімку 6144×8160 — а такий у архіві пари є, 50
+ * мегапікселів і 11.4 МБ — це 200 МБ самого лише растру.
+ *
+ * ЧЕСНА МЕЖА: чому саме той знімок не стиснувся на телефоні пари, ми
+ * НЕ знаємо — помилки з того телефона немає, є лише оригінал у сховищі.
+ * Пам'ять — здогад, і він тут названий здогадом. Твердо відомо інше:
+ * стиснення впало, а старий код на це відповідав тим, що клав у сховище
+ * оригінал. Цей шлях існує, щоб на падіння відповідати спробою, а не
+ * капітуляцією, — хай би яка була причина.
+ *
+ * `createImageBitmap` із `resizeWidth` просить браузер віддати вже
+ * зменшене зображення, не тримаючи повного растру. Перевірено на живому
+ * модулі в справжньому Chromium зі зламаним головним декодером:
+ * 4000×3000 доходить сюди й виходить **1600×1200**.
+ *
+ * ЧИСЛА В МІЛІСЕКУНДАХ ТУТ НЕ ЗАПИСАНІ НАВМИСНО. Єдиний браузер, який у
+ * цій пісочниці є, малює програмно, і час у ньому йде приблизно вдвадцятеро
+ * повільніше (пастка №7 у `scripts/live/README.md`). Виміряти, що саме
+ * швидше, тут можна; сказати, скільки це на телефоні пари, — ні.
+ *
+ * ЧОМУ ЦЕ ЗАПАСНИЙ ШЛЯХ, А НЕ ГОЛОВНИЙ. `resizeWidth` працює в обидва
+ * боки: знімок 400×300 він РОЗТЯГНЕ до 1600×1200, і ми поклали б у
+ * сховище більший файл, ніж принесли. Дізнатись справжні сторони
+ * наперед можна лише декодуванням, тобто тим самим, чого ми уникаємо.
+ * Тому порядок такий: спершу чесний шлях, який ніколи не збільшує, а
+ * коли він не впорався — цей.
+ *
+ * Той самий прийом уже живе в `components/ui/Photo.tsx` (рятунок
+ * завеликого оригіналу) і той самий порядок «два декодери по черзі» —
+ * у `normalize` вище: різні файли валять різні декодери.
+ *
+ * ШИРИНА ЗАДАЄТЬСЯ ОДНА. Якщо передати обидві сторони, браузер стискає
+ * зображення саме в ці числа й **пропорції гинуть**: 200×100 при обох
+ * сторонах по 64 дає рівно 64×64, а сама лише ширина — 64×32. Довгу
+ * сторону доводить до межі вже полотно, і це безкоштовно: до нього
+ * доїжджає вже маленький растр.
+ *
+ * Перевірено на цьому модулі, а не на здогаді: зі зламаним `<img>`
+ * знімок 200×100 виходить звідси **1600×800**, а 100×200 — **800×1600**.
+ * З двома сторонами обидва дали б 1600×1600.
+ */
+async function compressViaBitmap(
+  file: Blob,
+  maxSide: number,
+  quality: number,
+): Promise<CompressResult> {
+  if (typeof createImageBitmap !== 'function') {
+    throw new Error('createImageBitmap недоступний');
+  }
+  const bitmap = await createImageBitmap(file, {
+    resizeWidth: maxSide,
+    resizeQuality: 'high',
+    // Орієнтація явно — з тієї ж причини, що й у `Photo.tsx`: типове
+    // значення міняли між редакціями специфікації, і без цього рядка
+    // знімок міг лягти поверненим на 90° лише на частині браузерів.
+    imageOrientation: 'from-image',
+  });
+  try {
+    let w = bitmap.width;
+    let h = bitmap.height;
+    if (h > maxSide) {
+      const r = maxSide / h;
+      w = Math.round(w * r);
+      h = Math.round(h * r);
+    }
+    return await encode((ctx, cw, ch) => ctx.drawImage(bitmap, 0, 0, cw, ch), w, h, quality);
+  } finally {
+    bitmap.close();
+  }
+}
+
 export function compress(
   file: File,
   maxSide = 1280,
@@ -200,47 +305,48 @@ export function compress(
   return normalize(file).then(
     (normalized) =>
       new Promise<CompressResult>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = reject;
-        reader.onload = (e) => {
-          const img = new Image();
-          img.onerror = reject;
-          img.onload = () => {
-            let w = img.naturalWidth;
-            let h = img.naturalHeight;
-            if (w > maxSide || h > maxSide) {
-              const r = Math.min(maxSide / w, maxSide / h);
-              w = Math.round(w * r);
-              h = Math.round(h * r);
-            }
-            const canvas = document.createElement('canvas');
-            canvas.width = w;
-            canvas.height = h;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) {
-              reject(new Error('canvas 2d context недоступний'));
-              return;
-            }
-            ctx.imageSmoothingEnabled = true;
-            ctx.imageSmoothingQuality = 'high';
-            ctx.drawImage(img, 0, 0, w, h);
-
-            const useWebp = supportsWebp();
-            const type = useWebp ? 'image/webp' : 'image/jpeg';
-            const ext = useWebp ? 'webp' : 'jpg';
-            const chosen = useWebp ? quality : jpegEquivalent(quality);
-            canvas.toBlob(
-              (blob) =>
-                blob
-                  ? resolve({ blob, ext, contentType: type })
-                  : reject(new Error('toBlob failed')),
-              type,
-              chosen,
-            );
-          };
-          img.src = e.target?.result as string;
+        /*
+         * Об'єктний URL, а не читання файлу в рядок base64.
+         *
+         * Base64 роздуває файл приблизно на третину: 11 МБ знімка ставали
+         * рядком на ~14.5 МБ, який мусив лежати в пам'яті ПОРУЧ із
+         * розпакованим растром. Об'єктний URL не копіює нічого.
+         */
+        const url = URL.createObjectURL(normalized);
+        const img = new Image();
+        const done = <T,>(fn: (value: T) => void) => (value: T) => {
+          URL.revokeObjectURL(url);
+          fn(value);
         };
-        reader.readAsDataURL(normalized);
-      }),
+        const fail = done(reject);
+        img.onerror = () => fail(new Error('не вдалося прочитати зображення'));
+        img.onload = () => {
+          let w = img.naturalWidth;
+          let h = img.naturalHeight;
+          if (w > maxSide || h > maxSide) {
+            const r = Math.min(maxSide / w, maxSide / h);
+            w = Math.round(w * r);
+            h = Math.round(h * r);
+          }
+          encode((ctx, cw, ch) => ctx.drawImage(img, 0, 0, cw, ch), w, h, quality)
+            .then(done(resolve), fail);
+        };
+        img.src = url;
+      })
+        /*
+         * НЕ ЗДАЄМОСЬ МОВЧКИ — І НЕ ЗДАЄМОСЬ ОРИГІНАЛОМ.
+         *
+         * Тут закінчувалось усе, а троє викликачів ловили помилку й лили
+         * в сховище ОРИГІНАЛ, пишучи про це лише в консоль. Пара не
+         * бачила нічого, а в сховищі осідав знімок на 11 МБ, який
+         * Supabase відмовляється трансформувати («The source image
+         * resolution is too large to process»), тож кожен показ коштував
+         * рятівного декодування в `Photo.tsx`: браузер розпаковує всі
+         * 50 мегапікселів заради кадру 96 пікселів завширшки.
+         *
+         * Тепер невдача головного шляху — привід СПРОБУВАТИ ІНАКШЕ, а не
+         * привід підсунути те, чого портал не вміє показати.
+         */
+        .catch(() => compressViaBitmap(normalized, maxSide, quality)),
   );
 }

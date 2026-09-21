@@ -68,21 +68,18 @@ export function usePolaroidMutations() {
   const toast = useToast();
   const invalidate = () => void client.invalidateQueries({ queryKey: qk.photos() });
 
-  /** HEIC → normalize, потім compress (із фолбеком на оригінал). */
+  /**
+   * HEIC → normalize, потім compress. Без фолбека на оригінал.
+   *
+   * Фолбек тут був, і був тихим: `console.warn` і 11 МБ у сховище. Пара
+   * дізнавалась про це ніяк, а портал такий знімок трансформувати не
+   * вміє. Тепер другий декодер пробує сам `compress`, а справжня невдача
+   * доходить до `onError` і до тоста.
+   */
   const upload = useMutation({
     mutationFn: async (file: File): Promise<void> => {
       const normalized = await normalize(file);
-      let blob: Blob = normalized;
-      let ext = (normalized.name.split('.').pop() || 'jpg').toLowerCase();
-      let contentType = normalized.type;
-      try {
-        const out = await compress(normalized, 1280, 0.78);
-        blob = out.blob;
-        ext = out.ext;
-        contentType = out.contentType;
-      } catch (e) {
-        console.warn('usePolaroidMutations upload: стиснення не вдалося, ллю оригінал', e);
-      }
+      const { blob, ext, contentType } = await compress(normalized, 1280, 0.78);
       /*
        * Випадковий хвіст в імені — не косметика: дві фотографії, вибрані
        * в одну мілісекунду (а мультизавантаження робить саме це), інакше

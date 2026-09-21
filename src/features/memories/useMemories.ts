@@ -120,17 +120,20 @@ async function rollbackUploadedMemory(memory: MemoryRow): Promise<void> {
  * файл масового імпорту — дві копії розійшлися б.
  */
 async function uploadOne(input: UploadMemoryInput): Promise<MemoryRow> {
-  let blob: Blob = input.file;
-  let ext = 'jpg';
-  let contentType = 'image/jpeg';
-  try {
-    const out = await compress(input.file, 1600, 0.84);
-    blob = out.blob;
-    ext = out.ext;
-    contentType = out.contentType;
-  } catch (e) {
-    console.warn('[Спогади] стиснення не вдалося, вантажу оригінал:', e);
-  }
+  /*
+   * БЕЗ ТИХОГО ЗАПАСНОГО ШЛЯХУ.
+   *
+   * Тут стояло `catch → вантажу оригінал` із `console.warn`. Пара про це
+   * не дізнавалась, а в сховищі осідав знімок на 11 МБ, який Supabase
+   * відмовляється трансформувати, — і кожен його показ коштував рятівного
+   * декодування в `Photo.tsx`. `CLAUDE.md` забороняє це прямо: «no silent
+   * fallbacks».
+   *
+   * Тепер `compress` сам пробує другий декодер (`compressViaBitmap`), а
+   * якщо не зміг і він — помилка йде нагору, і `onError` каже про неї
+   * парі. Спогад без придатного фото не створюється.
+   */
+  const { blob, ext, contentType } = await compress(input.file, 1600, 0.84);
 
   const memoryDate = normalizeMemoryDate(input.date, input.precision);
   const [y, m] = memoryDate.split('-');

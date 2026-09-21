@@ -14,7 +14,7 @@ import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, publicUrl } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
-import { compress, normalize } from '@/lib/images';
+import { compress } from '@/lib/images';
 import { reverseGeocode } from '@/lib/geo';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -35,32 +35,28 @@ export function useMapPins() {
   return useQuery({ queryKey: qk.mapPins(), queryFn: fetchPins });
 }
 
-/** Фото піна: HEIC → compress → Storage. Повертає URL або null. */
-export async function uploadPinPhoto(file: File, pinId: number): Promise<string | null> {
-  let normalized: File;
-  try {
-    normalized = await normalize(file);
-  } catch (e) {
-    console.error('uploadPinPhoto HEIC:', e);
-    return null;
-  }
-  let blob: Blob = normalized;
-  let ext = (normalized.name.split('.').pop() || 'jpg').toLowerCase();
-  let contentType = normalized.type;
-  try {
-    const out = await compress(normalized, 1080, 0.75);
-    blob = out.blob;
-    ext = out.ext;
-    contentType = out.contentType;
-  } catch (e) {
-    console.warn('uploadPinPhoto compress:', e);
-  }
+/**
+ * Фото піна: HEIC → compress → Storage. Повертає URL або КИДАЄ.
+ *
+ * Тут було три проковтнуті помилки поспіль: невдала конвертація HEIC —
+ * `console.error` і `null`; невдале стиснення — `console.warn` і
+ * ОРИГІНАЛ у сховище; невдале завантаження — знову `console.error` і
+ * `null`. Викликач бачив `null` і просто йшов далі, тож мітка зберігалась
+ * без фото, а пара не дізнавалась ані що фото не долетіло, ані чому.
+ *
+ * `null` як «щось пішло не так» не розрізняє причин і не лишає слідів.
+ * Тепер функція або віддає адресу, або кидає, а викликач вирішує, що з
+ * цим робити, — і в нього є що сказати парі.
+ *
+ * `normalize` тут більше немає: `compress` кличе його сам першим рядком.
+ */
+export async function uploadPinPhoto(file: File, pinId: number): Promise<string> {
+  const { blob, ext, contentType } = await compress(file, 1080, 0.75);
   const path = `pin-${pinId}-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage.from(BUCKET).upload(path, blob, { upsert: true, contentType });
-  if (error) {
-    console.error('uploadPinPhoto:', error);
-    return null;
-  }
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, blob, { upsert: true, contentType });
+  if (error) throw error;
   return publicUrl(BUCKET, path);
 }
 
@@ -110,9 +106,19 @@ export function useMapPinMutations() {
       const { data, error } = await supabase.from('map_pins').insert(row).select('id').single();
       if (error || !data) throw error ?? new Error('insert failed');
 
+      /*
+       * Мітка ВЖЕ в базі, тож падіння фото не має вдавати, що місце не
+       * збереглося: `onError` сказав би «Помилка збереження місця», і це
+       * була б неправда. Ловимо рівно крок із фото й кажемо про нього.
+       */
       if (v.file) {
-        const url = await uploadPinPhoto(v.file, data.id);
-        if (url) await supabase.from('map_pins').update({ photo_url: url }).eq('id', data.id);
+        try {
+          const url = await uploadPinPhoto(v.file, data.id);
+          await supabase.from('map_pins').update({ photo_url: url }).eq('id', data.id);
+        } catch (e) {
+          console.error('uploadPinPhoto:', e);
+          toast.show('Місце збережено, але фото не вдалося підготувати');
+        }
       }
       const { data: fresh } = await supabase
         .from('map_pins')
