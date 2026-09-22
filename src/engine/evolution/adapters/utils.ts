@@ -6,7 +6,7 @@ import type {
   EvolutionAdapterResult,
   EvolutionAdapterSource,
 } from './types';
-import { byCodePoint } from '../../ordering';
+import { byCodePoint, byNormalizedText } from '../../ordering';
 
 export function emptyAdapterResult(): EvolutionAdapterResult {
   return { events: [], diagnostics: [] };
@@ -54,7 +54,12 @@ export function compareAdapterDiagnostics(left: AdapterDiagnostic, right: Adapte
   return byCodePoint(left.source, right.source)
     || byCodePoint(left.recordId, right.recordId)
     || byCodePoint(left.code, right.code)
-    || byCodePoint(left.message, right.message);
+    /*
+     * ПОВІДОМЛЕННЯ — ЛЮДСЬКИЙ ТЕКСТ, а не ключ: діагностика пишеться
+     * українською й приходить із чужих адаптерів. Решта трьох полів —
+     * ідентифікатори, які склав сам портал, тож їм вистачає кодових точок.
+     */
+    || byNormalizedText(left.message, right.message);
 }
 
 export function compareEvolutionInputs(left: EvolutionEventInput, right: EvolutionEventInput): number {

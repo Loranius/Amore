@@ -19,7 +19,7 @@
 import * as THREE from 'three';
 import { boundsOverlap, breatheMargin, isInsideHost, type HostSolid } from './hostBody';
 import { triangleInside, worldVertices } from './junctionTrim';
-import { byCodePoint } from '@/engine/ordering';
+import { byCodePoint, byNormalizedText } from '@/engine/ordering';
 
 export type ShellViolationKind =
   /** Тіло посилається на господаря, якого немає в опублікованій масі. */
@@ -386,7 +386,8 @@ export function probeJunctions(
       }
     }
   }
-  violations.sort((a, b) => byCodePoint(a.key, b.key) || byCodePoint(a.detail, b.detail));
+  // `detail` — українське речення, `key` — ідентифікатор тіла.
+  violations.sort((a, b) => byCodePoint(a.key, b.key) || byNormalizedText(a.detail, b.detail));
   return violations;
 }
 

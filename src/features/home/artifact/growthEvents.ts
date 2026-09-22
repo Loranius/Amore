@@ -34,7 +34,7 @@ import { daysBetween } from '../homeUtils';
 import type { CrystalWish } from '../useCrystal';
 import type { ArtifactInput, DatedItem, DepositionEvent, GrowthDomainId, NodeKind } from './artifactTypes';
 import { hashSeedString } from '../mulberry32';
-import { byCodePoint } from '@/engine/ordering';
+import { byCodePoint, byNormalizedText } from '@/engine/ordering';
 
 interface Bucket {
   /** Абсолютний (не після зрізання капом) індекс — саме він і йде в key, тому
@@ -163,7 +163,13 @@ function buildBedrockStream(daysTogether: number): DepositionStream {
   }
 
   // Стабільне злиття: день народження, tie-break за key (обидва незмінні).
-  timed.sort((a, b) => a.birthDay - b.birthDay || byCodePoint(a.event.key, b.event.key));
+  /*
+     `key` тут не завжди машинний: у стрімах місць він складений із НАЗВИ
+     (`${kind}-${p.name}`), тож зводимо до тієї самої форми, що й сама
+     назва вище. Інакше два сорти над тими самими даними могли б
+     розійтись — рівно та вада, яку ADR-0202 уже ловив у календарях.
+  */
+  timed.sort((a, b) => a.birthDay - b.birthDay || byNormalizedText(a.event.key, b.event.key));
   return { id: 'bedrock', events: timed.map((t) => t.event) };
 }
 
@@ -184,7 +190,13 @@ function buildPlaceStream(
   const [radiusMin, radiusRange] = kind === 'country' ? [0.15, 0.06] : [0.1, 0.045];
   // Ранг у стрімі: (перший візит, назва) — у CrystalPlace немає id БД.
   const events = [...places.slice(0, cap)]
-    .sort((a, b) => byCodePoint(a.firstVisit, b.firstVisit) || byCodePoint(a.name, b.name))
+    /*
+     * НАЗВА МІСТА — ЛЮДСЬКИЙ ТЕКСТ, і саме цей сорт був найдорожчою
+     * знахідкою ADR-0205: `Їжаківка` та `Ізмаїл` міняються місцями між
+     * `en-US` і `uk-UA`, а цей порядок задає ранг шпиля навколо монарха.
+     * `firstVisit` — ISO-дата, їй вистачає кодових точок.
+     */
+    .sort((a, b) => byCodePoint(a.firstVisit, b.firstVisit) || byNormalizedText(a.name, b.name))
     .map((p): DepositionEvent => ({
       key: `${kind}-${p.name}`,
       kind,
