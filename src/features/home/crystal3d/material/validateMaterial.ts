@@ -37,6 +37,7 @@ import { distanceOutsideHost, type HostSolid } from '../geometry/hostBody';
 import { worldVertices } from '../geometry/junctionTrim';
 import type { ClusterBranch, ClusterMaterial } from '../crystalCluster';
 import { bindMaterialRegions, type MaterialRegion, type MaterialRegionStats } from './crystalMaterial';
+import { byCodePoint } from '@/engine/ordering';
 
 export type MaterialViolationKind =
   | 'unbound-material'
@@ -140,7 +141,7 @@ export function validateMaterialRegions(
     }
   }
 
-  violations.sort((a, b) => a.key.localeCompare(b.key) || a.kind.localeCompare(b.kind));
+  violations.sort((a, b) => byCodePoint(a.key, b.key) || byCodePoint(a.kind, b.kind));
   return violations;
 }
 

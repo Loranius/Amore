@@ -29,6 +29,7 @@ import {
   treeTrunkHeightScale,
   treeTrunkRadiusScale,
 } from './growthLaw';
+import { byCodePoint } from '../../ordering';
 
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
 
@@ -319,7 +320,7 @@ export function buildTreeGrowthInstructions(
     artifact,
     year.index + 1,
     yearFactsOf(artifact, year, asOfEpoch),
-  )).sort((left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id));
+  )).sort((left, right) => left.sequence - right.sequence || byCodePoint(left.id, right.id));
 
   return {
     growth,

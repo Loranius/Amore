@@ -25,6 +25,7 @@ import { bodyMaterialProps, materialSignature } from '../material/bodyMaterial';
 import { DEFAULT_GFX, type GfxProfile } from './gfxProfile';
 import { applySkyReflection } from './skyReflection';
 import { buildStudioEnvMap } from './envMap';
+import { byCodePoint } from '@/engine/ordering';
 
 export interface BodyBatch {
   /** Ключ матеріалу — стабільний, придатний як React-key. */
@@ -74,7 +75,7 @@ export function buildBodyBatches(
   const envMap = gfx.env ? buildStudioEnvMap() : null;
 
   return [...groups.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => byCodePoint(a, b))
     .map(([signature, group]) => {
       // BatchedMesh вимагає стелі буферів наперед — рахуємо точно, бо весь
       // набір геометрій уже відомий (нічого не додається в рантаймі).

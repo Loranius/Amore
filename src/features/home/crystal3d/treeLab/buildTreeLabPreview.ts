@@ -128,6 +128,7 @@ import {
   buildTreeSpeciesPreviewArtifact,
   TREE_SPECIES_PREVIEW_AS_OF,
 } from './treeSpeciesFixture';
+import { byCodePoint } from '@/engine/ordering';
 
 const TREE_FIXTURE_RULES_VERSION = 'tree-species-preview-v1.0.0';
 
@@ -201,7 +202,7 @@ function scalarFingerprint(value: unknown): string {
 
   const tokens: string[] = [];
   const visit = (prefix: string, source: Record<string, unknown>) => {
-    for (const [key, entry] of Object.entries(source).sort(([left], [right]) => left.localeCompare(right))) {
+    for (const [key, entry] of Object.entries(source).sort(([left], [right]) => byCodePoint(left, right))) {
       if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
         tokens.push(`${prefix}${key}:${String(entry)}`);
       } else if (Array.isArray(entry)) {

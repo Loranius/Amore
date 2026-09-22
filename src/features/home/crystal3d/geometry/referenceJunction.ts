@@ -11,6 +11,7 @@ import { mergeVertices } from 'three/addons/utils/BufferGeometryUtils.js';
 import type { ClusterBranch } from '../crystalCluster';
 import type { HostSolid } from './hostBody';
 import type { LodLevel } from './lod';
+import { byCodePoint } from '@/engine/ordering';
 
 interface JunctionBudget {
   readonly resolution: number;
@@ -164,7 +165,7 @@ function selectSource(
       const b = solids.get(right.key)!;
       const av = a.profile.r * a.profile.r * a.profile.h;
       const bv = b.profile.r * b.profile.r * b.profile.h;
-      return bv - av || left.key.localeCompare(right.key);
+      return bv - av || byCodePoint(left.key, right.key);
     })[0] ?? null;
 }
 

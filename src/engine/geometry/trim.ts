@@ -13,6 +13,7 @@ import type {
   CrystalMeshData,
   CrystalSolid,
 } from './types';
+import { byCodePoint } from '../ordering';
 
 function vertexAt(positions: readonly number[], index: number): GrowthVec3 {
   return {
@@ -204,7 +205,7 @@ export function trimCrystalMesh(
 ): CrystalMeshData {
   const candidates = solids
     .filter((solid) => solid.body.id !== self.body.id && boundsOverlap(self, solid, config.hiddenFaceEpsilon))
-    .sort((left, right) => left.body.id.localeCompare(right.body.id));
+    .sort((left, right) => byCodePoint(left.body.id, right.body.id));
   const kept: number[] = [];
   // Face identifiers are per triangle, so dropping a triangle has to drop its
   // identifier in the same step. Rebuilding them afterwards from the index list

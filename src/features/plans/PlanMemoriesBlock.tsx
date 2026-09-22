@@ -20,6 +20,7 @@ import {
   usePlanLinks,
 } from './usePlanLinks';
 import type { PlanRow } from '@/types';
+import { byCodePoint } from '@/engine/ordering';
 
 
 function memoryDateForPlan(plan: PlanRow): string {
@@ -64,7 +65,7 @@ export function PlanMemoriesBlock({
   const memories = useMemo(
     () => linkedMemories
       .slice()
-      .sort((left, right) => left.memory_date.localeCompare(right.memory_date) || left.id - right.id),
+      .sort((left, right) => byCodePoint(left.memory_date, right.memory_date) || left.id - right.id),
     [linkedMemories],
   );
   const pending = linksPending || (memoryIds.length > 0 && linkedMemoriesPending);

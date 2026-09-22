@@ -34,6 +34,7 @@ import { daysBetween } from '../homeUtils';
 import type { CrystalWish } from '../useCrystal';
 import type { ArtifactInput, DatedItem, DepositionEvent, GrowthDomainId, NodeKind } from './artifactTypes';
 import { hashSeedString } from '../mulberry32';
+import { byCodePoint } from '@/engine/ordering';
 
 interface Bucket {
   /** Абсолютний (не після зрізання капом) індекс — саме він і йде в key, тому
@@ -52,7 +53,7 @@ interface Bucket {
  * багато сирих рядків в одне відкладення» під принципом «ніколи не перебудовувати».
  */
 export function bucketByFixedSize(items: readonly DatedItem[], bucketSize: number): Bucket[] {
-  const sorted = [...items].sort((a, b) => a.date.localeCompare(b.date));
+  const sorted = [...items].sort((a, b) => byCodePoint(a.date, b.date));
   const buckets: Bucket[] = [];
   let bucketIndex = 0;
   for (let i = 0; i < sorted.length; i += bucketSize, bucketIndex++) {
@@ -162,7 +163,7 @@ function buildBedrockStream(daysTogether: number): DepositionStream {
   }
 
   // Стабільне злиття: день народження, tie-break за key (обидва незмінні).
-  timed.sort((a, b) => a.birthDay - b.birthDay || a.event.key.localeCompare(b.event.key));
+  timed.sort((a, b) => a.birthDay - b.birthDay || byCodePoint(a.event.key, b.event.key));
   return { id: 'bedrock', events: timed.map((t) => t.event) };
 }
 
@@ -183,7 +184,7 @@ function buildPlaceStream(
   const [radiusMin, radiusRange] = kind === 'country' ? [0.15, 0.06] : [0.1, 0.045];
   // Ранг у стрімі: (перший візит, назва) — у CrystalPlace немає id БД.
   const events = [...places.slice(0, cap)]
-    .sort((a, b) => a.firstVisit.localeCompare(b.firstVisit) || a.name.localeCompare(b.name))
+    .sort((a, b) => byCodePoint(a.firstVisit, b.firstVisit) || byCodePoint(a.name, b.name))
     .map((p): DepositionEvent => ({
       key: `${kind}-${p.name}`,
       kind,

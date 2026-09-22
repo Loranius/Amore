@@ -3,6 +3,7 @@ import type {
   MemoryLinkSource,
   WishlistSource,
 } from '@/engine/evolution/adapters';
+import { byCodePoint } from '@/engine/ordering';
 
 const ALLOWED_MEMORY_SOURCES = new Set(['wish', 'place', 'goal', 'event']);
 
@@ -81,7 +82,7 @@ export function buildEvolutionMemoryLinks(
   }
   return links.sort((left, right) =>
     left.memoryId - right.memoryId
-      || left.sourceType.localeCompare(right.sourceType)
+      || byCodePoint(left.sourceType, right.sourceType)
       || left.sourceId - right.sourceId,
   );
 }

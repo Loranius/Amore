@@ -11,6 +11,7 @@ import { daysLabel } from '@/features/calendar/calendarUtils';
 import { MONTHS_UA_GENITIVE } from '@/features/_shared/month';
 import { PLAN_STATUSES, PLAN_STATUS_ORDER } from './planConstants';
 import type { PlanRow, PlanStatus, PlanTaskRow } from '@/types';
+import { byCodePoint } from '@/engine/ordering';
 
 /** Чи план уже не в роботі (виконаний, відкладений або скасований). */
 export function isClosed(plan: PlanRow): boolean {
@@ -190,7 +191,7 @@ export function sortPlans(plans: readonly PlanRow[], today = new Date()): PlanRo
       if (aPast !== bPast) return aPast ? 1 : -1;
       if (da !== db) return da - db;
     }
-    return b.created_at.localeCompare(a.created_at);
+    return byCodePoint(b.created_at, a.created_at);
   });
 }
 

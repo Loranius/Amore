@@ -17,6 +17,7 @@ import type {
   CrystalCompositionState,
   CrystalSilhouette,
 } from './types';
+import { byCodePoint } from '../ordering';
 
 const TAU = Math.PI * 2;
 
@@ -240,7 +241,7 @@ export function buildCrystalComposition(
   validateInput(input);
   const rootCandidates = input.growth.bodies.filter((body) => body.generation === 0 || body.tier === 'king');
   const root = [...rootCandidates].sort(
-    (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
+    (left, right) => left.sequence - right.sequence || byCodePoint(left.id, right.id),
   )[0] ?? input.growth.bodies[0]!;
   const axis = roundVec(root.direction);
   const { tangent, bitangent } = orthonormalBasis(axis);

@@ -6,6 +6,7 @@ import type {
   EvolutionAdapterResult,
   EvolutionAdapterSource,
 } from './types';
+import { byCodePoint } from '../../ordering';
 
 export function emptyAdapterResult(): EvolutionAdapterResult {
   return { events: [], diagnostics: [] };
@@ -50,16 +51,16 @@ export function withPressure(
 }
 
 export function compareAdapterDiagnostics(left: AdapterDiagnostic, right: AdapterDiagnostic): number {
-  return left.source.localeCompare(right.source)
-    || left.recordId.localeCompare(right.recordId)
-    || left.code.localeCompare(right.code)
-    || left.message.localeCompare(right.message);
+  return byCodePoint(left.source, right.source)
+    || byCodePoint(left.recordId, right.recordId)
+    || byCodePoint(left.code, right.code)
+    || byCodePoint(left.message, right.message);
 }
 
 export function compareEvolutionInputs(left: EvolutionEventInput, right: EvolutionEventInput): number {
-  return left.occurredAt.localeCompare(right.occurredAt)
-    || left.source.localeCompare(right.source)
-    || left.id.localeCompare(right.id);
+  return byCodePoint(left.occurredAt, right.occurredAt)
+    || byCodePoint(left.source, right.source)
+    || byCodePoint(left.id, right.id);
 }
 
 export function mergeAdapterResults(results: readonly EvolutionAdapterResult[]): EvolutionAdapterResult {

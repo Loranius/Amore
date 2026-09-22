@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
+import { byCodePoint } from '@/engine/ordering';
 
 export interface EvolutionRuntimeMetrics {
   frames: number;
@@ -92,7 +93,7 @@ function sceneComposition(scene: { traverseVisible: (fn: (node: unknown) => void
     }
   });
   return [...counts.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
+    .sort(([left], [right]) => byCodePoint(left, right))
     .map(([kind, count]) => `${kind}:${count}`)
     .join(',');
 }

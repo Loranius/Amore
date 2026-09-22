@@ -20,6 +20,7 @@ import type {
   OrganicSurfaceConfig,
   OrganicSweepMesh,
 } from './surfaceTypes';
+import { byCodePoint } from '../../ordering';
 
 interface JunctionGroup {
   key: string;
@@ -153,7 +154,7 @@ function collectJunctionGroups(frameState: OrganicCurveFrameState): JunctionGrou
     result.push({
       key,
       parent,
-      children: [...children].sort((left, right) => left.branchId.localeCompare(right.branchId)),
+      children: [...children].sort((left, right) => byCodePoint(left.branchId, right.branchId)),
       anchor,
       parentRadius: firstJunction.parentRadius,
       terminal,
@@ -191,7 +192,7 @@ function visibleJunctionGroups(
     .filter((group) => group.parentRadius >= maximumRadius * minimumRatio)
     .sort((left, right) => (
       right.parentRadius - left.parentRadius
-      || left.key.localeCompare(right.key)
+      || byCodePoint(left.key, right.key)
     ))
     .slice(0, MAX_PATCHES_BY_LOD[lod]);
 }

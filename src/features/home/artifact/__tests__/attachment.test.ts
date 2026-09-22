@@ -18,6 +18,7 @@ import {
 } from '../index';
 import { hashSeedString } from '../../mulberry32';
 import { dot, lengthOf, v3 } from '../vec3';
+import { byCodePoint } from '@/engine/ordering';
 
 const SEED = '8264-3607-EEA8';
 const NOW = new Date('2026-07-21T12:00:00');
@@ -159,7 +160,7 @@ describe('AttachmentJunction — CAI-REQ-004', () => {
 
   it('порядок junction-ів канонічний (за junctionId)', () => {
     const ids = runGrowth(makeInput()).junctions.map((j) => j.junctionId);
-    expect(ids).toEqual([...ids].sort((a, b) => a.localeCompare(b)));
+    expect(ids).toEqual([...ids].sort((a, b) => byCodePoint(a, b)));
     expect(new Set(ids).size).toBe(ids.length);
   });
 

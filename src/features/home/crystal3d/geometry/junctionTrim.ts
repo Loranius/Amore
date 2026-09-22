@@ -49,6 +49,7 @@
 // ============================================================
 import * as THREE from 'three';
 import { boundsOverlap, breatheMargin, isInsideHost, type HostSolid } from './hostBody';
+import { byCodePoint } from '@/engine/ordering';
 
 export interface TrimStats {
   key: string;
@@ -150,7 +151,7 @@ export function trimHiddenFaces(
   for (const solid of solids.values()) {
     if (solid.key !== self.key && boundsOverlap(self, solid)) candidates.push(solid);
   }
-  candidates.sort((a, b) => a.key.localeCompare(b.key));
+  candidates.sort((a, b) => byCodePoint(a.key, b.key));
   if (candidates.length === 0) {
     const stats = noTrim(self.key, hostKey, triangleCount);
     geometry.userData.trim = stats;

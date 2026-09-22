@@ -48,6 +48,7 @@
 import { mulberry32, hashSeedString } from '../../mulberry32';
 import { type Vec3, add, scale, normalize, lerpVec, dot, v3, perpendicularBasis } from '../vec3';
 import { scoreComposition, type CompositionScore } from './score';
+import { byCodePoint } from '@/engine/ordering';
 
 // Hierarchy Engine (Vol IV): рівно один фокус (king), далі support/family
 // (незалежні домінанти) → companion (супутники колоній) → micro (пил).
@@ -177,7 +178,7 @@ const keyedRng = (seedNum: number, tag: string): (() => number) => mulberry32(se
 function assignTiers(bodies: ComposedBody[]): void {
   const dominants = bodies
     .filter((b) => b.role === 'dominant' && !b.primary)
-    .sort((a, b) => volumeOf(b) - volumeOf(a) || a.key.localeCompare(b.key));
+    .sort((a, b) => volumeOf(b) - volumeOf(a) || byCodePoint(a.key, b.key));
   const supports = new Set(dominants.slice(0, 2).map((b) => b.key));
   for (const b of bodies) {
     b.tier = b.primary
@@ -330,7 +331,7 @@ function competitionPass(bodies: ComposedBody[], strength: number): void {
   // Абсолютний поріг об'єму (НЕ топ-N): участь тіла не залежить від сусідів.
   const large = bodies
     .filter((b) => !b.shielded && b.role !== 'micro' && volumeOf(b) > MIN_COMPETITOR_VOLUME)
-    .sort((a, b) => a.key.localeCompare(b.key));
+    .sort((a, b) => byCodePoint(a.key, b.key));
   for (let i = 0; i < large.length; i++) {
     for (let j = i + 1; j < large.length; j++) {
       const a = large[i]!;
@@ -423,7 +424,7 @@ function densityPass(bodies: ComposedBody[], seedNum: number, config: Compositio
     const allowance = Math.max(1, Math.round(maxSmallPerSector * (0.5 + richness[s]!) * (2 - strength)));
     if (list.length <= allowance) continue;
     const surplus = list
-      .sort((a, b) => volumeOf(a) - volumeOf(b) || a.key.localeCompare(b.key))
+      .sort((a, b) => volumeOf(a) - volumeOf(b) || byCodePoint(a.key, b.key))
       .slice(0, list.length - allowance);
     for (const b of surplus) removed.add(b.key);
   }
@@ -442,7 +443,7 @@ function microPass(bodies: ComposedBody[], seedNum: number, config: CompositionC
   const sectorCount = config.sectors.count;
   const parents = bodies
     .filter((b) => b.role === 'dominant' && volumeOf(b) > config.micro.minParentVolume)
-    .sort((a, b) => volumeOf(b) - volumeOf(a) || a.key.localeCompare(b.key));
+    .sort((a, b) => volumeOf(b) - volumeOf(a) || byCodePoint(a.key, b.key));
   const micro: ComposedBody[] = [];
   for (const parent of parents) {
     if (micro.length >= config.micro.globalCap) break;

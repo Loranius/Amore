@@ -17,6 +17,7 @@ import {
   bindMaterialRegions,
   type MaterialRegionStats,
 } from '../material/crystalMaterial';
+import { byCodePoint } from '@/engine/ordering';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const CAMERA_FRONT = new THREE.Vector3(0, 0, 1);
@@ -109,10 +110,10 @@ export function selectReferenceDisplaySources(
 
   const accentCandidates = leafEligible
     .filter((branch) => accentKeys.has(branch.key))
-    .sort((left, right) => left.key.localeCompare(right.key));
+    .sort((left, right) => byCodePoint(left.key, right.key));
   const smallestExtras = leafEligible
     .filter((branch) => !accentKeys.has(branch.key))
-    .sort((left, right) => volume(left) - volume(right) || left.key.localeCompare(right.key));
+    .sort((left, right) => volume(left) - volume(right) || byCodePoint(left.key, right.key));
 
   // Дециль — популяційна метрика. Фіксовані дев’ять шпилів достатні для
   // sparse/typical, але не для rich. Юбка тому масштабується разом з історією.
@@ -134,7 +135,7 @@ export function selectReferenceDisplaySources(
   const shortSet = new Set(shortSources.map((branch) => branch.key));
   const mediumSources = leafEligible
     .filter((branch) => branch.role !== 'micro' && !shortSet.has(branch.key))
-    .sort((left, right) => volume(right) - volume(left) || left.key.localeCompare(right.key))
+    .sort((left, right) => volume(right) - volume(left) || byCodePoint(left.key, right.key))
     .slice(0, MEDIUM_ANGLES.length);
 
   const selectedShort = shortSources.slice(0, targetShortCount);

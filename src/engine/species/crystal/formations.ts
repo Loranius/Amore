@@ -39,6 +39,7 @@ import type {
   CrystalGrowthInstruction,
   CrystalSpeciesDiagnostics,
 } from './types';
+import { byCodePoint } from '../../ordering';
 
 /**
  * The one body every colony has, whatever else it grew.
@@ -525,7 +526,7 @@ export function buildColonies(
     });
   }
 
-  colonies.sort((left, right) => left.epochIndex - right.epochIndex || left.channel.localeCompare(right.channel));
+  colonies.sort((left, right) => left.epochIndex - right.epochIndex || byCodePoint(left.channel, right.channel));
   return colonies;
 }
 

@@ -46,6 +46,11 @@ Canonical ordering uses an explicit comparator over normalized strings and numer
 
 Every unordered logical collection SHALL define a tie-breaker ending in a stable ID.
 
+The reference comparator is `byCodePoint` in `src/engine/ordering` (ADR-0205): it
+normalizes to NFC and then compares code points, so its answer depends on neither
+the environment locale nor the device's ICU version. `src/lib/noLocaleCompare.test.ts`
+enforces this clause by scanning `src/**` for the forbidden call.
+
 ## 5. Numbers
 
 Canonical numeric values SHALL:

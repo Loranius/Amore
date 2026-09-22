@@ -10,6 +10,7 @@
 import * as THREE from 'three';
 import { hashSeedString } from '../../mulberry32';
 import type { ClusterBranch } from '../crystalCluster';
+import { byCodePoint } from '@/engine/ordering';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const TAU = Math.PI * 2;
@@ -178,7 +179,7 @@ export function enforceReferenceDruseContract(
     .sort((left, right) => {
       const lv = left.height * left.radiusBottom * left.radiusBottom;
       const rv = right.height * right.radiusBottom * right.radiusBottom;
-      return lv - rv || left.key.localeCompare(right.key);
+      return lv - rv || byCodePoint(left.key, right.key);
     });
   const innerSatelliteKeys = new Set(satellites.slice(0, 2).map((branch) => branch.key));
 

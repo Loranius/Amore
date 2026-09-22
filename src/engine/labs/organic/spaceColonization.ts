@@ -18,6 +18,7 @@ import type {
   OrganicSkeletonNode,
   OrganicSkeletonState,
 } from './types';
+import { byCodePoint } from '../../ordering';
 
 interface HostSelection {
   node: OrganicSkeletonNode;
@@ -26,7 +27,7 @@ interface HostSelection {
 
 function sortedAttractors(attractors: readonly OrganicAttractor[]): OrganicAttractor[] {
   return [...attractors].sort(
-    (left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id),
+    (left, right) => left.sequence - right.sequence || byCodePoint(left.id, right.id),
   );
 }
 
@@ -110,7 +111,7 @@ function selectHost(
       (left, right) =>
         left.score - right.score
         || left.node.sequence - right.node.sequence
-        || left.node.id.localeCompare(right.node.id),
+        || byCodePoint(left.node.id, right.node.id),
     );
 
   return {

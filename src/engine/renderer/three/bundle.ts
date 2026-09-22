@@ -5,6 +5,7 @@ import type { CrystalLifeFrame } from '../../life';
 import type { CrystalBodyMaterial, CrystalMaterialState } from '../../material';
 import { createThreeCrystalGeometry } from './bufferGeometry';
 import { createThreeCrystalMaterial } from './material';
+import { byCodePoint } from '../../ordering';
 
 export interface ThreeCrystalBatch {
   signature: string;
@@ -67,7 +68,7 @@ function groupByMaterial(
   }
 
   return [...groups.values()].sort((left, right) =>
-    left.material.signature.localeCompare(right.material.signature),
+    byCodePoint(left.material.signature, right.material.signature),
   );
 }
 

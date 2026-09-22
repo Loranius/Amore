@@ -22,6 +22,7 @@ import * as THREE from 'three';
 import { boundsOverlap, breatheMargin, isInsideHost } from './hostBody';
 import { worldVertices } from './junctionTrim';
 import type { ShellEntry } from './validateShell';
+import { byCodePoint } from '@/engine/ordering';
 
 export type TopologyViolationKind =
   /** Грань нульової площі — сміття, що дає NaN-нормалі й z-fighting. */
@@ -154,7 +155,7 @@ export function validateTopology(entries: readonly ShellEntry[]): TopologyViolat
   }
 
   violations.push(...findCoplanarOverlaps(entries, worlds));
-  violations.sort((a, b) => a.key.localeCompare(b.key) || a.kind.localeCompare(b.kind));
+  violations.sort((a, b) => byCodePoint(a.key, b.key) || byCodePoint(a.kind, b.kind));
   return violations;
 }
 

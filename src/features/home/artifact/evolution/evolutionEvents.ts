@@ -8,6 +8,7 @@
 import { daysBetween } from '../../homeUtils';
 import type { ArtifactInput, DatedItem } from '../artifactTypes';
 import type { EvolutionCategory, EvolutionEvent, EvolutionSource, EvolutionTimeline } from './evolutionTypes';
+import { byCodePoint } from '@/engine/ordering';
 
 /** Вік від дати БД, клемплений ≥0 (майбутня дата = «щойно»). */
 const age = (date: string): number => Math.max(0, daysBetween(date));
@@ -145,6 +146,6 @@ export function buildEvolutionTimeline(input: ArtifactInput): EvolutionTimeline 
   }
 
   // Минуле → сьогодні; стабільний tie-break за id.
-  events.sort((a, b) => b.ageDays - a.ageDays || a.id.localeCompare(b.id));
+  events.sort((a, b) => b.ageDays - a.ageDays || byCodePoint(a.id, b.id));
   return { events };
 }

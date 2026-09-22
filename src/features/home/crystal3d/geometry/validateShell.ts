@@ -19,6 +19,7 @@
 import * as THREE from 'three';
 import { boundsOverlap, breatheMargin, isInsideHost, type HostSolid } from './hostBody';
 import { triangleInside, worldVertices } from './junctionTrim';
+import { byCodePoint } from '@/engine/ordering';
 
 export type ShellViolationKind =
   /** Тіло посилається на господаря, якого немає в опублікованій масі. */
@@ -178,7 +179,7 @@ export function validateExternalShell(entries: readonly ShellEntry[]): ShellViol
     }
   }
 
-  violations.sort((a, b) => a.key.localeCompare(b.key) || RANK[a.kind] - RANK[b.kind]);
+  violations.sort((a, b) => byCodePoint(a.key, b.key) || RANK[a.kind] - RANK[b.kind]);
   return violations;
 }
 
@@ -260,7 +261,7 @@ export function probeExterior(
       }
     }
   }
-  violations.sort((a, b) => a.key.localeCompare(b.key));
+  violations.sort((a, b) => byCodePoint(a.key, b.key));
   return violations;
 }
 
@@ -385,7 +386,7 @@ export function probeJunctions(
       }
     }
   }
-  violations.sort((a, b) => a.key.localeCompare(b.key) || a.detail.localeCompare(b.detail));
+  violations.sort((a, b) => byCodePoint(a.key, b.key) || byCodePoint(a.detail, b.detail));
   return violations;
 }
 

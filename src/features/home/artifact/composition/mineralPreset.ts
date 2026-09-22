@@ -22,6 +22,7 @@ import {
   type SilhouettePreset,
 } from './framework';
 import type { CompositionScore } from './score';
+import { byCodePoint } from '@/engine/ordering';
 
 // ── Силуети (Stage 3): читабельні навіть як чорна тінь ───────────
 // envelope(alignment 0..1, horiz, y) → цільовий множник довжини ~0.7..1.1.
@@ -200,7 +201,7 @@ export function composeMineralCluster(
   // каскадом ховаються й «виточені» з викинутого тіла (`X~...` від X).
   if (composed.length > TOTAL_BODY_CAP) {
     const sorted = [...composed].sort(
-      (a, b) => a.radius * a.radius * a.length - b.radius * b.radius * b.length || a.key.localeCompare(b.key),
+      (a, b) => a.radius * a.radius * a.length - b.radius * b.radius * b.length || byCodePoint(a.key, b.key),
     );
     const loadBearing = new Set(
       composed.map((c) => c.attachment?.hostKey).filter((k): k is string => typeof k === 'string'),

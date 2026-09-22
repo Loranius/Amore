@@ -18,6 +18,7 @@
 // геометрія й ідентичність.
 // ============================================================
 import { type Vec3, add, scale, sub, dot, normalize, lengthOf, perpendicularBasis, v3 } from '../vec3';
+import { byCodePoint } from '@/engine/ordering';
 
 /** Версія формату junction — росте при зміні семантики полів. */
 export const ATTACHMENT_JUNCTION_VERSION = '1.0.0';
@@ -164,7 +165,7 @@ export function buildJunctions(bodies: readonly JunctionBody[]): AttachmentJunct
     if (host === undefined) continue; // осиротіле — звіт валідації, не junction
     junctions.push(buildJunction(host, child));
   }
-  junctions.sort((a, b) => a.junctionId.localeCompare(b.junctionId));
+  junctions.sort((a, b) => byCodePoint(a.junctionId, b.junctionId));
   return junctions;
 }
 

@@ -21,6 +21,7 @@ import type {
   OrganicSurfaceConfig,
 } from './surfaceTypes';
 import type { OrganicSkeletonNode, OrganicSkeletonState } from './types';
+import { byCodePoint } from '../../ordering';
 
 interface CurvePoint {
   node: OrganicSkeletonNode;
@@ -78,7 +79,7 @@ function branchOrder(
   if (!leftFirst || !rightFirst) return left.length - right.length;
   if (leftFirst.branchId === ORGANIC_TRUNK_BRANCH_ID) return -1;
   if (rightFirst.branchId === ORGANIC_TRUNK_BRANCH_ID) return 1;
-  return leftFirst.sequence - rightFirst.sequence || leftFirst.branchId.localeCompare(rightFirst.branchId);
+  return leftFirst.sequence - rightFirst.sequence || byCodePoint(leftFirst.branchId, rightFirst.branchId);
 }
 
 function collectBranches(skeleton: OrganicSkeletonState): OrganicSkeletonNode[][] {
@@ -89,7 +90,7 @@ function collectBranches(skeleton: OrganicSkeletonState): OrganicSkeletonNode[][
     else grouped.set(node.branchId, [node]);
   }
   return [...grouped.values()]
-    .map((branch) => [...branch].sort((left, right) => left.sequence - right.sequence || left.id.localeCompare(right.id)))
+    .map((branch) => [...branch].sort((left, right) => left.sequence - right.sequence || byCodePoint(left.id, right.id)))
     .sort(branchOrder);
 }
 

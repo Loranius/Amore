@@ -12,6 +12,7 @@ import type {
   CrystalMeshData,
   CrystalSolid,
 } from './types';
+import { byCodePoint } from '../ordering';
 
 function compareIds(left: string, right: string): number {
   return left < right ? -1 : left > right ? 1 : 0;
@@ -240,7 +241,7 @@ export function buildCrystalGeometry(
     if (!junction) return [];
     if (!junction.sealed) diagnostics.unsealedJunctionIds.push(junction.id);
     return [junction];
-  }).sort((left, right) => left.id.localeCompare(right.id));
+  }).sort((left, right) => byCodePoint(left.id, right.id));
 
   // The substrate is published last and is never budget-omitted: it is what
   // hides the crystals' buried base caps, so dropping it would expose exactly

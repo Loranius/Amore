@@ -8,6 +8,7 @@
 // ============================================================
 import type * as THREE from 'three';
 import type { ClusterBranch } from '../crystalCluster';
+import { byCodePoint } from '@/engine/ordering';
 
 const DEFAULT_MINIMUM_HIDDEN_BODIES = 4;
 const MAX_VISIBLE_SPECK_SHARE = 0.25;
@@ -106,7 +107,7 @@ export function enforceReferenceHiddenBudget(
       return (
         leftSpeck - rightSpeck
         || bodyVolume(left) - bodyVolume(right)
-        || left.branch.key.localeCompare(right.branch.key)
+        || byCodePoint(left.branch.key, right.branch.key)
       );
     })
     .slice(0, targetCount);
