@@ -362,13 +362,19 @@
 /* Число особистого вихідного — повним кольором тексту, а не приглушеним.
    Інакше день, коли хтось вільний, читався так само тихо, як порожній:
    три рівні (разом → сам → нічого) мусять розрізнятись і без кольору. */
-.sched .sched-cell--lena-off { background: color-mix(in srgb, var(--sched-her) 13%, var(--surface)); }
+/* ЗАЛИВКИ ОДНІЄЇ ЛЮДИНИ БІЛЬШЕ НЕМАЄ (ADR-0208).
+   ------------------------------------------------------------
+   Тут стояв тон `--sched-her` 13% на всю клітинку, а поряд — такий самий
+   для `--sched-him`. Разом із доріжками це давало ПОТРОЄНЕ кодування
+   одного факту: заливка, смужка й рамка казали те саме, і саме через це
+   чотири стани доводилось розгадувати за відтінком.
+   Тепер клітинка одного вільного — нейтральна, а каже про це доріжка.
+   Заливку лишено рівно одному стану, який складається з двох, —
+   спільному вихідному. */
 .sched .sched-cell--lena-off .sched-cell-num,
 .sched .sched-cell--dima-off .sched-cell-num { color: var(--text); }
-.sched .sched-cell--lena-off .sched-cell-symbol { background: var(--sched-her); }
 
-.sched .sched-cell--dima-off { background: color-mix(in srgb, var(--sched-him) 13%, var(--surface)); }
-.sched .sched-cell--dima-off .sched-cell-symbol { background: var(--sched-him); }
+
 
 /* Крапка переїхала з НИЗУ вгору: смужка стану тепер стоїть саме внизу,
    і на знімку 12 серпня вони налазили одна на одну. */
@@ -734,4 +740,75 @@
     animation: none;
     transition: none;
   }
+}
+
+/* ============================================================
+   ДВІ ДОРІЖКИ В КЛІТИНЦІ ДНЯ (ADR-0208, варіант A).
+   ------------------------------------------------------------
+   Стан дня більше не тримається на відтінку: верхня смужка — Лєна,
+   нижня — Діма, заповнена означає вихідний. Хто саме вільний, каже
+   МІСЦЕ, і легенда згори підписує обидва кольори іменами.
+
+   Жодного нового токена: `--sched-her`, `--sched-him` і `--sched-both`
+   уже є в `index.css` — ними підписані чипи над сіткою.
+   ============================================================ */
+.sched-cell-lanes {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  inline-size: 58%;
+  margin-top: 3px;
+}
+.sched-lane {
+  display: block;
+  block-size: 4px;
+  /* Токеном, а не числом: `radiusScale.test.ts` стереже, щоб радіуси не
+     заводились сирими пікселями. Смужка заввишки 4 px — це пігулка. */
+  border-radius: var(--radius-pill);
+  /* Незаповнена доріжка — не «нічого», а видимий жолоб: інакше «робочий
+     день» і «графік ще не заповнено» виглядали б однаково. */
+  background: color-mix(in srgb, var(--text) 13%, transparent);
+  transition: background 120ms ease-out;
+}
+.sched-lane--her.is-off { background: var(--sched-her); }
+.sched-lane--him.is-off { background: var(--sched-him); }
+
+/* Обраний дотиком день — кант, а не заливка: заливку вже зайняв стан. */
+.sched-cell.is-picked {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* Чию доріжку перемикає дотик. Це НЕ режим: сітка лишається живою й
+   показує обох, змінюється тільки адресат дотику. */
+.sched-lane-pick {
+  display: flex;
+  gap: 6px;
+  margin: 0 0 10px;
+}
+.sched-lane-pick button {
+  flex: 1;
+  min-block-size: 44px;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 800;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 120ms ease-out, color 120ms ease-out;
+}
+.sched-lane-pick button.is-active {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface-2));
+  border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.sched-lane-pick button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-lane, .sched-lane-pick button { transition: none; }
 }

@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { usePeople } from '@/features/_shared/useUsers';
 import { currentYearMonth, daysInMonth, monthKeyOf, todayLocal, ymd } from '@/features/_shared/month';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { useSchedule } from './useSchedule';
+import { useSchedule, useScheduleMutation } from './useSchedule';
 import { useScheduleReminder } from './useScheduleReminder';
 import { useSharedDaysOff } from './useSharedDaysOff';
 import { usePlans } from '@/features/plans/usePlans';
@@ -15,7 +15,8 @@ import { ScheduleCompletionStatus } from './ScheduleCompletionStatus';
 import { ScheduleMonthOverview } from './ScheduleMonthOverview';
 import { ScheduleUpcoming } from './ScheduleUpcoming';
 import { ScheduleDayDetails } from './ScheduleDayDetails';
-import { countdownLabel, dayStatus, fmtLongDate, type DayStatus } from './scheduleViewModel';
+import { countdownLabel, dayStatus, fmtLongDate, nextMark, type DayStatus } from './scheduleViewModel';
+import { normalizeMark } from './scheduleEditorModel';
 import './schedule.css';
 import './scheduleCompleteness.css';
 import './scheduleEditToggle.css';
@@ -43,6 +44,7 @@ export function SchedulePage() {
   const [remindedKeys, setRemindedKeys] = useState<Set<string>>(() => new Set());
 
   const { data: marks = {} } = useSchedule(yr, mo);
+  const scheduleMutation = useScheduleMutation(yr, mo);
   const { data: sharedDates = [] } = useSharedDaysOff();
   const { data: allPlans = [] } = usePlans();
   const navigate = useNavigate();
@@ -200,6 +202,19 @@ export function SchedulePage() {
 
   const nextSharedDate = sharedDates[0];
 
+  /*
+   * Чию доріжку перемикає дотик. Типово — свою: саме свій графік
+   * заповнюють щодня, а чужий правлять зрідка (і для цього поруч стоїть
+   * другий чип, а не окремий режим).
+   */
+  const [laneUserId, setLaneUserId] = useState<number | null>(null);
+  const activeLaneId = laneUserId ?? currentUser?.id ?? users[0]?.id ?? null;
+  const toggleDay = (date: string) => {
+    if (activeLaneId === null) return;
+    const current = normalizeMark(marks[activeLaneId]?.[date]);
+    scheduleMutation.mutate({ userId: activeLaneId, date, mark: nextMark(current) });
+  };
+
   return (
     // Фон раніше приходив від обгортки хабу «Календар». Графік більше під
     // ним не живе — це власний розділ, тож він несе його сам, як і решта
@@ -207,12 +222,14 @@ export function SchedulePage() {
     <section className="sched pink-page">
       <header className="sched-hero">
         {/*
-          * «Редагувати» — у слоті дії спільних дверей (ADR-0046).
+          * «Заповнити місяць» — у слоті дії спільних дверей (ADR-0046).
           *
-          * Кнопка стояла окремим правовирівняним рядком між карткою
-          * місяця й статусами заповнення — тобто висіла в порожнечі, не
-          * належачи ні тому, ні тому. Слот дії `PageHeader` існує рівно
-          * для дії рівня екрана, а режим редагування саме такий.
+          * ПІДПИС ЗМІНИВСЯ РАЗОМ ІЗ РОЛЛЮ (ADR-0208). Кнопка вела в режим,
+          * без якого не можна було поставити жодної мітки; тепер день
+          * перемикається дотиком просто в сітці, а за цією кнопкою
+          * лишилось те, чого дотик не вміє: шаблони «2 через 2», «3 через
+          * 3», «Пн–Пт», копія з минулого місяця, очищення й вибір кількох
+          * днів одразу. Тобто не «редагувати», а «заповнити гуртом».
           */}
         <PageHeader
           eyebrow="Календар пари"
@@ -225,7 +242,7 @@ export function SchedulePage() {
               onClick={toggleEditMode}
               aria-pressed={editMode}
             >
-              {editMode ? 'Завершити' : 'Редагувати'}
+              {editMode ? 'Готово' : 'Заповнити місяць'}
             </button>
           )}
         />
@@ -278,7 +295,30 @@ export function SchedulePage() {
         </div>
       ) : (
         <>
-          <ScheduleMonthOverview yr={yr} mo={mo} today={today} usersCount={users.length} statusCounts={statusCounts} statusOf={statusOf} plansOn={plansOn} onSelectDate={setSelectedDate} />
+          <ScheduleMonthOverview
+            yr={yr}
+            mo={mo}
+            today={today}
+            usersCount={users.length}
+            statusCounts={statusCounts}
+            statusOf={statusOf}
+            plansOn={plansOn}
+            marks={marks}
+            users={users}
+            lena={lena}
+            dima={dima}
+            editingUserId={activeLaneId}
+            onPickUser={setLaneUserId}
+            editable={activeLaneId !== null}
+            selectedDate={selectedDate}
+            /*
+             * Дотик робить ДВІ речі одразу, і це навмисно: перемикає день
+             * обраної доріжки й вибирає його. Перше — щоденна робота, друге
+             * відкриває рядок деталей під сіткою. Так рідкісна дія дістає
+             * повноширинні двері замість вгадування крапки в кутку.
+             */
+            onSelectDate={(date) => { toggleDay(date); setSelectedDate(date); }}
+          />
           <ScheduleUpcoming sharedDates={sharedDates} plansOn={plansOn} onSelectDate={setSelectedDate} onPlan={openPlans} />
         </>
       )}
