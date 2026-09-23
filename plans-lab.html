@@ -1,0 +1,676 @@
+<!doctype html>
+<html lang="uk" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Плани — три напрями</title>
+<meta name="description" content="Три композиції для модуля «Плани» Amore на справжніх даних пари.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   СВІТ НЕ ВИГАДУЄТЬСЯ ЗАНОВО.
+   Токени скопійовані з `src/index.css` один до одного. Модуль володіє
+   КОМПОЗИЦІЄЮ, а не палітрою (amore-visual-direction): три варіанти
+   нижче різняться тим, ЯК розкладено екран, і нічим більше.
+   ============================================================ */
+:root {
+  --bg: #100b18;
+  --surface: #191424;
+  --surface-2: #231e2f;
+  --surface-3: #2f293b;
+  --text: #f5f4f6;
+  --muted: #b2a8c7;
+  --accent: #b06bff;
+  --accent-strong: #8b3df0;
+  --border: rgba(198, 160, 255, 0.14);
+  --danger: #ff5f7e;
+  --ok: #3fd8c8;
+  --warn: #f0a63a;
+  --today: #3fd8d8;
+
+  --plan-cat-date: #ff6b9d;
+  --plan-cat-trip: #5ba3d9;
+  --plan-cat-ride: #6fb1c4;
+  --plan-cat-place: #7ec8a9;
+  --plan-cat-event: #d9a441;
+  --plan-cat-activity: #e8829c;
+  --plan-cat-rest: #b98a9a;
+  --plan-cat-holiday: #c9922f;
+  --plan-cat-learning: #9b6ea8;
+  --plan-cat-home: #8a9bb8;
+  --plan-cat-other: #a08d97;
+
+  --radius-hair: 4px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-card: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 2px 8px rgba(4, 2, 10, 0.45);
+  --shadow-md: 0 10px 26px rgba(4, 2, 10, 0.5);
+  --shadow-lg: 0 24px 60px rgba(4, 2, 10, 0.6);
+  --page-gradient: linear-gradient(168deg, #161023 0%, #120d1c 52%, #0b0811 100%);
+
+  /* Шкала руху — та, що вже є в `src/features/**`. Шостого значення
+     не заводимо. */
+  --t-press: 120ms;
+  --t-state: 180ms;
+  --t-reveal: 260ms;
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.45;
+}
+
+/* ── Оправа сторінки ─────────────────────────────────────── */
+.wrap { max-width: 1400px; margin: 0 auto; padding: 32px 16px 80px; }
+
+.lede { max-width: 68ch; margin: 0 auto 40px; }
+.lede h1 {
+  font-size: clamp(28px, 6vw, 40px);
+  font-weight: 800; letter-spacing: -0.02em;
+  margin: 0 0 4px;
+}
+.lede .eyebrow {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 10px;
+}
+.lede p { color: var(--muted); margin: 0 0 12px; font-size: 15px; }
+.lede strong { color: var(--text); font-weight: 700; }
+
+/* Виміряний брифінг — не прикраса: варіанти без нього не читаються. */
+.facts {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  margin: 24px 0 8px;
+}
+.fact {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 12px 14px;
+}
+.fact b { display: block; font-size: 26px; font-weight: 800; line-height: 1.1; }
+.fact span { color: var(--muted); font-size: 12.5px; }
+.fact.warn b { color: var(--warn); }
+
+/* ── Ряд макетів ─────────────────────────────────────────── */
+.decks {
+  display: grid; gap: 44px;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  align-items: start;
+}
+/* `min-width: 0` обов'язковий: елемент ґрід-сітки типово не стискається
+   вужче за власний min-content, а смужка днів у A має min-content 442 px —
+   саме вона й тягнула сторінку вбік. */
+.deck { display: flex; flex-direction: column; align-items: center; gap: 18px; min-width: 0; }
+
+.deck-head { width: min(412px, 100%); }
+.deck-head h2 {
+  font-size: 22px; font-weight: 800; margin: 0 0 2px; letter-spacing: -0.01em;
+}
+.deck-head .axis {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 8px;
+}
+.deck-head p { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
+.deck-head .cost {
+  margin: 8px 0 0; font-size: 13.5px; color: var(--muted);
+  border-left: 3px solid var(--warn); padding-left: 10px;
+}
+.deck-head .cost b { color: var(--warn); font-weight: 800; }
+
+/* ── Телефон ─────────────────────────────────────────────── */
+.phone {
+  /* `min()`, а не `width` + `max-width`: у вузькій колонці друге не
+     стискало фрейм, і сторінка їхала вбік на 16 px. */
+  width: min(412px, 100%);
+  height: 780px;
+  background: var(--page-gradient);
+  border: 1px solid var(--border);
+  border-radius: 34px;
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  position: relative;
+  display: flex; flex-direction: column;
+}
+.screen { flex: 1; min-width: 0; overflow-y: auto; overscroll-behavior: contain; }
+.screen::-webkit-scrollbar { width: 0; }
+.pad { padding: 0 16px; }
+
+.hdr { padding: 22px 16px 10px; }
+.hdr .kicker {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 2px;
+}
+.hdr h3 { margin: 0; font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+
+.sect {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin: 22px 0 10px;
+}
+.sect h4 { margin: 0; font-size: 15px; font-weight: 800; letter-spacing: -0.01em; }
+.sect .count { color: var(--muted); font-size: 13px; font-weight: 700; }
+
+/* Док — спільний для всіх трьох, бо він не модуля */
+.dock {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; height: 62px;
+  background: rgba(25, 20, 36, 0.92);
+  backdrop-filter: blur(14px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  align-items: center; text-align: center;
+  font-size: 10.5px; font-weight: 700; color: var(--muted);
+}
+.dock .on { color: var(--text); }
+.dock .on i {
+  display: block; width: 44px; height: 26px; margin: 0 auto 3px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.dock i { display: block; height: 26px; }
+.dock .heart { color: var(--accent); font-size: 19px; line-height: 26px; }
+.screen { padding-bottom: 86px; }
+
+/* ── Спільна мова карток ─────────────────────────────────── */
+.rule { width: 3px; border-radius: var(--radius-pill); flex: none; align-self: stretch; }
+.cat {
+  font-size: 11.5px; font-weight: 800; letter-spacing: 0.04em;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.dot { width: 7px; height: 7px; border-radius: 50%; flex: none; }
+.ttl { font-size: 16.5px; font-weight: 800; letter-spacing: -0.01em; }
+.meta { color: var(--muted); font-size: 13px; }
+
+/* ════════════════════════════════════════════════════════════
+   A — СТРІЧКА. Вісь — час.
+   ════════════════════════════════════════════════════════════ */
+.scrub {
+  display: flex; gap: 6px; padding: 4px 16px 2px;
+  overflow-x: auto; scrollbar-width: none;
+}
+.scrub::-webkit-scrollbar { display: none; }
+.day {
+  flex: none; width: 46px; padding: 8px 0 7px; text-align: center;
+  border-radius: var(--radius-md);
+  background: var(--surface); border: 1px solid transparent;
+  transition: background var(--t-press) var(--ease), border-color var(--t-press) var(--ease);
+}
+.day .dow { font-size: 10.5px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+.day .num { font-size: 17px; font-weight: 800; margin-top: 1px; }
+.day.today { border-color: color-mix(in srgb, var(--today) 62%, transparent); }
+.day.today .num { color: var(--today); }
+.day.has::after {
+  content: ''; display: block; width: 5px; height: 5px; margin: 3px auto 0;
+  border-radius: 50%; background: var(--plan-cat-home);
+}
+.day.empty { opacity: 0.42; }
+
+.arow {
+  display: flex; gap: 12px; align-items: center;
+  padding: 13px 14px; margin-bottom: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+.arow .when {
+  flex: none; width: 52px; text-align: center;
+  font-size: 12px; font-weight: 800; color: var(--muted); line-height: 1.25;
+}
+.arow .when b { display: block; font-size: 19px; color: var(--text); font-weight: 800; }
+.arow .body { min-width: 0; flex: 1; }
+.arow .body .ttl { display: block; margin-bottom: 2px; }
+.arow .tail { flex: none; font-size: 12px; font-weight: 800; color: var(--muted); }
+
+.someday {
+  display: flex; flex-wrap: wrap; gap: 7px;
+}
+.chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 13px; border-radius: var(--radius-pill);
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 14px; font-weight: 700;
+}
+
+/* ════════════════════════════════════════════════════════════
+   B — ТРИ КУПКИ. Вісь — стан.
+   ════════════════════════════════════════════════════════════ */
+.monthpill {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 8px 14px; border-radius: var(--radius-pill);
+  background: var(--surface-2); border: 1px solid var(--border);
+  font-size: 13.5px; font-weight: 800; color: var(--muted);
+}
+.lane { margin-bottom: 18px; }
+.lane-head {
+  display: flex; align-items: center; gap: 9px; margin-bottom: 9px;
+}
+.lane-head h4 { margin: 0; font-size: 15px; font-weight: 800; }
+.badge {
+  min-width: 24px; height: 22px; padding: 0 7px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3); color: var(--muted);
+  font-size: 12.5px; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.badge.hot { background: color-mix(in srgb, var(--accent) 30%, transparent); color: var(--text); }
+.brow {
+  display: flex; gap: 11px; align-items: center;
+  padding: 12px 13px; margin-bottom: 6px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+.brow .body { min-width: 0; flex: 1; }
+.brow .ttl { display: block; font-size: 15.5px; }
+.brow .meta { font-size: 12.5px; }
+.fold {
+  width: 100%; text-align: left;
+  padding: 12px 13px; border-radius: var(--radius-md);
+  background: transparent; border: 1px dashed var(--border);
+  color: var(--muted); font: inherit; font-size: 13.5px; font-weight: 700;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.merge {
+  margin-top: 6px; padding: 11px 13px;
+  border-radius: var(--radius-md);
+  background: color-mix(in srgb, var(--warn) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--warn) 34%, transparent);
+  font-size: 13px; color: #f7d9a8;
+}
+.merge b { color: var(--warn); font-weight: 800; }
+.merge button {
+  margin-top: 8px; font: inherit; font-size: 13px; font-weight: 800;
+  background: color-mix(in srgb, var(--warn) 22%, transparent);
+  color: #ffe6bd; border: 1px solid color-mix(in srgb, var(--warn) 45%, transparent);
+  border-radius: var(--radius-pill); padding: 7px 14px;
+}
+
+/* ════════════════════════════════════════════════════════════
+   C — ЗАДУМ → ДАТА. Вісь — рішення.
+   ════════════════════════════════════════════════════════════ */
+.hero {
+  background: linear-gradient(158deg,
+    color-mix(in srgb, var(--plan-cat-home) 22%, var(--surface)) 0%,
+    var(--surface) 62%);
+  border: 1px solid color-mix(in srgb, var(--plan-cat-home) 34%, var(--border));
+  border-radius: var(--radius-lg);
+  padding: 17px 17px 15px;
+}
+.hero .cat { color: var(--plan-cat-home); }
+.hero h5 { margin: 6px 0 3px; font-size: 24px; font-weight: 800; letter-spacing: -0.02em; }
+.hero .sub { color: color-mix(in srgb, var(--plan-cat-home) 55%, var(--text)); font-size: 13.5px; }
+.bar {
+  margin-top: 14px; height: 7px; border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.32); overflow: hidden;
+}
+.bar i {
+  display: block; height: 100%; border-radius: var(--radius-pill);
+  background: linear-gradient(90deg, var(--plan-cat-home), color-mix(in srgb, var(--plan-cat-home) 55%, var(--accent)));
+  transform-origin: left;
+}
+.barnums {
+  display: flex; justify-content: space-between; margin-top: 7px;
+  font-size: 12px; font-weight: 700;
+  color: color-mix(in srgb, var(--plan-cat-home) 50%, var(--muted));
+}
+
+.deckcards { position: relative; height: 212px; margin-top: 8px; }
+.dcard {
+  position: absolute; left: 0; right: 0; top: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); padding: 16px;
+  box-shadow: var(--shadow-md);
+}
+/* Порожні картки колоди мусять мати ВИСОТУ, інакше вони ховаються за
+   верхньою цілком і колоди не видно — саме це й показав перший знімок. */
+.dcard.b2, .dcard.b3 { height: 182px; }
+.dcard.b2 { transform: translateY(14px) scale(0.955); opacity: 0.7; z-index: 1; }
+.dcard.b3 { transform: translateY(27px) scale(0.912); opacity: 0.38; z-index: 0; }
+.dcard.b1 { z-index: 2; }
+.dcard h5 { margin: 7px 0 4px; font-size: 21px; font-weight: 800; letter-spacing: -0.01em; }
+.dcard .why { color: var(--muted); font-size: 13.5px; margin: 0 0 14px; }
+.acts { display: flex; gap: 8px; }
+.btn {
+  font: inherit; font-size: 14px; font-weight: 800;
+  border-radius: var(--radius-pill); padding: 11px 16px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text);
+  transition: transform var(--t-press) var(--ease), background var(--t-press) var(--ease);
+}
+.btn:active { transform: scale(0.97); }
+.btn.primary {
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+  border-color: transparent; flex: 1;
+}
+.btn.ghost { background: transparent; color: var(--muted); }
+.quiet {
+  margin-top: 16px; padding: 13px 15px;
+  border-radius: var(--radius-md); background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 13.5px; color: var(--muted); font-weight: 700;
+}
+.quiet b { color: var(--text); font-weight: 800; }
+
+/* ── Один авторський момент на макет ─────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  .bar i { animation: grow 640ms var(--ease) both; }
+  @keyframes grow { from { transform: scaleX(0); } }
+  .dcard.b1 { animation: lift var(--t-reveal) var(--ease) both; }
+  @keyframes lift { from { transform: translateY(8px); opacity: 0; } }
+}
+
+/* ── Вузький екран: макети один під одним ────────────────── */
+@media (max-width: 860px) {
+  .decks { grid-template-columns: 1fr; gap: 36px; }
+  .wrap { padding: 24px 16px 64px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="lede">
+    <p class="eyebrow">Демо · модуль «Плани»</p>
+    <h1>Три напрями, а не три фарбування</h1>
+    <p>Світ порталу тут не змінюється: ті самі токени з <code>src/index.css</code>,
+      той самий Nunito, та сама шкала руху. Модуль володіє <strong>композицією</strong> —
+      і саме вона в трьох варіантах різна. Кожен відповідає на своє питання.</p>
+    <p>Усе наповнення — <strong>справжні плани пари</strong>, прочитані з бази,
+      а не вигадані. Саме вони й показують, у чому вада нинішнього екрана.</p>
+
+    <div class="facts">
+      <div class="fact"><b>1</b><span>активний план із датою</span></div>
+      <div class="fact"><b>5</b><span>задумів без дати</span></div>
+      <div class="fact"><b>12</b><span>завершених</span></div>
+      <div class="fact warn"><b>×4</b><span>однакові «Побачення, яке пам'ятаємо»</span></div>
+    </div>
+    <p style="margin-top:14px">Нинішній екран віддає <strong>40% першого
+      вікна</strong> сітці місяця, у якій на весь вересень одна крапка, а розділ
+      «Найближчі плани» містить рівно одну картку. Тобто найбільший елемент несе
+      найменше змісту, а справжній центр ваги модуля — задуми без дати — лежить
+      нижче згину. Плюс поля, яких ніхто не заповнює: <strong>одне фото на 18
+      планів, жодного місця, жодного автора, жодного посилання.</strong></p>
+  </header>
+
+  <div class="decks">
+
+    <!-- ══════════════ A ══════════════ -->
+    <section class="deck">
+      <div class="deck-head">
+        <p class="axis">Варіант A · вісь: час</p>
+        <h2>Стрічка</h2>
+        <p>Календар перестає бути муралом і стає навігатором: тиждень смужкою
+          вгорі. Тіло екрана — порядок денний за обріями: цього тижня, цей
+          місяць, далі, колись.</p>
+        <p class="cost"><b>Ціна:</b> місяць цілком більше не видно одним
+          поглядом — за ним треба тягнути смужку.</p>
+      </div>
+
+      <div class="phone">
+        <div class="screen">
+          <div class="hdr">
+            <p class="kicker">Вересень 2026</p>
+            <h3>Плани</h3>
+          </div>
+
+          <div class="scrub">
+            <div class="day empty"><div class="dow">пн</div><div class="num">21</div></div>
+            <div class="day empty"><div class="dow">вт</div><div class="num">22</div></div>
+            <div class="day today"><div class="dow">ср</div><div class="num">23</div></div>
+            <div class="day has"><div class="dow">чт</div><div class="num">24</div></div>
+            <div class="day empty"><div class="dow">пт</div><div class="num">25</div></div>
+            <div class="day empty"><div class="dow">сб</div><div class="num">26</div></div>
+            <div class="day empty"><div class="dow">нд</div><div class="num">27</div></div>
+            <div class="day empty"><div class="dow">пн</div><div class="num">28</div></div>
+          </div>
+
+          <div class="pad">
+            <div class="sect"><h4>Триває</h4></div>
+            <div class="arow">
+              <span class="rule" style="background:var(--plan-cat-home)"></span>
+              <div class="when"><b>84</b>дні</div>
+              <div class="body">
+                <span class="ttl">Ремонт хати</span>
+                <span class="meta">до 1 січня 2028</span>
+              </div>
+              <div class="tail">15%</div>
+            </div>
+
+            <div class="sect"><h4>Далі</h4><span class="count">порожньо</span></div>
+            <div class="arow" style="opacity:.55;border-style:dashed">
+              <div class="body">
+                <span class="meta">Жодного плану з датою попереду.
+                  Задуми внизу — будь-який можна призначити.</span>
+              </div>
+            </div>
+
+            <div class="sect"><h4>Колись</h4><span class="count">5</span></div>
+            <div class="someday">
+              <span class="chip"><i class="dot" style="background:var(--plan-cat-event)"></i>Брекети Лєні</span>
+              <span class="chip"><i class="dot" style="background:var(--plan-cat-learning)"></i>Медична</span>
+              <span class="chip"><i class="dot" style="background:var(--plan-cat-date)"></i>Secret Garden</span>
+              <span class="chip"><i class="dot" style="background:var(--plan-cat-date)"></i>Тераса</span>
+              <span class="chip"><i class="dot" style="background:var(--plan-cat-date)"></i>Гончарство</span>
+            </div>
+
+            <div class="sect"><h4>Прожите</h4><span class="count">12</span></div>
+            <div class="arow" style="opacity:.62">
+              <span class="rule" style="background:var(--plan-cat-trip)"></span>
+              <div class="when">лип</div>
+              <div class="body">
+                <span class="ttl">Одеса мама</span>
+                <span class="meta">11–14 липня 2026</span>
+              </div>
+            </div>
+            <div class="arow" style="opacity:.62">
+              <span class="rule" style="background:var(--plan-cat-ride)"></span>
+              <div class="when">серп</div>
+              <div class="body">
+                <span class="ttl">Їдемо в село на машинці врум врум</span>
+                <span class="meta">12 серпня 2026</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <nav class="dock">
+          <div><i></i>Вішлист</div>
+          <div class="on"><i></i>Плани</div>
+          <div><i class="heart">♥</i></div>
+          <div><i></i>Покупки</div>
+          <div><i></i>Ще</div>
+        </nav>
+      </div>
+    </section>
+
+    <!-- ══════════════ B ══════════════ -->
+    <section class="deck">
+      <div class="deck-head">
+        <p class="axis">Варіант B · вісь: стан</p>
+        <h2>Три купки</h2>
+        <p>Питання екрана — не «які плани є», а «що з ними робити»: саме так уже
+          міркує <code>planGroups.ts</code>. Календаря на огляді немає зовсім;
+          він за пігулкою місяця. Зате видно кількості — і видно чотири дублікати,
+          які сьогодні ховаються в хвості.</p>
+        <p class="cost"><b>Ціна:</b> дату не видно взагалі, доки не відкриєш
+          місяць. Для пари, що живе датами, це крок назад.</p>
+      </div>
+
+      <div class="phone">
+        <div class="screen">
+          <div class="hdr" style="display:flex;justify-content:space-between;align-items:flex-end">
+            <div>
+              <p class="kicker">18 планів</p>
+              <h3>Плани</h3>
+            </div>
+            <span class="monthpill">Вересень ▾</span>
+          </div>
+
+          <div class="pad">
+            <div class="lane">
+              <div class="lane-head"><h4>Зараз</h4><span class="badge hot">1</span></div>
+              <div class="brow">
+                <span class="rule" style="background:var(--plan-cat-home)"></span>
+                <div class="body">
+                  <span class="cat" style="color:var(--plan-cat-home)">
+                    <i class="dot" style="background:var(--plan-cat-home)"></i>Для дому</span>
+                  <span class="ttl">Ремонт хати</span>
+                  <span class="meta">триває · 84 з 549 днів</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="lane">
+              <div class="lane-head"><h4>Задуми</h4><span class="badge">5</span></div>
+              <div class="brow">
+                <span class="rule" style="background:var(--plan-cat-event)"></span>
+                <div class="body">
+                  <span class="cat" style="color:var(--plan-cat-event)">
+                    <i class="dot" style="background:var(--plan-cat-event)"></i>Захід</span>
+                  <span class="ttl">Брекети Лєні</span>
+                </div>
+              </div>
+              <div class="brow">
+                <span class="rule" style="background:var(--plan-cat-learning)"></span>
+                <div class="body">
+                  <span class="cat" style="color:var(--plan-cat-learning)">
+                    <i class="dot" style="background:var(--plan-cat-learning)"></i>Навчання</span>
+                  <span class="ttl">Медична</span>
+                </div>
+              </div>
+              <div class="brow">
+                <span class="rule" style="background:var(--plan-cat-date)"></span>
+                <div class="body">
+                  <span class="cat" style="color:var(--plan-cat-date)">
+                    <i class="dot" style="background:var(--plan-cat-date)"></i>Побачення</span>
+                  <span class="ttl">Secret Garden</span>
+                </div>
+              </div>
+              <div class="brow">
+                <span class="rule" style="background:var(--plan-cat-date)"></span>
+                <div class="body">
+                  <span class="cat" style="color:var(--plan-cat-date)">
+                    <i class="dot" style="background:var(--plan-cat-date)"></i>Побачення</span>
+                  <span class="ttl">Тераса</span>
+                </div>
+              </div>
+              <div class="brow">
+                <span class="rule" style="background:var(--plan-cat-date)"></span>
+                <div class="body">
+                  <span class="cat" style="color:var(--plan-cat-date)">
+                    <i class="dot" style="background:var(--plan-cat-date)"></i>Побачення</span>
+                  <span class="ttl">Гончарство</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="lane">
+              <div class="lane-head"><h4>Прожите</h4><span class="badge">12</span></div>
+              <button class="fold"><span>Показати прожите</span><span>▾</span></button>
+              <div class="merge">
+                <b>Чотири однакові записи.</b> «Побачення, яке пам'ятаємо»
+                створене чотири рази 6 вересня, за дві секунди — схоже на
+                випадковий чотирикратний дотик.
+                <br><button>Звести в один</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <nav class="dock">
+          <div><i></i>Вішлист</div>
+          <div class="on"><i></i>Плани</div>
+          <div><i class="heart">♥</i></div>
+          <div><i></i>Покупки</div>
+          <div><i></i>Ще</div>
+        </nav>
+      </div>
+    </section>
+
+    <!-- ══════════════ C ══════════════ -->
+    <section class="deck">
+      <div class="deck-head">
+        <p class="axis">Варіант C · вісь: рішення</p>
+        <h2>Задум → дата</h2>
+        <p>Найрадикальніший, і він виходить прямо з даних: п'ять із шести
+          відкритих записів — без дати. Отже робота екрана не «показати список»,
+          а <strong>перетворити задум на план</strong>. Один активний план
+          зверху зі справжнім поступом, під ним колода задумів і одна головна
+          дія.</p>
+        <p class="cost"><b>Ціна:</b> список як список зникає. Щоб побачити все
+          одразу, потрібен окремий перехід.</p>
+      </div>
+
+      <div class="phone">
+        <div class="screen">
+          <div class="hdr">
+            <p class="kicker">23 вересня 2026</p>
+            <h3>Плани</h3>
+          </div>
+
+          <div class="pad">
+            <div class="hero">
+              <span class="cat"><i class="dot" style="background:var(--plan-cat-home)"></i>Для дому · триває</span>
+              <h5>Ремонт хати</h5>
+              <p class="sub" style="margin:0">1 липня 2026 — 1 січня 2028</p>
+              <div class="bar"><i style="width:15.3%"></i></div>
+              <div class="barnums"><span>84 дні позаду</span><span>465 попереду</span></div>
+            </div>
+
+            <div class="sect"><h4>Що наступне?</h4><span class="count">5 задумів</span></div>
+            <div class="deckcards">
+              <div class="dcard b3"></div>
+              <div class="dcard b2"></div>
+              <div class="dcard b1">
+                <span class="cat" style="color:var(--plan-cat-date)">
+                  <i class="dot" style="background:var(--plan-cat-date)"></i>Побачення</span>
+                <h5>Secret Garden</h5>
+                <p class="why">Лежить без дати від 29 липня.</p>
+                <div class="acts">
+                  <button class="btn primary">Дати дату</button>
+                  <button class="btn ghost">Далі →</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="quiet"><span>Прожито разом</span><b>12 планів</b></div>
+            <div class="quiet" style="margin-top:8px"><span>Задумів без дати</span><b>5</b></div>
+          </div>
+        </div>
+        <nav class="dock">
+          <div><i></i>Вішлист</div>
+          <div class="on"><i></i>Плани</div>
+          <div><i class="heart">♥</i></div>
+          <div><i></i>Покупки</div>
+          <div><i></i>Ще</div>
+        </nav>
+      </div>
+    </section>
+
+  </div>
+
+  <footer class="lede" style="margin-top:56px">
+    <p class="eyebrow">Що спільного в усіх трьох</p>
+    <p>Зникли <strong>кружечки-шеврони</strong> на кожній картці: уся картка й так
+      натискається, а п'ять однакових стрілок — це п'ять однакових плям.
+      Категорія більше не заливає картку градієнтом, вона тримається
+      <strong>трипіксельної смужки або крапки</strong> — колір означає, а не
+      прикрашає. Заголовок один на картку, і він найбільший у ній.</p>
+    <p>Жодного нового кольору, жодного нового радіуса, жодної нової тривалості:
+      усе з токенів порталу й зі шкали <code>90 · 160 · 180 · 220 · 260 мс</code>.
+      На кожному макеті рівно <strong>один авторський момент</strong> руху — смуга
+      поступу в C, поява верхньої картки колоди — і обидва мають гілку
+      <code>prefers-reduced-motion</code>.</p>
+  </footer>
+
+</div>
+</body>
+</html>
