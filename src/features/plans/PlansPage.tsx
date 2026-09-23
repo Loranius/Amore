@@ -1,5 +1,5 @@
 // ============================================================
-// «Плани» — об'єднаний модуль: календар і плани пари.
+// «Плани» — модуль із фокусом (ADR-0207, варіант C).
 // ------------------------------------------------------------
 // У календарі живуть ДВІ різні сутності:
 //   plan  — те, що пара збирається зробити; має статус, бюджет, задачі й
@@ -7,16 +7,23 @@
 //   event — дата / свято / день народження; лишається позначкою в календарі
 //           й отримує Telegram-нагадування, але НЕ стає планом.
 //
-// Вкладки «Події»/«Календар» тут більше немає. «Події» була входом лише в
-// «Наш шлях» (anniversary) — і власник попросив прибрати проміжну зупинку:
-// тепер сузір'я відкривається дотиком по лічильнику днів на головній
-// (`Hero.tsx`), а модуль планів завжди показує календар одразу.
-// Позначки типу anniversary в календарній сітці не зникли: тап по такій
-// даті й далі відкриває редагування на місці — це вже не «Наш шлях», а
-// звичайна календарна позначка, як день народження чи свято.
+// ЩО ЗМІНИЛОСЬ І ЧОМУ. Власник: «не подобається взагалі все». Три напрями
+// зняті в `plans-lab.html`, обрано C — вісь РІШЕННЯ. Теза не зі смаку, а
+// з заміру бази: **п'ять із шести відкритих записів не мають дати**, а
+// сітка місяця займала 40% першого вікна, щоб показати одну крапку.
+//
+// Тепер зверху стоїть один план, заради якого модуль відкривають, під ним
+// колода задумів з однією дією — дати дату, — а списки живуть за тихими
+// лічильниками.
+//
+// КАЛЕНДАР НЕ ВИДАЛЕНИЙ, І ЦЕ ВАЖЛИВО. Макет C його не показував, але
+// перевірка маршрутів перед роботою знайшла, що `/calendar` — це
+// **редирект сюди**: іншого місяця в порталі немає. Викинути сітку
+// означало б забрати в пари єдиний календар. Тому вона спустилась у свій
+// лічильник, а `/calendar` веде на `?view=calendar` і розкриває її одразу.
 // ============================================================
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettledPending } from '@/lib/useSettledPending';
 import { ChevronRightIcon, PlusIcon } from '@/components/icons/UiIcon';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
@@ -27,14 +34,19 @@ import { useCalendarMutations, useEvents } from '@/features/calendar/useCalendar
 import { enrichEvent, sortEnriched } from '@/features/calendar/calendarUtils';
 import { CalendarMonthView } from '@/features/calendar/CalendarViews';
 import { AddEventModal } from '@/features/calendar/AddEventModal';
+import { PageHeader } from '@/components/ui/PageHeader';
 import { AddPlanModal } from './AddPlanModal';
 import { PlanTile } from './PlanTile';
-import { groupPlans } from './planGroups';
+import { PlanFocusEmpty, PlanFocusHero } from './PlanFocusHero';
+import { PlanIdeaDeck } from './PlanIdeaDeck';
+import { focusPlan, ideaQueue, scheduledPlans } from './planFocus';
+import { isClosed } from './planModel';
 import { usePlanMutations, usePlans } from './usePlans';
 import '@/features/world/worldDim.css';
 import './plans.css';
 import './plansModule.css';
-import type { EventRow, EventType } from '@/types';
+import './plansFocus.css';
+import type { EventRow, EventType, PlanRow } from '@/types';
 
 type EventKind = Extract<EventType, 'anniversary' | 'birthday' | 'holiday'>;
 
@@ -44,10 +56,12 @@ type EventModal = {
   type: EventKind;
 } | null;
 
-import { PageHeader } from '@/components/ui/PageHeader';
+/** Які тихі лічильники відкриті. Календар приходить із рядка запиту. */
+type OpenSection = 'scheduled' | 'ideas' | 'closed' | 'calendar';
 
 export function PlansPage() {
   const navigate = useNavigate();
+  const [search] = useSearchParams();
 
   // Модуль впускає світ, як вішліст: сцена лишається фоном, дотики — сторінці.
   const { webglSupported } = useArtifactWorld();
@@ -59,11 +73,15 @@ export function PlansPage() {
   const [addingPlan, setAddingPlan] = useState(false);
   const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
   const [eventModal, setEventModal] = useState<EventModal>(null);
-  const [showClosed, setShowClosed] = useState(false);
+  const [open, setOpen] = useState<Set<OpenSection>>(
+    // `/calendar` веде сюди редиректом. Хто прийшов по календар, мусить
+    // побачити календар, а не шукати його за лічильником.
+    () => new Set(search.get('view') === 'calendar' ? (['calendar'] as OpenSection[]) : []),
+  );
 
   const plansQuery = usePlans();
   const eventsQuery = useEvents();
-  const { addPlan, confirmPlan } = usePlanMutations();
+  const { addPlan, confirmPlan, updatePlan } = usePlanMutations();
   const { addEvent, updateEvent } = useCalendarMutations();
 
   const plans = useMemo(() => plansQuery.data ?? [], [plansQuery.data]);
@@ -71,7 +89,7 @@ export function PlansPage() {
 
   // Календар показує важливі моменти, дні народження й звичайні календарні
   // дати/свята. Вони всі живуть у `events`, тому ніколи не потрапляють у
-  // PlanSection нижче.
+  // списки планів нижче.
   const calendarEvents = useMemo(
     () => events.filter((event) => (
       event.type === 'anniversary' || event.type === 'birthday' || event.type === 'holiday'
@@ -83,7 +101,17 @@ export function PlansPage() {
     [calendarEvents],
   );
 
-  const groups = useMemo(() => groupPlans(plans), [plans]);
+  const hero = useMemo(() => focusPlan(plans), [plans]);
+  const ideas = useMemo(() => ideaQueue(plans), [plans]);
+  const scheduled = useMemo(() => scheduledPlans(plans, new Date(), hero), [plans, hero]);
+  const closed = useMemo(() => plans.filter(isClosed), [plans]);
+
+  const toggle = (section: OpenSection) => setOpen((current) => {
+    const next = new Set(current);
+    if (next.has(section)) next.delete(section);
+    else next.add(section);
+    return next;
+  });
 
   const openNewEvent = (type: EventKind = 'holiday', date?: string) => {
     setEventModal({ row: null, type, date });
@@ -101,9 +129,7 @@ export function PlansPage() {
   // Плюс означає рівно одну дію — новий план. Календарна подія
   // створюється контекстно: другий тап по вже вибраному дню в сітці
   // відкриває її модалку з датою (`onAddOn` нижче).
-  const openPlanComposer = () => {
-    setAddingPlan(true);
-  };
+  const openPlanComposer = () => setAddingPlan(true);
 
   const closeAddPlan = () => {
     if (addPlan.isPending) return;
@@ -139,10 +165,6 @@ export function PlansPage() {
       ) : skeletonVisible ? (
         // Скелет перевіряється ПЕРЕД `busy`: саме він тримає гілку, поки
         // не вийде мінімальний час показу (див. `useSettledPending`).
-        //
-        // `pm-sheet--loading` знімає вхідну анімацію саме зі скелета:
-        // інакше `pm-sheet-in` грає двічі поспіль на двох різних
-        // розкладках, і перехід читається як ривок.
         <div className="pm-sheet pm-sheet--loading" aria-busy="true">
           <div className="pm-skeleton pm-skeleton--month" />
           <div className="pm-tiles">
@@ -152,60 +174,91 @@ export function PlansPage() {
         </div>
       ) : busy ? null : (
         <div className="pm-sheet">
-          <CalendarMonthView
-            events={calendarEvents}
-            plans={plans}
-            yr={yr}
-            mo={mo}
-            onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
-            onGoToday={() => setYm(currentYearMonth())}
-            // Перший тап по дню лише вибирає його. Повторний тап по тому
-            // самому дню (або кнопка в панелі дня) одразу відкриває модалку
-            // календарної події з уже підставленою датою.
-            onAddOn={(date) => openNewEvent('holiday', date)}
-            onOpenEvent={(event) => openExistingEvent(
-              enriched.find((item) => item.id === event.id) ?? event,
-            )}
-            onOpenPlan={(id) => navigate(`/plans/${id}`)}
-          />
+          {hero !== null
+            ? <PlanFocusHero plan={hero} />
+            : <PlanFocusEmpty ideas={ideas.length} />}
 
-          <PlanSection
-            title="Найближчі плани"
-            more="Дивитися всі"
-            plans={groups.upcoming}
-            onConfirm={(id) => confirmPlan.mutate(id)}
-            empty="Жодного плану з датою. Додайте перший — він одразу стане в сітці вище."
-          />
-
-          <PlanSection
-            title="Ідеї без дати"
-            more="Колись"
-            plans={groups.ideas}
-            onConfirm={(id) => confirmPlan.mutate(id)}
-            empty="Ідей поки немає."
-          />
-
-          {groups.closed.length > 0 && (
+          {ideas.length > 0 && (
             <>
-              <button
-                type="button"
-                className="pm-section-toggle"
-                aria-expanded={showClosed}
-                onClick={() => setShowClosed((current) => !current)}
-              >
-                Завершені
-                <span>
-                  {groups.closed.length}
-                  <ChevronRightIcon size={16} />
-                </span>
-              </button>
-              {showClosed && (
-                <div className="pm-tiles">
-                  {groups.closed.map((plan) => <PlanTile key={plan.id} plan={plan} />)}
-                </div>
-              )}
+              <div className="pm-section-head">
+                <h2>Що наступне?</h2>
+              </div>
+              <PlanIdeaDeck
+                ideas={ideas}
+                busy={updatePlan.isPending}
+                /*
+                 * `date_precision: 'day'` разом зі `start_date` — саме та
+                 * пара, якої чекає `hasPreciseDate`. Без неї задум дістав
+                 * би дату й однаково лишився б поза сіткою й поза
+                 * відліком, тобто дія виглядала б зробленою й не була б.
+                 */
+                onPickDate={(id, iso) => updatePlan.mutate({
+                  id,
+                  patch: { start_date: iso, end_date: null, date_precision: 'day' },
+                })}
+              />
             </>
           )}
+
+          <QuietSection
+            label="Заплановано"
+            count={scheduled.length}
+            open={open.has('scheduled')}
+            onToggle={() => toggle('scheduled')}
+          >
+            <div className="pm-tiles">
+              {scheduled.map((plan) => (
+                <PlanTile key={plan.id} plan={plan} onConfirm={(id) => confirmPlan.mutate(id)} />
+              ))}
+            </div>
+          </QuietSection>
+
+          <QuietSection
+            label="Задуми без дати"
+            count={ideas.length}
+            open={open.has('ideas')}
+            onToggle={() => toggle('ideas')}
+          >
+            <div className="pm-tiles">
+              {ideas.map((plan) => (
+                <PlanTile key={plan.id} plan={plan} onConfirm={(id) => confirmPlan.mutate(id)} />
+              ))}
+            </div>
+          </QuietSection>
+
+          <QuietSection
+            label="Прожито разом"
+            count={closed.length}
+            open={open.has('closed')}
+            onToggle={() => toggle('closed')}
+          >
+            <div className="pm-tiles">
+              {closed.map((plan) => <PlanTile key={plan.id} plan={plan} />)}
+            </div>
+          </QuietSection>
+
+          <QuietSection
+            label="Календар"
+            open={open.has('calendar')}
+            onToggle={() => toggle('calendar')}
+          >
+            <CalendarMonthView
+              events={calendarEvents}
+              plans={plans}
+              yr={yr}
+              mo={mo}
+              onStepMonth={(delta) => setYm(stepMonth(yr, mo, delta))}
+              onGoToday={() => setYm(currentYearMonth())}
+              // Перший тап по дню лише вибирає його. Повторний тап по тому
+              // самому дню (або кнопка в панелі дня) одразу відкриває модалку
+              // календарної події з уже підставленою датою.
+              onAddOn={(date) => openNewEvent('holiday', date)}
+              onOpenEvent={(event) => openExistingEvent(
+                enriched.find((item) => item.id === event.id) ?? event,
+              )}
+              onOpenPlan={(id) => navigate(`/plans/${id}`)}
+            />
+          </QuietSection>
         </div>
       )}
 
@@ -248,51 +301,43 @@ export function PlansPage() {
   );
 }
 
-/** Скільки карток видно до того, як секція просить «Дивитися всі». */
-const SECTION_PREVIEW = 4;
-
 /**
- * Секція планів.
+ * Тихий лічильник, який розкривається на місці.
  *
- * Праворуч від назви стоїть вихід («Дивитися всі ›», «Колись ›») — так на
- * референсі. Він розкриває решту КАРТОК ТУТ САМО, а не веде кудись: окремого
- * екрана «всі плани» в застосунку немає, і вигадувати маршрут заради стрілки
- * не варто. Кнопка з'являється лише тоді, коли є що розкривати.
+ * ЦЕ ВІДПОВІДЬ НА НАЗВАНУ ЦІНУ ВАРІАНТА C: «список як список зникає».
+ * Зникнути він не має права — кожен запис мусить мати двері, — але й
+ * займати перший екран теж. Тому рядок каже ЧИСЛО (це вже інформація:
+ * «прожито разом 12»), а вміст приходить на дотик.
+ *
+ * Порожній розділ не показується взагалі: рядок «Заплановано 0» — це
+ * шум, який ще й читається як несправність. Календар — виняток, у нього
+ * лічильника немає, бо місяць не рахується.
  */
-function PlanSection({ title, more, plans, onConfirm, empty }: {
-  title: string;
-  more: string;
-  plans: readonly import('@/types').PlanRow[];
-  onConfirm: (id: number) => void;
-  empty: string;
+function QuietSection({ label, count, open, onToggle, children }: {
+  label: string;
+  count?: number;
+  open: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const hidden = Math.max(0, plans.length - SECTION_PREVIEW);
-  const shown = expanded ? plans : plans.slice(0, SECTION_PREVIEW);
-
+  if (count === 0) return null;
   return (
     <>
-      <div className="pm-section-head">
-        <h2>{title}</h2>
-        {hidden > 0 && (
-          <button
-            type="button"
-            className="pm-section-more"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((current) => !current)}
-          >
-            {expanded ? 'Згорнути' : more}
-            <ChevronRightIcon size={16} />
-          </button>
-        )}
-      </div>
-      {plans.length === 0 ? (
-        <p className="pm-section-empty">{empty}</p>
-      ) : (
-        <div className="pm-tiles">
-          {shown.map((plan) => <PlanTile key={plan.id} plan={plan} onConfirm={onConfirm} />)}
-        </div>
-      )}
+      <button
+        type="button"
+        className="pf-quiet"
+        aria-expanded={open}
+        onClick={onToggle}
+      >
+        <span className="pf-quiet-mark">
+          <ChevronRightIcon size={15} />
+          {label}
+        </span>
+        {count !== undefined && <b>{count}</b>}
+      </button>
+      {open && <div className="pf-quiet-body">{children}</div>}
     </>
   );
 }
+
+export type { PlanRow };

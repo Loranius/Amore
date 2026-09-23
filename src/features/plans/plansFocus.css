@@ -1,0 +1,256 @@
+/* ============================================================
+   Фокус модуля «Плани» — варіант C (ADR-0207).
+   ------------------------------------------------------------
+   Один активний план зверху, колода задумів під ним, тихі лічильники
+   внизу. Тут немає жодного нового токена, жодного нового радіуса й
+   жодної нової тривалості: усе з `index.css` і зі шкали 90·160·180·
+   220·260 мс (`amore-visual-direction`).
+
+   КОЛІР КАТЕГОРІЇ ВХОДИТЬ У ПОВЕРХНЮ, А НЕ ЗАЛИВАЄ ЇЇ. Попередня
+   редакція клала градієнт на третину ширини плитки — на знімку це
+   читалось як пляма, а не як підказка. Тут відтінок дає 18% поверхні
+   й кант; ґрунт лишається нейтральним (DESIGN.md, The Rare Colour Rule).
+
+   РОЗМИТТЯ ТУТ НЕМАЄ ЖОДНОГО. The One Blur Rule: під цими поверхнями
+   живе вже розмита `worldDim`-вуаль, тож `backdrop-filter` намалював би
+   плаский колір за ціну щокадрової роботи.
+   ============================================================ */
+
+/* ── Герой ───────────────────────────────────────────────── */
+.pf-hero {
+  position: relative;
+  border-radius: var(--radius-lg);
+  padding: 16px 16px 14px;
+  background:
+    linear-gradient(
+      158deg,
+      color-mix(in srgb, var(--plan-color, var(--accent)) 18%, var(--surface)) 0%,
+      var(--surface) 64%
+    );
+  border: 1px solid color-mix(in srgb, var(--plan-color, var(--accent)) 30%, var(--border));
+  box-shadow: var(--shadow-md);
+}
+
+/* Уся картка веде на план — одним посиланням поверх, а не стрілкою в
+   кутку. Стрілок у модулі було п'ять на екран, і всі однакові. */
+.pf-hero-open {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  z-index: 1;
+}
+.pf-hero-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pf-hero-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  /* Підпис на кольоровій поверхні тонується ВІД ЦЬОГО Ж відтінку, а не
+     сіріє: сіре на фіолетовому — найчастіший спосіб здешевити портал. */
+  color: color-mix(in srgb, var(--plan-color, var(--accent)) 62%, var(--text));
+}
+
+.pf-hero-title {
+  margin: 7px 0 2px;
+  font-size: 25px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.16;
+}
+
+.pf-hero-date {
+  margin: 0;
+  font-size: 13.5px;
+  color: color-mix(in srgb, var(--plan-color, var(--accent)) 38%, var(--muted));
+}
+
+.pf-hero-bar {
+  margin-top: 13px;
+  block-size: 7px;
+  border-radius: var(--radius-pill);
+  /* Доріжка тоном ВІД ЧОРНИЛА, а не жорстким чорним: у світлій темі
+     34% чорного дали б смугу, темнішу за сам текст. `--text` у кожній
+     темі свій, тож ця заливка тримається обох. */
+  background: color-mix(in srgb, var(--text) 16%, transparent);
+  overflow: hidden;
+}
+.pf-hero-bar i {
+  display: block;
+  block-size: 100%;
+  border-radius: var(--radius-pill);
+  background: linear-gradient(
+    90deg,
+    var(--plan-color, var(--accent)),
+    color-mix(in srgb, var(--plan-color, var(--accent)) 55%, var(--accent))
+  );
+  transform-origin: left center;
+}
+
+.pf-hero-nums {
+  display: flex;
+  justify-content: space-between;
+  margin: 7px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: color-mix(in srgb, var(--plan-color, var(--accent)) 34%, var(--muted));
+}
+
+.pf-hero--empty {
+  background: var(--surface);
+  border-color: var(--border);
+  box-shadow: none;
+}
+.pf-hero--empty .pf-hero-title { font-size: 21px; }
+
+/* ── Колода задумів ──────────────────────────────────────── */
+.pf-deck {
+  position: relative;
+  margin-top: 18px;
+}
+
+.pf-card {
+  position: relative;
+  z-index: 2;
+  border-radius: var(--radius-lg);
+  padding: 15px 15px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-md);
+}
+
+/* Стос — власна система координат. Без неї `inset: 0` міряло б усю
+   секцію разом із лічильником під нею, і тло колоди накривало б його:
+   саме це показав перший живий знімок екрана. */
+.pf-deck-stack { position: relative; }
+
+/* Тло колоди. Абсолютні, бо вони не займають місця — вони лише
+   визирають з-під верхньої й кажуть «тут не один». `inset: 0` робить їх
+   рівно передньою карткою; без висоти вони ховались би за нею цілком. */
+.pf-card--behind {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+.pf-card--l1 { transform: translateY(9px) scale(0.965); opacity: 0.62; z-index: 1; }
+.pf-card--l2 { transform: translateY(18px) scale(0.93); opacity: 0.34; z-index: 0; }
+
+.pf-card-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--plan-color, var(--accent));
+}
+
+.pf-card-title {
+  margin: 7px 0 3px;
+  font-size: 21px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+.pf-card-title a { color: inherit; text-decoration: none; }
+.pf-card-title a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius-hair);
+}
+
+.pf-card-why {
+  margin: 0 0 13px;
+  font-size: 13.5px;
+  color: var(--muted);
+}
+
+.pf-card-acts { display: flex; gap: 8px; }
+/* Головна дія тягнеться, тиха — рівно під свій підпис. Обидві 48px:
+   той самий зріст, що в смузі дій модалки (DESIGN.md). */
+.pf-card-date { flex: 1; min-block-size: 48px; }
+.pf-card-next { min-block-size: 48px; padding-inline: 18px; }
+
+/* Поле дати стоїть під кнопкою й не ховається `display: none`: схований
+   input не отримує фокуса з клавіатури, а `showPicker()` у частині
+   браузерів відмовляється відкриватись для невидимого елемента. */
+.pf-card-input {
+  position: absolute;
+  inset-inline-start: 15px;
+  inset-block-end: 14px;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+  border: 0;
+  padding: 0;
+}
+.pf-card-input:focus-visible {
+  inline-size: auto;
+  block-size: auto;
+  opacity: 1;
+  position: static;
+  margin-top: 10px;
+}
+
+.pf-deck-count {
+  margin: 10px 0 0;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+/* ── Тихі лічильники ─────────────────────────────────────── */
+.pf-quiet {
+  inline-size: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 13px 15px;
+  min-block-size: 48px;
+  border-radius: var(--radius-md);
+  /* Те саме й тут: білі 3% на світлому ґрунті — це ніщо, і рядок
+     тримався б самим кантом. Світла тема це й показала. */
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+  transition: background var(--dur-press, 120ms) ease-out;
+}
+.pf-quiet:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+.pf-quiet[aria-expanded='true'] { background: color-mix(in srgb, var(--text) 8%, transparent); }
+.pf-quiet b { color: var(--text); font-weight: 800; }
+.pf-quiet-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.pf-quiet svg { transition: rotate 180ms ease-out; }
+.pf-quiet[aria-expanded='true'] svg { rotate: 90deg; }
+
+.pf-quiet-body { margin-top: 8px; }
+
+/* ── Один авторський момент ──────────────────────────────── */
+@media (prefers-reduced-motion: no-preference) {
+  /* Смуга поступу виростає з нуля рівно раз, на появі героя. Це єдина
+     авторська анімація екрана: решта — зворотний зв'язок на дотик. */
+  .pf-hero-bar i { animation: pf-grow 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both; }
+  @keyframes pf-grow { from { transform: scaleX(0); } }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pf-quiet svg { transition: none; }
+}

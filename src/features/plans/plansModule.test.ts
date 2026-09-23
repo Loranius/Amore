@@ -89,3 +89,41 @@ describe('«Кристальний шлях» видалено, а не прих
     expect(guilty).toEqual([]);
   });
 });
+
+describe('колода задумів не накриває власний лічильник (ADR-0207)', () => {
+  /*
+   * ВАДА, ЗА ФАКТОМ ЯКОЇ НАПИСАНО. Нижні картки колоди мали
+   * `block-size: 100%`, і сотий відсоток міряв УСЮ секцію разом із
+   * підписом «1 з 5» під нею. Тло колоди лягало поверх лічильника, і той
+   * зникав. Знайшов це живий знімок, не типізація й не тест.
+   *
+   * Лікується двома речами разом, тому й стережуться обидві: стос дістає
+   * власну систему координат, а тло міряється `inset: 0`, тобто рівно
+   * передньою карткою.
+   */
+  const css = read('plansFocus.css');
+  const deck = readFileSync(join(PLANS_DIR, 'PlanIdeaDeck.tsx'), 'utf8');
+
+  it('стос має власну обгортку в розмітці', () => {
+    expect(deck).toContain('className="pf-deck-stack"');
+  });
+
+  it('обгортка створює систему координат', () => {
+    expect(css).toMatch(/\.pf-deck-stack\s*\{[^}]*position:\s*relative/);
+  });
+
+  it('тло колоди міряється передньою карткою, а не секцією', () => {
+    const rule = css.slice(css.indexOf('.pf-card--behind'));
+    const body = rule.slice(0, rule.indexOf('}'));
+    expect(body).toContain('inset: 0');
+    // Саме це поєднання і було вадою: висота у відсотках від секції.
+    expect(body).not.toMatch(/block-size:\s*100%/);
+  });
+
+  it('сторож справді дивиться в потрібне місце', () => {
+    // Без цього три зелені перевірки вище нічого не доводять: якби
+    // `read` повертав порожнє, вони б не впали лише на `not.toMatch`.
+    expect(css.length).toBeGreaterThan(500);
+    expect(css).toContain('.pf-card--behind');
+  });
+});
