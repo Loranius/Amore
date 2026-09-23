@@ -39,6 +39,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # CLAUDE.md п.7 вимагає цього при змінах у документації, а ганяв його
+      # досі лише той, хто згадав зробити це руками (аудит §1.3).
+      - name: Validate documentation
+        run: python3 scripts/validate_documentation.py
+
+      # Ворота з `scripts/quality-gate.sh` НЕ ганяються тут цілком — це
+      # повторило б typecheck, test і build нижче вдруге. Перевіряється
+      # тільки те, що їхній список не розійшовся з `package.json`: саме
+      # таке розходження й зробило старі ворота непрохідними (§1.2).
+      - name: Check the gate list matches package.json
+        run: bash scripts/quality-gate.sh --check
+
       - name: Typecheck
         run: |
           set -o pipefail
