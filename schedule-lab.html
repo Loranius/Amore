@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="uk" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Графік — три напрями</title>
+<meta name="description" content="Три композиції для вкладки «Графік» Amore на справжньому вересні пари.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   Світ порталу не вигадується заново: токени з `src/index.css`.
+   Модуль володіє КОМПОЗИЦІЄЮ, а не палітрою.
+   ============================================================ */
+:root {
+  --bg: #100b18;
+  --surface: #191424;
+  --surface-2: #231e2f;
+  --surface-3: #2f293b;
+  --text: #f5f4f6;
+  --muted: #b2a8c7;
+  --accent: #b06bff;
+  --accent-strong: #8b3df0;
+  --border: rgba(198, 160, 255, 0.14);
+  --warn: #f0a63a;
+  --today: #3fd8d8;
+  --sched-both: #9a67e0;
+  --sched-her: #e0759b;
+  --sched-him: #4fa8c8;
+
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-card: 16px;
+  --radius-lg: 22px;
+  --radius-xl: 28px;
+  --radius-pill: 999px;
+  --shadow-md: 0 10px 26px rgba(4, 2, 10, 0.5);
+  --shadow-lg: 0 24px 60px rgba(4, 2, 10, 0.6);
+  --page-gradient: linear-gradient(168deg, #161023 0%, #120d1c 52%, #0b0811 100%);
+  --ease: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased; line-height: 1.45;
+}
+
+.wrap { max-width: 1400px; margin: 0 auto; padding: 32px 16px 80px; }
+.lede { max-width: 68ch; margin: 0 auto 40px; }
+.lede h1 { font-size: clamp(28px, 6vw, 40px); font-weight: 800; letter-spacing: -0.02em; margin: 0 0 4px; }
+.lede .eyebrow {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.14em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 10px;
+}
+.lede p { color: var(--muted); margin: 0 0 12px; font-size: 15px; }
+.lede strong { color: var(--text); font-weight: 700; }
+.lede code { font-size: 0.92em; color: var(--text); }
+
+.facts { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); margin: 24px 0 8px; }
+.fact { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 12px 14px; }
+.fact b { display: block; font-size: 26px; font-weight: 800; line-height: 1.1; }
+.fact span { color: var(--muted); font-size: 12.5px; }
+.fact.warn b { color: var(--warn); }
+
+.decks { display: grid; gap: 44px; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); align-items: start; }
+.deck { display: flex; flex-direction: column; align-items: center; gap: 18px; min-width: 0; }
+.deck-head { width: min(412px, 100%); }
+.deck-head h2 { font-size: 22px; font-weight: 800; margin: 0 0 2px; letter-spacing: -0.01em; }
+.deck-head .axis {
+  font-size: 12px; font-weight: 800; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 8px;
+}
+.deck-head p { margin: 0 0 6px; color: var(--muted); font-size: 14px; }
+.deck-head .cost {
+  margin: 8px 0 0; font-size: 13.5px; color: var(--muted);
+  border-left: 3px solid var(--warn); padding-left: 10px;
+}
+.deck-head .cost b { color: var(--warn); font-weight: 800; }
+
+.phone {
+  width: min(412px, 100%); height: 800px;
+  background: var(--page-gradient); border: 1px solid var(--border);
+  border-radius: 34px; box-shadow: var(--shadow-lg);
+  overflow: hidden; position: relative; display: flex; flex-direction: column;
+}
+.screen { flex: 1; min-width: 0; overflow-y: auto; padding-bottom: 86px; }
+.screen::-webkit-scrollbar { width: 0; }
+.pad { padding: 0 16px; }
+
+.hdr { padding: 20px 16px 8px; display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.hdr .kicker { font-size: 11px; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 2px; }
+.hdr h3 { margin: 0; font-size: 29px; font-weight: 800; letter-spacing: -0.02em; }
+.hdr .edit {
+  flex: none; font: inherit; font-size: 13.5px; font-weight: 800;
+  padding: 9px 15px; border-radius: var(--radius-pill);
+  background: var(--surface-2); border: 1px solid var(--border); color: var(--text);
+}
+.hdr .edit.on { background: linear-gradient(180deg, var(--accent), var(--accent-strong)); border-color: transparent; }
+
+.dock {
+  position: absolute; left: 12px; right: 12px; bottom: 12px; height: 62px;
+  background: rgba(25, 20, 36, 0.92); backdrop-filter: blur(14px);
+  border: 1px solid var(--border); border-radius: var(--radius-xl);
+  display: grid; grid-template-columns: repeat(5, 1fr);
+  align-items: center; text-align: center; font-size: 10.5px; font-weight: 700; color: var(--muted);
+}
+.dock .on { color: var(--text); }
+.dock i { display: block; height: 26px; }
+.dock .on i {
+  width: 44px; height: 26px; margin: 0 auto 3px; border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 34%, transparent);
+  border: 1px solid color-mix(in srgb, var(--accent) 50%, transparent);
+}
+.dock .heart { color: var(--accent); font-size: 19px; line-height: 26px; }
+
+/* ── Спільне ─────────────────────────────────────────────── */
+.next {
+  margin: 10px 0 0; padding: 14px 15px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(158deg, color-mix(in srgb, var(--sched-both) 20%, var(--surface)) 0%, var(--surface) 64%);
+  border: 1px solid color-mix(in srgb, var(--sched-both) 32%, var(--border));
+}
+.next .lbl { font-size: 11.5px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: color-mix(in srgb, var(--sched-both) 60%, var(--text)); }
+.next h4 { margin: 5px 0 1px; font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.next .sub { font-size: 13px; font-weight: 700; color: color-mix(in srgb, var(--sched-both) 45%, var(--muted)); }
+.next button {
+  margin-top: 12px; width: 100%; min-height: 46px;
+  font: inherit; font-size: 15px; font-weight: 800;
+  border-radius: var(--radius-pill); border: 0; color: #fff;
+  background: linear-gradient(180deg, var(--accent), var(--accent-strong));
+}
+
+.monthbar { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 10px; }
+.monthbar h4 { margin: 0; font-size: 17px; font-weight: 800; }
+.monthbar .arrows { display: flex; gap: 6px; }
+.monthbar .arrows span {
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border-radius: var(--radius-sm); background: var(--surface-2);
+  border: 1px solid var(--border); color: var(--muted); font-weight: 800;
+}
+
+/* Ключ: два імені, два кольори, один раз. */
+.key { display: flex; gap: 14px; align-items: center; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 10px; flex-wrap: wrap; }
+.key i { display: inline-block; width: 12px; height: 8px; border-radius: 3px; margin-right: 5px; vertical-align: -1px; }
+.key .her i { background: var(--sched-her); }
+.key .him i { background: var(--sched-him); }
+.key .both i { background: var(--sched-both); }
+
+.dows { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 5px; }
+.dows span { text-align: center; font-size: 10.5px; font-weight: 800; color: var(--muted); text-transform: uppercase; }
+
+/* ════════ A — ДВІ ДОРІЖКИ ════════ */
+.gridA { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cellA {
+  position: relative; aspect-ratio: 1 / 1.12;
+  border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--border);
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  padding-bottom: 4px;
+}
+.cellA .n { font-size: 14.5px; font-weight: 800; line-height: 1; }
+.cellA .lanes { display: flex; flex-direction: column; gap: 2px; width: 62%; }
+.cellA .lane { height: 5px; border-radius: 3px; background: rgba(255, 255, 255, 0.09); }
+.cellA .lane.her { background: var(--sched-her); }
+.cellA .lane.him { background: var(--sched-him); }
+.cellA.both {
+  background: color-mix(in srgb, var(--sched-both) 26%, var(--surface));
+  border-color: color-mix(in srgb, var(--sched-both) 62%, transparent);
+}
+.cellA.both .n { color: #fff; }
+.cellA.today { outline: 2px solid var(--today); outline-offset: -2px; }
+.cellA .plan {
+  position: absolute; top: 4px; right: 4px;
+  width: 5px; height: 5px; border-radius: 50%; background: var(--warn);
+}
+.cellA.out { opacity: 0; pointer-events: none; }
+
+/* ════════ B — ТИЖДЕНЬ РЯДКОМ ════════ */
+.weeks { display: flex; flex-direction: column; gap: 9px; }
+.week {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-md); padding: 8px 9px 9px;
+}
+.week .nums { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-bottom: 5px; }
+.week .nums span { text-align: center; font-size: 12px; font-weight: 800; color: var(--muted); }
+.week .nums span.today { color: var(--today); }
+.week .nums span.both { color: #fff; }
+.week .nums span.out { opacity: 0.18; }
+.lane-row { display: grid; grid-template-columns: 26px 1fr; gap: 7px; align-items: center; margin-top: 3px; }
+.lane-row b { font-size: 10.5px; font-weight: 800; color: var(--muted); text-align: right; }
+.lane-track { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; }
+.lane-cell { height: 13px; border-radius: 4px; background: rgba(255, 255, 255, 0.07); }
+.lane-cell.off.her { background: var(--sched-her); }
+.lane-cell.off.him { background: var(--sched-him); }
+.lane-cell.out { opacity: 0; }
+/* Спільний вихідний — одна смуга на обидві доріжки. Вона мусить стояти
+   В ТІЙ САМІЙ сітці, що й доріжки: перша редакція малювала її на всю
+   ширину тижня, і вона роз'їжджалась із днями на ширину підпису. */
+.week .shared { display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px; margin-top: 4px; }
+.week .shared span { height: 4px; border-radius: 3px; }
+.week .shared span.on { background: var(--sched-both); }
+
+/* ════════ C — ПЕНЗЕЛЬ ПРИ СІТЦІ ════════ */
+.brush {
+  position: sticky; top: 0; z-index: 3;
+  margin: 0 -16px 10px; padding: 10px 16px;
+  background: linear-gradient(180deg, #14101f 72%, rgba(20, 16, 31, 0));
+}
+.brush .who { display: flex; gap: 6px; margin-bottom: 7px; }
+.brush .who button {
+  flex: 1; min-height: 40px; font: inherit; font-size: 13.5px; font-weight: 800;
+  border-radius: var(--radius-pill); background: var(--surface-2);
+  border: 1px solid var(--border); color: var(--muted);
+}
+.brush .who button.on { color: var(--text); border-color: color-mix(in srgb, var(--sched-him) 70%, transparent); background: color-mix(in srgb, var(--sched-him) 22%, var(--surface-2)); }
+.brush .marks { display: flex; gap: 6px; }
+.brush .marks button {
+  flex: 1; min-height: 44px; font: inherit; font-size: 13.5px; font-weight: 800;
+  border-radius: var(--radius-md); background: var(--surface-2);
+  border: 1px solid var(--border); color: var(--muted);
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+}
+.brush .marks button.on { color: #fff; background: linear-gradient(180deg, var(--accent), var(--accent-strong)); border-color: transparent; }
+.brush .marks i { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.brush .marks .w i { background: rgba(255,255,255,0.22); }
+.brush .marks .o i { background: var(--sched-him); }
+.brush .hint { margin: 7px 0 0; font-size: 12px; color: var(--muted); }
+
+.gridC { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+.cellC {
+  position: relative; aspect-ratio: 1 / 1.05; border-radius: var(--radius-sm);
+  background: var(--surface); border: 1px solid var(--border);
+  display: grid; place-items: center; font-size: 15px; font-weight: 800;
+}
+.cellC .mine { position: absolute; inset: auto 5px 5px 5px; height: 4px; border-radius: 3px; background: rgba(255,255,255,0.10); }
+.cellC.off .mine { background: var(--sched-him); }
+.cellC.both { background: color-mix(in srgb, var(--sched-both) 24%, var(--surface)); border-color: color-mix(in srgb, var(--sched-both) 55%, transparent); }
+.cellC.today { outline: 2px solid var(--today); outline-offset: -2px; }
+.cellC.out { opacity: 0; }
+.cellC.sel { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 40%, transparent); }
+
+.fill { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 12.5px; font-weight: 700; color: var(--muted); }
+.fill b { color: var(--text); }
+
+@media (max-width: 860px) { .decks { grid-template-columns: 1fr; gap: 36px; } .wrap { padding: 24px 16px 64px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="lede">
+    <p class="eyebrow">Демо · вкладка «Графік»</p>
+    <h1>Що саме тут важко</h1>
+    <p>Модель проста: у кожного дня для кожного з двох є рівно один стан —
+      <strong>робота</strong> або <strong>вихідний</strong>. У базі за три місяці
+      існує лише два значення, <code>Р</code> і <code>Х</code>. Тобто складність
+      екрана вигадана, а не породжена даними.</p>
+
+    <div class="facts">
+      <div class="fact"><b>4</b><span>стани дня, і всі закодовані лише відтінком</span></div>
+      <div class="fact"><b>2×</b><span>заливка й підкреслення кажуть те саме</span></div>
+      <div class="fact warn"><b>~1640<span style="font-size:15px"> px</span></b><span>хрому до першого дня в режимі редагування</span></div>
+      <div class="fact"><b>3×</b><span>«графік заповнено» сказано тричі на одному екрані</span></div>
+    </div>
+
+    <p style="margin-top:14px"><strong>Легенда пояснює не те.</strong> Єдиний
+      підпис під сіткою — про помаранчеву крапку (план на день). Про кольори,
+      які заливають усю сітку, не сказано нічого: чому 5 вересня темно-червоне,
+      а 2-ге темно-синє, доводиться здогадуватись.</p>
+
+    <p><strong>Редагування стоїть далеко від того, що редагує.</strong> У режимі
+      правки до першої клітинки треба проскролити шапку, картку «наступний
+      спільний вихідний» (яка під час правки лише заважає), перемикач місяця,
+      дві картки «Графік заповнено», перемикач людини, панель «Позначати як» і
+      смугу заповнення. Змінив пензель — скрол униз; торкнувся дня — скрол
+      угору. Плюс мертва кнопка «Пропусків немає», яка нічого не робить.</p>
+
+    <p><strong>І одна помилка, якої тест на Node побачити не міг.</strong>
+      Картка пише «неділю, 20 вересня» замість «неділя». Причина не в коді:
+      <code>toLocaleDateString</code> із днем тижня <em>у складі дати</em> дає
+      в ICU Chromium знахідний відмінок, а Node — називний. Виміряно обома:
+      Chromium «неділю» / «суботу», Node «неділя» / «субота». Лікується тим, що
+      день тижня форматується <strong>окремо</strong> — тоді Chromium теж дає
+      називний.</p>
+
+    <p style="margin-top:14px">Усе наповнення нижче — <strong>справжній вересень
+      пари</strong>: 15 вихідних у Лєни, 11 у Діми, 8 спільних. Серед них те,
+      чого нинішня сітка не показує зовсім — <strong>17–20 вересня, чотири
+      спільні вихідні поспіль</strong>.</p>
+  </header>
+
+  <div class="decks" id="decks"></div>
+
+  <footer class="lede" style="margin-top:56px">
+    <p class="eyebrow">Спільне в усіх трьох</p>
+    <p>Заливка й підкреслення більше не кажуть те саме: <strong>стан показує
+      одна річ</strong>. Ключ із двома іменами стоїть один раз угорі й пояснює
+      саме те, що бачиш у сітці. «Графік заповнено» сказано <strong>один
+      раз</strong>, а не тричі. Мертвої кнопки немає. День тижня — у називному
+      відмінку.</p>
+    <p>Жодного нового кольору: <code>--sched-her</code>, <code>--sched-him</code>
+      і <code>--sched-both</code> уже є в <code>index.css</code> — саме ними й
+      підписані чипи на нинішньому екрані. Змінилось те, що вони тепер
+      <em>послідовні</em>: той самий колір означає те саме в ключі, у клітинці
+      й у підсумку.</p>
+  </footer>
+</div>
+
+<script>
+/* Справжній вересень 2026, прочитаний із бази пари.
+   Х — вихідний, Р — робота. 1 вересня 2026 — вівторок. */
+const SEPT = [
+  ['Х','Х'],['Р','Х'],['Р','Р'],['Р','Р'],['Х','Р'],['Х','Р'],['Х','Р'],
+  ['Р','Р'],['Р','Х'],['Х','Х'],['Х','Р'],['Р','Р'],['Р','Р'],['Х','Р'],
+  ['Р','Р'],['Р','Р'],['Х','Х'],['Х','Х'],['Х','Х'],['Х','Х'],['Р','Р'],
+  ['Р','Р'],['Р','Х'],['Х','Х'],['Х','Р'],['Х','Р'],['Р','Р'],['Р','Р'],
+  ['Р','Р'],['Х','Х'],
+]; // [Лєна, Діма] для днів 1..30
+const TODAY = 23;
+const PLAN_DAYS = new Set([17]);        // подія в сітці «Планів» того ж місяця
+const LEAD = 1;                          // порожніх клітинок перед 1 вересня
+const day = (n) => SEPT[n - 1];
+const herOff = (n) => day(n)[0] === 'Х';
+const himOff = (n) => day(n)[1] === 'Х';
+const bothOff = (n) => herOff(n) && himOff(n);
+
+const el = (tag, cls, html) => {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (html !== undefined) node.innerHTML = html;
+  return node;
+};
+
+const DOWS = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'нд'];
+
+function dock(active) {
+  const nav = el('nav', 'dock');
+  for (const [name, on] of [['Вішлист', 0], ['Плани', 0], ['', 0], ['Покупки', 0], ['Ще', 1]]) {
+    const slot = el('div', on ? 'on' : '');
+    slot.append(el('i', name ? '' : 'heart', name ? '' : '♥'));
+    if (name) slot.append(document.createTextNode(name));
+    nav.append(slot);
+  }
+  return nav;
+}
+
+function header(title, editOn, editLabel) {
+  const h = el('div', 'hdr');
+  const left = el('div');
+  left.append(el('p', 'kicker', 'Календар пари'), el('h3', null, title));
+  h.append(left, el('button', 'edit' + (editOn ? ' on' : ''), editLabel));
+  return h;
+}
+
+function nextShared() {
+  const box = el('div', 'next');
+  box.innerHTML = `
+    <div class="lbl">Наступний спільний вихідний</div>
+    <h4>четвер, 24 вересня</h4>
+    <div class="sub">Завтра</div>
+    <button type="button">Запланувати</button>`;
+  return box;
+}
+
+function monthBar() {
+  const bar = el('div', 'monthbar');
+  bar.innerHTML = `<h4>Вересень 2026</h4>
+    <div class="arrows"><span>‹</span><span>›</span></div>`;
+  return bar;
+}
+
+function keyRow() {
+  const k = el('div', 'key');
+  k.innerHTML = `<span class="her"><i></i>Лєна вільна</span>
+    <span class="him"><i></i>Діма вільний</span>
+    <span class="both"><i></i>обоє</span>`;
+  return k;
+}
+
+function dows() {
+  const row = el('div', 'dows');
+  for (const d of DOWS) row.append(el('span', null, d));
+  return row;
+}
+
+/* ── A ── */
+function variantA() {
+  const scr = el('div', 'screen');
+  scr.append(header('Графік', false, 'Готово'));
+  const pad = el('div', 'pad');
+  pad.append(nextShared(), monthBar(), keyRow(), dows());
+
+  const grid = el('div', 'gridA');
+  for (let i = 0; i < LEAD; i += 1) grid.append(el('div', 'cellA out'));
+  for (let n = 1; n <= 30; n += 1) {
+    const cell = el('div', 'cellA' + (bothOff(n) ? ' both' : '') + (n === TODAY ? ' today' : ''));
+    cell.append(el('div', 'n', String(n)));
+    const lanes = el('div', 'lanes');
+    lanes.append(el('div', 'lane' + (herOff(n) ? ' her' : '')), el('div', 'lane' + (himOff(n) ? ' him' : '')));
+    cell.append(lanes);
+    if (PLAN_DAYS.has(n)) cell.append(el('div', 'plan'));
+    grid.append(cell);
+  }
+  pad.append(grid);
+  pad.append(el('p', 'fill', '<span>Графік заповнено обома</span><b>вересень · 30 з 30</b>'));
+  scr.append(pad);
+  return scr;
+}
+
+/* ── B ── */
+function variantB() {
+  const scr = el('div', 'screen');
+  scr.append(header('Графік', false, 'Готово'));
+  const pad = el('div', 'pad');
+  pad.append(nextShared(), monthBar(), keyRow());
+
+  const weeks = el('div', 'weeks');
+  for (let start = 1 - LEAD; start <= 30; start += 7) {
+    const week = el('div', 'week');
+    const nums = el('div', 'nums');
+    const her = el('div', 'lane-track');
+    const him = el('div', 'lane-track');
+    const shared = el('div', 'shared');
+    for (let k = 0; k < 7; k += 1) {
+      const n = start + k;
+      const inside = n >= 1 && n <= 30;
+      nums.append(el('span', !inside ? 'out' : (n === TODAY ? 'today' : (bothOff(n) ? 'both' : '')), inside ? String(n) : '·'));
+      her.append(el('div', 'lane-cell her' + (inside && herOff(n) ? ' off' : '') + (inside ? '' : ' out')));
+      him.append(el('div', 'lane-cell him' + (inside && himOff(n) ? ' off' : '') + (inside ? '' : ' out')));
+      shared.append(el('span', inside && bothOff(n) ? 'on' : ''));
+    }
+    week.append(nums);
+    const r1 = el('div', 'lane-row'); r1.append(el('b', null, 'Л'), her);
+    const r2 = el('div', 'lane-row'); r2.append(el('b', null, 'Д'), him);
+    const r3 = el('div', 'lane-row'); r3.append(el('b', null, ''), shared);
+    week.append(r1, r2, r3);
+    weeks.append(week);
+  }
+  pad.append(weeks);
+  pad.append(el('p', 'fill', '<span>Графік заповнено обома</span><b>вересень · 30 з 30</b>'));
+  scr.append(pad);
+  return scr;
+}
+
+/* ── C ── */
+function variantC() {
+  const scr = el('div', 'screen');
+  scr.append(header('Графік', true, 'Завершити'));
+  const pad = el('div', 'pad');
+
+  const brush = el('div', 'brush');
+  brush.innerHTML = `
+    <div class="who"><button type="button" class="on">Діма</button><button type="button">Лєна</button></div>
+    <div class="marks">
+      <button type="button" class="w"><i></i>Робота</button>
+      <button type="button" class="o on"><i></i>Вихідний</button>
+      <button type="button">Стерти</button>
+    </div>
+    <p class="hint">Проведи пальцем по днях, щоб позначити кілька поспіль.</p>`;
+  pad.append(brush, dows());
+
+  const grid = el('div', 'gridC');
+  for (let i = 0; i < LEAD; i += 1) grid.append(el('div', 'cellC out'));
+  for (let n = 1; n <= 30; n += 1) {
+    /* Тут НЕ показуємо «обоє»: режим правки править графік однієї
+       людини, і другий стан у тій самій клітинці означав би, що екран
+       каже про двох, а редагує одного. */
+    const cls = ['cellC'];
+    if (himOff(n)) cls.push('off');
+    if (n === TODAY) cls.push('today');
+    if (n >= 25 && n <= 27) cls.push('sel');
+    const cell = el('div', cls.join(' '), String(n));
+    cell.append(el('div', 'mine'));
+    grid.append(cell);
+  }
+  pad.append(grid);
+  pad.append(el('p', 'fill', '<span>Позначено за цей місяць</span><b>Діма · 30 з 30</b>'));
+  scr.append(pad);
+  return scr;
+}
+
+const DECKS = [
+  {
+    axis: 'Варіант A · вісь: позиція замість відтінку',
+    title: 'Дві доріжки',
+    body: 'У кожного дня дві смужки: верхня — Лєна, нижня — Діма. Заповнена означає вихідний. Хто саме вільний, каже <b>місце</b>, а не здогад про відтінок; спільний день додає рамку. Торкання смужки перемикає саме цей день — <b>режиму правки немає взагалі</b>.',
+    cost: 'ціль дотику — смужка, а не вся клітинка; на дрібних днях легко влучити не в ту.',
+    build: variantA,
+  },
+  {
+    axis: 'Варіант B · вісь: серії днів',
+    title: 'Тиждень рядком',
+    body: 'Місяць розгортається тижнями, а доріжки йдуть <b>горизонтально</b> — тому серія днів читається як суцільна смуга. 17–20 вересня одразу видно чотирма спільними вихідними поспіль, чого сітка не показує. Правка — протягом пальця по доріжці.',
+    cost: 'місяць займає більше висоти, і форма незвична: це вже не календар, а стрічка.',
+    build: variantB,
+  },
+  {
+    axis: 'Варіант C · вісь: правка поруч із сіткою',
+    title: 'Пензель при сітці',
+    body: 'Найобережніший: сітка лишається сіткою, але <b>пензель липне над нею</b>, а все, що заважає під час правки, згортається. Сітка — перше, що видно, а не останнє. Протягом пальця можна позначити кілька днів поспіль (на макеті — 25–27).',
+    cost: 'це все ще окремий режим: показано графік однієї людини, і щоб побачити обох, з нього треба вийти.',
+    build: variantC,
+  },
+];
+
+const host = document.getElementById('decks');
+for (const deck of DECKS) {
+  const section = el('section', 'deck');
+  const head = el('div', 'deck-head');
+  head.innerHTML = `<p class="axis">${deck.axis}</p><h2>${deck.title}</h2>
+    <p>${deck.body}</p><p class="cost"><b>Ціна:</b> ${deck.cost}</p>`;
+  const phone = el('div', 'phone');
+  phone.append(deck.build(), dock());
+  section.append(head, phone);
+  host.append(section);
+}
+</script>
+</body>
+</html>
