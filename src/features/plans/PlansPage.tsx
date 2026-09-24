@@ -22,7 +22,7 @@
 // означало б забрати в пари єдиний календар. Тому вона спустилась у свій
 // лічильник, а `/calendar` веде на `?view=calendar` і розкриває її одразу.
 // ============================================================
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSettledPending } from '@/lib/useSettledPending';
 import { ChevronRightIcon, PlusIcon } from '@/components/icons/UiIcon';
@@ -73,11 +73,32 @@ export function PlansPage() {
   const [addingPlan, setAddingPlan] = useState(false);
   const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
   const [eventModal, setEventModal] = useState<EventModal>(null);
-  const [open, setOpen] = useState<Set<OpenSection>>(
-    // `/calendar` веде сюди редиректом. Хто прийшов по календар, мусить
-    // побачити календар, а не шукати його за лічильником.
-    () => new Set(search.get('view') === 'calendar' ? (['calendar'] as OpenSection[]) : []),
-  );
+  const [open, setOpen] = useState<Set<OpenSection>>(() => new Set());
+
+  /*
+   * `/calendar` веде сюди редиректом. Хто прийшов по календар, мусить
+   * побачити календар, а не шукати його за лічильником.
+   *
+   * ЧОМУ ЕФЕКТ, А НЕ ПОЧАТКОВЕ ЗНАЧЕННЯ `useState`. Перша редакція
+   * ADR-0207 читала параметр саме там — і це працювало рівно доти, доки
+   * на екран заходили ЗЗОВНІ. `/plans` і `/plans?view=calendar` — це один
+   * і той самий елемент маршруту, тож перехід між ними НЕ перемонтовує
+   * сторінку, ініціалізатор не виконується вдруге, і посилання на
+   * `?view=calendar` з самого модуля не робило б нічого. Мовчки: адреса
+   * в рядку змінилась, екран — ні.
+   *
+   * Ефект залежить від булевого значення, а не від рядка запиту, і саме
+   * тому пара може розділ ЗАКРИТИ: закриття не міняє параметр, залежність
+   * лишається тією самою, ефект не запускається вдруге й не відкриває
+   * розділ назад.
+   */
+  const wantsCalendar = search.get('view') === 'calendar';
+  useEffect(() => {
+    if (!wantsCalendar) return;
+    setOpen((current) => (
+      current.has('calendar') ? current : new Set(current).add('calendar')
+    ));
+  }, [wantsCalendar]);
 
   const plansQuery = usePlans();
   const eventsQuery = useEvents();

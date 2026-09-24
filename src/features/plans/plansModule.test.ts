@@ -127,3 +127,55 @@ describe('колода задумів не накриває власний лі�
     expect(css).toContain('.pf-card--behind');
   });
 });
+
+describe('`?view=calendar` відкриває календар і на вже відкритій сторінці (ADR-0207)', () => {
+  /*
+   * ВИМОГА. Параметр `view=calendar` — це твердження про те, ЩО МАЄ БУТИ
+   * ВИДНО, а не подія входу. Він мусить відкривати календар незалежно від
+   * того, зайшли на модуль ззовні (`/calendar` → редирект) чи перейшли на
+   * нього з самого `/plans`.
+   *
+   * ВАДА, ЗА ФАКТОМ ЯКОЇ НАПИСАНО. Перша редакція ADR-0207 читала параметр
+   * у початковому значенні `useState`. `/plans` і `/plans?view=calendar` —
+   * один елемент маршруту, тож React не перемонтовує сторінку, і
+   * ініціалізатор удруге не виконується: адреса мінялась, екран — ні.
+   * Мовчки, без помилки. Спіймав це не тест, а питання «а що станеться,
+   * якщо перейти туди зсередини», поставлене до написання рядка e2e.
+   *
+   * ЧОМУ ЦЕ ПРОКСІ, І ЧОМУ ЦЬОГО МАЛО. У наборі немає DOM, тож поведінку
+   * React тут перевірити нічим — перевіряється лише МЕХАНІЗМ: параметр
+   * читається в хуку, який переживає зміну, а не в ініціалізаторі, що
+   * виконується раз. Саму поведінку стереже `e2e/visual/plans.visual.spec.ts`,
+   * який ходить `#/plans` → `#/plans?view=calendar` без перезавантаження.
+   */
+  const page = readFileSync(join(PLANS_DIR, 'PlansPage.tsx'), 'utf8');
+
+  /** Тіло `useState(...)`, у якому жила вада. */
+  const stateInit = page.slice(page.indexOf('useState<Set<OpenSection>>'));
+  const initBody = stateInit.slice(0, stateInit.indexOf(';'));
+
+  it('початкове значення розділів не залежить від рядка запиту', () => {
+    expect(initBody).not.toContain('view');
+    expect(initBody).not.toContain('search');
+  });
+
+  it('параметр читається там, де його зміну видно', () => {
+    expect(page).toMatch(/const wantsCalendar = search\.get\('view'\) === 'calendar'/);
+    expect(page).toMatch(/useEffect\(\(\) => \{[\s\S]*?wantsCalendar[\s\S]*?\}, \[wantsCalendar\]\)/);
+  });
+
+  it('ефект не повертає закритий розділ назад', () => {
+    // Залежність — булеве значення, а не рядок запиту: закриття розділу
+    // не міняє адресу, тож ефект не запускається вдруге. Якби тут стояв
+    // сам `search`, пара не змогла б календар закрити.
+    const effect = page.slice(page.indexOf('useEffect(() => {'));
+    expect(effect.slice(0, effect.indexOf('])'))).not.toContain('[search]');
+  });
+
+  it('сторож справді дивиться в потрібне місце', () => {
+    // Без цього три перевірки вище зелені й на порожньому рядку.
+    expect(page).toContain('useState<Set<OpenSection>>');
+    expect(initBody.length).toBeGreaterThan(10);
+    expect(initBody.length).toBeLessThan(200);
+  });
+});
