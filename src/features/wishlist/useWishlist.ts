@@ -36,16 +36,25 @@ import {
 } from './giftMemory';
 import { isAmbiguousWishlistTransportError } from './wishlistFailurePolicy';
 import type { WishlistImagePreference } from './wishlistImagePreference';
-import type { WishlistItemRow, UserName } from '@/types';
+import type { WishlistItemRow } from '@/types';
 
 const BUCKET = 'wishlist-photos';
 const ARCHIVE_SIGNED_URL_REFRESH_MS = 5 * 60 * 60 * 1000;
 const ARCHIVE_STALE_TIME_MS = 4 * 60 * 60 * 1000;
 
-const GENITIVE: Record<UserName, string> = { Діма: 'Діми', Лєна: 'Лєни' };
-export function partnerGenitive(name: string | undefined): string {
-  return name && name in GENITIVE ? GENITIVE[name as UserName] : (name ?? 'Партнера');
-}
+/*
+ * ТУТ БУЛА ДРУГА КОПІЯ `partnerGenitive` — із власною таблицею відмінків
+ * і ВЛАСНИМ запасним шляхом («Партнера» замість самого імені). Два
+ * правила на одне питання вже розійшлись, і саме так у цьому проєкті
+ * розходились два запити портальних джерел (ADR-0077) і дві копії правил
+ * геокодера (ADR-0079).
+ *
+ * Найкрасномовніше те, що цю копію **не імпортував ніхто**: усі чотири
+ * місця брали функцію з `partnerLabel.ts`, тобто розбіжність у запасному
+ * шляху не проявлялась — вона просто чекала. Реекспорт лишається, щоб
+ * імпорт звідси не зламався, але правило живе в одному місці.
+ */
+export { partnerGenitive } from './partnerLabel';
 
 export { usePartner };
 

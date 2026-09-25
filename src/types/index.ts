@@ -17,13 +17,29 @@
 // 1. КОРИСТУВАЧІ
 // ────────────────────────────────────────────────────────────
 
+declare const userNameBrand: unique symbol;
+
 /**
- * У системі рівно два користувачі. Літеральна унія — навмисно:
- * ловить друкарські помилки в порівняннях (`name === 'Лена'` не
- * скомпілюється). На межі з БД значення валідується guard'ом
- * `isUserName` (lib/guards.ts), а не сліпим кастом.
+ * Ім'я людини в порталі — рядок, який ПРОЙШОВ перевірку на межі з базою.
+ *
+ * ТУТ БУЛА ЛІТЕРАЛЬНА УНІЯ `'Діма' | 'Лєна'`, і в неї була чесна мета:
+ * ловити друкарські помилки в порівняннях (`name === 'Лена'` не
+ * компілювалось). Ціна виявилась іншого масштабу — **вона робила портал
+ * непридатним для будь-якої іншої пари**, хоч `users.name` у базі завжди
+ * був звичайним `text`. Тобто обмеження існувало лише в типах і не
+ * захищало жодного інваріанта даних.
+ *
+ * Найдорожче було не саме обмеження, а його наслідок у `toAppUser`:
+ * рядок із «чужим» іменем не падав з помилкою, а МОВЧКИ зникав зі
+ * списку (`useUsers` відфільтровує `null`). Зареєстрована пара
+ * побачила б екран входу без себе — без жодного повідомлення.
+ *
+ * Бренд лишається замість унії, бо роль `guards.ts` не змінилась: тип
+ * каже «це значення пройшло межу», а не «це один із двох рядків».
+ * Справжній інваріант тепер рантаймовий і названий у `asUserName`:
+ * непорожнє після обрізання, не довше `USER_NAME_MAX`.
  */
-export type UserName = 'Діма' | 'Лєна';
+export type UserName = string & { readonly [userNameBrand]: true };
 
 /**
  * Користувач, як його бачить клієнт після auth-pin.
@@ -613,6 +629,43 @@ export type AuthPinResponse =
       retryAfterSeconds?: number;
     };
 
+/** Один із двох при реєстрації: як зовуть і чим заходить. */
+export interface CoupleRegisterMember {
+  name: string;
+  /** Рівно 8 цифр — та сама умова, що в `AuthPinRequest`. */
+  pin: string;
+}
+
+export interface CoupleRegisterRequest {
+  members: [CoupleRegisterMember, CoupleRegisterMember];
+  /** `YYYY-MM-DD`. З неї рушій бере вік артефакта й початок тону. */
+  started_at: string;
+}
+
+/**
+ * Дискримінована унія за `ok`, як у `AuthPinResponse`.
+ *
+ * `portal_taken` — не збій, а названа відмова: реєстрація працює лише на
+ * порожньому порталі, доки ознака пари не стоїть на всіх таблицях
+ * (ADR-0209). Екран мусить показати це реченням, а не «щось пішло не так».
+ */
+export type CoupleRegisterResponse =
+  | { ok: true; couple_id: number; members: { id: number; name: string }[] }
+  | {
+      ok?: false;
+      error:
+        | 'portal_taken'
+        | 'bad_request'
+        | 'need_two_members'
+        | 'bad_member'
+        | 'bad_name'
+        | 'same_name'
+        | 'bad_pin'
+        | 'bad_started_at'
+        | 'started_at_in_future'
+        | 'server_error';
+    };
+
 /** Ключі кроків конструктора страв (порядок = порядок кроків майстра). */
 export type CulinaryStepKey =
   | 'type' | 'taste' | 'base' | 'ingredients' | 'effort' | 'cuisine';
@@ -702,6 +755,7 @@ export type DbNotifyResponse = { ok: boolean };
 /** Мапа ім'я функції → контракт. Джерело правди для invokeFn<K>. */
 export interface EdgeFunctions {
   'auth-pin':          { Body: AuthPinRequest; Response: AuthPinResponse };
+  'couple-register':   { Body: CoupleRegisterRequest; Response: CoupleRegisterResponse };
   'culinary-ai':       { Body: CulinaryAiRequest; Response: CulinaryDish };
   'shopping-parse':    { Body: ShoppingParseRequest; Response: ShoppingParseResponse };
   'events-finder':     { Body: EventsFinderRequest; Response: EventsFinderResponse };

@@ -1,6 +1,9 @@
-import type { UserName } from '@/types';
-
-const GENITIVE: Partial<Record<UserName, string>> = {
+/**
+ * Відомі родові форми. Ключ — звичайний рядок, а не `UserName`: імена
+ * пари більше не є двома літералами (`types/index.ts`), тож `Record`
+ * по них перестав щось обмежувати.
+ */
+const GENITIVE: Readonly<Record<string, string>> = {
   Діма: 'Діми',
   Лєна: 'Лєни',
 };
@@ -8,9 +11,17 @@ const GENITIVE: Partial<Record<UserName, string>> = {
 /**
  * Використовуємо відоме відмінювання для чинних імен, а для майбутніх
  * користувачів завжди показуємо фактичне ім'я без загального fallback.
+ *
+ * ЦЕ РІШЕННЯ ЛИШАЄТЬСЯ І ПІСЛЯ РЕЄСТРАЦІЇ, хоч тепер воно видиме: пара
+ * з іменем «Олексій» побачить «Бажання Олексій» — називний відмінок у
+ * родовому місці. Виводити український родовий із довільного імені
+ * правилами можна («-а»→«-и», «-й»→«-я», приголосний→«-а»), але це
+ * окрема робота з власним заміром: помилка тут не абстрактна, її пара
+ * читає власним іменем. Краще показати ім'я як є, ніж відмінок,
+ * вигаданий навмання. Названо як межа в ADR-0209.
  */
 export function partnerGenitive(name: string): string {
-  return GENITIVE[name as UserName] ?? name;
+  return GENITIVE[name] ?? name;
 }
 
 export function partnerWishlistTitle(name: string): string {

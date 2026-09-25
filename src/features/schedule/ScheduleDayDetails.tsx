@@ -13,10 +13,13 @@ import { PLAN_CATEGORIES, PLAN_STATUSES } from '@/features/plans/planConstants';
 import type { PlanRow } from '@/types';
 import type { DayStatus } from './scheduleViewModel';
 import { fmtLongDate, statusText } from './scheduleViewModel';
+import type { StatusNames } from './scheduleViewModel';
 
-export function ScheduleDayDetails({ date, status, plans, onClose, onPlan }: {
+export function ScheduleDayDetails({ date, status, names, plans, onClose, onPlan }: {
   date: string;
   status: DayStatus;
+  /** Імена приходять зі сторінки: панель їх не знає й не вгадує. */
+  names: StatusNames;
   plans: PlanRow[];
   onClose: () => void;
   onPlan: () => void;
@@ -27,7 +30,7 @@ export function ScheduleDayDetails({ date, status, plans, onClose, onPlan }: {
       <section className="sched-day-sheet" role="dialog" aria-modal="true" aria-label={`Деталі за ${fmtLongDate(date)}`}>
         <div className="sched-day-handle" />
         <div className="sched-day-head">
-          <div><span>{fmtLongDate(date)}</span><h2>{statusText(status)}</h2></div>
+          <div><span>{fmtLongDate(date)}</span><h2>{statusText(status, names)}</h2></div>
           <button type="button" onClick={onClose} aria-label="Закрити"><CloseIcon size={16} /></button>
         </div>
         {plans.length > 0 ? (

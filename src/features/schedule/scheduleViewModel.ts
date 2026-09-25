@@ -75,10 +75,42 @@ export function countdownLabel(date: string, today: string): string {
   return `Через ${days} дн.`;
 }
 
-export function statusText(status: DayStatus): string {
+/** Двоє членів пари, як їх зовуть — для рядка про стан дня. */
+export interface StatusNames {
+  /** Той, кого модуль тримає в слоті `--her` (другий за порядком id). */
+  lena: string | undefined;
+  /** Той, кого модуль тримає в слоті `--him` (перший за порядком id). */
+  dima: string | undefined;
+}
+
+/**
+ * Що сказано про день словами.
+ *
+ * ТУТ БУЛИ НЕ ЛИШЕ ІМЕНА, А Й РІД: «Лєна вільна» проти «Діма вільний».
+ * Імена підставити легко, рід — ні: з рядка `users.name` він не виводиться,
+ * а вгадувати його по закінченню означало б звертатись до пари неправильно
+ * її ж іменем (ADR-0209).
+ *
+ * Тому форма змінена на таку, що НЕ УЗГОДЖУЄТЬСЯ ні в роді, ні у відмінку:
+ * ім'я стоїть у називному, дієслово — у третій особі однини. Вона працює
+ * для «Лєна», «Діма», «Олексій» і «Marie» однаково.
+ *
+ * Ціна названа прямо: формулювання цієї пари змінилось із
+ * «Лєна вільна, Діма працює» на «Тільки Лєна відпочиває, Діма працює».
+ * Зміст той самий, слів на одне більше.
+ *
+ * `undefined` тут можливий, поки список користувачів не приїхав, і тоді
+ * рядок не вигадує імені: він каже про кількість, а не про людину.
+ */
+export function statusText(status: DayStatus, names: StatusNames): string {
   if (status === 'both-off') return 'Ви обоє вільні';
-  if (status === 'lena-off') return 'Лєна вільна, Діма працює';
-  if (status === 'dima-off') return 'Діма вільний, Лєна працює';
+  if (status === 'lena-off') return pairLine(names.lena, names.dima);
+  if (status === 'dima-off') return pairLine(names.dima, names.lena);
   return 'Спільного вихідного немає';
+}
+
+function pairLine(resting: string | undefined, working: string | undefined): string {
+  if (resting === undefined || working === undefined) return 'Вільний лише один із вас';
+  return `Тільки ${resting} відпочиває, ${working} працює`;
 }
 

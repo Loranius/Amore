@@ -23,6 +23,7 @@ import { Layout } from '@/components/layout/Layout';
 import { RouteErrorBoundary } from '@/components/layout/RouteErrorBoundary';
 import { RequireAuth, RedirectIfAuthed } from '@/components/guards/RequireAuth';
 import { LoginPage } from '@/features/auth/LoginPage';
+import { RegisterPage } from '@/features/auth/RegisterPage';
 import { HomePage } from '@/features/home/HomePage';
 import { PageSkeleton } from '@/components/ui/PageSkeleton';
 
@@ -103,6 +104,21 @@ export const router = createHashRouter([
     element: (
       <RedirectIfAuthed>
         <LoginPage />
+      </RedirectIfAuthed>
+    ),
+  },
+  {
+    /*
+     * Реєстрація стоїть ПОЗА `RequireAuth`, як і вхід: на порожньому
+     * порталі ще нікого немає, кому там бути авторизованим (ADR-0209).
+     * `RedirectIfAuthed` теж навколо неї — пара, яка вже зайшла, не має
+     * створювати другу пару, і саме це їй скаже сервер (`portal_taken`);
+     * краще не доводити її до цієї відмови.
+     */
+    path: '/register',
+    element: (
+      <RedirectIfAuthed>
+        <RegisterPage />
       </RedirectIfAuthed>
     ),
   },

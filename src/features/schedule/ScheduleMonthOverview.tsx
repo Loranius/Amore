@@ -88,14 +88,21 @@ export function ScheduleMonthOverview({
             <span className="sched-key-label">разом</span>
             <b>{statusCounts.both}</b>
           </span>
+          {/*
+            * ПІДПИС БЕРЕТЬСЯ З КОРИСТУВАЧА, А НЕ З ЛІТЕРАЛА. Тут стояли
+            * `Лєна` і `Діма` рядками — і саме такий рядок показав би
+            * зареєстрованій парі чужі імена над їхньою ж сіткою
+            * (ADR-0209). Обидва користувачі вже приходять пропсами з
+            * ADR-0208, тож брати підпис звідси нічого не коштує.
+            */}
           <span className="sched-key-item sched-key-item--her">
             <i className="sched-key-swatch" />
-            <span className="sched-key-label">Лєна</span>
+            <span className="sched-key-label">{lena?.name}</span>
             <b>{statusCounts.lena}</b>
           </span>
           <span className="sched-key-item sched-key-item--him">
             <i className="sched-key-swatch" />
-            <span className="sched-key-label">Діма</span>
+            <span className="sched-key-label">{dima?.name}</span>
             <b>{statusCounts.dima}</b>
           </span>
         </div>
@@ -150,7 +157,7 @@ export function ScheduleMonthOverview({
                 className={`sched-cell sched-cell--interactive sched-cell--${status}${date === today ? ' sched-cell--today' : ''}${date === selectedDate ? ' is-picked' : ''}`}
                 onClick={() => onSelectDate(date)}
                 aria-label={
-                  `${fmtLongDate(date)}. ${statusText(status)}`
+                  `${fmtLongDate(date)}. ${statusText(status, { lena: lena?.name, dima: dima?.name })}`
                   + `${plans.length ? '. Є план на цей день' : ''}`
                   + (editable ? `. Торкніться, щоб зробити ${mineOff ? 'робочим' : 'вихідним'}` : '')
                 }

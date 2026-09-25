@@ -10,9 +10,11 @@
 // фактично перемикає на /.
 // ============================================================
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
 import { useUsers } from '@/features/_shared/useUsers';
 import { PortalConfetti } from './PortalConfetti';
+import './register.css';
 import type { AppUser } from '@/types';
 
 type Screen = 'select' | 'pin' | 'portal';
@@ -76,6 +78,33 @@ export function LoginPage() {
       <div className="auth-screen">
         <div className="auth-card">
           <p className="empty-state">Не вдалось завантажити користувачів. Перевір Supabase.</p>
+        </div>
+      </div>
+    );
+  }
+
+  /*
+   * ПОРОЖНІЙ ПОРТАЛ — ЦЕ ОКРЕМИЙ ЕКРАН, А НЕ ПОРОЖНІЙ СПИСОК (ADR-0209).
+   *
+   * Доти гілки не було: при нульовому `users` малювався той самий вибір
+   * користувача, лише без кнопок. Питання «хто заходить?» над порожнім
+   * місцем — тупик, і саме так виглядав би свіжий портал.
+   *
+   * Перевіряється ДОВЖИНА, а не `isPending`/`isError`: обидва стани вже
+   * оброблені вище, тож сюди приходить успішна відповідь, у якій нікого
+   * немає.
+   */
+  if ((users?.length ?? 0) === 0) {
+    return (
+      <div className="auth-screen">
+        <div className="auth-card">
+          <div className="auth-kicker">Amore</div>
+          <h1 className="auth-title">Тут ще нікого немає</h1>
+          <p className="reg-hint">
+            Портал чекає на свою пару. Створення займає три кроки: імена,
+            PIN і день, з якого ви разом.
+          </p>
+          <Link className="btn reg-next" to="/register">Створити портал</Link>
         </div>
       </div>
     );

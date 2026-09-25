@@ -55,8 +55,36 @@ export function SchedulePage() {
   const currentMonth = currentYearMonth();
   const canRemindForMonth = month >= monthKeyOf(currentMonth.yr, currentMonth.mo);
   const currentUser = users.find((user) => user.name === me.name);
-  const lena = users.find((user) => user.name === 'Лєна');
-  const dima = users.find((user) => user.name === 'Діма');
+  /*
+   * ДВОЄ ЧЛЕНІВ ПАРИ ЗНАХОДЯТЬСЯ ПОРЯДКОМ, А НЕ ІМЕНЕМ (ADR-0209).
+   *
+   * Тут стояло `users.find((u) => u.name === 'Лєна')`. Для цієї пари це
+   * працює, для будь-якої іншої дає `undefined` — і сітка втратила б
+   * доріжку без жодної помилки. `useUsers` замовляє `order('id')`, тож
+   * порядок тут визначений, а не випадковий.
+   *
+   * Імена змінних лишаються `lena`/`dima` СВІДОМО й лише доти, доки
+   * модуль не перейде на нейтральні ключі: `statusCounts`, `DayStatus`
+   * і класи `--her`/`--him` носять ті самі два імені, і перейменувати
+   * одне з чотирьох означало б розсинхронити їх між собою. Це названа
+   * межа ADR-0209, а не забута дрібниця.
+   */
+  const [firstMember, secondMember] = users;
+  /*
+   * ПОРЯДОК → СЛОТ, І ЦЕЙ РЯДОК КОШТУВАВ ЗАМІРУ. Перша редакція написала
+   * `const [lena, dima] = users` — за алфавітом здогаду. У базі ж
+   * **id 1 — Діма, id 2 — Лєна** (перевірено запитом), тож ця редакція
+   * поміняла б обидві доріжки Й обидва підписи місцями на живому екрані
+   * власника. Типізація тут згодна на будь-який порядок: обидва — AppUser.
+   *
+   * Тому відображення назване прямо: перший член пари займає слот `--him`,
+   * другий — `--her`. Для цієї пари це дає точно той самий екран, що й
+   * раніше. Для нової пари порядок довільний, але СТАЛИЙ — рівно так само
+   * чесно, як `resolveCrystalColorPartners` обирає кольори за порядком id,
+   * коли імен не знає.
+   */
+  const dima = firstMember;
+  const lena = secondMember;
   const activeEditUser = users.find((user) => user.id === editUserId) ?? currentUser ?? users[0];
   const remindedUserIds = new Set(
     users.filter((user) => remindedKeys.has(`${month}:${user.id}`)).map((user) => user.id),
@@ -323,7 +351,7 @@ export function SchedulePage() {
         </>
       )}
 
-      {selectedDate && <ScheduleDayDetails date={selectedDate} status={selectedStatus} plans={plansOn(selectedDate)} onClose={() => setSelectedDate(null)} onPlan={openPlans} />}
+      {selectedDate && <ScheduleDayDetails date={selectedDate} status={selectedStatus} names={{ lena: lena?.name, dima: dima?.name }} plans={plansOn(selectedDate)} onClose={() => setSelectedDate(null)} onPlan={openPlans} />}
     </section>
   );
 }

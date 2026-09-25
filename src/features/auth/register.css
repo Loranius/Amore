@@ -1,0 +1,106 @@
+/* ============================================================
+   «Створити портал» — стиль реєстрації (ADR-0209).
+   ------------------------------------------------------------
+   Жодного нового токена, радіуса чи тривалості: екран стоїть на
+   `.auth-screen`/`.auth-card` входу й додає лише поля, підказку й
+   лічильник днів.
+
+   The Rare Colour Rule: ґрунт, картка й кант нейтральні; колір тут несе
+   рівно два стани — акцент на підписі кроку й `--danger` на причині
+   відмови. The Shadow Is A Shadow: тінь картки успадкована від
+   `.auth-card`, кольорового світіння немає. One Blur: розмиття немає
+   зовсім — під цим екраном немає нерозмитого тла, яке варто було б
+   показати.
+
+   The Two Accents Rule: `--accent` іде на текст і лінію (підпис кроку,
+   кант поля у фокусі), `--accent-strong` не використовується тут узагалі,
+   бо білого тексту на акценті на цьому екрані немає — головну кнопку
+   малює спільний `.btn`.
+   ============================================================ */
+
+.reg-card {
+  /* Пад цифр ширший за текстові поля, тож картка трохи просторіша за
+     логінову, але шкалу відступів не змінює. */
+  gap: 16px;
+}
+
+.reg-hint {
+  margin: -4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  text-align: center;
+}
+
+.reg-fields {
+  inline-size: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.reg-field {
+  inline-size: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: start;
+}
+.reg-field > span {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.reg-input {
+  inline-size: 100%;
+  /* 48px — той самий зріст, що в смузі дій модалки (DESIGN.md). */
+  min-block-size: 48px;
+  box-sizing: border-box;
+  padding: 0 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+/* 16px вище — не смак: менший кегль змушує Safari на iOS збільшувати
+   сторінку при фокусі в поле, і екран «стрибає». */
+.reg-input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.reg-pin-stage {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.reg-days {
+  margin: 0;
+  font-size: 15px;
+  color: var(--muted);
+}
+.reg-days b {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.reg-problem {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.4;
+  color: var(--danger);
+  text-align: center;
+}
+
+.reg-next { inline-size: 100%; min-block-size: 48px; }
+.reg-back { inline-size: 100%; min-block-size: 48px; }
