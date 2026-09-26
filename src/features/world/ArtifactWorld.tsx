@@ -19,7 +19,7 @@ import { useWebglSupport } from '../home/crystal3d/useWebglSupport';
 import { HomeArtifactWebglFallback } from '../home/HomeArtifactPreviewFallback';
 import { PortalBackdrop } from '../home/PortalBackdrop';
 import {
-  HOME_ARTIFACT_STORAGE_KEY,
+  HOME_ARTIFACT_QUERY_KEY,
   resolveHomeArtifact,
   withHomeArtifactSearch,
   type HomeArtifact,
@@ -35,47 +35,64 @@ import {
   type GrowthReporter,
   type WorldGrowth,
 } from './growthChannel';
+import {
+  cachedArtifact,
+  useSaveSharedArtifact,
+  useSharedArtifact,
+} from './sharedArtifact';
 import './artifactWorld.css';
 
 const CrystalScene = lazy(() => import('../home/crystal3d/CrystalSceneEntry'));
 const ReefScene = lazy(() => import('../home/reef3d/world/ReefWorldScene'));
 
-function storedArtifact(): string | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    return window.localStorage.getItem(HOME_ARTIFACT_STORAGE_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function persistArtifact(artifact: HomeArtifact): void {
-  if (typeof window === 'undefined') return;
-  try {
-    window.localStorage.setItem(HOME_ARTIFACT_STORAGE_KEY, artifact);
-  } catch {
-    // Storage may be unavailable in private or hardened browser modes.
-  }
-}
-
-/**
- * Holds which artifact is alive, for everything under the shell.
- *
- * Lifted out of `HomePage` unchanged — the URL parameter still wins over the
- * stored choice, the choice is still written back to both. What changed is only
- * how long it lives: with the world outliving the route, a selection that died
- * with the page would send a couple who chose the tree back to a crystal the
- * moment they visited the shopping list.
+/*
+ * ТУТ ЖИЛИ `storedArtifact` І `persistArtifact` — читання й запис у
+ * `localStorage`. Вибір виду переїхав у `settings` і став спільним для
+ * пари (ADR-0209 §17, рішення власника), тож обидві функції переїхали в
+ * `sharedArtifact.ts` разом із ним. Місцеве сховище не зникло — воно
+ * стало КЕШЕМ першого кадру, і саме тому лишилось під тим самим ключем:
+ * пара, яка вже обрала вид, не побачить стрибка з кристала.
  */
+
 export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
   const { supported: webglSupported, retry: retryWebgl } = useWebglSupport();
   const [artifact, setArtifact] = useState<HomeArtifact>(() => resolveHomeArtifact(
     typeof window === 'undefined' ? '' : window.location.search,
-    storedArtifact(),
+    cachedArtifact(),
   ));
 
+  const shared = useSharedArtifact();
+  const saveShared = useSaveSharedArtifact();
+
+  /*
+   * Спільний вибір переймається, КОЛИ приїхав, — і лише якщо адреса не
+   * називає вид явно.
+   *
+   * Виняток із адресою не з обережності: `?artifact=` і `?engine=` — це
+   * ручки лабораторії (`resolveHomeArtifact`), і знімок, зроблений із
+   * ними, мусить показувати те, що просили, а не те, що обрала пара.
+   * Без цієї умови будь-який прогін лабораторії тихо повертався б до
+   * спільного виду — рівно та пастка, за яку `scripts/live/README.md`
+   * тримає пункт №9.
+   */
+  useEffect(() => {
+    const value = shared.data;
+    if (value === undefined || value === null) return;
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get(HOME_ARTIFACT_QUERY_KEY) !== null || params.get('engine') !== null) return;
+    }
+    setArtifact((current) => (current === value ? current : value));
+  }, [shared.data]);
+
   const selectArtifact = useCallback((next: HomeArtifact) => {
-    persistArtifact(next);
+    /*
+     * Запис іде «у фоні», а сцена перемикається одразу: кеш і стан
+     * оновлюються синхронно всередині `saveShared`, тож дотик не чекає
+     * на мережу. Помилка запису не ковтається — вона потрапляє в консоль
+     * із причиною, а вибір лишається чинним на цьому пристрої.
+     */
+    void saveShared(next);
     if (typeof window !== 'undefined') {
       const search = withHomeArtifactSearch(window.location.search, next);
       window.history.replaceState(
