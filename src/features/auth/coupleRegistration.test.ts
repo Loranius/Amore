@@ -189,3 +189,51 @@ describe('серверна копія правила не розійшлась �
     expect(server).toContain('auth.admin.deleteUser');
   });
 });
+
+describe('екран питає про порожність на вході, а не в кінці (ADR-0209 §12)', () => {
+  /*
+   * ВАДА, ЗА ФАКТОМ ЯКОЇ НАПИСАНО. Першу редакцію екрана власний зонд
+   * пройшов НАСКРІЗЬ на справжньому порталі, де пара вже є: усі три
+   * кроки й чотири набори PIN, — і лише тоді сервер сказав
+   * `portal_taken`. Людину вели через найдовшу частину шляху заради
+   * відмови, відомої з першої секунди.
+   *
+   * Перевірка статична: у наборі немає DOM. Саму поведінку стереже
+   * `e2e/visual/register.visual.spec.ts`, який ходить на обидва стани.
+   */
+  const page = readFileSync(join(__dirname, 'RegisterPage.tsx'), 'utf8')
+    // Коментарі знімаються: вони описують правило дослівно.
+    .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, ' '))
+    .replace(/(^|[^:])\/\/[^\n]*/g, (_match, lead: string) => lead);
+
+  it('екран справді питає список користувачів', () => {
+    expect(page).toContain('useUsers()');
+    expect(page).toMatch(/existingUsers\?\.length \?\? 0\) > 0/);
+  });
+
+  it('незнання не видається за порожнечу', () => {
+    // `isError` мусить мати ВЛАСНУ гілку: «не вдалося перевірити» — це не
+    // «вільно». Інакше збій мережі провів би пару через увесь шлях.
+    expect(page).toContain('usersFailed');
+    expect(page).toMatch(/if \(usersFailed\)/);
+  });
+
+  it('після створення екран не показує відмову власному порталу', () => {
+    // Створена пара робить портал непорожнім. Без цього прапорця гілка
+    // відмови встигла б блимнути між відповіддю функції й переходом.
+    expect(page).toMatch(/if \(!submitted && \(existingUsers/);
+  });
+
+  it('прапорець ставиться ДО входу, бо саме вхід оновлює список', () => {
+    const submit = page.indexOf('setSubmitted(true)');
+    const loginCall = page.indexOf('await login(');
+    expect(submit).toBeGreaterThan(0);
+    expect(loginCall).toBeGreaterThan(0);
+    expect(submit).toBeLessThan(loginCall);
+  });
+
+  it('сторож справді дивиться в потрібний файл', () => {
+    expect(page).toContain('couple-register');
+    expect(page.length).toBeGreaterThan(4000);
+  });
+});

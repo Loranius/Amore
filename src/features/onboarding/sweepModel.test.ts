@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PLAN_CATEGORY_ORDER } from '@/features/plans/planConstants';
 import { PLAN_PRESSURES } from '@/engine/evolution/adapters/rules';
@@ -174,5 +176,43 @@ describe('день знаходить свій рік стосунків', () =>
   it('позначку часу приймає так само, як день', () => {
     // З бази дата приходить і як `YYYY-MM-DD`, і як позначка часу.
     expect(yearContaining(years, '2015-07-01T12:00:00.000Z')!.index).toBe(1);
+  });
+});
+
+describe('щойно зареєстрована пара доходить до вибору виду (ADR-0209 §13)', () => {
+  /*
+   * ВИМОГА. Вибір виду — частина шляху, яким пара створює портал. Він
+   * мусить бути досяжним одразу після реєстрації.
+   *
+   * ВАДА, ЗА ФАКТОМ ЯКОЇ НАПИСАНО, І ЗНАЙШЛАСЬ ВОНА ЛИШЕ ТОМУ, ЩО
+   * ЗʼЯВИЛАСЬ РЕЄСТРАЦІЯ. Реєстрація ставить дату й не ставить жодної
+   * річниці — отже крок виходить `anniversaries`. А `SweepSpecies` і
+   * кнопка «До артефакта» стояли лише під `step === 'years'`. Тобто пара,
+   * яка щойно створила портал, не могла ні обрати вид, ні завершити
+   * прохід, доки не додасть річницю.
+   *
+   * Перевірка з двох половин: чисте правило кроку (тут воно й доводить,
+   * що нова пара потрапляє саме на `anniversaries`) і розмітка, яка
+   * більше не ховає вибір за назвою кроку.
+   */
+  it('після реєстрації крок — саме той, на якому вибір і ховався', () => {
+    expect(sweepStepOf({ relationshipStartedAt: '2015-06-14', yearlyAnniversaryCount: 0 }))
+      .toBe('anniversaries');
+  });
+
+  it('вибір виду й вихід залежать від РОКІВ, а не від назви кроку', () => {
+    const view = readFileSync(join(__dirname, 'HistorySweepView.tsx'), 'utf8')
+      // Коментарі знімаються: вони цитують стару умову дослівно.
+      .replace(/\/\*[\s\S]*?\*\//g, (match) => match.replace(/[^\n]/g, ' '))
+      .replace(/(^|[^:])\/\/[^\n]*/g, (_match, lead: string) => lead);
+
+    expect(view).toContain('{years.length > 0 && <SweepSpecies');
+    // Саме це поєднання і було вадою.
+    expect(view).not.toContain("{sweep.step === 'years' && <SweepSpecies");
+    expect(view).not.toMatch(/sweep\.step === 'years' && \(\s*<div className="sweep-actions"/);
+
+    // Сторож справді дивиться в потрібний файл.
+    expect(view).toContain('SweepSpecies');
+    expect(view.length).toBeGreaterThan(3000);
   });
 });

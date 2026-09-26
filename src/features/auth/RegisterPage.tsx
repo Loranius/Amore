@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { ChevronLeftIcon, CloseIcon } from '@/components/icons/UiIcon';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
+import { useUsers } from '@/features/_shared/useUsers';
 import { invokeFn } from '@/lib/supabase';
 import { daysBetween } from '@/features/home/homeUtils';
 import { plural } from '@/lib/plural';
@@ -72,10 +73,66 @@ export function RegisterPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /*
+   * ПОРОЖНІСТЬ ПИТАЄТЬСЯ НА ВХОДІ, А НЕ В КІНЦІ.
+   *
+   * ВАДА, ЗА ФАКТОМ ЯКОЇ НАПИСАНО: першу редакцію цього екрана власний
+   * зонд пройшов НАСКРІЗЬ на справжньому порталі, де пара вже є, — усі
+   * три кроки й чотири набори PIN, — і лише тоді сервер сказав
+   * `portal_taken`. Тобто людину проводили через найдовшу частину шляху,
+   * щоб відмовити в тому, що було відомо з першої секунди.
+   *
+   * Серверна перевірка лишається й лишається головною: екран не є
+   * авторитетом, і між цим запитом і надсиланням портал міг стати
+   * зайнятим. Але змусити пройти весь шлях заради відомої відмови —
+   * це не «надійно», це неввічливо.
+   */
+  const { data: existingUsers, isPending: usersPending, isError: usersFailed } = useUsers();
+  /*
+   * `submitted` тримає екран на місці після успіху: створена пара робить
+   * портал НЕПОРОЖНІМ, і без цього прапорця гілка нижче встигла б
+   * показати «портал уже має пару» в проміжку між відповіддю функції й
+   * переходом на `/start`. Тобто пара побачила б відмову замість власного
+   * щойно створеного порталу.
+   */
+  const [submitted, setSubmitted] = useState(false);
+
   const today = todayLocal();
   const nameProblem = useMemo(() => nameStepProblem(names[0], names[1]), [names]);
 
   const days = /^\d{4}-\d{2}-\d{2}$/.test(startedAt) ? daysBetween(startedAt) : null;
+
+  // ── Чи вільний портал ──────────────────────────────────────
+  if (usersPending) {
+    return <Shell title="Хвилинку" hint="Дивимось, чи вільний цей портал.">{null}</Shell>;
+  }
+  if (usersFailed) {
+    /*
+     * Мовчазного «вважаємо порожнім» тут немає навмисно: не знати —
+     * це не те саме, що знати, що вільно. Спроба створити пару наосліп
+     * упреться в ту саму відмову сервера, лише після всього шляху.
+     */
+    return (
+      <Shell title="Не видно бази" hint="Не вдалося перевірити, чи вільний портал.">
+        <p className="reg-problem">Перевірте зʼєднання й спробуйте ще раз.</p>
+        <button type="button" className="btn btn-ghost reg-back" onClick={() => void navigate('/login')}>
+          На вхід
+        </button>
+      </Shell>
+    );
+  }
+  if (!submitted && (existingUsers?.length ?? 0) > 0) {
+    return (
+      <Shell
+        title="Цей портал уже зайнятий"
+        hint="Тут живе пара, і другої в одному порталі бути не може."
+      >
+        <button type="button" className="btn reg-next" onClick={() => void navigate('/login')}>
+          Увійти
+        </button>
+      </Shell>
+    );
+  }
 
   // ── Крок імен ──────────────────────────────────────────────
   if (step === 'names') {
@@ -247,6 +304,7 @@ export function RegisterPage() {
      * набрати його втретє означало б покарати за реєстрацію. Перший
      * створений — той, чиє ім'я стояло першим.
      */
+    setSubmitted(true);
     const first = response.members[0];
     if (first !== undefined) {
       const entered = await login(first.id, pins[0]);
