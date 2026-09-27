@@ -886,6 +886,29 @@ export async function swipeOverScene(page, { dx, ms }, { after = 6000, selector 
   return true;
 }
 
+/** Вертикальне перетягування по першому збігу селектора (ADR-0213). */
+export async function dragSelector(page, { selector, dy, ms }, { after = 900 } = {}) {
+  const box = await page.evaluate((css) => {
+    const node = document.querySelector(css);
+    if (node === null) return null;
+    const rect = node.getBoundingClientRect();
+    // Трохи вище за середину: низ картки — кнопка, і жест мусить початись
+    // і на ній, і поза нею однаково, але перевіряти варто типовий випадок.
+    return { x: rect.x + rect.width / 2, y: rect.y + rect.height * 0.35 };
+  }, selector);
+  if (box === null) return false;
+  const steps = 8;
+  await page.mouse.move(box.x, box.y);
+  await page.mouse.down();
+  for (let step = 1; step <= steps; step += 1) {
+    await page.mouse.move(box.x, box.y + (dy * step) / steps);
+    await page.waitForTimeout(ms / steps);
+  }
+  await page.mouse.up();
+  await page.waitForTimeout(after);
+  return true;
+}
+
 /** Тап по першому збігу — те саме, що робить палець, разом із очікуванням. */
 export async function tapSelector(page, selector, { after = 1200 } = {}) {
   const box = await page.evaluate((css) => {

@@ -188,4 +188,12 @@ describe('--seed: пам’ять минулого візиту', () => {
     expect(() => parseShotArgs(['--swipe=ліворуч'])).toThrow(OptionError);
     expect(() => parseShotArgs(['--swipe=100:0'])).toThrow(OptionError);
   });
+
+  it('--drag: селектор із двокрапками й числа з кінця (ADR-0213)', () => {
+    expect(parseShotArgs(['--drag=.pf-card--swipe:-160']).drags).toEqual([{ selector: '.pf-card--swipe', dy: -160, ms: 160 }]);
+    expect(parseShotArgs(['--drag=li:first-child:120:400']).drags).toEqual([{ selector: 'li:first-child', dy: 120, ms: 400 }]);
+    expect(parseShotArgs([]).drags).toEqual([]);
+    expect(() => parseShotArgs(['--drag=.x:0'])).toThrow(OptionError);
+    expect(() => parseShotArgs(['--drag=:-40'])).toThrow(OptionError);
+  });
 });

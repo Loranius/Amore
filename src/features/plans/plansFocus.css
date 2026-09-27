@@ -176,7 +176,27 @@
 /* Головна дія тягнеться, тиха — рівно під свій підпис. Обидві 48px:
    той самий зріст, що в смузі дій модалки (DESIGN.md). */
 .pf-card-date { flex: 1; min-block-size: 48px; }
-.pf-card-next { min-block-size: 48px; padding-inline: 18px; }
+
+/* Картка, яку гортають свайпом (ADR-0213). Вертикальний рух на ній
+   належить колоді, а не сторінці — `pan-x` лишає горизонтальні жести
+   браузеру. Перехід живе тут, а не в стилі елемента: під час перетягування
+   компонент його вимикає, щоб картка йшла за пальцем без запізнення. */
+.pf-card--swipe {
+  touch-action: pan-x;
+  user-select: none;
+  -webkit-user-select: none;
+  transition:
+    transform 240ms cubic-bezier(0.22, 0.8, 0.26, 1),
+    opacity 240ms ease-out;
+  will-change: transform;
+}
+.pf-card--swipe:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .pf-card--swipe { transition: none; }
+}
 
 /* Поле дати стоїть під кнопкою й не ховається `display: none`: схований
    input не отримує фокуса з клавіатури, а `showPicker()` у частині

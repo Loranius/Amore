@@ -130,6 +130,26 @@ export function parseSwipe(value) {
   return { dx, ms };
 }
 
+/**
+ * Перетягування по елементу сторінки: `<css>:<dy>[:<мс>]`, dy — вертикальний
+ * зсув у CSS-пікселях (мінус — угору). Для карток, які гортаються свайпом
+ * (колода «Що наступне?», ADR-0213). Селектор може містити двокрапки
+ * (`:first-child`), тож числа беруться з КІНЦЯ.
+ */
+export function parseDrag(value) {
+  const parts = String(value).split(':');
+  let ms = 160;
+  if (parts.length >= 3 && /^\d+$/.test(parts[parts.length - 1]) && /^-?\d+$/.test(parts[parts.length - 2])) {
+    ms = Number(parts.pop());
+  }
+  const dy = Number(parts.pop());
+  const selector = parts.join(':');
+  if (selector === '' || !Number.isInteger(dy) || dy === 0 || !(ms > 0)) {
+    throw new OptionError('--drag приймає селектор і зсув: --drag=.pf-card--swipe:-160 або --drag=.pf-card--swipe:120:400.');
+  }
+  return { selector, dy, ms };
+}
+
 export function routePath(route) {
   const value = String(route).trim();
   if (value === '') throw new OptionError('Порожній маршрут.');
@@ -202,6 +222,7 @@ export function parseShotArgs(argv) {
   const tapPoints = [];
   const zooms = [];
   const swipes = [];
+  const drags = [];
   const seed = [];
   const options = {
     tier: DEFAULTS.tier,
@@ -243,6 +264,7 @@ export function parseShotArgs(argv) {
       // Свайп сцени пальцем (ADR-0211): поворот рукою більше не йде через
       // `OrbitControls`, і колесо його не перевіряє. Кілька — послідовно.
       case 'swipe': swipes.push(...asList(value).map(parseSwipe)); break;
+      case 'drag': drags.push(parseDrag(value)); break;
       // Другий кадр того самого екрана через N мс: «що рухається, коли пара
       // нічого не робить». Без цього анімацію сцени нема чим перевірити —
       // один знімок про рух не каже нічого.
@@ -302,6 +324,7 @@ export function parseShotArgs(argv) {
     tapPoints,
     zooms,
     swipes,
+    drags,
     seed,
     theme: options.theme,
     keepServer: options.keepServer,

@@ -25,6 +25,7 @@ import {
   tapSelector,
   wheelOverScene,
   swipeOverScene,
+  dragSelector,
 } from './portal.mjs';
 import { artifactSpan } from './artifactSpan.mjs';
 
@@ -56,6 +57,8 @@ const USAGE = `
                                      що рухається, коли пара нічого не робить
   --swipe=<px>[:<мс>]                провести пальцем по сцені й зняти кадр, коли
                                      острів доведеться (типово 90 мс — різкий свайп)
+  --drag=<css>:<dy>[:<мс>]           потягнути елемент по вертикалі й зняти кадр
+                                     (мінус — угору; для карток зі свайпом)
   --zoom=<клацань>                   покрутити колесо над полотном і зняти кадр:
                                      від'ємне — ближче, додатне — далі; можна
                                      кілька, вони йдуть послідовно від поточної
@@ -323,6 +326,18 @@ async function main() {
                 + (ratio === null ? '' : ` · ×${ratio.toFixed(2)} до першого кадру`),
               );
             }
+          }
+
+          for (const [index, drag] of (options.drags ?? []).entries()) {
+            const moved = await dragSelector(portal.page, drag);
+            if (!moved) {
+              console.log(`  тяга    «${drag.selector}» не знайдено`);
+              continue;
+            }
+            const suffix = options.drags.length > 1 ? `-drag${index + 1}` : '-drag';
+            const dragFile = `${outDir}/${name}${suffix}.png`;
+            await portal.page.screenshot({ path: dragFile });
+            console.log(`  тяга    ${drag.selector} на ${drag.dy} px за ${drag.ms} мс → ${dragFile}`);
           }
 
           for (const [index, swipe] of (options.swipes ?? []).entries()) {

@@ -179,3 +179,31 @@ describe('`?view=calendar` відкриває календар і на вже в
     expect(initBody.length).toBeLessThan(200);
   });
 });
+
+describe('колода «Що наступне?» гортається свайпом (ADR-0213)', () => {
+  /*
+   * ВИМОГА ВЛАСНИКА: «прибери кнопку "далі"», «текст на кнопці "дати дату"
+   * зміни на "запланувати"», свайп угору/вниз — каруселлю.
+   */
+  const deck = readFileSync(join(PLANS_DIR, 'PlanIdeaDeck.tsx'), 'utf8');
+  const css = readFileSync(join(PLANS_DIR, 'plansFocus.css'), 'utf8');
+
+  it('кнопки «Далі» немає, головна дія — «Запланувати»', () => {
+    expect(deck).not.toMatch(/>\s*Далі\s*</);
+    expect(deck).not.toContain('pf-card-next');
+    expect(deck).toMatch(/>\s*Запланувати\s*</);
+    expect(deck).not.toMatch(/>\s*Дати дату\s*</);
+  });
+
+  it('картка слухає жест і клавіатуру, а вертикаль на ній належить колоді', () => {
+    expect(deck).toContain('onPointerDown={onPointerDown}');
+    expect(deck).toContain("event.key === 'ArrowDown'");
+    expect(css).toMatch(/\.pf-card--swipe\s*\{[^}]*touch-action:\s*pan-x/);
+  });
+
+  it('після свайпу відпускання над кнопкою — не клік', () => {
+    expect(deck).toContain('onClickCapture');
+    expect(deck).toContain('swallowClick.current = true');
+  });
+});
+
