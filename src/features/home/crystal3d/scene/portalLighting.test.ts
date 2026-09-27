@@ -94,7 +94,6 @@ describe('світло порталу (§10 брифу кристала)', () =>
      * а не підлогою світу.
      */
     expect(day.skyIntensity).toBeGreaterThan(night.skyIntensity * 4);
-    expect(day.cloudOpacity).toBeGreaterThan(night.cloudOpacity);
   });
 
   it('камінь острова — це камінь в обох порах доби, а не два різні місця', () => {

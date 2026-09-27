@@ -13,12 +13,10 @@
 // ============================================================
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import {
-  PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
   PORTAL_HALO_SEGMENTS,
   PORTAL_WATERFALLS,
   PORTAL_ISLAND_RUBBLE,
-  buildPortalCloudGeometry,
   buildPortalDriftGeometry,
   buildPortalFloraGeometry,
   buildPortalHaloGeometry,
@@ -129,7 +127,6 @@ export function measurePortalEnvironmentTriangles(
     buildPortalIslandGeometry(seed, PORTAL_ISLAND_RUBBLE[quality]),
     buildPortalTempleGeometry(seed),
     buildPortalDriftGeometry(seed, PORTAL_DRIFT_ROCKS[quality]),
-    buildPortalCloudGeometry(seed, PORTAL_CLOUD_BANKS[quality]),
     buildPortalFloraGeometry(seed, quality),
     buildPortalWaterfallGeometry(seed, PORTAL_WATERFALLS[quality]),
     buildPortalHaloGeometry(seed, PORTAL_HALO_SEGMENTS[quality]),
@@ -246,10 +243,33 @@ const TARGET_SHARE_OF_ARTIFACT = PORTAL_TARGET_SHARE_OF_ARTIFACT;
  * 0.40 — це 23.6°, тобто всередині смуги 10…28°, яку тримає
  * `portalScene.test.ts`.
  */
-const EYE_ELEVATION_SIN = 0.4;
+/*
+ * 0.40 → 0.18 (ADR-0210). Новий еталон власника дивиться НИЖЧЕ: плато в
+ * ньому — тонка смуга (80 px заввишки на 680 px ширини, тобто ≈10°
+ * нахилу), зате видно високі скелі під ним, а кристал домінує над
+ * островом. Попередній еталон (ADR-0164) показував острів згори, і 23.6°
+ * були правильні для нього. 0.18 — це 10.4°, нижня межа смуги 10…28°,
+ * яку тримає `portalScene.test.ts`.
+ *
+ * Експортується, бо поза головної (`crystalAtlas.ts`) мусить відтворювати
+ * кадр ТОЧНО, а тримала для цього власну копію числа: першу спробу цієї
+ * зміни живий кадр не побачив зовсім — копія лишилась 0.40.
+ */
+export const PORTAL_EYE_ELEVATION_SIN = 0.18;
+const EYE_ELEVATION_SIN = PORTAL_EYE_ELEVATION_SIN;
+
+/** Наскільки ближче за «вміщений» кадр стоїть камера (ADR-0210). */
+export const PORTAL_FRAME_CLOSENESS = 0.66;
 
 /** Наскільки ціль опускається під кристал, у частках відстані. */
-const FRAME_ISLAND_DROP = 0.075;
+/*
+ * 0.075 → 0.02 (ADR-0210). З ближчою камерою група «кристал + острів»
+ * піднялась на ≈0.07 висоти кадру вище, ніж у еталоні, і верхівка
+ * кристала майже впиралась у назву артефакта. Об'єкт під ціллю стоїть
+ * нижче центру на Δy/(2·tan(21°)·d), тож опустити все на 0.07 кадру
+ * означає підняти ціль на 0.054·d: 0.075 − 0.054 ≈ 0.02.
+ */
+const FRAME_ISLAND_DROP = 0.02;
 
 export interface PortalCameraFrame {
   position: readonly [number, number, number];
@@ -410,7 +430,19 @@ export function portalCameraFrame(
   // Афінна, а не пропорційна: див. `FRAME_BASE_HEIGHT`. Саме через це
   // кристал на екрані росте разом із парою, а не лишається одного розміру.
   const height = FRAME_BASE_HEIGHT + FRAME_PER_ARTIFACT * safeHeight;
-  const width = Math.max(height * FRAME_WIDTH_SHARE, safeRadius * 2 * FRAME_MARGIN);
+  /*
+   * Ширина кадру — два різні доданки, і наближення (ADR-0210) стосується
+   * лише першого. `висота × частка` — це ПРОПОРЦІЯ кадру, і вона
+   * стискається разом із висотою. `радіус × 2 × запас` — це БЕЗПЕКА від
+   * обрізання друзи з боків, і вона не стискається ніколи. Друга редакція
+   * не розрізняла їх: на телефоні виграла пропорція, камера відійшла, і
+   * кристал знову став дрібним — хоч друза на екрані займала лише 22%
+   * ширини.
+   */
+  const width = Math.max(
+    height * FRAME_WIDTH_SHARE * PORTAL_FRAME_CLOSENESS,
+    safeRadius * 2 * FRAME_MARGIN,
+  );
 
   // Height is solved at the artifact's **near side**, not at its axis.
   //
@@ -432,7 +464,25 @@ export function portalCameraFrame(
   // body that sets the vertical extent stands in *front* of it. Adding the
   // radius to both cost 10 points of screen width on a phone and bought
   // nothing — the clipping this fixes was entirely vertical.
-  const byHeight = height / (2 * tangent) + safeRadius;
+  /*
+   * КАМЕРА БЛИЖЧЕ (ADR-0210). У еталоні власника кристал займає ≈21%
+   * висоти кадру, у нашому — ≈13%. Екранний розмір ОСТРОВА від відстані
+   * не залежить (`portalIslandScale` іде за нею), а кристала — залежить,
+   * тож наближення збільшує саме кристал, і острів окремо тримає свій
+   * масштаб.
+   *
+   * Множник стоїть лише на ВИСОТІ КАДРУ, і обидва обмеження записані
+   * сторожами, які впіймали першу редакцію:
+   *
+   *  • поправка на передній край друзи геометрична й лишається точною —
+   *    множник на всій відстані стискав її до 0.33 замість радіуса;
+   *  • безпека по ширині — ЖОРСТКА межа. Множник на ній дозволив би на
+   *    вузькому екрані обрізати широку друзу з боків: `backs off on narrow
+   *    screens` показав рівні відстані для вузького й широкого екрана,
+   *    тобто вузький перестав відходити. Тому множник стоїть усередині
+   *    `width` лише на пропорції кадру (див. вище), а не тут.
+   */
+  const byHeight = (height / (2 * tangent)) * PORTAL_FRAME_CLOSENESS + safeRadius;
   const byWidth = width / (2 * tangent * safeAspect);
   const distance = Math.max(byHeight, byWidth);
 
@@ -546,8 +596,6 @@ export interface PortalPalette {
    * не виходить із приглушеного світу острова.
    */
   flora: string;
-  /** Море хмар унизу. Не туман: це тіло, і воно має власний тон. */
-  cloudSea: string;
   /**
    * Вода, що падає з кромки.
    *
@@ -567,8 +615,6 @@ export interface PortalPalette {
   halo: string;
   /** Сила кільця. Найпильніше число сцени: §10 не дозволяє його перегнати. */
   haloOpacity: number;
-  /** Наскільки хмари щільні. Уночі це натяк, удень — підлога світу. */
-  cloudOpacity: number;
   /**
    * Небо, трьома зупинками згори вниз (ADR-0165).
    *
@@ -690,7 +736,7 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
      * Було `#cfe0f0` — денна блакить, і разом із нею далина танула в
      * блакить під рожевим небом.
      */
-    fog: '#e9c3ac',
+    fog: '#a596cc',
     skyDeep: '#7b6aa6',
     skyMid: '#c9a2c4',
     skyGlow: '#f6d3b2',
@@ -704,7 +750,7 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
      * якого весь цей файл уникає. Світлота лишилась (тест тримає «удень
      * камінь світліший за нічний»), змінився відтінок.
      */
-    islandRock: '#b6a698',
+    islandRock: '#8e7688',
     groundBounce: '#8b8098',
     /*
      * Вапняк під сонцем — тепліший і світліший за плато під ним.
@@ -714,9 +760,9 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
      * матеріалу бюджет уже не має. '#e6d8cc' → '#f0dcc0': різниця
      * червоного до синього була 26 з 255, стала 48.
      */
-    templeStone: '#f0dcc0',
+    templeStone: '#f2d6d6',
     // Той самий камінь, але далі й тьмяніше — і так само теплий.
-    driftRock: '#9c8d80',
+    driftRock: '#7d74a4',
     /*
      * ЗЕЛЕНЬ УДЕНЬ — ОЛИВКОВА, А НЕ М'ЯТНА (ADR-0166).
      *
@@ -737,7 +783,7 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
      * лишається ТЕМНІШОЮ за камінь — бліде плато під сонцем інакше
      * з'їло б її.
      */
-    flora: '#8a8457',
+    flora: '#5b6a40',
     /*
      * ХМАРА ПРОХОЛОДНА, БО НЕБО ЗА НЕЮ ТЕПЛЕ (ADR-0165).
      *
@@ -752,13 +798,11 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
      * ця різниця відтінку, а не яскравості, і робить її тілом. Тепле
      * лишається тлом, прохолодне — тим, що в ньому стоїть.
      */
-    cloudSea: '#e4dbe6',
     // Удень вода ловить захід: тепла й дуже світла, але не біла.
-    waterfall: '#f7ecec',
+    waterfall: '#cbaaf2',
     waterfallOpacity: 0.88,
     halo: '#f0b8dc',
     haloOpacity: 0.36,
-    cloudOpacity: 0.92,
     skyLight: '#e8f1fb',
     skyIntensity: 2.1,
     // Денна заливка вчетверо сильніша за нічну. Ключ піднятий разом із
@@ -822,13 +866,11 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     flora: '#466456',
     // Хмари вночі — не білі. Біле море хмар під нічним небом читається
     // снігом у прожекторі; тут це відбитий місяць.
-    cloudSea: '#6d6194',
     // Уночі вода — відбитий місяць: холодна бузкова, і слабша, ніж удень.
     waterfall: '#b9aee2',
     waterfallOpacity: 0.62,
     halo: '#c79ae8',
     haloOpacity: 0.3,
-    cloudOpacity: 0.68,
     // Нічне небо: майже темрява, але не чорнота — джерело з нульовим
     // кольором перестає бути джерелом.
     skyLight: '#2a2444',

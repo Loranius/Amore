@@ -5,11 +5,9 @@ import {
   PORTAL_DRIFT_ROCKS,
   PORTAL_ISLAND_RADIUS,
   PORTAL_ISLAND_RUBBLE,
-  buildPortalCloudGeometry,
   buildPortalDriftGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
-  PORTAL_CLOUD_BANKS,
 } from './portalIsland';
 import {
   PORTAL_DRIFT_LIFT,
@@ -45,7 +43,6 @@ describe('левітація малих островів', () => {
     expect(attribute(buildPortalDriftGeometry(SEED, PORTAL_DRIFT_ROCKS.high))).toBeDefined();
     expect(attribute(buildPortalIslandGeometry(SEED, PORTAL_ISLAND_RUBBLE.high))).toBeUndefined();
     expect(attribute(buildPortalTempleGeometry(SEED))).toBeUndefined();
-    expect(attribute(buildPortalCloudGeometry(SEED, PORTAL_CLOUD_BANKS.high))).toBeUndefined();
   });
 
   it('дає кожній брилі СВОЮ фазу, а не спільну', () => {

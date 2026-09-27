@@ -33,12 +33,10 @@ import {
   templeFrontProfile,
 } from './islandProfile';
 import {
-  PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
   PORTAL_ISLAND_CROWN_TRIANGLES,
   PORTAL_ISLAND_RUBBLE,
   PORTAL_TEMPLE_FACE,
-  buildPortalCloudGeometry,
   buildPortalDriftGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
@@ -341,59 +339,6 @@ describe('наш храм проти еталона', () => {
   });
 });
 
-describe('наші хмари проти еталона', () => {
-  /*
-   * Хмари міряються ПОШТУЧНО, і це не педантизм. Пасмо кидає розмір
-   * випадково, тож середнє по вісімнадцяти може бути еталонним і тоді,
-   * коли дві-три хмари з нього — столові гори. Проміжна редакція цієї
-   * правки саме такою й була: середнє 5.13 при розкиді від 2.6 до 10.6.
-   */
-  const banks = PORTAL_CLOUD_BANKS.high;
-  const all = ours(buildPortalCloudGeometry(SEED, banks));
-  const floatsPerCloud = all.length / banks;
-  const clouds = Array.from({ length: banks }, (_, index) =>
-    cloudSilhouetteProfile(all.slice(index * floatsPerCloud, (index + 1) * floatsPerCloud)));
-  const mean = (pick: (cloud: (typeof clouds)[number]) => number): number =>
-    clouds.reduce((sum, cloud) => sum + pick(cloud), 0) / clouds.length;
-
-  it('ЖОДНА ХМАРА НЕ Є СТОЛОВОЮ ГОРОЮ', () => {
-    /*
-     * Число, заради якого міряли. Ширина й висота кидались незалежно, і
-     * стрункість виходила добутком двох випадковостей: середнє 8.94 при
-     * розкиді від 4.46 до 18.59, тоді як в еталона 5.23. Хмара зі
-     * стрункістю 18 — це пласка смуга на горизонті, тобто рівно той
-     * краєвид, який літаючий острів мав скасувати.
-     *
-     * Тепер вільним лишається РОЗМІР, а форма кидається у вузькій смузі:
-     * ширина 4.2…10.8, стрункість 2.95…3.70 (на екрані це 4.1…6.3, бо
-     * профіль міряє силует із горбами, а не прямокутник).
-     */
-    for (const cloud of clouds) {
-      expect(cloud.aspect).toBeGreaterThan(3.4);
-      expect(cloud.aspect).toBeLessThan(7);
-    }
-    expect(mean((cloud) => cloud.aspect)).toBeCloseTo(REFERENCE_WAS.cloudAspect, 0);
-  });
-
-  it('ВЕРХ БУГРИСТИЙ, ДНО РІВНЕ — та сама різниця, що в еталона', () => {
-    /*
-     * Дно рівне, але НЕ ВИМІРЯНЕ ЛІНІЙКОЮ: до цієї правки розкид дна був
-     * рівно 0.000 в усіх вісімнадцяти хмар, бо всі п'ять горбів сиділи
-     * на одній константі, а рівний нуль у природі виглядає різаним
-     * склом. Еталон дає 0.035, ми тепер 0.031.
-     *
-     * Стеля тут важливіша за підлогу: щойно дно стає таким же рваним, як
-     * верх, хмара перестає бути хмарою.
-     */
-    for (const cloud of clouds) {
-      expect(cloud.baseFlat).toBeLessThan(cloud.topRough * 0.5);
-    }
-    expect(mean((cloud) => cloud.baseFlat)).toBeGreaterThan(REFERENCE_WAS.cloudBaseFlat * 0.5);
-    expect(mean((cloud) => cloud.baseFlat)).toBeLessThan(REFERENCE_WAS.cloudBaseFlat * 1.5);
-    expect(mean((cloud) => cloud.topRough)).toBeGreaterThan(REFERENCE_WAS.cloudTopRough * 0.8);
-    expect(mean((cloud) => cloud.topRough)).toBeLessThan(REFERENCE_WAS.cloudTopRough * 1.25);
-  });
-});
 
 describe('наші брили проти еталона', () => {
   /*

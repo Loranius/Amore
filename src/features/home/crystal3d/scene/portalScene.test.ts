@@ -178,7 +178,14 @@ describe('portal camera frame', () => {
       // Опускання рівно оголошене: частка відстані, а не світова стала, бо
       // масштаб острова теж іде за відстанню.
       const aimedAtArtifact = height * 0.58;
-      expect(aimedAtArtifact - above, `${height}`).toBeCloseTo(frame.distance * 0.075, 9);
+      /*
+       * 0.075 → 0.02 (ADR-0210), і змінено саме оголошене опускання, а не
+       * вимога. З ближчою камерою група «кристал + острів» стала на ≈0.07
+       * кадру вищою за еталон власника, і верхівка впиралась у назву
+       * артефакта. Вимога цієї перевірки — «опускання рівно оголошене і не
+       * вище за верхівку» — тримається як була.
+       */
+      expect(aimedAtArtifact - above, `${height}`).toBeCloseTo(frame.distance * 0.02, 9);
     }
   });
 
@@ -252,8 +259,17 @@ describe('portal camera frame', () => {
 
   it('backs off on narrow screens instead of cropping the scene', () => {
     // Кадр по висоті задає артефакт; ширину рятує тільки відхід камери.
-    const narrow = portalCameraFrame(0.4, 1.2, 2.5);
-    const wide = portalCameraFrame(1.6, 1.2, 2.5);
+    /*
+     * РАДІУС 1.2 → 1.8 (ADR-0210), і змінено вхід, а не вимогу. З ближчою
+     * камерою друза радіусом 1.2 на аспекті 0.4 вже вміщується без відходу
+     * — тобто тест перестав потрапляти в ситуацію, яку перевіряє, і
+     * порівнював дві відстані, обидві задані висотою. Сама вимога «ніколи
+     * не обрізати» тримається окремо (`keeps the whole artifact inside the
+     * frame at every real aspect`); тут перевіряється, що саме ширина
+     * відсуває камеру, коли вона зв'язує.
+     */
+    const narrow = portalCameraFrame(0.4, 1.8, 2.5);
+    const wide = portalCameraFrame(1.6, 1.8, 2.5);
     expect(narrow.distance).toBeGreaterThan(wide.distance);
   });
 

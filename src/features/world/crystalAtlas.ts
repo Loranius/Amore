@@ -1,4 +1,5 @@
 import type { WorldRegion } from './worldRegions';
+import { PORTAL_EYE_ELEVATION_SIN } from '@/features/home/crystal3d/scene/portalScene';
 
 // ============================================================
 // The crystal's answer to each region — the artifact half of the atlas.
@@ -70,9 +71,11 @@ export interface WorldCameraPose {
 const CENTRE: WorldCameraPose = {
   azimuth: 0,
   targetHeight: 0.58,
-  // Той самий кут, що в кадрі (`EYE_ELEVATION_SIN`): центральна поза мусить
-  // відтворювати кадр ТОЧНО, інакше головна тихо змінила б ракурс.
-  elevation: 0.4,
+  // Той самий кут, що в кадрі: центральна поза мусить відтворювати кадр
+  // ТОЧНО, інакше головна тихо змінила б ракурс. Тут стояло число 0.4 — і
+  // саме ця копія не дала змінити кут кадру (ADR-0210): кадр поміняли,
+  // головна лишилась та сама. Тепер число одне.
+  elevation: PORTAL_EYE_ELEVATION_SIN,
   distance: 1,
   luminosity: 1,
 };

@@ -3,11 +3,9 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import * as THREE from 'three';
 import {
-  PORTAL_CLOUD_BANKS,
-  buildPortalCloudGeometry,
   buildPortalIslandGeometry,
 } from './portalIsland';
-import { PORTAL_PALETTES, portalCameraFrame } from './portalScene';
+import { portalCameraFrame } from './portalScene';
 
 // ============================================================
 // Небо порталу — ADR-0165.
@@ -23,7 +21,6 @@ import { PORTAL_PALETTES, portalCameraFrame } from './portalScene';
 // віддаллю (бо туман до неї не дістає й зробити цього за неї не може).
 // ============================================================
 
-const THEMES = ['light', 'dark'] as const;
 
 /** Той самий нахил, що в `portalCameraFrame`. Зміна тут — зміна ADR. */
 const EYE_ELEVATION_SIN = 0.4;
@@ -77,61 +74,7 @@ describe('небо порталу (ADR-0165)', () => {
     expect(backdrop).toContain("'--portal-sky-deep': PORTAL_PALETTES[theme].skyDeep");
   });
 
-  it('лишає хмару прохолоднішою за небо, у якому вона стоїть', () => {
-    /*
-     * Хмара кольору неба не існує. Після того, як тепла смуга неба
-     * переїхала туди, де стоїть море хмар, тепла хмара '#fbe3cd' майже
-     * зрівнялась із тлом: відстань у кольорі 17.1 з 441 проти 25.0 у
-     * прохолодної при тій самій площі 3.2% кадру. У вечірньому небі
-     * низ хмари лишається в тіні й читається прохолодним; саме різниця
-     * ВІДТІНКУ, а не яскравості, робить її тілом.
-     *
-     * «Прохолодніша» рахується як синій проти червоного відносно неба:
-     * абсолютна температура тут не має значення, важить лише знак
-     * різниці з тлом.
-     */
-    const warmth = (hex: string): number => {
-      const value = Number.parseInt(hex.slice(1), 16);
-      return (((value >> 16) & 255) - (value & 255)) / 255;
-    };
-    for (const theme of THEMES) {
-      const palette = PORTAL_PALETTES[theme];
-      expect(warmth(palette.cloudSea), `${theme} проти сяйва`)
-        .toBeLessThan(warmth(palette.skyGlow));
-      expect(warmth(palette.cloudSea), `${theme} проти туману`)
-        .toBeLessThan(warmth(palette.fog));
-    }
-  });
 
-  it('гасить хмару з віддаллю, бо туман до неї не дістає', () => {
-    /*
-     * Море хмар стоїть далеко за `fogFar` — під туманом воно стало б
-     * рівно кольором туману, тобто зникло б цілком, і саме тому меш
-     * узятий із `fog={false}`. Ціна цього вимикача: без туману дальня
-     * хмара нічим не відрізняється від ближньої. Повітряна перспектива
-     * запікається у четвертий канал кольору.
-     *
-     * Перевіряється не число, а НАПРЯМОК: найдальша хмара мусить бути
-     * помітно прозорішою за найближчу, а сам атрибут — чотириканальним,
-     * бо саме `itemSize === 4` вмикає в three гілку `USE_COLOR_ALPHA`.
-     */
-    const geometry = buildPortalCloudGeometry(11, PORTAL_CLOUD_BANKS.high);
-    const colour = geometry.getAttribute('color') as THREE.BufferAttribute;
-    expect(colour.itemSize).toBe(4);
-
-    const position = geometry.getAttribute('position') as THREE.BufferAttribute;
-    let nearest = { reach: Infinity, alpha: 0 };
-    let farthest = { reach: 0, alpha: 0 };
-    for (let vertex = 0; vertex < colour.count; vertex += 1) {
-      const reach = Math.hypot(position.getX(vertex), position.getZ(vertex));
-      const alpha = colour.getW(vertex);
-      if (reach < nearest.reach) nearest = { reach, alpha };
-      if (reach > farthest.reach) farthest = { reach, alpha };
-    }
-    expect(farthest.alpha).toBeLessThan(nearest.alpha * 0.5);
-    expect(farthest.alpha).toBeGreaterThan(0.1);
-    geometry.dispose();
-  });
 
   it('не ставить четвертий канал там, де всі тіла суцільні', () => {
     /*
