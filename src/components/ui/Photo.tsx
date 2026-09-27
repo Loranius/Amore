@@ -30,6 +30,7 @@
 // ============================================================
 import { useEffect, useState, type ImgHTMLAttributes } from 'react';
 import { pixelRatio, thumbUrl, type ThumbOptions } from '@/lib/imageCdn';
+import { isOversizedPhoto, markOversizedPhoto, rescueOversizedOriginal } from '@/lib/photoRescue';
 
 interface PhotoProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   /** Адреса оригіналу з бази. */
@@ -40,79 +41,14 @@ interface PhotoProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   quality?: ThumbOptions['quality'];
 }
 
-/**
- * Оригінал → маленький blob, декодований одразу в потрібний розмір.
- *
- * `null`, коли рятувати нічим (немає `createImageBitmap`, мережа
- * підвела чи файл узагалі не зображення) — тоді компонент показує
- * порожню рамку, а не застигає на повному оригіналі вдруге.
- */
-async function rescueOversizedOriginal(url: string, targetPx: number): Promise<Blob | null> {
-  if (typeof createImageBitmap !== 'function') return null;
-  const response = await fetch(url);
-  if (!response.ok) return null;
-  const source = await response.blob();
-  const bitmap = await createImageBitmap(source, {
-    /*
-     * СТОРОНА ОДНА, І ЦЕ ВИПРАВЛЕННЯ.
-     *
-     * Тут стояли ОБИДВІ — `resizeWidth` і `resizeHeight` з тим самим
-     * числом, — а це не «вписати в квадрат», це «стиснути рівно в ці
-     * числа». Виміряно в справжньому Chromium на знімку 200×100:
-     * обидві сторони по 64 дають 64×64, тобто пропорції гинуть; сама
-     * лише ширина дає 64×32.
-     *
-     * Тобто кожне неквадратне фото, яке доходило до рятунку, лягало на
-     * екран розплющеним. Помітно це було рівно там, де рятунок і потрібен
-     * — на великих знімках у повний екран.
-     *
-     * Довгу сторону доводить до межі полотно нижче: до нього доїжджає вже
-     * маленький растр, тож це безкоштовно.
-     */
-    resizeWidth: targetPx,
-    resizeQuality: 'medium',
-    /*
-     * ОРІЄНТАЦІЯ ЗАДАЄТЬСЯ ЯВНО, і це не педантизм.
-     *
-     * `<img>` повертає знімок за EXIF сам (`image-orientation: from-image`
-     * — типове значення), а `createImageBitmap` довгий час цього не
-     * робив: у першій редакції специфікації типовим було `none`, і
-     * браузери переходили на `from-image` у різні роки. Отже рятівний
-     * шлях міг покласти на екран знімок, повернутий на 90°, — і саме там,
-     * де інші шляхи його повертають правильно, тобто по-різному на різних
-     * платформах.
-     *
-     * Один рядок прибирає залежність від версії браузера.
-     */
-    imageOrientation: 'from-image',
-  });
-  try {
-    // Портретний знімок після `resizeWidth` лишається вищим за межу —
-    // доводимо довгу сторону тут.
-    let w = bitmap.width;
-    let h = bitmap.height;
-    if (h > targetPx) {
-      const r = targetPx / h;
-      w = Math.max(1, Math.round(w * r));
-      h = Math.max(1, Math.round(h * r));
-    }
-    const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(bitmap, 0, 0, w, h);
-    return await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob(resolve, 'image/jpeg', 0.82);
-    });
-  } finally {
-    bitmap.close();
-  }
-}
-
 export function Photo({ src, cssWidth, quality, ...rest }: PhotoProps) {
   const original = src ?? '';
-  const [failed, setFailed] = useState(false);
+  /*
+   * Знімок, для якого сховище вже відмовило в мініатюрі, рятується ОДРАЗУ
+   * (ADR-0212): інакше кожен візит спершу платить за гарантований 400 і
+   * лише потім починає рятунок.
+   */
+  const [failed, setFailed] = useState(() => isOversizedPhoto(original));
   const [rescued, setRescued] = useState<string | null>(null);
   // Рятунок не вдався (старий браузер без `createImageBitmap`, мережа
   // підвела) — тоді краще повний оригінал, ніж вічно порожня рамка.
@@ -121,7 +57,7 @@ export function Photo({ src, cssWidth, quality, ...rest }: PhotoProps) {
   // Нова адреса — нова спроба. Без цього скидання картка, яка колись
   // впала, лишалась би на оригіналі й після заміни фотографії.
   useEffect(() => {
-    setFailed(false);
+    setFailed(isOversizedPhoto(original));
     setRescued(null);
     setRescueFailed(false);
   }, [original]);
@@ -142,6 +78,13 @@ export function Photo({ src, cssWidth, quality, ...rest }: PhotoProps) {
       .then((blob) => {
         if (cancelled) return;
         if (!blob) { setRescueFailed(true); return; }
+        /*
+         * Запам'ятовується лише ПІСЛЯ вдалого рятунку: мініатюра могла
+         * впасти й від обірваної мережі, а тоді оригінал теж не приїхав би.
+         * Позначити такий знімок «завеликим» назавжди означало б щоразу
+         * тягнути 11 МБ замість 30 КБ.
+         */
+        markOversizedPhoto(original);
         createdUrl = URL.createObjectURL(blob);
         setRescued(createdUrl);
       })

@@ -21,7 +21,9 @@ import { createPortal } from 'react-dom';
 import { Map as MapLibreMap, Marker, setWorkerUrl, type MapMouseEvent } from 'maplibre-gl';
 import maplibreWorkerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { thumbUrl } from '@/lib/imageCdn';
+import { pixelRatio, thumbUrl } from '@/lib/imageCdn';
+import { isOversizedPhoto, markOversizedPhoto, rescueOversizedOriginal } from '@/lib/photoRescue';
+import { Photo } from '@/components/ui/Photo';
 import { reverseGeocode } from '@/lib/geo';
 import { CloseIcon } from '@/components/icons/UiIcon';
 import { CrosshairIcon } from '@/components/icons/MapIcon';
@@ -134,6 +136,8 @@ export function MemoriesMap({
   const holder = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibreMap | null>(null);
   const markers = useRef<Marker[]>([]);
+  // Урятовані мініатюри міток — blob-адреси, які треба відкликати разом із мітками.
+  const pinBlobs = useRef<string[]>([]);
   const draftMarker = useRef<Marker | null>(null);
 
   /*
@@ -217,6 +221,8 @@ export function MemoriesMap({
     return () => {
       markers.current.forEach((m) => m.remove());
       markers.current = [];
+      pinBlobs.current.forEach((url) => URL.revokeObjectURL(url));
+      pinBlobs.current = [];
       draftMarker.current?.remove();
       draftMarker.current = null;
       instance.remove();
@@ -231,6 +237,8 @@ export function MemoriesMap({
     if (!instance || !ready) return;
 
     markers.current.forEach((m) => m.remove());
+    pinBlobs.current.forEach((url) => URL.revokeObjectURL(url));
+    pinBlobs.current = [];
     markers.current = pins.map((pin) => {
       const el = document.createElement('button');
       el.type = 'button';
@@ -239,7 +247,34 @@ export function MemoriesMap({
 
       if (pin.photoUrl) {
         const img = document.createElement('img');
-        img.src = thumbUrl(pin.photoUrl, PIN_PHOTO_WIDTH);
+        const original = pin.photoUrl;
+        const target = Math.round(PIN_PHOTO_WIDTH * pixelRatio(PIN_PHOTO_WIDTH));
+        /*
+         * Мітка — сирий DOM, не React, тож <Photo> тут не стане. Той самий
+         * рятунок завеликого оригіналу (ADR-0212) — вручну: без нього знімок
+         * на 11.4 МБ лишав на карті биту мітку.
+         */
+        const rescue = () => {
+          img.onerror = null;
+          void rescueOversizedOriginal(original, target)
+            .then((blob) => {
+              if (!blob) { el.classList.add('is-blank'); img.remove(); return; }
+              markOversizedPhoto(original);
+              const url = URL.createObjectURL(blob);
+              pinBlobs.current.push(url);
+              img.src = url;
+            })
+            .catch((error: unknown) => {
+              console.warn('[MemoriesMap] мітку не вдалось урятувати:', error);
+              el.classList.add('is-blank');
+              img.remove();
+            });
+        };
+        if (isOversizedPhoto(original)) rescue();
+        else {
+          img.onerror = rescue;
+          img.src = thumbUrl(original, PIN_PHOTO_WIDTH);
+        }
         img.alt = '';
         img.loading = 'lazy';
         img.decoding = 'async';
@@ -369,11 +404,11 @@ export function MemoriesMap({
       {openPin && (
         <div className="mm-map-sheet">
           {openPin.photoUrl && (
-            <img
+            <Photo
               className="mm-map-sheet-photo"
-              src={thumbUrl(openPin.photoUrl, 360)}
+              src={openPin.photoUrl}
+              cssWidth={360}
               alt=""
-              decoding="async"
             />
           )}
           <b>{placeLabel(openPin) || openPin.title}</b>

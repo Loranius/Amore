@@ -5,7 +5,7 @@
 // закриває. Керується батьком через src|null.
 // ============================================================
 import { ModalClose } from '@/components/ui/ModalClose';
-import { thumbUrl } from '@/lib/imageCdn';
+import { Photo } from '@/components/ui/Photo';
 import { useEffect, useRef } from 'react';
 
 interface LightboxProps {
@@ -65,11 +65,17 @@ export function Lightbox({ src, onClose }: LightboxProps) {
           лягти на екран завширшки 412 CSS px. Просимо ширину екрана —
           сходинка (1080 або 1600) покриває навіть DPR 2 на планшеті.
         */}
-        <img
+        {/*
+          ЧЕРЕЗ <Photo>, А НЕ СИРИЙ <img> (ADR-0212). Саме той знімок на
+          11.4 МБ сховище не зменшує (400), і сирий <img> показував на
+          весь екран биту картинку. <Photo> рятує його стисненням у
+          браузері — тим самим шляхом, що в галереї.
+        */}
+        <Photo
           className="wl-lb-img"
-          src={thumbUrl(src, typeof window === 'undefined' ? 512 : window.innerWidth)}
+          src={src}
+          cssWidth={typeof window === 'undefined' ? 512 : window.innerWidth}
           alt=""
-          decoding="async"
         />
         {/*
           ТОЙ САМИЙ ХРЕСТИК, ЩО В УСЬОГО ПОРТАЛУ (ADR-0051), а не

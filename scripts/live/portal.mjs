@@ -375,7 +375,17 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
   });
 
   const logs = [];
-  page.on('console', (message) => logs.push({ type: message.type(), text: message.text() }));
+  /*
+   * «Failed to load resource» без адреси — це факт без причини: не
+   * скажеш, чи впав запит до бази, до шрифту, чи до картинки. Адреса живе
+   * в `location()` повідомлення, і її додано до тексту.
+   */
+  page.on('console', (message) => {
+    const text = message.text();
+    const url = message.location()?.url ?? '';
+    const withUrl = /Failed to load resource/.test(text) && url !== '' ? `${text} ← ${url}` : text;
+    logs.push({ type: message.type(), text: withUrl });
+  });
   page.on('pageerror', (error) => logs.push({ type: 'pageerror', text: error.message }));
 
   await page.addInitScript(({ memory, cores, wanted, entries }) => {

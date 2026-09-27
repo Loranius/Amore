@@ -15,7 +15,7 @@
 // ============================================================
 import { type CSSProperties } from 'react';
 import { useTheme } from '@/providers/ThemeProvider';
-import { PORTAL_PALETTES } from './crystal3d/scene/portalScene';
+import { PORTAL_PALETTES } from './crystal3d/scene/portalPalette';
 import { usePaintedSky, usePaintedSkyShape } from './usePaintedSky';
 import type { HomeArtifact } from './homeArtifact';
 import './portalBackdrop.css';

@@ -74,6 +74,45 @@ export default defineConfig({
               cacheableResponse: { statuses: [0, 200] },
             },
           },
+          /*
+           * МІНІАТЮРИ СХОВИЩА (ADR-0212). Галерея, листя, мітки на мапі
+           * показують не оригінали, а `render/image` (`lib/imageCdn.ts`), і
+           * правило нижче їх не ловило: кожен візит тягнув мініатюри з
+           * мережі, а офлайн галерея стояла порожня. Кешуються лише
+           * відповіді 200 — 400 на завеликий оригінал сюди не потрапить.
+           */
+          {
+            urlPattern: /\/storage\/v1\/render\/image\/public\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'supabase-thumbnails',
+              expiration: { maxEntries: 400, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+          /*
+           * ШРИФТ (ADR-0212). Nunito приходить із Google, і без кешу PWA
+           * офлайн падала на системний шрифт. Таблиця стилів — свіжа, коли
+           * є мережа; самі файли шрифту незмінні за адресою — з кешу.
+           */
+          {
+            urlPattern: /^https:\/\/fonts\.googleapis\.com\//,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'google-fonts-stylesheets',
+              expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            urlPattern: /^https:\/\/fonts\.gstatic\.com\//,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'google-fonts-files',
+              expiration: { maxEntries: 16, maxAgeSeconds: 60 * 60 * 24 * 365 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
           {
             urlPattern: /\/storage\/v1\/object\/public\//,
             handler: 'CacheFirst',

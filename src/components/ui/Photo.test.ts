@@ -10,6 +10,15 @@ const PHOTO = readFileSync(
   fileURLToPath(new URL('./Photo.tsx', import.meta.url)),
   'utf8',
 );
+/*
+ * Сам рятунок переїхав у `lib/photoRescue.ts` (ADR-0212): ним тепер
+ * користуються ще повноекранний перегляд і мапа. Мірки декодування
+ * читають його там.
+ */
+const RESCUE = readFileSync(
+  fileURLToPath(new URL('../../lib/photoRescue.ts', import.meta.url)),
+  'utf8',
+);
 
 describe('<Photo> — рятунок завеликого оригіналу', () => {
   it('ніколи не малює сирий оригінал, поки рятівне стиснення в польоті', () => {
@@ -22,8 +31,8 @@ describe('<Photo> — рятунок завеликого оригіналу', (
   });
 
   it('декодує оригінал одразу в потрібний розмір, а не в повний растр', () => {
-    expect(PHOTO).toContain('createImageBitmap(source, {');
-    expect(PHOTO).toContain('resizeWidth: targetPx');
+    expect(RESCUE).toContain('createImageBitmap(source, {');
+    expect(RESCUE).toContain('resizeWidth: targetPx');
   });
 
   it('просить ОДНУ сторону: дві вбивають пропорції', () => {
@@ -48,8 +57,8 @@ describe('<Photo> — рятунок завеликого оригіналу', (
      */
     // Двокрапка навмисно: шукаємо КЛЮЧ у параметрах, а не згадку слова
     // в поясненні вище — інакше тест забороняв би описувати власну ваду.
-    expect(PHOTO).not.toContain('resizeHeight:');
-    expect(PHOTO, 'полотно мусить доводити довгу сторону').toContain('if (h > targetPx)');
+    expect(RESCUE).not.toContain('resizeHeight:');
+    expect(RESCUE, 'полотно мусить доводити довгу сторону').toContain('if (h > targetPx)');
   });
 
   it('розмір цілі рахує від cssWidth і щільності екрана, а не від оригіналу', () => {
@@ -66,7 +75,7 @@ describe('<Photo> — рятунок завеликого оригіналу', (
      * рятівний шлях міг покласти знімок набік саме там, де решта шляхів
      * кладе його правильно, — тобто по-різному на різних платформах.
      */
-    expect(PHOTO).toContain("imageOrientation: 'from-image'");
+    expect(RESCUE).toContain("imageOrientation: 'from-image'");
   });
 
   it('декодує асинхронно за замовчуванням, а не за проханням кожного місця', () => {
@@ -90,5 +99,18 @@ describe('<Photo> — рятунок завеликого оригіналу', (
     // назавжди.
     expect(PHOTO).toContain('setRescueFailed(true)');
     expect(PHOTO).toMatch(/rescueFailed\s*\?\s*original\s*:\s*undefined/);
+  });
+});
+
+describe('пам\'ять про завеликі знімки (ADR-0212)', () => {
+  it('позначає знімок лише ПІСЛЯ вдалого рятунку, а не на будь-яку помилку мініатюри', () => {
+    // Мініатюра падає й від обірваної мережі; позначка за такою помилкою
+    // назавжди тягнула б 11 МБ замість 30 КБ.
+    expect(PHOTO).toMatch(/if \(!blob\) \{ setRescueFailed\(true\); return; \}[\s\S]*?markOversizedPhoto\(original\);/);
+    expect(PHOTO).not.toMatch(/onError=\{[\s\S]*?markOversizedPhoto/);
+  });
+
+  it('відомий завеликий знімок рятується одразу, без гарантованого 400', () => {
+    expect(PHOTO).toContain('useState(() => isOversizedPhoto(original))');
   });
 });

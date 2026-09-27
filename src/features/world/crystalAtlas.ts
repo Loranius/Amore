@@ -1,5 +1,5 @@
 import type { WorldRegion } from './worldRegions';
-import { PORTAL_EYE_ELEVATION_SIN } from '@/features/home/crystal3d/scene/portalScene';
+import { PORTAL_EYE_ELEVATION_SIN } from '@/features/home/crystal3d/scene/portalPalette';
 
 // ============================================================
 // The crystal's answer to each region — the artifact half of the atlas.

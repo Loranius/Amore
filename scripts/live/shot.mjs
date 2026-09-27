@@ -402,7 +402,7 @@ async function main() {
           if (notable.length > 0) {
             failures += notable.length;
             console.log(`  ПОМИЛКИ (${notable.length}):`);
-            for (const text of notable.slice(0, 5)) console.log(`    ${text.slice(0, 180)}`);
+            for (const text of notable.slice(0, 5)) console.log(`    ${text.slice(0, 320)}`);
           }
           portal.logs.length = 0;
         }
