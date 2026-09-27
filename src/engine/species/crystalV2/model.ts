@@ -34,7 +34,7 @@ import {
 } from './calendar';
 import { unit } from './hash';
 
-export const CRYSTAL_V2_VERSION = 'crystal-v2/2026-09-27';
+export const CRYSTAL_V2_VERSION = 'crystal-v2/2026-09-28';
 
 const SIDES = 6;
 
@@ -75,6 +75,8 @@ const OWN_HUE_STEPS = 6;
  * чисто червоним від одного-двох подарунків.
  */
 const GIFT_CONFIDENCE = 3;
+/** Радіус кристала року в частках його висоти (0.2 читалось «пеньками»). */
+const CHILD_SLENDERNESS = 0.16;
 
 export interface CrystalV2Snapshot {
   startDate: string;
@@ -272,7 +274,9 @@ export function buildCrystalV2Model(snapshot: CrystalV2Snapshot): CrystalV2Model
   const height = 1.4 + 1.25 * Math.log1p(years);
   // Ширина — спогади, але й час додає трохи: без цього порожня історія
   // давала стовп 3.9:1 — той «рожевий стовп», на який власник скаржився.
-  const radius = 0.4 + 0.1 * Math.log1p(years) + 0.06 * Math.log1p(counts.memories);
+  // Стрункіше, ніж спершу (власник, 2026-09-28: «кристал занадто
+  // громіздкий»): 0.40 + 0.10·ln + 0.06·ln давало живій історії 2.1:1.
+  const radius = 0.3 + 0.06 * Math.log1p(years) + 0.035 * Math.log1p(counts.memories);
   const tiers = 1 + Math.min(3, Math.floor(Math.log2(1 + counts.plans)));
   const tip = radius * 1.28; // ~52°: кут кварцової вершини, а не пропорція тіла
   const weights = Array.from({ length: tiers }, (_, j) => 0.8 + 0.4 * unit(seed, `monarch:tier${j}`));
@@ -303,7 +307,7 @@ export function buildCrystalV2Model(snapshot: CrystalV2Snapshot): CrystalV2Model
     const activity = ACTIVITY_KINDS.reduce((sum, kind) => sum + ACTIVITY_WEIGHTS[kind] * mix[kind], 0);
     const share = 0.14 + 0.08 * Math.log1p(age) + 0.045 * Math.log1p(activity);
     const childHeight = height * Math.min(0.55, Math.max(0.12, share));
-    const childRadius = childHeight * 0.2;
+    const childRadius = childHeight * CHILD_SLENDERNESS;
     const placesShare = activity > 0 ? (ACTIVITY_WEIGHTS.places * mix.places) / activity : 0;
     children.push({
       year: k,

@@ -18,11 +18,24 @@ import numpy as np
 from .hashing import unit
 
 
+# Фаска: частка кожного ребра шестикутника, зрізана з обох кінців, і
+# звуження призми догори. Те саме, що в `geometry.ts` (ADR-0217, 2026-09-28:
+# «занадто громіздкий і низькополігональний»). Фаска — пласка грань.
+BEVEL = 0.16
+TAPER = 0.88
+
+
 def _ring(sides: list[list[float]]) -> np.ndarray:
-    pts = []
+    corners = []
     for angle, reach in sides:
         a = math.radians(angle)
-        pts.append([math.cos(a) * reach, 0.0, math.sin(a) * reach])
+        corners.append(np.array([math.cos(a) * reach, 0.0, math.sin(a) * reach]))
+    n = len(corners)
+    pts = []
+    for i in range(n):
+        p = corners[i]
+        pts.append(p + (corners[(i - 1) % n] - p) * BEVEL)
+        pts.append(p + (corners[(i + 1) % n] - p) * BEVEL)
     return np.array(pts)
 
 
@@ -44,7 +57,8 @@ def body(sides, height, tier_heights, apex, bury) -> list[tuple[np.ndarray, int,
     face = 0
     n = len(ring0)
     bottom = ring0 + np.array([0, y0, 0])
-    top = ring0 + np.array([0, y1, 0])
+    shoulder = ring0 * TAPER
+    top = shoulder + np.array([0, y1, 0])
     for i in range(n):
         j = (i + 1) % n
         faces.append((np.array([bottom[i], bottom[j], top[j]]), face, QUAD_A))
@@ -58,7 +72,7 @@ def body(sides, height, tier_heights, apex, bury) -> list[tuple[np.ndarray, int,
         s = 1.0 - (t + 1) / tiers
         y += tier_heights[t]
         centre = apex_v * (1 - s)
-        nxt = ring0 * s + centre + np.array([0, y, 0])
+        nxt = shoulder * s + centre + np.array([0, y, 0])
         for i in range(n):
             j = (i + 1) % n
             if s > 1e-9:

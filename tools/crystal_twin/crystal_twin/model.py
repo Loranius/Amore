@@ -62,6 +62,8 @@ OWN_HUE_STEPS = 6
 # бажання — це «усі бажання в одному каналі», і справжній архів пари
 # у 2024–2025 ставав чисто червоним від одного-двох подарунків.
 GIFT_CONFIDENCE = 3
+# Радіус кристала року в частках його висоти (0.2 читалось «пеньками»).
+CHILD_SLENDERNESS = 0.16
 
 
 def r6(x: float) -> float:
@@ -192,7 +194,9 @@ def build_model(snapshot: dict[str, Any]) -> dict[str, Any]:
     # Ширина — спогади, але й час додає трохи: без цього порожня історія
     # давала стовп 3.9:1 — саме той «рожевий стовп», на який власник уже
     # скаржився (навичка crystal-look).
-    radius = 0.40 + 0.10 * math.log1p(years) + 0.06 * math.log1p(counts["memories"])
+    # Стрункіше, ніж спершу (власник, 2026-09-28: «кристал занадто
+    # громіздкий»): 0.40 + 0.10·ln + 0.06·ln давало живій історії 2.1:1.
+    radius = 0.30 + 0.06 * math.log1p(years) + 0.035 * math.log1p(counts["memories"])
     tiers = 1 + min(3, int(math.floor(math.log2(1 + counts["plans"]))))                # плани
     tip = radius * 1.28  # ~52°: кут кварцової вершини, а не пропорція тіла
     weights = [0.8 + 0.4 * unit(seed, f"monarch:tier{j}") for j in range(tiers)]
@@ -221,7 +225,7 @@ def build_model(snapshot: dict[str, Any]) -> dict[str, Any]:
         activity = sum(ACTIVITY_WEIGHTS[kind] * mix[kind] for kind in ACTIVITY_WEIGHTS)
         share = 0.14 + 0.08 * math.log1p(age) + 0.045 * math.log1p(activity)
         child_h = height * min(0.55, max(0.12, share))
-        child_r = child_h * 0.2
+        child_r = child_h * CHILD_SLENDERNESS
         places_share = (ACTIVITY_WEIGHTS["places"] * mix["places"]) / activity if activity > 0 else 0.0
         children.append({
             "year": k,

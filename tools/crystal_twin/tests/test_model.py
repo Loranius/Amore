@@ -69,6 +69,21 @@ class OneEffectPerModule(unittest.TestCase):
     def setUp(self):
         self.base = fixture("empty")
 
+    def test_monarch_is_slender_not_bulky(self):
+        # Власник, 2026-09-28: «кристал занадто громіздкий». Жива історія
+        # (≈3.75 року, 61 спогад) давала 2.1:1; стрункий монарх — від 2.8:1,
+        # і навіть сто спогадів за двадцять років не роблять із нього брус.
+        live = build_model({"startDate": "2022-12-26", "asOf": "2026-09-27", "partners": {},
+                            "memories": [{"id": i, "date": "2024-01-01"} for i in range(61)]})
+        m = live["monarch"]
+        self.assertGreaterEqual(m["height"] / (2 * m["radius"]), 2.8)
+        rich = build_model({"startDate": "2022-12-26", "asOf": "2042-12-26", "partners": {},
+                            "memories": [{"id": i, "date": "2030-01-01"} for i in range(400)]})
+        m = rich["monarch"]
+        self.assertGreaterEqual(m["height"] / (2 * m["radius"]), 2.5)
+        for child in live["children"]:
+            self.assertAlmostEqual(child["radius"] / child["height"], 0.16, places=4)
+
     def test_memories_only_widen(self):
         a = build_model(self.base)
         b = build_model(dict(self.base, memories=[{"id": i, "date": "2024-05-01"} for i in range(20)]))

@@ -2,7 +2,7 @@
 // Кристал v2 — геометрія з моделі (ADR-0217).
 // ------------------------------------------------------------
 // Той самий алгоритм, що в Python-двійнику (`crystal_twin/geometry.py`).
-// Кожне тіло — шестигранна призма з ярусною вершиною. Кільце ярусу j+1 —
+// Кожне тіло — шестигранна призма з фасками на ребрах і ярусною вершиною. Кільце ярусу j+1 —
 // це кільце j, стиснуте до осі й зсунуте до вершини, тож відповідні ребра
 // паралельні й кожна грань ПЛАСКА за побудовою. Нерівність граней дає не шум
 // (власник: «не роби поверхні кривими чи шумними»), а різні кут і відстань
@@ -67,11 +67,35 @@ export interface CrystalV2Geometry {
   height: number;
 }
 
+/**
+ * Частка кожного ребра шестикутника, яку зрізає фаска з обох кінців.
+ * Власник (2026-09-28): «занадто низькополігональний». Шість широких граней
+ * читались брусом; вузька грань-фаска між кожними двома — це те, що в
+ * еталонах ловить світло смужкою вздовж ребра. Кожна фаска — теж пласка
+ * грань, а не заокруглення: правило «грані пласкі» лишається.
+ */
+const BEVEL = 0.16;
+
+/**
+ * Призма звужується догори: верхнє кільце — 0.88 нижнього. Паралельний
+ * брус читався громіздким; звуження тримає грані пласкими (кільце
+ * стискається до осі, тож відповідні ребра лишаються паралельні).
+ */
+const TAPER = 0.88;
+
 function ring(sides: readonly (readonly [number, number])[]): V3[] {
-  return sides.map(([angle, reach]) => {
+  const corners = sides.map(([angle, reach]): V3 => {
     const a = (angle * Math.PI) / 180;
     return [Math.cos(a) * reach, 0, Math.sin(a) * reach];
   });
+  const n = corners.length;
+  const out: V3[] = [];
+  const toward = (p: V3, q: V3): V3 => [p[0] + (q[0] - p[0]) * BEVEL, 0, p[2] + (q[2] - p[2]) * BEVEL];
+  for (let i = 0; i < n; i += 1) {
+    const p = corners[i]!;
+    out.push(toward(p, corners[(i + n - 1) % n]!), toward(p, corners[(i + 1) % n]!));
+  }
+  return out;
 }
 
 function body(
@@ -87,8 +111,9 @@ function body(
   const y0 = -bury;
   const y1 = height - tip;
   const lift = (p: V3, y: number): V3 => [p[0], y, p[2]];
+  const shoulder = base.map((p): V3 => [p[0] * TAPER, 0, p[2] * TAPER]);
   const bottom = base.map((p) => lift(p, y0));
-  const top = base.map((p) => lift(p, y1));
+  const top = shoulder.map((p) => lift(p, y1));
   const tris: Tri[] = [];
   let face = 0;
   for (let i = 0; i < n; i += 1) {
@@ -103,7 +128,7 @@ function body(
   for (let t = 0; t < tiers; t += 1) {
     const s = 1 - (t + 1) / tiers;
     y += tierHeights[t]!;
-    const next = base.map((p): V3 => [
+    const next = shoulder.map((p): V3 => [
       p[0] * s + apex[0] * (1 - s),
       y,
       p[2] * s + apex[1] * (1 - s),
