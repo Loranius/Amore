@@ -21,8 +21,11 @@ import {
 } from '@/components/icons/UiIcon';
 import { TicketIcon } from '@/components/icons/NavIcon';
 import { CompassIcon } from '@/components/icons/MapIcon';
+import { useWorldModule } from '@/features/world/useWorldModule';
 
 export function WhereToPage() {
+  // Світ позаду, як у вішліста й планів (ADR-0215).
+  const worldVisible = useWorldModule();
   const { data: location } = useWhereToLocation();
   const saveLoc = useSaveLocation();
   const searchMut = useEventsSearch();
@@ -74,7 +77,7 @@ export function WhereToPage() {
   };
 
   return (
-    <section className="whereto pink-page">
+    <section className="whereto pink-page world-module" data-world={worldVisible ? 'true' : undefined}>
       <PageHeader
         title="Куди піти"
         eyebrow="Події поруч"

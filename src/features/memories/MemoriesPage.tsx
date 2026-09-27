@@ -37,6 +37,7 @@ import { MomentComposer } from './MomentComposer';
 import { useMoments } from './useMoments';
 import type { PlaceCandidate } from './momentPlace';
 import './memories.css';
+import { useWorldModule } from '@/features/world/useWorldModule';
 
 /*
  * Карта — окремий шматок збірки.
@@ -50,6 +51,8 @@ const MemoriesMap = lazy(() =>
 );
 
 export function MemoriesPage() {
+  // Світ позаду, як у вішліста й планів (ADR-0215).
+  const worldVisible = useWorldModule();
   const me = useCurrentUser();
   const navigate = useNavigate();
   const { data, isPending, isError, refetch, isFetching } = useMoments();
@@ -99,7 +102,7 @@ export function MemoriesPage() {
   // показує його, навіть якщо дані вже є.
   if (skeletonVisible) {
     return (
-      <section className="memories">
+      <section className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
         <div className="mm-grid" aria-hidden="true">
           {[0, 1, 2, 3].map((i) => <div key={i} className="mm-skeleton" />)}
         </div>
@@ -108,11 +111,11 @@ export function MemoriesPage() {
   }
 
   // Вікно очікування до порога: порожньо, але висота розділу вже своя.
-  if (isPending) return <section className="memories" aria-busy="true" />;
+  if (isPending) return <section className="memories world-module" data-world={worldVisible ? 'true' : undefined} aria-busy="true" />;
 
   if (isError) {
     return (
-      <section className="memories">
+      <section className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
         <div className="empty-state">
           <p>Не вдалось завантажити спогади.</p>
           <button type="button" className="btn" onClick={() => void refetch()} disabled={isFetching}>
@@ -127,7 +130,7 @@ export function MemoriesPage() {
   const earliest = moments[moments.length - 1]?.memory_date;
 
   return (
-    <section className="memories">
+    <section className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
       {/* Полароїд входить ДІЄЮ ЗАГОЛОВКА, а не третьою плаваючою кнопкою.
           Внизу їх рівно дві й вони дзеркальні — карта ліворуч, «+»
           праворуч; третя зламала б саме ту симетрію, якою екран читається

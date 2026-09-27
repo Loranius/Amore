@@ -39,8 +39,11 @@ import {
 import { useUserSizes } from './useSizes';
 import type { UserSizesRow } from '@/types';
 import './sizes.css';
+import { useWorldModule } from '@/features/world/useWorldModule';
 
 export function SizesPage() {
+  // Світ позаду, як у вішліста й планів (ADR-0215).
+  const worldVisible = useWorldModule();
   const users = usePeople();
   const me = useCurrentUser();
   const [chosenId, setChosenId] = useState<number | null>(null);
@@ -66,7 +69,7 @@ export function SizesPage() {
   const { filled, total } = sizesFilled(sizes, isFemale);
 
   return (
-    <section className="sizes-page">
+    <section className="sizes-page world-module" data-world={worldVisible ? 'true' : undefined}>
       <PageHeader
         title="Заміри"
         meta={

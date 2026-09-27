@@ -21,11 +21,14 @@ import { ChevronDownIcon, SwapIcon } from '@/components/icons/UiIcon';
 import { MediaFormModal, AddFromSearchModal } from './MediaModals';
 import { SwipeDeck } from '@/features/swipe/SwipeDeck';
 import type { MediaItemRow, MediaType, MediaStatus, TmdbSearchResult } from '@/types';
+import { useWorldModule } from '@/features/world/useWorldModule';
 
 type Filter = 'all' | MediaStatus;
 type ReviewTarget = { item: MediaItemRow; who: ReviewWho };
 
 export function MediaPage() {
+  // Світ позаду, як у вішліста й планів (ADR-0215).
+  const worldVisible = useWorldModule();
   const [type, setType] = useState<MediaType>('movie');
   const [filter, setFilter] = useState<Filter>('all');
   const [query, setQuery] = useState('');
@@ -71,7 +74,7 @@ export function MediaPage() {
   };
 
   return (
-    <section className="media pink-page">
+    <section className="media pink-page world-module" data-world={worldVisible ? 'true' : undefined}>
       <PageHeader
         title="Вотчліст"
         eyebrow="Фільми, серіали, книги"

@@ -31,8 +31,11 @@ function initialYearMonth(params: URLSearchParams): { yr: number; mo: number } {
 }
 
 import { PageHeader } from '@/components/ui/PageHeader';
+import { useWorldModule } from '@/features/world/useWorldModule';
 
 export function SchedulePage() {
+  // Світ позаду, як у вішліста й планів (ADR-0215).
+  const worldVisible = useWorldModule();
   const [searchParams, setSearchParams] = useSearchParams();
   const users = usePeople();
   const me = useCurrentUser();
@@ -247,7 +250,7 @@ export function SchedulePage() {
     // Фон раніше приходив від обгортки хабу «Календар». Графік більше під
     // ним не живе — це власний розділ, тож він несе його сам, як і решта
     // розділів порталу.
-    <section className="sched pink-page">
+    <section className="sched pink-page world-module" data-world={worldVisible ? 'true' : undefined}>
       <header className="sched-hero">
         {/*
           * «Заповнити місяць» — у слоті дії спільних дверей (ADR-0046).

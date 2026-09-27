@@ -27,6 +27,7 @@ import { placeLabel } from './momentPlace';
 import { formatMemoryDate } from './memoriesDate';
 import { useMomentMutations, useMoments } from './useMoments';
 import './memories.css';
+import { useWorldModule } from '@/features/world/useWorldModule';
 
 /**
  * Скільки колонок в альбомі: дві на телефоні, три на широкому екрані.
@@ -57,6 +58,8 @@ function useAlbumLanes(): number {
 }
 
 export function MomentPage() {
+  // Світ позаду, як у вішліста й планів (ADR-0215).
+  const worldVisible = useWorldModule();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const me = useCurrentUser();
@@ -72,12 +75,12 @@ export function MomentPage() {
   const moment = data?.moments.find((m) => String(m.id) === id);
 
   if (isPending) {
-    return <section className="memories"><div className="mm-skeleton mm-skeleton--hero" /></section>;
+    return <section className="memories world-module" data-world={worldVisible ? 'true' : undefined}><div className="mm-skeleton mm-skeleton--hero" /></section>;
   }
 
   if (!moment) {
     return (
-      <section className="memories">
+      <section className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
         <div className="empty-state">
           <p>Такого спогаду немає — можливо, його видалили.</p>
           <button type="button" className="btn" onClick={() => navigate('/memories')}>
@@ -92,7 +95,7 @@ export function MomentPage() {
   const album = albumColumns(moment.photos, lanes);
 
   return (
-    <section className="memories mm-page">
+    <section className="memories mm-page world-module" data-world={worldVisible ? 'true' : undefined}>
       <div className="mm-hero">
         {moment.cover && (
           // Обкладинка теж відкривається на повний екран: інакше спогад з

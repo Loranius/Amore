@@ -12,12 +12,15 @@ type Tab = 'constructor' | 'favorites';
 
 import { PageHeader } from '@/components/ui/PageHeader';
 import { HeartIcon, PotIcon } from '@/components/icons/NavIcon';
+import { useWorldModule } from '@/features/world/useWorldModule';
 
 export function CulinaryPage() {
+  // Світ позаду, як у вішліста й планів (ADR-0215).
+  const worldVisible = useWorldModule();
   const [tab, setTab] = useState<Tab>('constructor');
 
   return (
-    <section className="culinary pink-page">
+    <section className="culinary pink-page world-module" data-world={worldVisible ? 'true' : undefined}>
       {/* Надзаголовок НЕ «Що готуємо» — конструктор нижче ставить це
           питання дослівно, і два однакові рядки поспіль читаються як
           збій верстки. Та сама пастка, що й у «Скарбничці». */}

@@ -24,11 +24,14 @@
 import { useNavigate } from 'react-router-dom';
 import { HistorySweepView } from './HistorySweepView';
 import { useHistorySweep } from './useHistorySweep';
+import { useWorldModule } from '@/features/world/useWorldModule';
 
 export function HistorySweepPage() {
+  // Світ позаду, як у вішліста й планів (ADR-0215).
+  const worldVisible = useWorldModule();
   const sweep = useHistorySweep();
   const navigate = useNavigate();
-  return <HistorySweepView sweep={sweep} onDone={() => void navigate('/')} />;
+  return <HistorySweepView sweep={sweep} onDone={() => void navigate('/')} world={worldVisible} />;
 }
 
 export default HistorySweepPage;

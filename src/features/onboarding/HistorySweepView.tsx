@@ -48,8 +48,8 @@ function todayInput(): string {
 }
 
 export function HistorySweepView({
-  sweep, onDone,
-}: { sweep: HistorySweep; onDone: () => void }) {
+  sweep, onDone, world = false,
+}: { sweep: HistorySweep; onDone: () => void; world?: boolean }) {
   const [startDraft, setStartDraft] = useState('');
   const [title, setTitle] = useState(ANNIVERSARY_SUGGESTIONS[0]!);
   const [date, setDate] = useState('');
@@ -73,7 +73,7 @@ export function HistorySweepView({
   ].some((item) => !item.removable);
 
   return (
-    <div className="page sweep-page">
+    <div className="page sweep-page world-module" data-world={world ? 'true' : undefined}>
       <PageHeader eyebrow="Наші роки" title="Наша історія" />
 
       {sweep.error && (
