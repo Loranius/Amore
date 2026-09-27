@@ -17,62 +17,93 @@ import type { ConstellationLevel } from '../constellationRules';
 // велике тіло не може мерехтіти, як іскра, і саме це читається як вага.
 // ============================================================
 
-/** Скільки секунд світиться кожна наступна зірка під час появи. */
-const BIRTH_STEP = 0.24;
-/** Скільки триває поява однієї зірки. */
-const BIRTH_RISE = 0.55;
+/*
+ * ПОЯВА СУЗІР'Я — ХРОНОЛОГІЧНО Й ПОВІЛЬНО (ADR-0214).
+ *
+ * Власник: «при відкритті цього модуля спочатку загораються зірки
+ * хронологічно від першої до останньої, повільно з'єднуючись між собою у
+ * сузір'я».
+ *
+ * Було 0.24 с на зірку, і лінія росла одночасно з зіркою — десять подій
+ * проскакували за дві секунди, до того ж здебільшого поки фон ще
+ * вантажився. Тепер черга така: зірка загоряється → від неї тягнеться
+ * лінія до наступної → наступна спалахує рівно тоді, коли лінія до неї
+ * дійшла. Тобто шлях ПРОКЛАДАЄТЬСЯ від першої події до останньої.
+ *
+ * Крок — не стала, а частка загального часу: десять подій ідуть по 1.1 с,
+ * сто — по 0.35, і пара не чекає хвилину, поки проявиться довга історія.
+ */
 
-/** Наскільки зірка вже народилась, 0…1. */
-export function birthProgress(order: number, clock: number): number {
-  const start = order * BIRTH_STEP;
+/** До скількох секунд розтягується поява всього сузір'я. */
+const REVEAL_TOTAL = 10;
+/** Найповільніший крок між зірками — щоб дві-три події не тягнулись вічність. */
+const MAX_STEP = 1.3;
+/** Найшвидший — щоб довга історія все ще читалась зіркою за зіркою. */
+const MIN_STEP = 0.35;
+/** За скільки секунд зірка розгоряється. */
+const MAX_RISE = 0.9;
+/** Яку частку розгоряння лінія чекає, перш ніж рушити до наступної зірки. */
+const LINE_WAITS = 0.55;
+
+/** Секунди між спалахами сусідніх зірок для сузір'я з `count` зірок. */
+export function revealStep(count: number): number {
+  if (count < 2) return MAX_STEP;
+  return Math.min(MAX_STEP, Math.max(MIN_STEP, REVEAL_TOTAL / (count - 1)));
+}
+
+function riseTime(count: number): number {
+  return Math.min(MAX_RISE, revealStep(count) * 0.9);
+}
+
+function smooth(t: number): number {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+}
+
+/** Наскільки зірка вже народилась, 0…1. `count` — скільки зірок у сузір'ї. */
+export function birthProgress(order: number, clock: number, count: number): number {
+  const start = order * revealStep(count);
   if (clock <= start) return 0;
-  return Math.min(1, (clock - start) / BIRTH_RISE);
+  return Math.min(1, (clock - start) / riseTime(count));
 }
 
 /** Скільки секунд триває поява всього сузір'я. */
 export function birthDuration(count: number): number {
-  return count === 0 ? 0 : (count - 1) * BIRTH_STEP + BIRTH_RISE;
+  return count === 0 ? 0 : (count - 1) * revealStep(count) + riseTime(count);
 }
 
 /**
- * Скільки шляху вже прокладено, 0…1 уздовж кривої.
+ * Скільки прокладено лінії від зірки `leg` до зірки `leg + 1`, 0…1.
  *
- * Крива йде контрольними точками ланцюга за датою, і `TubeGeometry` розкладає
- * `uv.x` рівномірно за ПАРАМЕТРОМ, а не за довжиною. Отже точка з номером `i`
- * лежить рівно на `i / (n − 1)` — і частку легко порахувати без самої кривої.
+ * Лінія рушає, коли її зірка вже наполовину розгорілась, і приходить рівно
+ * в мить, коли наступна починає спалахувати. Хід — м'який (smoothstep):
+ * лінія рушає й під'їжджає повільно, а не б'ється в зірку.
+ */
+export function legProgress(leg: number, clock: number, count: number): number {
+  const step = revealStep(count);
+  const from = leg * step + riseTime(count) * LINE_WAITS;
+  const to = (leg + 1) * step;
+  if (to <= from) return clock >= to ? 1 : 0;
+  return smooth((clock - from) / (to - from));
+}
+
+/**
+ * Скільки шляху вже прокладено, 0…1 уздовж `uv.x`.
  *
- * Промінь тягнеться до зірки рівно так само, як вона народжується: інакше він
- * на мить висів би в порожнечі попереду неї.
+ * Зірка `i` лежить на `i / (n − 1)` (`buildConstellationLines`), тож частка —
+ * номер останнього прольоту в дорозі плюс його власний хід.
  */
 export function pathReveal(orders: readonly number[], clock: number): number {
   const count = orders.length;
   if (count < 2) return 0;
   let reveal = 0;
-  for (let index = 1; index < count; index += 1) {
-    const grown = birthProgress(orders[index]!, clock);
+  for (let leg = 0; leg < count - 1; leg += 1) {
+    const grown = legProgress(leg, clock, count);
     if (grown <= 0) break;
-    reveal = (index - 1 + grown) / (count - 1);
+    reveal = (leg + grown) / (count - 1);
+    if (grown < 1) break;
   }
   return Math.min(1, reveal);
-}
-
-/** Скільки відрізків труби на один проліт між подіями. */
-const SEGMENTS_PER_LEG = 14;
-/**
- * Стеля відрізків шляху.
- *
- * Бюджет, а не смак. Кількість подій у пари росте роками й нічим не обмежена;
- * без стелі сорок подій дали б 546 відрізків, сто — 1386, і геометрія шляху
- * почала б коштувати більше за все інше в сцені разом. 420 відрізків — це
- * приблизно 4200 трикутників при п'яти гранях, тобто трохи більше за все, що
- * сцена малює зараз, і на цьому число зупиняється назавжди.
- */
-const MAX_PATH_SEGMENTS = 420;
-
-/** Скільки відрізків труби будувати на ланцюг із `count` подій. */
-export function pathSegments(count: number): number {
-  if (count < 2) return 0;
-  return Math.min(MAX_PATH_SEGMENTS, (count - 1) * SEGMENTS_PER_LEG);
 }
 
 /**

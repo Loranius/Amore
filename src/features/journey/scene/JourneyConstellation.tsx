@@ -199,7 +199,7 @@ export function JourneyConstellation({
 
     stars.forEach((star, index) => {
       const aura = auras[index]!;
-      const born = reducedMotion ? 1 : birthProgress(star.order, now);
+      const born = reducedMotion ? 1 : birthProgress(star.order, now, stars.length);
       const grown = star.id === focusId ? born * (1 - yielded) : born;
       position.set(star.x, star.y, star.z);
 

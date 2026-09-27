@@ -2,36 +2,36 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import {
   AdditiveBlending,
-  CatmullRomCurve3,
-  TubeGeometry,
-  Vector3,
+  BufferAttribute,
+  BufferGeometry,
   type ShaderMaterial,
 } from 'three';
 import type { Star3D } from '../constellation3d';
 import { hslToRgb, type JourneyPalette } from '../journeyPalette';
-import { pathReveal, pathSegments, pulsePosition } from './constellationLife';
+import { pathReveal, pulsePosition } from './constellationLife';
+import { buildConstellationLines } from './constellationLines';
 
 // ============================================================
-// Шлях між подіями.
+// Шлях між подіями — ПРЯМІ, як на зоряній карті (ADR-0214).
 // ------------------------------------------------------------
-// Раніше тут були ВІДРІЗКИ: кожна зірка, крім найпершої за датою, тягла пряму
-// лінію до попередньої. Ламана з різкими зламами на кожній події — це і є
-// друга половина вади, яку власник назвав «network graph». Перша половина
-// (кут від порядку створення) виправлена в `constellation3d`; тут виправлена
-// друга: ланцюг проходить одним сплайном, і на зірці він згинається, а не
-// ламається.
+// Історія цього файлу — маятник, і обидва його боки варто знати.
 //
-// Це справжня геометрія у сцені, а не накладений SVG. Різниця не декоративна:
-// накладений шар не має глибини, тож ділянка шляху, яка мала б пройти ЗА
-// зіркою, малювалась би поверх неї, і сузір'я миттєво читалось би пласким.
+// Спершу тут були відрізки без жодного задуму: кожна зірка тягла пряму до
+// попередньої, кут ланцюга йшов від порядку створення, і власник назвав
+// результат «network graph». Тоді ланцюг став одним сплайном Катмулла —
+// Рома, що згинається на зірках.
 //
-// **Один виклик малювання на весь шлях.** `TubeGeometry` будується раз на
-// зміну набору подій; поява й імпульс живуть в уніформах, тобто щокадру не
-// перебудовується нічого.
+// Власник: «зроби сузір'я схожим на реальні сузір'я з гострими
+// геометричними з'єднаннями замість хвилястих». Справжня вада «графа» була
+// не в прямих, а в порядку й куті (їх виправив `constellation3d`), тож
+// прямі повертаються — вже як на карті неба: злам рівно на зірці, і лінія
+// зупиняється трохи до неї (`constellationLines.ts`).
 //
-// Крива навмисно стримана. `CatmullRomCurve3` із натягом 0.5 («centripetal»)
-// не робить петель на різких поворотах — а вони тут неминучі, бо ядро стоїть
-// у нулі осі, збоку від власного місця в ланцюгу.
+// Це справжня геометрія у сцені, а не накладений SVG: ділянка, що має
+// пройти ЗА зіркою, ховається за нею, і сузір'я не читається пласким.
+//
+// **Один виклик малювання на весь шлях.** Меш будується раз на зміну
+// набору подій; поява й імпульс живуть в уніформах.
 // ============================================================
 
 /**
@@ -42,8 +42,6 @@ import { pathReveal, pathSegments, pulsePosition } from './constellationLife';
  * розкритій події вона виходила помітнішою за саму подію.
  */
 const PATH_RADIUS = 0.12;
-/** Скільки поперечних граней у труби. П'ять досить: труба тонша за піксель здалеку. */
-const PATH_SIDES = 5;
 
 const PATH_VERTEX = /* glsl */ `
   varying vec2 vPath;
@@ -56,10 +54,10 @@ const PATH_VERTEX = /* glsl */ `
 /**
  * Поява й імпульс — обидва по ДОВЖИНІ труби, тобто по `uv.x`.
  *
- * `TubeGeometry` розкладає `uv.x` рівномірно за параметром кривої, тож
- * контрольна точка `i` лежить рівно на `i / (n − 1)`. Саме на цьому й
- * тримається `pathReveal`, і саме тому поява не потребує ні перебудови
- * геометрії, ні `drawRange`.
+ * `buildConstellationLines` кладе зірку `i` рівно на `uv.x = i / (n − 1)`
+ * (та сама угода, що була в сплайна). Саме на цьому й тримається
+ * `pathReveal`, і саме тому поява не потребує ні перебудови геометрії, ні
+ * `drawRange`.
  */
 const PATH_FRAGMENT = /* glsl */ `
   varying vec2 vPath;
@@ -97,11 +95,12 @@ export function ConstellationPath({
 
   const geometry = useMemo(() => {
     if (chain.length < 2) return null;
-    const points = chain.map((star) => new Vector3(star.x, star.y, star.z));
-    // `centripetal` — не смак, а запобіжник: `chordal` і `catmullrom` роблять
-    // петлю на різкому повороті, а ядро в нулі осі саме такий поворот і дає.
-    const curve = new CatmullRomCurve3(points, false, 'centripetal', 0.5);
-    return new TubeGeometry(curve, pathSegments(chain.length), PATH_RADIUS, PATH_SIDES, false);
+    const lines = buildConstellationLines(chain, PATH_RADIUS);
+    const next = new BufferGeometry();
+    next.setAttribute('position', new BufferAttribute(lines.positions, 3));
+    next.setAttribute('uv', new BufferAttribute(lines.uvs, 2));
+    next.setIndex(new BufferAttribute(lines.indices, 1));
+    return next;
   }, [chain]);
 
   useEffect(() => () => geometry?.dispose(), [geometry]);

@@ -1,23 +1,8 @@
 Assets used by the «Наш шлях» constellation scene.
 
---------------------------------------------------------------------
-amore_journey_skybox.glb
---------------------------------------------------------------------
-Asset: Billions stars Skybox HDRI panorama
-Creator: Aliaksandr.melas — https://sketchfab.com/alexandr.melas
-Source: https://sketchfab.com/3d-models/billions-stars-skybox-hdri-panorama-7e3e8f94810b44dd837bacad6c65b5e8
-License: CC-BY-4.0
-License URL: http://creativecommons.org/licenses/by/4.0/
-
-The source GLB is stored unchanged.
-
-A WebP re-encode was tried and reverted after measurement. It cost nothing in
-sharpness (mean gradient magnitude on the live screen: 4.114 vs 4.088 for PNG)
-but WebP subsamples chroma 2:1, and this panorama is magnified about 3x on
-screen -- the red and blue sparks of individual stars merged into flat purple.
-Lossless WebP weighs 7.98 MB, so it wins nothing. Downscaling is worse still:
-at 1536 px the point stars smear (star-pixel PSNR falls from 23.1 dB to
-15.6 dB).
+The former skybox (amore_journey_skybox.glb, «Billions stars Skybox HDRI
+panorama» by Aliaksandr.melas, CC-BY-4.0) is no longer shipped: the sky is
+now generated procedurally (ADR-0214).
 
 --------------------------------------------------------------------
 amore_journey_sun.glb
