@@ -14,12 +14,10 @@
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import {
   PORTAL_DRIFT_ROCKS,
-  PORTAL_HALO_SEGMENTS,
   PORTAL_WATERFALLS,
   PORTAL_ISLAND_RUBBLE,
   buildPortalDriftGeometry,
   buildPortalFloraGeometry,
-  buildPortalHaloGeometry,
   buildPortalWaterfallGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
@@ -62,8 +60,12 @@ export const PORTAL_GROUND_Y = CRYSTAL_GROUND_BASELINE;
  * call заради прохання власника «максимально наближено до еталона», і
  * це записано тут, а не сховано. Якщо call доведеться повернути, першим
  * знімається світний прохід водоспадів: аура важить у кадрі більше.
+ *
+ * 8 → 7 (ADR-0211). Світляне кільце прибрано на прохання власника
+ * («прибери кільце сяйва навколо кристала») разом із дисками світіння в
+ * тому самому меші. Конверт ADR-0164 знову дотримано.
  */
-export const PORTAL_ENVIRONMENT_DRAW_CALLS = 8;
+export const PORTAL_ENVIRONMENT_DRAW_CALLS = 7;
 
 /**
  * СТЕЛЯ трикутників оточення, а не точне число.
@@ -120,13 +122,19 @@ export const PORTAL_ENVIRONMENT_DRAW_CALLS = 8;
  * трикутники. Вартість 10.5 тис. на `high`, тобто ~96% стелі; це все ще
  * менше за конверт 15 000 (ADR-0164).
  *
+ * 11 000 → 12 200 (ADR-0211): водоспади за еталоном — потік по плато,
+ * завіса з п'яти стовпців-пасм (два трикутники на ланку стали вісьмома) і
+ * довше вільне падіння. Малюються двічі (світло), тож платяться двічі.
+ * Світляне кільце пішло й дещо повернуло. Вартість 11.7 тис. на `high`,
+ * тобто ~96% стелі; конверт 15 000 (ADR-0164) дотримано.
+ *
  * **ЧОМУ СТЕЛЯ НЕ СТРИБНУЛА ОДРАЗУ ДО 15 000**, які власник дозволив.
  * Дозвіл — це конверт, а стеля — мірка проти ТИХОГО роздування, і мірка,
  * втричі більша за виміряне, не міряє нічого (це записано абзацом вище й
  * не перестало бути правдою від того, що бюджет виріс). Стеля йде за
  * вартістю крок за кроком, і кожен крок названий.
  */
-export const PORTAL_ENVIRONMENT_TRIANGLES = 11_000;
+export const PORTAL_ENVIRONMENT_TRIANGLES = 12_200;
 
 /**
  * Реальна вартість оточення — джерело правди для стелі вище.
@@ -145,7 +153,6 @@ export function measurePortalEnvironmentTriangles(
     buildPortalDriftGeometry(seed, PORTAL_DRIFT_ROCKS[quality]),
     buildPortalFloraGeometry(seed, quality),
     buildPortalWaterfallGeometry(seed, PORTAL_WATERFALLS[quality]),
-    buildPortalHaloGeometry(seed, PORTAL_HALO_SEGMENTS[quality]),
   ];
   /*
    * ADR-0210: водоспади малюються ДВІЧІ — стрічкою й світним проходом
@@ -636,16 +643,6 @@ export interface PortalPalette {
   /** Наскільки щільний струмінь на самій кромці. Далі згасає вершиною. */
   waterfallOpacity: number;
   /**
-   * Світляне кільце навколо артефакта.
-   *
-   * Малюється ДОДАВАННЯМ, тож це не «колір кільця», а те, що воно додає
-   * до кадру. Тому воно й слабше вдень: додати світла до неба, яке вже
-   * майже біле, неможливо, а до нічного — можна забагато.
-   */
-  halo: string;
-  /** Сила кільця. Найпильніше число сцени: §10 не дозволяє його перегнати. */
-  haloOpacity: number;
-  /**
    * Марево навколо кристала (ADR-0210) — те, що на еталоні робить його
    * джерелом світла. Теж ДОДАВАННЯМ і теж «що додає», а не «якого кольору».
    */
@@ -842,8 +839,6 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     // Удень вода ловить захід: тепла й дуже світла, але не біла.
     waterfall: '#cbaaf2',
     waterfallOpacity: 0.88,
-    halo: '#f0b8dc',
-    haloOpacity: 0.36,
     aura: '#ff8fd2',
     auraOpacity: 0.62,
     waterfallGlow: 0.5,
@@ -913,8 +908,6 @@ export const PORTAL_PALETTES: Record<'light' | 'dark', PortalPalette> = {
     // Уночі вода — відбитий місяць: холодна бузкова, і слабша, ніж удень.
     waterfall: '#b9aee2',
     waterfallOpacity: 0.62,
-    halo: '#c79ae8',
-    haloOpacity: 0.3,
     aura: '#d98ae8',
     auraOpacity: 0.5,
     waterfallGlow: 0.4,

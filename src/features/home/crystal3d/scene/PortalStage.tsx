@@ -18,6 +18,7 @@ import {
 } from './portalOrbit';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { PortalCameraRig, PortalEnvironment } from './PortalEnvironment';
+import { usePortalSpinGesture } from './usePortalSpinGesture';
 import { PortalSky } from './PortalSky';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import type { WorldMotionMode } from '@/features/world/sceneDirector';
@@ -140,6 +141,18 @@ export function PortalStage({
   const zoomAnchor = frame.distance * (pose?.distance ?? CRYSTAL_CENTRE_POSE.distance);
   const handZoom = freeCamera || allowOrbit;
   /*
+   * ПОВОРОТ У КЕРОВАНІЙ КАМЕРІ — НАШ, А НЕ `OrbitControls` (ADR-0211).
+   * Той рухав камеру подіями й гасив на кадр, і на телефоні це давало
+   * ривки. Тепер палець веде `portalSpin.ts` — за часом, з інерцією й
+   * доводкою різкого свайпу. `OrbitControls` лишився щипку й вільній
+   * камері конструктора, де директор камеру не тримає.
+   */
+  const handSpin = usePortalSpinGesture(
+    allowOrbit && !freeCamera,
+    portalOrbitRotateSpeed(coarsePointer, false),
+    reduceMotion,
+  );
+  /*
    * Режим огляду конструктора лишається зі СВОЇМИ межами (0.16…3.2), і це
    * навмисне виключення. Вони старші за це прохання й вирішують іншу
    * задачу: підійти впритул до грані (0.6 одиниці — там, де камера ще не
@@ -227,6 +240,8 @@ export function PortalStage({
         mode={motionMode}
         spin={spin}
         freeCamera={freeCamera}
+        handSpin={handSpin}
+        reduceMotion={reduceMotion}
       />
 
       {children}
@@ -236,7 +251,7 @@ export function PortalStage({
         ref={controls}
         enablePan={freeCamera}
         enableZoom={handZoom}
-        enableRotate={freeCamera || allowOrbit}
+        enableRotate={freeCamera}
         enableDamping={!reduceMotion}
         /*
          * Згасання й швидкість повороту живуть у `portalOrbit.ts` разом

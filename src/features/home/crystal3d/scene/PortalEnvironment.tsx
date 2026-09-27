@@ -13,53 +13,20 @@
 // (ADR-0141), це вже не компроміс, а сама будова кадру: полотно
 // прозоре, і небо теми ВИДНО за краєм острова.
 // ============================================================
-import { useEffect, useMemo, useRef, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, type MutableRefObject, type RefObject } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { rockGrainTexture } from './rockGrainTexture';
 
-/*
- * Три числа кільця, і всі три — від ВИСОТИ АРТЕФАКТА (ADR-0168).
- *
- * Не від острова й не від відстані камери: кільце належить кристалові,
- * тож у молодої пари воно мале, у старої велике, і на екрані воно
- * лишається того самого розміру ВІДНОСНО того, навколо чого висить.
- *
- */
-/*
- * 0.5 → 0.34 (ADR-0169), і причину видно лише поруч із храмом.
- *
- * НАХИЛ ПРИБРАНО, І ЦЕ ГОЛОВНЕ.
- *
- * Нахилене кільце на своїх бічних краях видно майже з ребра, і там
- * десятки ланок стрічки лягають в ту саму смугу пікселів. При
- * ДОДАВАЛЬНОМУ змішуванні це не «трохи яскравіше», а вертикальна біла
- * смуга завдовжки в дві третини діаметра. Одна така смуга припадала рівно
- * на храм — і оскільки ближня половина кільця стоїть перед ним,
- * додавання малювало по колонаді щілину: у кадрі це читалось тріщиною в
- * будівлі, а не орбітою. Зменшення радіуса не допомогло: смуга просто
- * переїхала на інші колони.
- *
- * Перевірено відніманням: кадр без кільця тієї смуги не має.
- *
- * Горизонтальне кільце з камери під 23.6° дає рівний еліпс зі
- * співвідношенням осей 0.4 — і жодного ребра: стрічка всюди повернута до
- * ока однаково. Нахил, який мав «розкрити еліпс», його й псував: еліпс
- * розкриває сама камера.
- */
-const HALO_RADIUS_SHARE = 0.42;
-const HALO_HEIGHT_SHARE = 0.45;
-const HALO_TILT = 0;
-/** Повний оберт приблизно за сорок секунд: рух є, а погляд не тягне. */
-const HALO_TURN_PER_SECOND = 0.16;
 // Аура ширша за кристал і трохи витягнута вгору, як марево на еталоні.
 const AURA_HEIGHT_SHARE = 0.5;
 const AURA_WIDTH_SHARE = 1.5;
 const AURA_TALL_SHARE = 1.9;
 
 import { portalLevitation } from './portalLevitation';
-import { portalGlowBillboard } from './portalGlowBillboard';
 import { portalAuraTexture } from './portalAura';
+import { portalSpinStep } from './portalSpin';
+import type { PortalSpinHandle } from './usePortalSpinGesture';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -80,12 +47,10 @@ import {
 } from './portalScene';
 import {
   PORTAL_DRIFT_ROCKS,
-  PORTAL_HALO_SEGMENTS,
   PORTAL_WATERFALLS,
   PORTAL_ISLAND_RUBBLE,
   buildPortalDriftGeometry,
   buildPortalFloraGeometry,
-  buildPortalHaloGeometry,
   buildPortalWaterfallGeometry,
   buildPortalIslandGeometry,
   buildPortalTempleGeometry,
@@ -171,27 +136,6 @@ export function PortalEnvironment({
     () => buildPortalWaterfallGeometry(seed, PORTAL_WATERFALLS[quality]),
     [seed, quality],
   );
-  /*
-   * ДИСКИ СВІТІННЯ — ЛИШЕ ТАМ, ДЕ НЕМАЄ СПРАВЖНЬОГО BLOOM (ADR-0173).
-   *
-   * ADR-0170 будував їх як «bloom для бідних» і прямо сказав: коли
-   * повноекранний прохід дозволять, диски стануть або зайвими, або
-   * дешевим рівнем для слабких пристроїв. Дозволили — на профілі `high`
-   * (ADR-0173), тож вони лишаються рівно там, де проходу немає. Разом
-   * вони дають подвійне сяйво: пересвічене у вікні кристала стрибало до
-   * 8.28% проти 1.18% від самих дисків.
-   *
-   * Умова — профіль якості, а не сам прапорець: `PortalEnvironment` не
-   * знає про `?gfx=`, і тягти його сюди заради діагностичного випадку
-   * означало б прокинути прапорець крізь три компоненти. Ціна цього
-   * рішення названа: `?gfx=-bloom` на потужному пристрої лишає кристал
-   * зовсім без сяйва. Це діагностичний режим, і він не мусить бути
-   * красивим.
-   */
-  const halo = useMemo(
-    () => buildPortalHaloGeometry(seed, PORTAL_HALO_SEGMENTS[quality], quality !== 'high'),
-    [seed, quality],
-  );
 
   /*
    * Одне полотно на весь застосунок — і на обидві теми: воно несе лише
@@ -211,7 +155,6 @@ export function PortalEnvironment({
    */
   const floatClocks = useRef<{ value: number }[]>([]);
   const levitate = useMemo(() => portalLevitation(floatClocks), []);
-  const haloSpin = useRef<THREE.Group>(null);
   const floatSeconds = useRef(0);
   useFrame((_, delta) => {
     // Зупиняється разом із диханням камери, а не окремим прапорцем: камінь,
@@ -222,14 +165,6 @@ export function PortalEnvironment({
     // Усі — і брили, і трава на них. Один спільний годинник, бо камінь і
     // його кущик мусять іти в одну секунду.
     for (const clock of floatClocks.current) clock.value = floatSeconds.current;
-    /*
-     * Кільце обертається ТУТ, а не власним годинником: воно спиняється
-     * разом із диханням каменю, бо зупинка руху — це одне рішення пари,
-     * а не набір незалежних вимикачів (§47).
-     */
-    if (haloSpin.current !== null) {
-      haloSpin.current.rotation.y = floatSeconds.current * HALO_TURN_PER_SECOND;
-    }
   });
 
   /*
@@ -255,8 +190,7 @@ export function PortalEnvironment({
     // драйвера. Тепер він найважчий із п'яти, тож пропуск було б і видно.
     flora.dispose();
     falls.dispose();
-    halo.dispose();
-  }, [island, temple, drift, flora, falls, halo]);
+  }, [island, temple, drift, flora, falls]);
 
   return (
     <>
@@ -417,29 +351,10 @@ export function PortalEnvironment({
           А кут падіння — це різниця яскравості сусідніх граней, тобто
           рівно те, чим кристал і читається кристалом. */}
       {/*
-        Світляне кільце навколо артефакта (ADR-0168).
-        ------------------------------------------------------------
-        ПОЗА ГРУПОЮ ОСТРОВА, і це не дрібниця розміщення. Острів
-        масштабується під кадр (`portalIslandScale`), а кільце належить
-        АРТЕФАКТОВІ: воно мусить рости разом із ним, а не з декорацією.
-        Тому і радіус, і висота беруться з `frame.artifactHeight` — того
-        самого числа, яким кадр вимірює кристал.
-
-        ДОДАВАННЯМ, А НЕ ЗАМІЩЕННЯМ. Світло не закриває те, що за ним;
-        стрічка з простою прозорістю читалась би обручем із плівки. Ціна
-        додавання названа в палітрі: на майже білому денному небі додати
-        нічого не можна, тож кільце там слабше видно — це властивість
-        світла, а не вада.
-
-        `depthWrite={false}` плюс звичайний `depthTest`: дальня половина
-        кільця ховається за кристалом, як і має, але сама вона нічого не
-        вирізає.
-      */}
-      {/*
         Аура кристала (ADR-0210, див. `portalAura.ts`). Спрайт завжди
         дивиться в камеру; глибину ЧИТАЄ, тож кристал попереду її закриває,
-        і світло лягає навколо граней, а не на них. Малюється першою з
-        прозорих, щоб кільце лягало поверх неї.
+        і світло лягає навколо граней, а не на них. Кільце, що колись
+        лягало поверх неї, прибране на прохання власника (ADR-0211).
       */}
       <sprite
         position={[0, PORTAL_GROUND_Y + frame.artifactHeight * AURA_HEIGHT_SHARE, 0]}
@@ -457,26 +372,6 @@ export function PortalEnvironment({
         />
       </sprite>
 
-      <group
-        ref={haloSpin}
-        position={[0, PORTAL_GROUND_Y + frame.artifactHeight * HALO_HEIGHT_SHARE, 0]}
-        rotation={[HALO_TILT, 0, 0]}
-        scale={frame.artifactHeight * HALO_RADIUS_SHARE}
-      >
-        <mesh geometry={halo} frustumCulled={false} renderOrder={2}>
-          <meshBasicMaterial
-            color={palette.halo}
-            vertexColors
-            transparent
-            opacity={palette.haloOpacity}
-            blending={THREE.AdditiveBlending}
-            depthWrite={false}
-            fog={false}
-            side={THREE.DoubleSide}
-            onBeforeCompile={portalGlowBillboard}
-          />
-        </mesh>
-      </group>
 
       <directionalLight
         position={[0.6, PORTAL_GROUND_Y + 5.2, 0.4]}
@@ -520,6 +415,8 @@ export function PortalCameraRig({
   mode,
   spin = 0,
   freeCamera = false,
+  handSpin,
+  reduceMotion = false,
 }: {
   frame: PortalCameraFrame;
   controls: RefObject<OrbitControlsImpl | null>;
@@ -533,6 +430,9 @@ export function PortalCameraRig({
   spin?: number | undefined;
   /** Коли true, OrbitControls одноосібно володіє камерою для огляду сцени. */
   freeCamera?: boolean | undefined;
+  /** Поворот рукою (ADR-0211): плавний, з інерцією й доводкою. */
+  handSpin?: MutableRefObject<PortalSpinHandle> | undefined;
+  reduceMotion?: boolean | undefined;
 }) {
   const camera = useThree((state) => state.camera);
   const director = useRef<SceneDirectorState>(createSceneDirector(pose ?? CRYSTAL_CENTRE_POSE));
@@ -541,6 +441,8 @@ export function PortalCameraRig({
   // інакше кожен кадр стирав би ручний оберт.
   const written = useRef<{ azimuth: number; elevation: number; distance: number } | null>(null);
   const wasFreeCamera = useRef(freeCamera);
+  // Що жест уже віддав директорові: директор бере ПРИРІСТ, а не кут.
+  const handGiven = useRef<{ azimuth: number; elevation: number } | null>(null);
 
   useFrame((_, delta) => {
     const orbit = controls.current;
@@ -581,6 +483,25 @@ export function PortalCameraRig({
       };
     }
 
+    /*
+     * Поворот рукою йде до директора тим самим каналом, що й дрейф
+     * орбіти, — приростом ручного погляду. Тож директор, як і раніше,
+     * розчиняє його при переході між маршрутами й тримає, поки пара тут.
+     */
+    if (handSpin) {
+      const hand = handSpin.current;
+      hand.state = portalSpinStep(hand.state, performance.now() / 1000, reduceMotion);
+      const given = handGiven.current;
+      if (given !== null) {
+        drift = {
+          ...drift,
+          azimuth: drift.azimuth + (hand.state.azimuth - given.azimuth),
+          elevation: drift.elevation + (hand.state.elevation - given.elevation),
+        };
+      }
+      handGiven.current = { azimuth: hand.state.azimuth, elevation: hand.state.elevation };
+    }
+
     director.current = advanceSceneDirector(director.current, {
       target,
       mode: mode?.current ?? 'idle',
@@ -590,6 +511,7 @@ export function PortalCameraRig({
     });
 
     const view = sceneDirectorPose(director.current);
+    if (handSpin) handSpin.current.elevation = view.elevation;
     const placed = portalCameraView(frame, view);
     camera.position.set(placed.position[0], placed.position[1], placed.position[2]);
     if (camera instanceof THREE.PerspectiveCamera && camera.fov !== frame.fov) {

@@ -356,21 +356,6 @@ interface Soup {
   alpha: number | readonly [number, number, number];
   /** По одному значенню на вершину. Усі одиниці — меш непрозорий. */
   readonly alphas: number[];
-  /**
-   * Зсув вершини В ПЛОЩИНІ ЕКРАНА: [праворуч, угору] в одиницях меша.
-   *
-   * Той самий прийом, що `float` і `alpha`, і з тієї ж причини — але тут
-   * він робить те, чого геометрією не зробиш узагалі: БІЛБОРД. Тіло, яке
-   * має світитися навколо артефакта з будь-якого боку, не може бути
-   * пласким чотирикутником у світі: пара крутить острів рукою, і такий
-   * чотирикутник показав би ребро. Зсув у площині екрана рахує вершинний
-   * шейдер (ADR-0170), а сюди кладеться тільки те, НАСКІЛЬКИ зсувати.
-   *
-   * `null` — вершина лишається там, де стоїть. Так живе саме кільце.
-   */
-  glow: readonly [number, number] | null;
-  /** Пари зсувів, по одній на вершину. Усі нулі — білбордів немає. */
-  readonly glows: number[];
   push(
     a: Point,
     b: Point,
@@ -394,7 +379,6 @@ function soup(): Soup {
   const uvs: number[] = [];
   const floats: number[] = [];
   const alphas: number[] = [];
-  const glows: number[] = [];
   return {
     positions,
     colors,
@@ -403,8 +387,6 @@ function soup(): Soup {
     float: null,
     alphas,
     alpha: 1,
-    glows,
-    glow: null,
     push(a, b, c, shade = 1, uv) {
       if (this.float !== null) {
         for (let corner = 0; corner < 3; corner += 1) floats.push(this.float[0], this.float[1]);
@@ -418,9 +400,6 @@ function soup(): Soup {
         for (let corner = 0; corner < 3; corner += 1) alphas.push(this.alpha);
       } else {
         alphas.push(...this.alpha);
-      }
-      for (let corner = 0; corner < 3; corner += 1) {
-        glows.push(this.glow?.[0] ?? 0, this.glow?.[1] ?? 0);
       }
       positions.push(...a, ...b, ...c);
       const corners = typeof shade === 'number' ? [shade, shade, shade] : shade;
@@ -469,14 +448,6 @@ function finish(mesh: Soup): THREE.BufferGeometry {
    */
   if (mesh.floats.length > 0) {
     geometry.setAttribute('portalFloat', new THREE.Float32BufferAttribute(mesh.floats, 2));
-  }
-  /*
-   * Той самий закон, що вище: атрибут білборда ставиться ЛИШЕ там, де
-   * хоч одна вершина справді зсувається. Меш без нього не можна
-   * розвернути до камери навіть помилково.
-   */
-  if (mesh.glows.some((value) => value !== 0)) {
-    geometry.setAttribute('portalGlow', new THREE.Float32BufferAttribute(mesh.glows, 2));
   }
   geometry.computeVertexNormals();
   geometry.computeBoundingSphere();
@@ -1557,229 +1528,11 @@ export function buildPortalDriftGeometry(seed: number, count: number): THREE.Buf
 }
 
 // ── Світляне кільце ─────────────────────────────────────────
-
-/**
- * Диски світіння навколо артефакта — у тих самих одиницях, що й кільце.
- *
- * Кільце має радіус 1, і той, хто його вішає, множить усе на висоту
- * артефакта; ці числа їдуть тим самим множником, тож світіння росте
- * разом із кристалом, а не з декорацією.
- *
- * Два, а не один: широкий і слабкий — це повітря навколо тіла, вузький
- * і яскравий на вістрі — те, що око читає як джерело. Один диск дає або
- * пляму, або нічого.
- */
-const HALO_GLOWS: readonly { height: number; radius: number; alpha: number }[] = [
-  /*
-   * ВИСОТИ ВИМІРЯНІ ЗА СИЛУЕТОМ, а не поставлені «по центру».
-   * Додавання видно лише там, де за тілом небо: над плато острів
-   * закриває нижню третину кристала, і диск, поставлений на висоті
-   * кільця, світив у камінь. Обидва підняті у верхню половину — туди,
-   * де кристал і межує з небом.
-   */
-  { height: 0.25, radius: 0.52, alpha: 0.5 },
-  { height: 0.75, radius: 0.58, alpha: 0.62 },
-  { height: 1.2, radius: 0.34, alpha: 0.72 },
-];
-
-/** На скільки ланок ділиться кільце, за профілем якості. */
-export const PORTAL_HALO_SEGMENTS: Record<PortalQuality, number> = {
-  high: 60, balanced: 40, low: 24, fallback: 0,
-};
-
-/**
- * Світляне кільце навколо артефакта — в одиницях САМОГО КІЛЬЦЯ.
- *
- * Радіус 1, площина XZ, центр у нулі. Нахил, розмір і місце ставить той,
- * хто його вішає: кільце належить артефактові, а артефакт росте, тож
- * прибити тут світові координати означало б кільце, яке підходить парі
- * рівно одного віку.
- *
- * ЧОМУ ТРИ РЯДИ ВЕРШИН, А НЕ ДВА. Стрічка з двох рядів має РІЗАНІ краї:
- * при будь-якій прозорості видно рівно, де вона закінчується, і кільце
- * читається обручем із пластику. Три ряди — зовнішній, серединний,
- * внутрішній — дають прозорість 0 / 1 / 0 поперек стрічки, тобто край,
- * якого не видно. Це коштує вдвічі більше трикутників і є єдиною
- * причиною, чому кільце взагалі світиться, а не лежить.
- *
- * ЧОМУ ЯСКРАВІСТЬ ГУЛЯЄ ПО КОЛУ. Рівне кільце — це обруч. У еталоні
- * власника світло збирається дугами, а між ними майже гасне; саме це й
- * читається рухом світла, а не предметом.
- */
-export function buildPortalHaloGeometry(
-  seed: number,
-  segments: number,
-  /**
-   * Чи класти диски світіння.
-   *
-   * Вони — заміна повноекранному проходу, а не доповнення до нього
-   * (ADR-0173). Там, де є справжній Bloom, вони дають подвійне сяйво.
-   */
-  withGlow = true,
-): THREE.BufferGeometry {
-  const mesh = soup();
-  if (segments < 3) return finish(mesh);
-  /*
-   * Межа між кільцем і дисками ПУБЛІКУЄТЬСЯ, а не відновлюється.
-   *
-   * Здавалося б, її видно з атрибута: у кільця зсув нульовий, у дисків
-   * ні. Але ЦЕНТРАЛЬНА вершина диска теж має нульовий зсув — вона й є
-   * центр, — тож за атрибутом два тіла не розрізнити. Перша редакція
-   * тестів на цьому й спіткнулась: мірки кільця почали бачити радіус 0.
-   */
-  /*
-   * Ширина стрічки — від радіуса кільця, і 0.085 замість 0.055 після
-   * кадру: вужча стрічка на екрані телефона давала лінію в один-два
-   * пікселі, тобто подряпину, а не світло.
-   */
-  const halfWidth = 0.062;
-  const at = (index: number, side: number): Point => {
-    const angle = (index / segments) * Math.PI * 2;
-    /*
-     * Кільце НЕ ідеальне коло: радіус трохи гуляє. Ідеальне коло —
-     * єдина форма, яку око впізнає як накреслену циркулем, а сцена
-     * навколо неї вся рвана.
-     */
-    const wobble = 1 + (seededUnit(seed, `halo:wobble:${index % segments}`) - 0.5) * 0.06;
-    const radius = (1 + side * halfWidth) * wobble;
-    return [Math.cos(angle) * radius, side * halfWidth * 0.35, Math.sin(angle) * radius];
-  };
-  /** Дуги світла: дві широкі й одна вузька, розведені по колу. */
-  const glow = (index: number): number => {
-    const angle = (index / segments) * Math.PI * 2;
-    /*
-     * ПІДЛОГА, А НЕ НУЛЬ. Перша редакція гасила кільце майже до нуля між
-     * дугами, і в кадрі лишалась одна яскрава дуга ліворуч від кристала —
-     * випадковий розчерк, а не кільце. Кільце мусить читатись кільцем
-     * ЦІЛКОМ, а дуги — лише збирати в собі більше світла.
-     */
-    const wave = 0.38 + 0.62 * (0.5 + 0.5 * Math.sin(angle * 2 + 0.9));
-    const spark = 0.26 * Math.max(0, Math.sin(angle * 5 - 2.1));
-    return Math.min(1, wave + spark);
-  };
-  for (let index = 0; index < segments; index += 1) {
-    const next = (index + 1) % segments;
-    const inner = [at(index, -1), at(next, -1)] as const;
-    const core = [at(index, 0), at(next, 0)] as const;
-    const outer = [at(index, 1), at(next, 1)] as const;
-    const here = glow(index);
-    const there = glow(next);
-    // Ядро стрічки світиться, краї згасають у ніщо.
-    // Тон і прозорість ідуть ПО ТИХ САМИХ кутах: край стрічки і темніший,
-    // і прозоріший, ядро — і яскравіше, і щільніше.
-    const edge = 0.55;
-    mesh.alpha = [0, 0, there];
-    mesh.push(inner[0], inner[1], core[1], [edge, edge, there]);
-    mesh.alpha = [0, there, here];
-    mesh.push(inner[0], core[1], core[0], [edge, there, here]);
-    mesh.alpha = [here, there, 0];
-    mesh.push(core[0], core[1], outer[1], [here, there, edge]);
-    mesh.alpha = [here, 0, 0];
-    mesh.push(core[0], outer[1], outer[0], [here, edge, edge]);
-  }
-  /*
-   * ── СВІТІННЯ НАВКОЛО АРТЕФАКТА ────────────────────────────
-   *
-   * Це «bloom для бідних», і саме так світіння робили до постобробки:
-   * додавальний диск із м'яким краєм, повернутий до ока. Повноекранний
-   * прохід нам заборонений, доки не поставлено діагноз білому фону на
-   * пристрої власника (`render/gfxProfile.ts`), і цей шлях від того
-   * діагнозу не залежить узагалі — жодного render target, жодного
-   * нового матеріалу, жодного нового draw call: диски їдуть у мешеві
-   * кільця, бо в них те саме додавальне змішування.
-   *
-   * ЧОМУ ДИСК, А НЕ ЧОТИРИКУТНИК. Чотирикутник має чотири кути, тобто
-   * альфа в ньому може бути лише на краях; щоб яскравість спадала ВІД
-   * ЦЕНТРА, потрібна вершина в центрі. Віяло з центром і двома кільцями
-   * дає спад у два кроки — це вже читається світлом, а не наклейкою.
-   *
-   * ЧОМУ ЙОГО НЕ ВИДНО ПОВЕРХ КРИСТАЛА. Диск стоїть у площині, що
-   * проходить ЧЕРЕЗ вісь артефакта, тобто всередині його тіла; ближня
-   * половина кристала пише глибину й затуляє ближню половину диска.
-   * Лишається рівно те, що поза силуетом, — тобто сяйво навколо, а не
-   * пляма на гранях.
-   */
-  const ringTriangles = mesh.positions.length / 9;
-  for (const disc of (withGlow ? HALO_GLOWS : [])) {
-    /*
-     * ТРИ КІЛЬЦЯ, А НЕ ДВА, І ОБОВ'ЯЗКОВО ПО ДВА ТРИКУТНИКИ НА ЛАНКУ.
-     *
-     * Перша редакція клала між кільцями по одному трикутнику
-     * (внутрішня вершина плюс дві зовнішні) — і кадр показав СОНЦЕ З
-     * ПРОМЕНЯМИ: половина кожної ланки лишалась незакритою, тож диск
-     * вийшов зіркою. Смуга між двома кільцями — це чотирикутник, і
-     * закрити його можна лише двома трикутниками.
-     */
-    /*
-     * ЯСКРАВІШЕ НЕ В ЦЕНТРІ, А НА СЕРЕДИНІ, і це не смак кривої.
-     * Центр диска лежить НА ОСІ артефакта, тобто всередині його тіла:
-     * ближня половина кристала пише глибину й закриває саме ту частину,
-     * де світло найсильніше. Максимум, посаджений у центр, витрачається
-     * на невидиме. Перенесений на середнє кільце, він лягає рівно на
-     * силует — а сяйво навколо силуету і є те, чого ми домагаємось.
-     */
-    const rings: readonly { at: number; alpha: number; shade: number }[] = [
-      { at: 0, alpha: disc.alpha * 0.55, shade: 1 },
-      { at: 0.44, alpha: disc.alpha, shade: 0.82 },
-      { at: 1, alpha: 0, shade: 0.4 },
-    ];
-    const sides = 12;
-    const anchor: Point = [0, disc.height, 0];
-    const on = (ring: { at: number }, angle: number): readonly [number, number] => [
-      Math.cos(angle) * disc.radius * ring.at,
-      Math.sin(angle) * disc.radius * ring.at,
-    ];
-    /**
-     * Трикутник із трьома РІЗНИМИ зсувами.
-     *
-     * `glow` — поле тіла, як `float` і `alpha`, тобто одне на три кути.
-     * Диску потрібні три різні, тож зсуви двох останніх вершин
-     * дописуються прямо в масив. Це єдине місце в файлі, де так робиться,
-     * і воно назване: інакше довелось би заводити ще одну форму `push`
-     * заради одного тіла.
-     */
-    const spoke = (
-      offsets: readonly (readonly [number, number])[],
-      alphas: readonly [number, number, number],
-      shades: readonly [number, number, number],
-    ): void => {
-      mesh.alpha = alphas;
-      mesh.glow = offsets[0]!;
-      const at = (mesh.positions.length / 3) * 2;
-      mesh.push(anchor, anchor, anchor, shades);
-      for (let corner = 1; corner < 3; corner += 1) {
-        mesh.glows[at + corner * 2] = offsets[corner]![0];
-        mesh.glows[at + corner * 2 + 1] = offsets[corner]![1];
-      }
-    };
-    for (let band = 0; band + 1 < rings.length; band += 1) {
-      const inner = rings[band]!;
-      const outer = rings[band + 1]!;
-      for (let corner = 0; corner < sides; corner += 1) {
-        const a = (corner / sides) * Math.PI * 2;
-        const b = ((corner + 1) / sides) * Math.PI * 2;
-        spoke(
-          [on(inner, a), on(outer, a), on(outer, b)],
-          [inner.alpha, outer.alpha, outer.alpha],
-          [inner.shade, outer.shade, outer.shade],
-        );
-        // Друга половина смуги. У центральному віялі її немає: там
-        // «внутрішнє кільце» — одна точка, і чотирикутника не існує.
-        if (inner.at > 0) {
-          spoke(
-            [on(inner, a), on(outer, b), on(inner, b)],
-            [inner.alpha, outer.alpha, inner.alpha],
-            [inner.shade, outer.shade, inner.shade],
-          );
-        }
-      }
-    }
-  }
-  mesh.glow = null;
-  const geometry = finish(mesh);
-  geometry.userData.haloLayout = { ring: ringTriangles, glow: mesh.positions.length / 9 - ringTriangles };
-  return geometry;
-}
+//
+// ПРИБРАНЕ (ADR-0211). Власник: «прибери кільце сяйва навколо кристала».
+// Разом із кільцем пішли й диски світіння (ADR-0170), що жили в тому ж
+// меші, і білборд-шейдер, який існував лише для них. Сяйво кристала тепер
+// дає одна аура (`portalAura.ts`, ADR-0210).
 
 // ── Водоспади ───────────────────────────────────────────────
 
@@ -1810,99 +1563,150 @@ export const PORTAL_WATERFALLS: Record<PortalQuality, number> = {
 export function buildPortalWaterfallGeometry(seed: number, count: number): THREE.BufferGeometry {
   const mesh = soup();
   const rows = ISLAND_ROOT_ROWS_ALL.length;
-  // Скільки ланок падає у вільному повітрі під коренем.
-  const freeLinks = 3;
+  /*
+   * Скільки ланок падає у вільному повітрі під коренем. 3 → 7 (ADR-0211):
+   * на еталоні власника вода не зникає під островом, а тягнеться далеко
+   * вниз і розчиняється в морі хмар.
+   */
+  const freeLinks = 7;
+  const layout: { stream: number; curtain: number }[] = [];
   for (let index = 0; index < count; index += 1) {
     const tag = `island:fall:${index}`;
-    /*
-     * Клини розведені по колу рівно, з місцевим зсувом. Випадковий вибір
-     * із повторами посадив би два водоспади на один клин, і замість двох
-     * падінь вийшло б одне подвійної яскравості.
-     */
-    const segment = Math.floor(
-      ((index + 0.5) / count + (seededUnit(seed, `${tag}:spin`) - 0.5) * 0.6 / count)
-      * PORTAL_ISLAND_SEGMENTS,
-    ) % PORTAL_ISLAND_SEGMENTS;
-    const angle = segmentAngle(seed, segment, PORTAL_ISLAND_SEGMENTS);
+    const angle = waterfallAngle(seed, index, count);
     const out: Point = [Math.cos(angle), 0, Math.sin(angle)];
     const across: Point = [-out[2], 0, out[0]];
     /*
-     * ВУЗЬКО. 0.028…0.048 радіуса острова дало в кадрі білі ЛАТКИ на
-     * породі завширшки з десяту частину острова: на такій ширині стрічка
-     * перестає бути струменем. Водоспад упізнають за тим, що він ДОВГИЙ І
-     * ТОНКИЙ, а не за тим, що він білий.
+     * ШИРШЕ Й ЯСКРАВІШЕ, НІЖ БУЛО (ADR-0211). ADR-0167 звузив струмінь до
+     * 0.016…0.029, бо широка БІЛА стрічка читалась латкою на породі. На
+     * еталоні вода — це саме широка завіса, але вона має ЯДРО: світла
+     * середина й прозорі краї. Латкою стрічку робив рівний тон упоперек,
+     * а не ширина, — тож ширина повернулась разом з ядром.
      */
-    const width = 0.016 + seededUnit(seed, `${tag}:wide`) * 0.013;
-    /*
-     * ВОДА ЙДЕ ПО ПОРОДІ, А НЕ ПО ПРЯМІЙ, І ЦЕ НЕ ПРИКРАСА.
-     *
-     * Перша редакція пускала стрічку рівно вниз від кромки плато. Кадр
-     * показав, чим це є: острів найширший НЕ на кромці — виміряно 1.03
-     * радіуса на плато проти 1.32 на висоті −0.4, — тож пряма стрічка йшла
-     * ВСЕРЕДИНІ породи й з'являлась лише там, де обрив уже звузився. Видно
-     * було нижню половину падіння без початку, тобто стовп туману.
-     *
-     * Тому профіль береться з тієї самої арифметики, що будує обрив
-     * (`ISLAND_ROOT_ROWS_ALL` і `islandRadiusAt`), і відсувається назовні
-     * на зазор. Це ще й правда про воду: вона тече по каменю.
-     *
-     * Береться ГЛАДКИЙ профіль, без пошумленого `rootPoint`: шум там
-     * кидається на кожну вершину окремо, і стрічка від нього тремтіла б
-     * упоперек породи замість того, щоб її облягати.
-     */
+    const width = 0.034 + seededUnit(seed, `${tag}:wide`) * 0.018;
     const clearance = 0.035 + seededUnit(seed, `${tag}:gap`) * 0.02;
+    /*
+     * ВОДА ЙДЕ ПО ПОРОДІ, А НЕ ПО ПРЯМІЙ (ADR-0167): профіль береться з
+     * тієї самої арифметики, що будує обрив, і відсувається назовні на
+     * зазор. Береться ГЛАДКИЙ профіль — шум на кожну вершину змусив би
+     * стрічку тремтіти впоперек породи.
+     */
+    /*
+     * ВОДА ВІДРИВАЄТЬСЯ ВІД ПОРОДИ ТАМ, ДЕ ОБРИВ ЗВУЖУЄТЬСЯ (ADR-0211).
+     *
+     * ADR-0167 вів стрічку по кореню до самого вістря, і перший кадр після
+     * розширення води показав наслідок: обидва передні водоспади сходились
+     * під островом в один стовп. Вода так не падає. Поки обрив під кромкою
+     * РОЗШИРЮЄТЬСЯ (острів найширший не на кромці), вона тече по ньому;
+     * де він починає звужуватись, вона продовжує ПРЯМО ВНИЗ — і висить
+     * завісою перед породою, як на еталоні. Тож радіус — наростаючий
+     * максимум профілю обриву: вода ніколи не заходить у камінь і ніколи
+     * не повертає за ним досередини.
+     */
+    const radiusAt: number[] = [islandRadiusAt(seed, angle) + clearance];
+    for (let row = 0; row < rows; row += 1) {
+      const [share] = ISLAND_ROOT_ROWS_ALL[row]!;
+      radiusAt.push(Math.max(radiusAt[row]!, islandRadiusAt(seed, angle) * share + clearance));
+    }
     const spine = (link: number): { at: Point; spread: number } => {
       const rim = portalIslandHeightAt(seed, angle, 1);
       const spread = link / (rows + freeLinks + 1);
-      /*
-       * ЛАНКА НУЛЬ — САМА КРОМКА. `ISLAND_ROOT_ROWS_ALL` починається вже
-       * НИЖЧЕ за неї, тож без цієї ланки вода з'являлась на кілька
-       * пікселів під плато, і в кадрі це читалось не падінням, а білою
-       * подряпиною на породі: витік було видно, а джерело — ні.
-       */
       if (link === 0) {
-        const radius = islandRadiusAt(seed, angle) + clearance;
+        const radius = radiusAt[0]!;
         return { at: [Math.cos(angle) * radius, rim, Math.sin(angle) * radius], spread };
       }
       if (link <= rows) {
-        const [share, drop] = ISLAND_ROOT_ROWS_ALL[link - 1]!;
-        const radius = islandRadiusAt(seed, angle) * share + clearance;
+        const [, drop] = ISLAND_ROOT_ROWS_ALL[link - 1]!;
+        const radius = radiusAt[link]!;
         return { at: [Math.cos(angle) * radius, rim - drop, Math.sin(angle) * radius], spread };
       }
-      // Нижче кореня падати нема по чому: вода йде у вільне повітря,
-      // тримаючи той радіус, на якому корінь її покинув.
-      const [lastShare, lastDrop] = ISLAND_ROOT_ROWS_ALL[rows - 1]!;
-      const radius = islandRadiusAt(seed, angle) * lastShare + clearance;
-      const step = (link - rows) * 0.16;
+      const [, lastDrop] = ISLAND_ROOT_ROWS_ALL[rows - 1]!;
+      const radius = radiusAt[rows]!;
+      const step = (link - rows) * 0.22;
       return {
         at: [Math.cos(angle) * radius, rim - lastDrop - step, Math.sin(angle) * radius],
         spread,
       };
     };
-    const edge = (link: number, side: number): Point => {
-      const { at, spread } = spine(link);
-      // Ширшає донизу, але не безмежно: корінь квадратний дає завісу, а не лійку.
-      const half = width * (1 + Math.sqrt(spread) * 1.4);
-      const sway = (seededUnit(seed, `${tag}:sway:${link}`) - 0.5) * width * 0.4;
-      return [
-        at[0] + across[0] * (side * half + sway),
-        at[1],
-        at[2] + across[2] * (side * half + sway),
-      ];
-    };
+    /** Напівширина: струмінь на кромці, завіса внизу, водяний пил на дні. */
+    const halfAt = (spread: number) => width * (1 + Math.sqrt(spread) * 2.2);
+    const sway = (link: number) => (seededUnit(seed, `${tag}:sway:${link}`) - 0.5) * width * 0.4;
     /*
-     * ЗГАСАННЯ РАХУЄТЬСЯ ПО ГЛИБИНІ, А НЕ ПО НОМЕРУ ЛАНКИ, і це друге
-     * виправлення за кадром.
+     * СТРУМЕНІ (ADR-0211): п'ять стовпців упоперек, і кожен має власну
+     * щільність на ВСЮ висоту падіння. Звідси вертикальні пасма, як на
+     * еталоні, — рівний тон упоперек читався пластиковою стрічкою.
+     */
+    const streaks: WaterColumns = [
+      0.16,
+      0.42 + seededUnit(seed, `${tag}:streak:l`) * 0.4,
+      1,
+      0.42 + seededUnit(seed, `${tag}:streak:r`) * 0.4,
+      0.16,
+    ];
+    const spreadRow = (centre: Point, half: number): WaterRow => [
+      place(centre, -half),
+      place(centre, -half * 0.42),
+      centre,
+      place(centre, half * 0.42),
+      place(centre, half),
+    ];
+    const place = (at: Point, offset: number): Point => [
+      at[0] + across[0] * offset,
+      at[1],
+      at[2] + across[2] * offset,
+    ];
+
+    /*
+     * ПОТІК ПО ПЛАТО (ADR-0211). На еталоні вода не з'являється з кромки
+     * нізвідки: світні русла біжать по плато від кристала до обриву, і
+     * саме це робить водоспад продовженням острова, а не прикрасою збоку.
+     * Русло лежить на тій самій поверхні (`portalIslandHeightAt`), трохи
+     * над нею, і його остання ланка — це рівно перша ланка падіння, тож
+     * між потоком і завісою немає ні щілини, ні сходинки.
+     */
+    const streamFrom = 0.56;
+    const streamLinks = 5;
+    const streamLift = 0.016;
+    const headAt = spine(0).at;
+    const streamPoint = (step: number): { at: Point; half: number } => {
+      if (step === streamLinks) return { at: headAt, half: halfAt(0) };
+      const share = streamFrom + ((1 - streamFrom) * step) / streamLinks;
+      const radius = islandRadiusAt(seed, angle) * share;
+      const bend = (seededUnit(seed, `${tag}:bend:${step}`) - 0.5) * 0.05;
+      const ground = portalIslandHeightAt(seed, angle, share) + streamLift;
+      const at: Point = [
+        Math.cos(angle) * radius + across[0] * bend,
+        ground,
+        Math.sin(angle) * radius + across[2] * bend,
+      ];
+      // Русло вужче за завісу й ширшає до кромки, де вода набирає силу.
+      return { at, half: halfAt(0) * (0.45 + 0.55 * (step / streamLinks)) };
+    };
+    const before = mesh.positions.length;
+    for (let step = 0; step < streamLinks; step += 1) {
+      const above = streamPoint(step);
+      const below = streamPoint(step + 1);
+      // Джерело тихе, до кромки — повна сила.
+      const aAlpha = 0.55 + 0.45 * (step / streamLinks);
+      const bAlpha = 0.55 + 0.45 * ((step + 1) / streamLinks);
+      pushWaterLink(
+        mesh,
+        spreadRow(above.at, above.half),
+        spreadRow(below.at, below.half),
+        streaks,
+        aAlpha,
+        bAlpha,
+        1.1,
+      );
+    }
+    const streamTriangles = (mesh.positions.length - before) / 9;
+
+    /*
+     * ЗГАСАННЯ ПО ГЛИБИНІ, А НЕ ПО НОМЕРУ ЛАНКИ (ADR-0167): ряди кореня
+     * біля кромки стоять густо, і згасання за номером лишало яскравими
+     * кілька пікселів висоти.
      *
-     * Ланки не рівні: біля кромки ряди кореня стоять густо, а нижче
-     * розходяться. Згасання за номером ланки давало яскравим перші
-     * тридцять відсотків ЛАНОК, що по висоті — кілька пікселів: у кадрі
-     * це читалось не падінням, а білою латкою на породі. Перед тим
-     * зворотна крайність — 1 - t² — тримала стрічку майже до кінця, і
-     * під островом стояв сірий стовп пари.
-     *
-     * Глибина — те, що бачить око. Струмінь яскравий там, де він ще
-     * цілий, і тане з висотою падіння.
+     * Показник 1.25 → 0.9 (ADR-0211): вода світить уздовж усього обриву й
+     * тане лише у вільному падінні, як на еталоні.
      */
     const links = rows + freeLinks + 1;
     const spineY: number[] = [];
@@ -1910,24 +1714,90 @@ export function buildPortalWaterfallGeometry(seed: number, count: number): THREE
     const span = Math.max(1e-6, spineY[0]! - spineY[links]!);
     const fade = (link: number): number => {
       const fallen = (spineY[0]! - spineY[Math.min(link, links)]!) / span;
-      return Math.max(0, 1 - fallen) ** 1.25;
+      return Math.max(0, 1 - fallen) ** 0.9;
     };
+    const row = (link: number): WaterRow => {
+      const { at, spread } = spine(link);
+      const centre = link === 0 ? at : place(at, sway(link));
+      return spreadRow(centre, halfAt(spread));
+    };
+    const curtainBefore = mesh.positions.length;
     for (let link = 0; link < links; link += 1) {
-      const aboveL = edge(link, -1);
-      const aboveR = edge(link, 1);
-      const belowL = edge(link + 1, -1);
-      const belowR = edge(link + 1, 1);
       const top = fade(link);
       const bottom = fade(link + 1);
-      // Яскравіше вгорі, де струмінь ще цілий; нижче — водяний пил.
-      const shade = 0.66 + 0.34 * top;
-      mesh.alpha = [top, top, bottom];
-      mesh.push(aboveL, aboveR, belowR, shade);
-      mesh.alpha = [top, bottom, bottom];
-      mesh.push(aboveL, belowR, belowL, shade);
+      // Ядро яскравіше вгорі, де струмінь ще цілий; нижче — водяний пил.
+      pushWaterLink(mesh, row(link), row(link + 1), streaks, top, bottom, 0.9 + 0.45 * top);
     }
+    layout.push({ stream: streamTriangles, curtain: (mesh.positions.length - curtainBefore) / 9 });
   }
-  return finish(mesh);
+  mesh.alpha = 1;
+  const geometry = finish(mesh);
+  geometry.userData.waterfallLayout = layout;
+  return geometry;
+}
+
+/**
+ * Де падає `index`-й водоспад із `count`.
+ *
+ * ДВА ПЕРШІ — СПЕРЕДУ (ADR-0211). ADR-0167 розводив падіння рівно по
+ * колу, і з камери, що дивиться спереду, їх було видно збоку або ніяк. На
+ * еталоні два головні водоспади — просто перед глядачем: лівий під
+ * храмом, правий ближче до середини. Решта розходиться по задній дузі,
+ * щоб острів лишався островом із будь-якого боку, куди його повернуть.
+ *
+ * Кут прив'язано до клину обрису (`segmentAngle`), як і раніше: вода
+ * падає з того самого клину, з якого складено обрив.
+ */
+function waterfallAngle(seed: number, index: number, count: number): number {
+  const front = Math.PI / 2;
+  const leftOfCentre = front + 0.46;
+  const rightOfCentre = front - 0.4;
+  let wanted: number;
+  if (index === 0) wanted = leftOfCentre;
+  else if (index === 1) wanted = rightOfCentre;
+  else {
+    const rest = count - 2;
+    const arc = Math.PI * 2 - (leftOfCentre - rightOfCentre);
+    wanted = leftOfCentre + (arc * (index - 1)) / (rest + 1)
+      + (seededUnit(seed, `island:fall:${index}:spin`) - 0.5) * 0.3 * (arc / (rest + 1));
+  }
+  const step = (Math.PI * 2) / PORTAL_ISLAND_SEGMENTS;
+  const segment = ((Math.round(wanted / step) % PORTAL_ISLAND_SEGMENTS) + PORTAL_ISLAND_SEGMENTS)
+    % PORTAL_ISLAND_SEGMENTS;
+  return segmentAngle(seed, segment, PORTAL_ISLAND_SEGMENTS);
+}
+
+/** Ряд води впоперек: [край, пасмо, ядро, пасмо, край]. */
+type WaterRow = readonly [Point, Point, Point, Point, Point];
+/** Щільність кожного з п'яти стовпців, 0…1. */
+type WaterColumns = readonly [number, number, number, number, number];
+
+/**
+ * Одна ланка води: два ряди по п'ять точок.
+ *
+ * ЯДРО, А НЕ РІВНИЙ ТОН (ADR-0211). Посередині вода густа й світла, до
+ * країв — прозора й темніша, а пасма між ними мають кожне свою щільність.
+ * Саме це на еталоні робить завісу водою, а не стрічкою: рівний тон
+ * упоперек читався латкою незалежно від ширини.
+ */
+function pushWaterLink(
+  mesh: Soup,
+  above: WaterRow,
+  below: WaterRow,
+  columns: WaterColumns,
+  topAlpha: number,
+  bottomAlpha: number,
+  coreShade: number,
+): void {
+  const shadeOf = (column: number) => coreShade * (0.7 + 0.3 * columns[column]!);
+  for (let column = 0; column < 4; column += 1) {
+    const left = column;
+    const right = column + 1;
+    mesh.alpha = [topAlpha * columns[left]!, topAlpha * columns[right]!, bottomAlpha * columns[right]!];
+    mesh.push(above[left]!, above[right]!, below[right]!, [shadeOf(left), shadeOf(right), shadeOf(right)]);
+    mesh.alpha = [topAlpha * columns[left]!, bottomAlpha * columns[right]!, bottomAlpha * columns[left]!];
+    mesh.push(above[left]!, below[right]!, below[left]!, [shadeOf(left), shadeOf(right), shadeOf(left)]);
+  }
 }
 
 // ── Море хмар ───────────────────────────────────────────────

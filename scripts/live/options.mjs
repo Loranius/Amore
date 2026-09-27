@@ -115,6 +115,21 @@ export function parseNotches(value) {
   return notches;
 }
 
+/**
+ * Свайп сцени: зсув пальця в CSS-пікселях по горизонталі, ціле, не нуль.
+ * Мінус — ліворуч. Швидкість жесту — окремий суфікс `:<мс>` (типово 90 мс,
+ * тобто різкий свайп; повільний — `--swipe=200:900`).
+ */
+export function parseSwipe(value) {
+  const [distance, duration = '90'] = String(value).split(':');
+  const dx = Number(distance);
+  const ms = Number(duration);
+  if (!Number.isInteger(dx) || dx === 0 || !Number.isFinite(ms) || ms <= 0) {
+    throw new OptionError('--swipe приймає зсув у пікселях і, за бажання, тривалість: --swipe=-240 або --swipe=240:900.');
+  }
+  return { dx, ms };
+}
+
 export function routePath(route) {
   const value = String(route).trim();
   if (value === '') throw new OptionError('Порожній маршрут.');
@@ -186,6 +201,7 @@ export function parseShotArgs(argv) {
   const taps = [];
   const tapPoints = [];
   const zooms = [];
+  const swipes = [];
   const seed = [];
   const options = {
     tier: DEFAULTS.tier,
@@ -224,6 +240,9 @@ export function parseShotArgs(argv) {
       // стоїть, як і тапи: питання «а чи вертається назад» інакше не
       // поставити.
       case 'zoom': zooms.push(...asList(value).map(parseNotches)); break;
+      // Свайп сцени пальцем (ADR-0211): поворот рукою більше не йде через
+      // `OrbitControls`, і колесо його не перевіряє. Кілька — послідовно.
+      case 'swipe': swipes.push(...asList(value).map(parseSwipe)); break;
       // Другий кадр того самого екрана через N мс: «що рухається, коли пара
       // нічого не робить». Без цього анімацію сцени нема чим перевірити —
       // один знімок про рух не каже нічого.
@@ -282,6 +301,7 @@ export function parseShotArgs(argv) {
     taps,
     tapPoints,
     zooms,
+    swipes,
     seed,
     theme: options.theme,
     keepServer: options.keepServer,

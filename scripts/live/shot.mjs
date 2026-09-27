@@ -24,6 +24,7 @@ import {
   tapPoint,
   tapSelector,
   wheelOverScene,
+  swipeOverScene,
 } from './portal.mjs';
 import { artifactSpan } from './artifactSpan.mjs';
 
@@ -53,6 +54,8 @@ const USAGE = `
                                      вони йдуть послідовно (модалка → її вміст)
   --again=<мс>                       другий кадр того самого екрана через N мс:
                                      що рухається, коли пара нічого не робить
+  --swipe=<px>[:<мс>]                провести пальцем по сцені й зняти кадр, коли
+                                     острів доведеться (типово 90 мс — різкий свайп)
   --zoom=<клацань>                   покрутити колесо над полотном і зняти кадр:
                                      від'ємне — ближче, додатне — далі; можна
                                      кілька, вони йдуть послідовно від поточної
@@ -320,6 +323,18 @@ async function main() {
                 + (ratio === null ? '' : ` · ×${ratio.toFixed(2)} до першого кадру`),
               );
             }
+          }
+
+          for (const [index, swipe] of (options.swipes ?? []).entries()) {
+            const moved = await swipeOverScene(portal.page, swipe);
+            if (!moved) {
+              console.log('  свайп   полотна немає — жест нікуди слати');
+              break;
+            }
+            const suffix = options.swipes.length > 1 ? `-swipe${index + 1}` : '-swipe';
+            const swipeFile = `${outDir}/${name}${suffix}.png`;
+            await portal.page.screenshot({ path: swipeFile });
+            console.log(`  свайп   ${swipe.dx} px за ${swipe.ms} мс → ${swipeFile}`);
           }
 
           // Дотики по координаті — для сцени, де селектора немає.

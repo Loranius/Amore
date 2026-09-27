@@ -34,7 +34,15 @@ describe('вільна камера конструктора', () => {
     const stage = read('crystal3d/scene/PortalStage.tsx');
     const rig = read('crystal3d/scene/PortalEnvironment.tsx');
 
-    expect(stage).toMatch(/enableRotate=\{freeCamera \|\| allowOrbit\}/);
+    /*
+     * ПОВОРОТ ПОДІЛЕНО (ADR-0211). У вільній камері, як і раніше, крутить
+     * `OrbitControls`. У керованій — власний жест `usePortalSpinGesture`:
+     * власник скаржився на ривки, а їх давало згасання орбіти на кадр.
+     * Тож ознака вільної камери тут — `enableRotate={freeCamera}`, а
+     * керований поворот вмикається рівно навпаки.
+     */
+    expect(stage).toMatch(/enableRotate=\{freeCamera\}/);
+    expect(stage).toMatch(/usePortalSpinGesture\(\s*allowOrbit && !freeCamera,/);
     /*
      * МАСШТАБ БІЛЬШЕ НЕ ОЗНАКА ЦЬОГО РЕЖИМУ (ADR-0160).
      *

@@ -179,4 +179,13 @@ describe('--seed: пам’ять минулого візиту', () => {
   it('без прапорця засіву немає', () => {
     expect(parseShotArgs(['home']).seed).toEqual([]);
   });
+
+  it('--swipe: зсув і тривалість, різкий за замовчуванням (ADR-0211)', () => {
+    expect(parseShotArgs(['--swipe=-240']).swipes).toEqual([{ dx: -240, ms: 90 }]);
+    expect(parseShotArgs(['--swipe=240:900,-60']).swipes).toEqual([{ dx: 240, ms: 900 }, { dx: -60, ms: 90 }]);
+    expect(parseShotArgs([]).swipes).toEqual([]);
+    expect(() => parseShotArgs(['--swipe=0'])).toThrow(OptionError);
+    expect(() => parseShotArgs(['--swipe=ліворуч'])).toThrow(OptionError);
+    expect(() => parseShotArgs(['--swipe=100:0'])).toThrow(OptionError);
+  });
 });

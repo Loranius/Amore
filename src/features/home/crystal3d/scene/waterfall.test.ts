@@ -37,6 +37,29 @@ function vertices(geometry: THREE.BufferGeometry): { at: P; alpha: number }[] {
   return out;
 }
 
+/**
+ * Вершини самих завіс, без потоків на плато (ADR-0211).
+ *
+ * Кожен водоспад тепер — потік по плато й завіса під кромкою, і будівник
+ * публікує, скільки трикутників у кожній частині. Мірки ОБРИВУ (звуження,
+ * згасання, розведення) питають завісу: потік лежить на плато, тож він і
+ * вищий, і ближчий до осі — будь-яка мірка по суміші міряла б його.
+ */
+function curtains(geometry: THREE.BufferGeometry): { at: P; alpha: number }[][] {
+  const layout = geometry.userData.waterfallLayout as { stream: number; curtain: number }[] | undefined;
+  expect(layout, 'водоспади не опублікували розклад').toBeDefined();
+  const all = vertices(geometry);
+  const out: { at: P; alpha: number }[][] = [];
+  let at = 0;
+  for (const fall of layout!) {
+    at += fall.stream * 3;
+    out.push(all.slice(at, at + fall.curtain * 3));
+    at += fall.curtain * 3;
+  }
+  expect(at).toBe(all.length);
+  return out;
+}
+
 /** Найвища точка плато — та висота, з якої вода й мусить зриватись. */
 function crownTop(): number {
   const island = buildPortalIslandGeometry(SEED, 0);
@@ -63,26 +86,58 @@ describe('водоспади з кромки (ADR-0167)', () => {
     geometry.dispose();
   });
 
-  it('облягає породу: радіус звужується разом із коренем', () => {
+  it('ніколи не заходить у камінь і не повертає за ним досередини (ADR-0211)', () => {
     /*
-     * Це і є гарантія проти прямої стрічки. Корінь острова звужується
-     * донизу, тож вода, що по ньому тече, мусить звужуватись разом із
-     * ним; стрічка, пущена рівно вниз, тримала б сталий радіус.
+     * ЗМІНА ЗМІСТУ. Тут стояло «облягає породу: радіус звужується разом із
+     * коренем» (ADR-0167). Ця гарантія боролась із прямою стрічкою, що йшла
+     * ВСЕРЕДИНІ породи, — і перемогла її, але ціною, яку показав кадр
+     * ADR-0211: вода, що облягає корінь до вістря, зводить обидва передні
+     * водоспади в один стовп під островом. На еталоні вода падає ПРЯМО
+     * ВНИЗ там, де обрив під нею звужується.
      *
-     * Порівнюються верхня й нижня третини кожного падіння окремо — по
-     * одному клину, бо радіус острова залежить від кута.
+     * Незмінне від ADR-0167 одне: вода не проходить крізь камінь. Тож
+     * перевіряється саме воно — завіса на кожній висоті ширша за острів на
+     * тому ж куті, — і нове правило: донизу радіус не меншає.
      */
     const geometry = buildPortalWaterfallGeometry(SEED, PORTAL_WATERFALLS.high);
-    const all = vertices(geometry);
-    const perFall = all.length / PORTAL_WATERFALLS.high;
-    for (let fall = 0; fall < PORTAL_WATERFALLS.high; fall += 1) {
-      const own = all.slice(fall * perFall, (fall + 1) * perFall);
-      const sorted = [...own].sort((a, b) => b.at[1] - a.at[1]);
-      const radius = (list: typeof own) =>
-        list.reduce((sum, one) => sum + Math.hypot(one.at[0], one.at[2]), 0) / list.length;
-      const head = radius(sorted.slice(0, Math.floor(perFall / 3)));
-      const tail = radius(sorted.slice(-Math.floor(perFall / 3)));
-      expect(head, `падіння ${fall}`).toBeGreaterThan(tail * 1.15);
+    const island = vertices(buildPortalIslandGeometry(SEED, 0));
+    for (const [fall, own] of curtains(geometry).entries()) {
+      /*
+       * Осьова лінія завіси — середина кожного ряду: ряд симетричний
+       * відносно ядра, тож середнє його точок і є ядро.
+       */
+      const byRow = new Map<string, P[]>();
+      for (const one of own) {
+        const key = one.at[1].toFixed(6);
+        byRow.set(key, [...(byRow.get(key) ?? []), one.at]);
+      }
+      const cores = [...byRow.values()].map((points) => ({
+        at: [
+          points.reduce((sum, point) => sum + point[0], 0) / points.length,
+          points[0]![1],
+          points.reduce((sum, point) => sum + point[2], 0) / points.length,
+        ] as P,
+      }));
+      const angle = Math.atan2(cores[0]!.at[2], cores[0]!.at[0]);
+      const bearing = (one: { at: P }) => Math.abs(
+        ((Math.atan2(one.at[2], one.at[0]) - angle + Math.PI * 3) % (Math.PI * 2)) - Math.PI,
+      );
+      const rock = island.filter((one) => bearing(one) < 0.04);
+      const sorted = [...cores].sort((a, b) => b.at[1] - a.at[1]);
+      let previous = 0;
+      let compared = 0;
+      for (const core of sorted) {
+        const radius = Math.hypot(core.at[0], core.at[2]);
+        expect(radius, `падіння ${fall}: радіус меншає донизу`).toBeGreaterThanOrEqual(previous - 0.03);
+        previous = Math.max(previous, radius);
+        const beside = rock.filter((one) => Math.abs(one.at[1] - core.at[1]) < 0.06);
+        if (beside.length === 0) continue;
+        compared += 1;
+        const widest = Math.max(...beside.map((one) => Math.hypot(one.at[0], one.at[2])));
+        expect(radius, `падіння ${fall} на ${core.at[1].toFixed(2)} — у камені`).toBeGreaterThan(widest - 0.02);
+      }
+      // Мірка, що нічого не порівняла, нічого й не гарантує.
+      expect(compared, `падіння ${fall}: поруч немає каменю`).toBeGreaterThan(3);
     }
     geometry.dispose();
   });
@@ -102,16 +157,22 @@ describe('водоспади з кромки (ADR-0167)', () => {
     const geometry = buildPortalWaterfallGeometry(SEED, PORTAL_WATERFALLS.high);
     const colour = geometry.getAttribute('color') as THREE.BufferAttribute;
     expect(colour.itemSize).toBe(4);
-    const all = vertices(geometry);
+    const all = curtains(geometry).flat();
     const lowest = all.reduce((deep, one) => (one.at[1] < deep.at[1] ? one : deep), all[0]!);
     expect(lowest.alpha).toBeLessThan(0.02);
-    const highest = all.reduce((high, one) => (one.at[1] > high.at[1] ? one : high), all[0]!);
-    expect(highest.alpha).toBeGreaterThan(0.9);
+    /*
+     * Нагорі ЯДРО повної сили. Краї завіси навмисно прозорі (ADR-0211:
+     * світле ядро, прозорі краї), тож питається найщільніша вершина
+     * верхнього ряду, а не будь-яка найвища.
+     */
+    const top = Math.max(...all.map((one) => one.at[1]));
+    const crest = all.filter((one) => one.at[1] > top - 1e-6);
+    expect(Math.max(...crest.map((one) => one.alpha))).toBeGreaterThan(0.9);
+    expect(Math.min(...crest.map((one) => one.alpha))).toBeLessThan(0.4);
     /*
      * І на половині глибини вода вже помітно слабша: рівне згасання
      * лишало під островом сірий стовп пари.
      */
-    const top = highest.at[1];
     const bottom = lowest.at[1];
     const middle = all.filter((one) => Math.abs(one.at[1] - (top + bottom) / 2) < 0.08);
     expect(middle.length).toBeGreaterThan(0);
@@ -124,13 +185,10 @@ describe('водоспади з кромки (ADR-0167)', () => {
     // Два водоспади на одному клині — це не два падіння, а одне подвійної
     // яскравості, за яке заплачено двічі.
     const geometry = buildPortalWaterfallGeometry(SEED, PORTAL_WATERFALLS.high);
-    const all = vertices(geometry);
-    const perFall = all.length / PORTAL_WATERFALLS.high;
-    const angles: number[] = [];
-    for (let fall = 0; fall < PORTAL_WATERFALLS.high; fall += 1) {
-      const head = all[fall * perFall]!;
-      angles.push(Math.atan2(head.at[2], head.at[0]));
-    }
+    const angles = curtains(geometry).map((own) => {
+      const head = own[1]!;
+      return Math.atan2(head.at[2], head.at[0]);
+    });
     for (let one = 0; one < angles.length; one += 1) {
       for (let other = one + 1; other < angles.length; other += 1) {
         // Різниця кутів у [0, π]: скільки між двома падіннями по колу.
@@ -147,5 +205,44 @@ describe('водоспади з кромки (ADR-0167)', () => {
     const empty = buildPortalWaterfallGeometry(SEED, PORTAL_WATERFALLS.fallback);
     expect(empty.getAttribute('position').count).toBe(0);
     empty.dispose();
+  });
+
+  it('два головні водоспади — СПЕРЕДУ, перед глядачем (ADR-0211)', () => {
+    /*
+     * ВИМОГА ВЛАСНИКА: «допрацюй водоспади, щоб вони були схожі на
+     * референс». На еталоні два головні падіння — просто перед камерою.
+     * Рівне коло ADR-0167 ставило їх збоку й позаду, і з головного ракурсу
+     * води майже не було видно. Камера дивиться з +Z, тобто «спереду» —
+     * кут π/2 у площині XZ.
+     */
+    const geometry = buildPortalWaterfallGeometry(SEED, PORTAL_WATERFALLS.high);
+    const falls = curtains(geometry);
+    for (const fall of [0, 1]) {
+      const head = falls[fall]![1]!;
+      const angle = Math.atan2(head.at[2], head.at[0]);
+      expect(Math.abs(angle - Math.PI / 2), `падіння ${fall}`).toBeLessThan(0.7);
+    }
+    geometry.dispose();
+  });
+
+  it('вода біжить по плато до кромки й переходить у завісу без щілини', () => {
+    const geometry = buildPortalWaterfallGeometry(SEED, PORTAL_WATERFALLS.high);
+    const layout = geometry.userData.waterfallLayout as { stream: number; curtain: number }[];
+    const all = vertices(geometry);
+    const falls = curtains(geometry);
+    let at = 0;
+    for (let fall = 0; fall < layout.length; fall += 1) {
+      const stream = all.slice(at, at + layout[fall]!.stream * 3);
+      at += (layout[fall]!.stream + layout[fall]!.curtain) * 3;
+      expect(stream.length, `потік ${fall}`).toBeGreaterThan(0);
+      // Джерело — глибше на плато, ніж кромка: потік тече НАЗОВНІ.
+      const radii = stream.map((one) => Math.hypot(one.at[0], one.at[2]));
+      expect(Math.min(...radii)).toBeLessThan(0.7);
+      // Остання ланка потоку — рівно верхній ряд завіси: жодної щілини.
+      const crest = falls[fall]!.slice(0, 6).map((one) => one.at.join(','));
+      const tail = new Set(stream.map((one) => one.at.join(',')));
+      expect(crest.some((point) => tail.has(point)), `стик ${fall}`).toBe(true);
+    }
+    geometry.dispose();
   });
 });
