@@ -67,6 +67,14 @@ jobs:
       - name: Run tests
         run: npm test
 
+      # Python-двійник кристала (ADR-0217): та сама модель росту іншою мовою.
+      # Його тести й еталонні JSON звіряють правило з порталом.
+      - name: Install crystal twin dependencies
+        run: python3 -m pip install --quiet numpy pillow
+
+      - name: Run crystal twin tests
+        run: npm run test:twin
+
       - name: Build GitHub Pages bundle
         run: npm run build
         env:

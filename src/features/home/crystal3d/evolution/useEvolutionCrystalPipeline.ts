@@ -52,7 +52,7 @@ export interface UseEvolutionCrystalPipelineResult {
   error: Error | null;
 }
 
-function readQuality(): CrystalMaterialQuality {
+export function readQuality(): CrystalMaterialQuality {
   if (typeof window === 'undefined' || typeof navigator === 'undefined') return 'fallback';
   const extendedNavigator = navigator as Navigator & { deviceMemory?: number };
   return resolveCrystalRendererQuality({

@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState } from 'react';
 import type { HomeArtifact } from '../homeArtifact';
 import { CrystalPlaceholder } from '../CrystalPlaceholder';
-import EvolutionCrystalPreviewScene from './evolution/EvolutionCrystalPreviewScene';
+import CrystalV2Scene from './v2/CrystalV2Scene';
 import { isTreeLabPreviewEnabled } from './treeLab/featureFlag';
 
 const TreeLabPreviewScene = lazy(() => import('./treeLab/TreeLabPreviewScene'));
@@ -46,5 +46,7 @@ export default function CrystalSceneEntry({ artifact }: CrystalSceneEntryProps) 
     );
   }
 
-  return <EvolutionCrystalPreviewScene />;
+  // Кристал v2 (ADR-0217). Старий конвеєр Evolution — його шлях відкату,
+  // і вантажить його сама v2, лише коли не змогла зібратись.
+  return <CrystalV2Scene />;
 }

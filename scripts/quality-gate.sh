@@ -40,7 +40,7 @@ set -euo pipefail
 # ============================================================
 
 # Ворота: мусять пройти перед зміною. Порядок — від найдешевшого.
-GATES=(typecheck test build verify:pages-build)
+GATES=(typecheck test test:twin build verify:pages-build)
 
 # Не ворота, і чому саме:
 #   dev, preview   — запускають сервер і не завершуються;

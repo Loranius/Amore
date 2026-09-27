@@ -1,0 +1,45 @@
+{
+ "startDate": "2022-12-26",
+ "asOf": "2026-09-27",
+ "partners": {
+  "red": 2,
+  "blue": 1
+ },
+ "wishes": [
+  {
+   "id": 0,
+   "date": "2023-01-05",
+   "isShared": false,
+   "ownerId": 1,
+   "fulfilledById": 2
+  },
+  {
+   "id": 1,
+   "date": "2023-02-04",
+   "isShared": false,
+   "ownerId": 1,
+   "fulfilledById": 2
+  },
+  {
+   "id": 2,
+   "date": "2023-03-06",
+   "isShared": false,
+   "ownerId": 1,
+   "fulfilledById": 2
+  },
+  {
+   "id": 3,
+   "date": "2023-04-05",
+   "isShared": false,
+   "ownerId": 1,
+   "fulfilledById": 2
+  },
+  {
+   "id": 4,
+   "date": "2023-05-05",
+   "isShared": false,
+   "ownerId": 1,
+   "fulfilledById": 2
+  }
+ ]
+}
