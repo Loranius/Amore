@@ -24,6 +24,7 @@ import { useCrystalSeed } from '@/features/home/useHome';
 import { useCalendarMutations } from '@/features/calendar/useCalendar';
 import { AddEventModal } from '@/features/calendar/AddEventModal';
 import { useImmersiveRoute } from '@/features/world/useImmersiveRoute';
+import { useWorldModule } from '@/features/world/useWorldModule';
 import type { EventRow } from '@/types';
 import type { ConstellationEvent } from './constellationRules';
 import { EventDetails } from './EventDetails';
@@ -46,6 +47,8 @@ function toConstellationEvent(event: EventRow): ConstellationEvent {
 }
 
 export function JourneyPage() {
+  // Світ позаду, як у решти модулів (ADR-0216).
+  const worldVisible = useWorldModule();
   useImmersiveRoute();
   const navigate = useNavigate();
   /**
@@ -94,7 +97,11 @@ export function JourneyPage() {
   const split = splitLayout(mode);
 
   return (
-    <div className="journey-page" data-journey-layout={split ? 'split' : 'full'}>
+    <div
+      className="journey-page"
+      data-journey-layout={split ? 'split' : 'full'}
+      data-world={worldVisible ? 'true' : undefined}
+    >
       {moments.length === 0 ? (
         <section className="jn-empty">
           <strong>Небо ще порожнє</strong>
@@ -110,6 +117,7 @@ export function JourneyPage() {
           dismissSignal={dismissSignal}
           addClosedSignal={addClosedSignal}
           bloom={search.get('bloom') !== 'off'}
+          world={worldVisible}
         />
       )}
 

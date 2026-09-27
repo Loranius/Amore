@@ -53,6 +53,27 @@ describe('усі модулі просвічуються світом (ADR-0215)
     expect(read(path)).toMatch(/useWorldVisibleRoute\(\)|useWorldModule\(\)/);
   });
 
+  it('«Наш шлях» — теж (ADR-0216): полотно прозоре, небо стає вуаллю над світом', () => {
+    const page = read('features/journey/JourneyPage.tsx');
+    expect(page).toContain('useWorldModule()');
+    expect(page).toContain('world={worldVisible}');
+    const scene = read('features/journey/scene/JourneyScene.tsx');
+    expect(scene).toContain('alpha: world');
+    expect(scene).toContain('veil={world}');
+    expect(read('features/journey/journeyScene.css')).toMatch(/\.journey-page\[data-world='true'\]\s*\{[^}]*background:\s*transparent/);
+  });
+
+  it('мапа спогадів — теж (ADR-0216): карта-вуаль, а під нею лише світ, не галерея', () => {
+    const map = read('features/memories/MemoriesMap.tsx');
+    expect(map).toContain('mapVeilChanges(');
+    expect(map).toContain("root.setAttribute('data-map-open', 'true')");
+    // Світ під картою вмикає сторінка «Спогадів»; другий виклик хука в
+    // діалозі зняв би позначку при закритті карти.
+    expect(map).not.toContain('useWorldModule()');
+    const css = read('features/memories/memories.css');
+    expect(css).toMatch(/\[data-map-open='true'\] \.app-shell > \.content \{ visibility: hidden; \}/);
+  });
+
   it('гра — виняток за словом власника: світу в ній немає', () => {
     const game = read('features/game/GamePage.tsx');
     expect(game).not.toContain('useWorldModule');

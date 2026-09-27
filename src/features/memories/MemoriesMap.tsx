@@ -35,6 +35,8 @@ import {
 } from './mapView';
 import { useImmersiveRoute } from '@/features/world/useImmersiveRoute';
 import { placeLabel, type PlaceCandidate } from './momentPlace';
+import { mapVeilChanges, type VeilLayer } from './mapVeil';
+import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import type { Moment, MomentPlace } from './useMoments';
 
 /*
@@ -154,6 +156,26 @@ export function MemoriesMap({
    * встигала попросити НІ ОДНОГО тайла.
    */
   useImmersiveRoute();
+  /*
+   * Світ позаду вмикає сама сторінка «Спогадів» (`useWorldModule`), а карта —
+   * її діалог. Другий виклик хука тут зняв би позначку світу, коли карту
+   * закривають, хоча сторінка під нею досі хоче світ. Тож тут лише питаємо,
+   * чи сцена є.
+   */
+  const { webglSupported: worldVisible } = useArtifactWorld();
+
+  /*
+   * Поки карта відкрита над світом, сторінку під нею ховаємо. Діалог
+   * монтується в \`body\`, а прозора карта показувала б не світ, а галерею
+   * «Спогадів» під собою — перший живий знімок показав саме фотографії
+   * крізь вулиці.
+   */
+  useEffect(() => {
+    if (!worldVisible) return undefined;
+    const root = document.documentElement;
+    root.setAttribute('data-map-open', 'true');
+    return () => root.removeAttribute('data-map-open');
+  }, [worldVisible]);
 
   const [ready, setReady] = useState(false);
   const [draft, setDraft] = useState<DraftPoint | null>(null);
@@ -191,7 +213,23 @@ export function MemoriesMap({
       instance.fitBounds(view.bounds, { padding: FIT_PADDING_PX, animate: false });
     }
 
-    instance.on('load', () => setReady(true));
+    instance.on('load', () => {
+      /*
+       * Світ проступає крізь карту (ADR-0216): тло стилю зникає, заливки
+       * стають напівпрозорими, дороги й підписи лишаються чіткими.
+       */
+      if (worldVisible) {
+        const layers = (instance.getStyle()?.layers ?? []) as VeilLayer[];
+        for (const change of mapVeilChanges(layers)) {
+          try {
+            instance.setPaintProperty(change.id, change.property, change.value);
+          } catch (error) {
+            console.warn('[MemoriesMap] шар не став вуаллю:', change.id, error);
+          }
+        }
+      }
+      setReady(true);
+    });
 
     // Тап по вільному місцю ставить точку. Кліки по мітках сюди не
     // доходять: маркер — окремий DOM-вузол, і його обробник зупиняє подію.
@@ -361,7 +399,7 @@ export function MemoriesMap({
   // екрана фото: сторінка модуля лежить у `.page-fade`, який на час
   // анімації створює власний stacking context.
   return createPortal(
-    <div className="mm-map" role="dialog" aria-modal="true" aria-label="Карта спогадів">
+    <div className="mm-map" role="dialog" aria-modal="true" aria-label="Карта спогадів" data-world={worldVisible ? 'true' : undefined}>
       <div className="mm-map-canvas" ref={holder} />
 
       <div className="mm-map-bar">
