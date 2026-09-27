@@ -117,10 +117,26 @@ describe('світло порталу (§10 брифу кристала)', () =>
       const palette = PORTAL_PALETTES[theme];
       expect(luminance(palette.templeStone), theme)
         .toBeGreaterThan(luminance(palette.islandRock));
-      // Брили вдалині тьмяніші за плато: інакше вони читаються ближчими,
-      // ніж є, і глибина, заради якої вони існують, зникає.
-      expect(luminance(palette.driftRock), theme)
-        .toBeLessThan(luminance(palette.islandRock));
+      /*
+       * Брили вдалині БЛИЖЧІ ДО ТУМАНУ, ніж плато: інакше вони читаються
+       * ближчими, ніж є, і глибина, заради якої вони існують, зникає.
+       *
+       * ЗМІНА ЗМІСТУ (ADR-0210). Тут стояло «тьмяніші за плато». Це була
+       * правда під білим денним небом, де далина темніла. Під намальованим
+       * лавандовим небом нового еталона далекі острівці СВІТЛІШІ й
+       * синіші — повітряна перспектива тягне їх до кольору серпанку, а не
+       * до чорного. Незмінне в обох світах одне: далеке ближче до туману.
+       */
+      const rgb = (hex: string): number[] => {
+        const value = Number.parseInt(hex.slice(1), 16);
+        return [(value >> 16) & 255, (value >> 8) & 255, value & 255];
+      };
+      const toFog = (hex: string): number => {
+        const [r, g, b] = rgb(hex);
+        const [fr, fg, fb] = rgb(palette.fog);
+        return Math.hypot(r! - fr!, g! - fg!, b! - fb!);
+      };
+      expect(toFog(palette.driftRock), theme).toBeLessThan(toFog(palette.islandRock));
     }
   });
 

@@ -228,6 +228,21 @@ export const PORTAL_SKY_PAINT_WIDTH = 256;
 export const PORTAL_SKY_PAINT_HEIGHT = 560;
 
 /**
+ * Два полотна: для телефона й для широкого екрана (ADR-0210).
+ *
+ * `cover` на альбомному екрані показував середню третину портретного
+ * полотна: зеніт і тиха зона йшли за верхній край, і за світлим
+ * чорнилом шапки лягало сонце. Художник міряє все в частках кадру й
+ * враховує пропорцію в шумі, тож альбомне полотно — той самий світ,
+ * скомпонований під інший кадр, а не розтягнута картинка.
+ */
+export const PORTAL_SKY_SHAPES = {
+  tall: { width: PORTAL_SKY_PAINT_WIDTH, height: PORTAL_SKY_PAINT_HEIGHT },
+  wide: { width: 640, height: 400 },
+} as const;
+export type PortalSkyShape = keyof typeof PORTAL_SKY_SHAPES;
+
+/**
  * Хмарне поле в точці кадру.
  *
  * Над обрієм — окремі купчасті хмари, яких більшає донизу, до обрію.
@@ -284,7 +299,13 @@ function cloudField(u: number, v: number, aspect: number, layout: typeof PORTAL_
      */
     const quiet = (1 - smoothstep(0.18, 0.34, Math.abs(u - 0.5))) * (1 - smoothstep(0.2, 0.3, v));
     const amount = Math.min(1, 0.12 + 0.8 * lowBank + 0.5 * highBank + 0.3 * side) * fade * (1 - quiet);
-    return { density, threshold: cloudThreshold(amount), sea: false };
+    /*
+     * Поріг ПІДНЯТО в самій зоні, а не лише знято покриття: при нульовому
+     * покритті поріг 0.68, і вершини шуму подекуди його перетинають. На
+     * альбомному полотні така «випадкова» хмара лягла рівно за лічильник
+     * (L 0.29 при межі 0.16) — тест широкого екрана це зловив.
+     */
+    return { density, threshold: cloudThreshold(amount) + quiet * 0.5, sea: false };
   }
   /*
    * ПЕРСПЕКТИВА — НЕ ПОВНА, І ЦЕ СВІДОМО. Чесна площина хмар стискає шум

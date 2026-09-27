@@ -4,6 +4,7 @@ import {
   PORTAL_SKY_LOOKS,
   PORTAL_SKY_PAINT_HEIGHT as H,
   PORTAL_SKY_PAINT_WIDTH as W,
+  PORTAL_SKY_SHAPES,
   hexToRgb,
   paintPortalSky,
 } from './portalSkyPainting';
@@ -96,5 +97,32 @@ describe('тиха зона за текстом шапки', () => {
       for (const u of [0.03, 0.08, 0.92, 0.97]) brightest = Math.max(brightest, luminance(at(light, u, v)));
     }
     expect(brightest).toBeGreaterThan(0.2);
+  });
+});
+
+describe('альбомне полотно для широкого екрана', () => {
+  /*
+   * ВИМОГА (регресія, виміряна на живому екрані 1280×800). `cover` показував
+   * середню третину портретного полотна, і за світлим чорнилом шапки лягало
+   * сонце: «днів разом» зникало. Альбомне полотно мусить тримати ту саму
+   * тиху зону вгорі по центру.
+   */
+  const { width, height } = PORTAL_SKY_SHAPES.wide;
+  const wide = paintPortalSky(PORTAL_SKY_LOOKS.light, width, height);
+  const wideAt = (u: number, v: number) => {
+    const i = (Math.min(height - 1, Math.floor(v * height)) * width + Math.min(width - 1, Math.floor(u * width))) * 4;
+    return [wide[i]!, wide[i + 1]!, wide[i + 2]!];
+  };
+
+  it('альбомне, а не портретне', () => {
+    expect(width).toBeGreaterThan(height);
+  });
+
+  it('по центру вгорі — темний зеніт, як і на телефоні', () => {
+    for (let v = 0.03; v <= 0.2; v += 0.03) {
+      for (let u = 0.35; u <= 0.65; u += 0.05) {
+        expect(luminance(wideAt(u, v))).toBeLessThan(0.16);
+      }
+    }
   });
 });

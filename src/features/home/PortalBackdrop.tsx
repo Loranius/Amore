@@ -16,7 +16,7 @@
 import { type CSSProperties } from 'react';
 import { useTheme } from '@/providers/ThemeProvider';
 import { PORTAL_PALETTES } from './crystal3d/scene/portalScene';
-import { usePaintedSky } from './usePaintedSky';
+import { usePaintedSky, usePaintedSkyShape } from './usePaintedSky';
 import type { HomeArtifact } from './homeArtifact';
 import './portalBackdrop.css';
 
@@ -28,7 +28,8 @@ export function PortalBackdrop({ artifact }: { artifact: HomeArtifact }) {
    * лишається: він видимий, поки воркер малює, і він же — єдине небо без
    * воркера.
    */
-  const painting = usePaintedSky(theme, artifact === 'crystal');
+  const shape = usePaintedSkyShape();
+  const painting = usePaintedSky(theme, artifact === 'crystal', shape);
   return (
     <>
       <div

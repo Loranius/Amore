@@ -52,9 +52,14 @@ const HALO_HEIGHT_SHARE = 0.45;
 const HALO_TILT = 0;
 /** Повний оберт приблизно за сорок секунд: рух є, а погляд не тягне. */
 const HALO_TURN_PER_SECOND = 0.16;
+// Аура ширша за кристал і трохи витягнута вгору, як марево на еталоні.
+const AURA_HEIGHT_SHARE = 0.5;
+const AURA_WIDTH_SHARE = 1.5;
+const AURA_TALL_SHARE = 1.9;
 
 import { portalLevitation } from './portalLevitation';
 import { portalGlowBillboard } from './portalGlowBillboard';
+import { portalAuraTexture } from './portalAura';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { CRYSTAL_CENTRE_POSE, type WorldCameraPose } from '@/features/world/crystalAtlas';
 import {
@@ -139,6 +144,7 @@ export function PortalEnvironment({
   quality,
   reduceMotion,
   frame,
+  veinReach,
 }: PortalEnvironmentProps) {
   const palette = PORTAL_PALETTES[theme];
 
@@ -151,9 +157,15 @@ export function PortalEnvironment({
     () => buildPortalDriftGeometry(seed, PORTAL_DRIFT_ROCKS[quality]),
     [seed, quality],
   );
+  /*
+   * Радіус підкладки в ОДИНИЦЯХ ОСТРОВА: `veinReach` приходить у
+   * одиницях сцени, а острів масштабується за відстанню камери.
+   * Округлено до сотої, щоб дрібний рух кадру не перебудовував траву.
+   */
+  const baseReach = Math.round((veinReach / portalIslandScale(frame.distance)) * 100) / 100;
   const flora = useMemo(
-    () => buildPortalFloraGeometry(seed, quality),
-    [seed, quality],
+    () => buildPortalFloraGeometry(seed, quality, baseReach),
+    [seed, quality, baseReach],
   );
   const falls = useMemo(
     () => buildPortalWaterfallGeometry(seed, PORTAL_WATERFALLS[quality]),
@@ -188,6 +200,7 @@ export function PortalEnvironment({
    * при двох порталах.
    */
   const rockGrain = useMemo(() => rockGrainTexture(), []);
+  const aura = useMemo(() => portalAuraTexture(), []);
 
   /*
    * ЛЕВІТАЦІЯ БРИЛ (ADR-0162).
@@ -368,6 +381,23 @@ export function PortalEnvironment({
             side={THREE.DoubleSide}
           />
         </mesh>
+        {/*
+          Світло води (ADR-0210): та сама стрічка ще раз, ДОДАВАННЯМ. На
+          еталоні водоспад світиться, а напівпрозора стрічка сама по собі
+          лише пропускала камінь крізь себе й читалась блідою ниткою.
+          Альфа вершини та сама, тож і світло згасає донизу.
+        */}
+        <mesh geometry={falls} frustumCulled={false} renderOrder={2}>
+          <meshBasicMaterial
+            color={palette.waterfall}
+            vertexColors
+            transparent
+            opacity={palette.waterfallGlow}
+            blending={THREE.AdditiveBlending}
+            depthWrite={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
 
       {/*
         МОРЕ ХМАР ТЕПЕР НАМАЛЬОВАНЕ (ADR-0210). Тут стояв меш із пласких
@@ -405,6 +435,28 @@ export function PortalEnvironment({
         кільця ховається за кристалом, як і має, але сама вона нічого не
         вирізає.
       */}
+      {/*
+        Аура кристала (ADR-0210, див. `portalAura.ts`). Спрайт завжди
+        дивиться в камеру; глибину ЧИТАЄ, тож кристал попереду її закриває,
+        і світло лягає навколо граней, а не на них. Малюється першою з
+        прозорих, щоб кільце лягало поверх неї.
+      */}
+      <sprite
+        position={[0, PORTAL_GROUND_Y + frame.artifactHeight * AURA_HEIGHT_SHARE, 0]}
+        scale={[frame.artifactHeight * AURA_WIDTH_SHARE, frame.artifactHeight * AURA_TALL_SHARE, 1]}
+        renderOrder={1}
+      >
+        <spriteMaterial
+          map={aura}
+          color={palette.aura}
+          opacity={palette.auraOpacity}
+          transparent
+          blending={THREE.AdditiveBlending}
+          depthWrite={false}
+          fog={false}
+        />
+      </sprite>
+
       <group
         ref={haloSpin}
         position={[0, PORTAL_GROUND_Y + frame.artifactHeight * HALO_HEIGHT_SHARE, 0]}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { PortalSkyShape } from './crystal3d/scene/portalSkyPainting';
 
 // ============================================================
 // Намальоване небо як адреса картинки для CSS-шару (ADR-0210).
@@ -14,14 +15,16 @@ import { useEffect, useState } from 'react';
 // ============================================================
 
 type Theme = 'light' | 'dark';
+type Key = `${Theme}:${PortalSkyShape}`;
 
-const cache = new Map<Theme, string>();
-const pending = new Map<Theme, Promise<string | null>>();
+const cache = new Map<Key, string>();
+const pending = new Map<Key, Promise<string | null>>();
 
-function paint(theme: Theme): Promise<string | null> {
-  const known = cache.get(theme);
+function paint(theme: Theme, shape: PortalSkyShape): Promise<string | null> {
+  const key: Key = `${theme}:${shape}`;
+  const known = cache.get(key);
   if (known !== undefined) return Promise.resolve(known);
-  const running = pending.get(theme);
+  const running = pending.get(key);
   if (running !== undefined) return running;
 
   const job = new Promise<string | null>((resolve) => {
@@ -58,7 +61,7 @@ function paint(theme: Theme): Promise<string | null> {
           return;
         }
         const url = URL.createObjectURL(blob);
-        cache.set(theme, url);
+        cache.set(key, url);
         resolve(url);
       }, 'image/png');
     };
@@ -67,24 +70,50 @@ function paint(theme: Theme): Promise<string | null> {
       console.warn('painted sky: worker failed, gradient stays', error);
       resolve(null);
     };
-    worker.postMessage(theme);
+    worker.postMessage({ theme, shape });
   });
-  pending.set(theme, job);
-  void job.finally(() => pending.delete(theme));
+  pending.set(key, job);
+  void job.finally(() => pending.delete(key));
   return job;
 }
 
-/** Адреса намальованого неба теми, або `null`, поки його немає. */
-export function usePaintedSky(theme: Theme, enabled: boolean): string | null {
-  const [url, setUrl] = useState<string | null>(() => (enabled ? cache.get(theme) ?? null : null));
+/**
+ * Яке полотно просить екран: альбомний кадр — `wide`, решта — `tall`.
+ * Слухає зміну пропорції (поворот планшета, зміна вікна).
+ */
+export function usePaintedSkyShape(): PortalSkyShape {
+  const query = '(min-aspect-ratio: 1/1)';
+  const read = (): PortalSkyShape => (
+    typeof window !== 'undefined' && typeof window.matchMedia === 'function'
+      && window.matchMedia(query).matches ? 'wide' : 'tall'
+  );
+  const [shape, setShape] = useState<PortalSkyShape>(read);
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return;
+    const media = window.matchMedia(query);
+    const update = () => setShape(media.matches ? 'wide' : 'tall');
+    update();
+    media.addEventListener('change', update);
+    return () => media.removeEventListener('change', update);
+  }, []);
+  return shape;
+}
+
+/** Адреса намальованого неба теми й форми, або `null`, поки його немає. */
+export function usePaintedSky(theme: Theme, enabled: boolean, shape: PortalSkyShape = 'tall'): string | null {
+  const key: Key = `${theme}:${shape}`;
+  const [url, setUrl] = useState<string | null>(() => (enabled ? cache.get(key) ?? null : null));
   useEffect(() => {
     if (!enabled) { setUrl(null); return; }
     let alive = true;
-    const known = cache.get(theme);
+    const known = cache.get(key);
     if (known !== undefined) { setUrl(known); return; }
-    setUrl(null);
-    void paint(theme).then((next) => { if (alive) setUrl(next); });
+    /*
+     * Поки нове полотно малюється, старе лишається: зміна форми вікна не
+     * мусить блимати градієнтом.
+     */
+    void paint(theme, shape).then((next) => { if (alive && next !== null) setUrl(next); });
     return () => { alive = false; };
-  }, [theme, enabled]);
+  }, [theme, shape, enabled, key]);
   return url;
 }

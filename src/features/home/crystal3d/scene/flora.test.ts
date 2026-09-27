@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type * as THREE from 'three';
 import type { PortalFloraLayout } from './portalIsland';
 import {
+  PORTAL_BASE_BUSHES,
   PORTAL_BUSHES,
+  PORTAL_CANOPY_TRIANGLES,
   PORTAL_DRIFT_ROCKS,
   PORTAL_FLORA_TUFTS,
   PORTAL_ISLAND_CROWN_TRIANGLES,
@@ -122,12 +124,14 @@ function tufts(): { seat: P; float: readonly [number, number] }[] {
   const marks = floats(geometry);
   const plan = layout(geometry);
   const out: { seat: P; float: readonly [number, number] }[] = [];
+  /*
+   * ЛИШЕ КУЩИКИ ПЛАТО (ADR-0210). На брилах тепер ростуть крони —
+   * двадцятигранники, а не пучки з трьох листків, — і ділити їх кроком у
+   * три означало б рахувати грані крони кущиками. Крони на брилах читає
+   * `rockCanopies()`.
+   */
   const spans: readonly (readonly [number, number])[] = [
     [plan.moss, plan.moss + plan.tufts],
-    [
-      plan.moss + plan.tufts + plan.bushes + plan.drapes + plan.rockMoss,
-      plan.moss + plan.tufts + plan.bushes + plan.drapes + plan.rockMoss + plan.rockTufts,
-    ],
   ];
   for (const [from, to] of spans) {
     for (let blade = from; blade < to; blade += 3) {
@@ -143,17 +147,46 @@ function tufts(): { seat: P; float: readonly [number, number] }[] {
   return out;
 }
 
+/**
+ * Крони на летючих брилах (ADR-0210): кожна — `PORTAL_CANOPY_TRIANGLES`
+ * граней поспіль, з одною фазою левітації на всіх вершинах.
+ */
+function rockCanopies(): { centre: P; bottom: number; float: readonly [number, number] }[] {
+  const geometry = flora();
+  const face = triangles(geometry);
+  const marks = floats(geometry);
+  const plan = layout(geometry);
+  const from = plan.moss + plan.tufts + plan.bushes + plan.drapes + plan.rockMoss;
+  const out: { centre: P; bottom: number; float: readonly [number, number] }[] = [];
+  for (let first = from; first < from + plan.rockTufts; first += PORTAL_CANOPY_TRIANGLES) {
+    const points = face.slice(first, first + PORTAL_CANOPY_TRIANGLES).flat();
+    const mean = (axis: 0 | 1 | 2) => points.reduce((sum, point) => sum + point[axis], 0) / points.length;
+    const at = first * 3 * 2;
+    out.push({
+      centre: [mean(0), mean(1), mean(2)],
+      bottom: Math.min(...points.map((point) => point[1])),
+      float: [marks[at]!, marks[at + 1]!],
+    });
+  }
+  return out;
+}
+
 describe('рослинність на островах', () => {
   it('росте і на плато, і на летючих брилах', () => {
     // «На всі острови» дослівно: якби кущики були лише на плато, тест
     // проходив би, а прохання — ні.
-    const grown = tufts();
-    const still = grown.filter((tuft) => tuft.float[0] === 0 && tuft.float[1] === 0);
-    const flying = grown.filter((tuft) => tuft.float[1] !== 0);
+    const still = tufts().filter((tuft) => tuft.float[0] === 0 && tuft.float[1] === 0);
     // Кущики плато — саме вони; мох, кущі й звиси до `tufts()` не входять.
     expect(still.length).toBe(PORTAL_FLORA_TUFTS.high);
-    expect(flying.length).toBeGreaterThan(PORTAL_DRIFT_ROCKS.high * 0.5);
-    expect(flying.length).toBeLessThanOrEqual(PORTAL_DRIFT_ROCKS.high);
+    /*
+     * На брилах — дві-три крони на брилу, що не лишилась голою (ADR-0210;
+     * було по одному пучку). Гола — близько чверті, тож нижня межа —
+     * половина брил по дві крони, верхня — кожна брила по три.
+     */
+    const flying = rockCanopies();
+    expect(flying.every((tree) => tree.float[1] !== 0)).toBe(true);
+    expect(flying.length).toBeGreaterThan(PORTAL_DRIFT_ROCKS.high * 0.5 * 2);
+    expect(flying.length).toBeLessThanOrEqual(PORTAL_DRIFT_ROCKS.high * 3);
   });
 
   it('кущик на брилі несе ТУ САМУ фазу, що й камінь під ним', () => {
@@ -169,7 +202,7 @@ describe('рослинність на островах', () => {
     for (let at = 0; at + 1 < stone.length; at += 2) {
       known.add(`${stone[at]}|${stone[at + 1]}`);
     }
-    const flying = tufts().filter((tuft) => tuft.float[1] !== 0);
+    const flying = rockCanopies();
     expect(flying.length).toBeGreaterThan(0);
     for (const tuft of flying) {
       expect(known, `${tuft.float[0]}|${tuft.float[1]}`)
@@ -198,18 +231,27 @@ describe('рослинність на островах', () => {
       seen.z1 = Math.max(seen.z1, point[2]);
       seen.top = Math.max(seen.top, point[1]);
     }
-    for (const tuft of tufts().filter((one) => one.float[1] !== 0)) {
-      const key = `${tuft.float[0]}|${tuft.float[1]}`;
+    /*
+     * ДЛЯ КРОНИ, А НЕ ДЛЯ ПУЧКА (ADR-0210). Питання те саме — чи стоїть
+     * зелень на своєму камені, — але в крони немає «основи листка». Тож
+     * питається: центр крони над плямою каменю, а низ крони торкається
+     * шапки — не висить над нею й не пірнає крізь камінь.
+     */
+    for (const tree of rockCanopies()) {
+      const key = `${tree.float[0]}|${tree.float[1]}`;
       const rock = box.get(key)!;
       expect(rock, key).toBeDefined();
-      expect(tuft.seat[0], `${key} x`).toBeGreaterThanOrEqual(rock.x0);
-      expect(tuft.seat[0], `${key} x`).toBeLessThanOrEqual(rock.x1);
-      expect(tuft.seat[2], `${key} z`).toBeGreaterThanOrEqual(rock.z0);
-      expect(tuft.seat[2], `${key} z`).toBeLessThanOrEqual(rock.z1);
-      // На шапці, а не на зламі знизу: шапка брили — це колишня поверхня
-      // острова, тобто єдине місце на камені, де трава могла лишитись.
-      expect(rock.top - tuft.seat[1], `${key} y`).toBeLessThan((rock.x1 - rock.x0) * 0.6);
-      expect(tuft.seat[1], `${key} y`).toBeLessThanOrEqual(rock.top);
+      expect(tree.centre[0], `${key} x`).toBeGreaterThanOrEqual(rock.x0);
+      expect(tree.centre[0], `${key} x`).toBeLessThanOrEqual(rock.x1);
+      expect(tree.centre[2], `${key} z`).toBeGreaterThanOrEqual(rock.z0);
+      expect(tree.centre[2], `${key} z`).toBeLessThanOrEqual(rock.z1);
+      const width = rock.x1 - rock.x0;
+      // На шапці, а не під каменем: центр крони вище за верх брили.
+      expect(tree.centre[1], `${key} y`).toBeGreaterThan(rock.top);
+      // І не в повітрі над нею: низ крони не вище за верх каменю більш ніж
+      // на двадцяту ширини брили — і не глибше за третину її ширини.
+      expect(tree.bottom - rock.top, `${key} y`).toBeLessThan(width * 0.05);
+      expect(rock.top - tree.bottom, `${key} y`).toBeLessThan(width * 0.34);
     }
   });
 
@@ -319,8 +361,16 @@ describe('рослинність на островах', () => {
     const share = plan.moss / cells;
     expect(share).toBeGreaterThan(PORTAL_MOSS_COVER.high * 0.85);
     expect(share).toBeLessThan(PORTAL_MOSS_COVER.high * 1.15);
-    // І моху більше, ніж усіх кущиків разом: земля зелена, трава — деталь.
-    expect(plan.moss).toBeGreaterThan(plan.tufts + plan.bushes);
+    /*
+     * ТУТ СТОЯЛО «моху більше, ніж усіх кущиків разом» — і більше не
+     * стоїть, це свідома зміна змісту (ADR-0210). У еталоні власника
+     * зелена маса острова — ДЕРЕВА, крони, що закривають землю, і кущі
+     * стали деревами з двома-трьома кронами по двадцять граней. Моху тепер
+     * менше за трикутниками, хоча вкриває він ту саму площу: гарантія
+     * «земля зелена» — це частка клітинок вище, а не змагання в
+     * трикутниках із деревами, які міряють інше.
+     */
+    expect(plan.moss).toBeGreaterThan(plan.tufts);
   });
 
   it('кладе мох НА плато, а не в нього і не над ним', () => {
@@ -378,9 +428,20 @@ describe('рослинність на островах', () => {
       plan.moss + plan.tufts + plan.bushes + plan.drapes + plan.rockMoss + plan.rockTufts,
     ).toBe(count);
     expect(plan.tufts).toBe(PORTAL_FLORA_TUFTS.high * 3);
-    expect(plan.bushes).toBe(PORTAL_BUSHES.high * 5);
+    /*
+     * Кущ став деревом, а довкола підкладки кристала виріс пояс кущів
+     * (ADR-0210). Дерево — стовбур із 4 граней і 2-3 крони по
+     * `PORTAL_CANOPY_TRIANGLES`, кущ поясу — одна крона. Частину місць
+     * біля храму пропущено, тож точне число залежить від насіння; стеля —
+     * ні, і саме вона тут стережеться.
+     */
+    const ceiling = PORTAL_BUSHES.high * (4 + 3 * PORTAL_CANOPY_TRIANGLES)
+      + PORTAL_BASE_BUSHES.high * PORTAL_CANOPY_TRIANGLES;
+    expect(plan.bushes).toBeLessThanOrEqual(ceiling);
+    expect(plan.bushes).toBeGreaterThan(ceiling * 0.5);
+    expect(plan.bushes % 4).toBe(0);
     expect(plan.drapes).toBe(PORTAL_RIM_TUFTS.high * 2);
-    expect(plan.rockTufts % 3).toBe(0);
+    expect(plan.rockTufts % PORTAL_CANOPY_TRIANGLES).toBe(0);
     // Шапка брили — віяло з семи трикутників, по одному на кут.
     expect(plan.rockMoss % 7).toBe(0);
   });

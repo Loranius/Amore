@@ -8,16 +8,14 @@
 // ============================================================
 import {
   PORTAL_SKY_LOOKS,
-  PORTAL_SKY_PAINT_HEIGHT,
-  PORTAL_SKY_PAINT_WIDTH,
+  PORTAL_SKY_SHAPES,
   paintPortalSky,
+  type PortalSkyShape,
 } from './crystal3d/scene/portalSkyPainting';
 
-self.onmessage = (event: MessageEvent<'light' | 'dark'>) => {
-  const theme = event.data === 'dark' ? 'dark' : 'light';
-  const pixels = paintPortalSky(PORTAL_SKY_LOOKS[theme]);
-  (self as unknown as Worker).postMessage(
-    { theme, width: PORTAL_SKY_PAINT_WIDTH, height: PORTAL_SKY_PAINT_HEIGHT, pixels },
-    [pixels.buffer],
-  );
+self.onmessage = (event: MessageEvent<{ theme: 'light' | 'dark'; shape: PortalSkyShape }>) => {
+  const theme = event.data.theme === 'dark' ? 'dark' : 'light';
+  const { width, height } = PORTAL_SKY_SHAPES[event.data.shape === 'wide' ? 'wide' : 'tall'];
+  const pixels = paintPortalSky(PORTAL_SKY_LOOKS[theme], width, height);
+  (self as unknown as Worker).postMessage({ theme, width, height, pixels }, [pixels.buffer]);
 };

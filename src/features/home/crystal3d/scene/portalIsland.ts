@@ -284,7 +284,10 @@ export const PORTAL_ISLAND_RUBBLE: Record<'high' | 'balanced' | 'low' | 'fallbac
 
 /** Скільки брил висить у повітрі навколо острова. */
 export const PORTAL_DRIFT_ROCKS: Record<'high' | 'balanced' | 'low' | 'fallback', number> = {
-  high: 34, balanced: 22, low: 12, fallback: 0,
+  // 34 → 48 (ADR-0210). У еталоні власника острівців обабіч кристала
+  // з десяток. На телефоні половина горизонтального поля зору — лише ≈10°,
+  // тож 34 брили на повне коло давали в кадрі дві-три.
+  high: 48, balanced: 30, low: 16, fallback: 0,
 };
 
 /*
@@ -970,24 +973,48 @@ function pushRubble(mesh: Soup, seed: number, index: number): void {
  * кутах нижньої сходинки: внутрішній кут виходить на 0.527, зовнішній на
  * 0.946 при обрисі 0.967.
  */
-const TEMPLE_AT: readonly [number, number] = [0.297, -0.612];
+/*
+ * ЛІВОРУЧ СПЕРЕДУ (ADR-0210): [0.297, −0.612] → [−0.39, 0.557], тобто
+ * 0.68 радіуса під кутом 125°. У новому еталоні власника храм стоїть
+ * ліворуч від кристала й ближче до глядача, і саме так він читається
+ * храмом. На старому місці — праворуч і позаду — з камери 10.4° його
+ * затуляв кристал, і лишалась видимою «табуретка»: край даху на ніжках.
+ *
+ * Відстань від осі та сама, 0.68, — і тому обидва запаси кільця ті самі
+ * (усередині 0.5 храму бути не може, `DESIGN.md`). Перша спроба ставила
+ * храм під 152° і повертала фасадом на камеру: тоді вздовж радіуса лягала
+ * ШИРИНА храму замість глибини, і внутрішній кут заїхав на 0.39 — на
+ * жеоду. Тест кільця це зловив; кадр не показав би.
+ */
+const TEMPLE_AT: readonly [number, number] = [
+  0.68 * Math.cos((125 * Math.PI) / 180),
+  0.68 * Math.sin((125 * Math.PI) / 180),
+];
 
 /**
- * Куди дивиться фасад храму — одиничний вектор на центр острова.
+ * Куди дивиться фасад храму — одиничний вектор ВІД центру острова.
  *
  * Публікується, бо будь-яка мірка ФАСАДУ мусить дивитись у тому самому
  * напрямку. Профіль храму проєктує тіло на площину XY, тобто мовчки
- * вважає, що фасад повернутий на +Z; відколи храм розвернувся до
- * артефакта (ADR-0169), така проєкція бачить його навскіс — і показала
- * колонаду 0.575 замість 0.655 та фронтон 12.5° замість 14°.
- *
- * Форма не змінилась ані на трикутник. Змінилась мірка, і саме її
- * довелось повернути разом із храмом.
+ * вважає, що фасад повернутий на +Z; відколи храм розвернувся
+ * (ADR-0169), така проєкція бачить його навскіс — і показала колонаду
+ * 0.575 замість 0.655 та фронтон 12.5° замість 14°.
  */
 export const PORTAL_TEMPLE_FACE: readonly [number, number] = (() => {
+  /*
+   * НАЗОВНІ, А НЕ НА КРИСТАЛ (ADR-0210). ADR-0169 повертав фасад рівно на
+   * центр острова: з камери позаду-збоку це показувало фронтон. У новому
+   * еталоні храм стоїть попереду-ліворуч, і фасад на центр дивився б ВІД
+   * глядача — у кадрі був би тил. Назовні під 125° — це три чверті до
+   * камери: фронтон і колонада боку разом, як на еталоні.
+   *
+   * Радіальний, а не «на камеру», з тієї ж причини, що й у ADR-0169:
+   * уздовж радіуса тоді лягає ГЛИБИНА храму, вужча за ширину, і храм
+   * вміщається в кільце між жеодою й кромкою.
+   */
   const [ox, oz] = TEMPLE_AT;
   const length = Math.hypot(ox, oz) || 1;
-  return [-ox / length, -oz / length];
+  return [ox / length, oz / length];
 })();
 
 /**
@@ -1407,11 +1434,41 @@ function driftRockAt(seed: number, index: number, count: number): {
   float: readonly [number, number];
 } {
   const tag = `island:drift:${index}`;
-  const angle = ((index + seededUnit(seed, `${tag}:spin`) * 0.8) / Math.max(1, count)) * Math.PI * 2;
+  /*
+   * КОЖНА ШОСТА — У ПЕРЕДНЬОМУ СЕКТОРІ (ADR-0210), біля напрямку, куди
+   * камера дивиться за замовчуванням (−Z). Орбіта повна, тож решта лишається
+   * по всьому колу: повернувши сцену, пара не побачить голого неба. Але
+   * головна — це кадр, який вона бачить щоразу, і для нього брил мало.
+   */
+  const front = index % 6 === 0;
+  /*
+   * ОБАБІЧ ОСІ, А НЕ НА НІЙ. Перша редакція клала передні брили в ±26°, і
+   * на телефоні, де половина поля зору ≈10°, усе, що влучало в кадр,
+   * скупчилось просто за кристалом — сірий натовп довкола вершини. У
+   * еталоні простір довкола кристала чистий, а острівці розсунуті до боків
+   * кадру. Тому 5°–15° від осі, по черзі ліворуч і праворуч.
+   */
+  const side = Math.floor(index / 6) % 2 === 0 ? 1 : -1;
+  const angle = front
+    ? -Math.PI / 2 + side * (0.09 + seededUnit(seed, `${tag}:spin`) * 0.17)
+    : ((index + seededUnit(seed, `${tag}:spin`) * 0.8) / Math.max(1, count)) * Math.PI * 2;
   const reach = PORTAL_CAMERA_RING * (1.38 + seededUnit(seed, `${tag}:reach`) * 1.02);
-  const rise = -0.42 + seededUnit(seed, `${tag}:rise`) * 1.5;
+  /*
+   * ВИСОТА ВІД ВІДСТАНІ (ADR-0210). Було −0.42…1.08 одиниці острова — з
+   * камери 23.6° це клало брили в небо над островом. З камери 10.4° ті
+   * самі висоти лягли біля її обрію, тобто на 0.12–0.2 кадру, просто за
+   * шапку інтерфейсу. У еталоні власника острівці висять обабіч кристала,
+   * на 0.35–0.55 кадру, — тобто нижче за обрій камери, і тим нижче, чим
+   * далі. Тому висота береться часткою відстані: так кут під обрієм, а
+   * отже й висота в кадрі, не залежить від того, наскільки брила далека.
+   */
+  // Смуга висот широка: вузька (−0.20…−0.06) виставляла брили в одну
+  // стіну на рівні кристала.
+  const rise = reach * (-0.27 + seededUnit(seed, `${tag}:rise`) * 0.23);
+  // × 0.42 → 0.30 (ADR-0210): острівці в еталоні — дрібні, з небом між
+  // ними; при 0.42 вони злипались у стіну.
   const size = (0.055 + seededUnit(seed, `${tag}:size`) * 0.085)
-    * (reach / PORTAL_ISLAND_RADIUS) * 0.42;
+    * (reach / PORTAL_ISLAND_RADIUS) * 0.3;
   return {
     tag,
     cx: Math.cos(angle) * reach,
@@ -1914,7 +1971,22 @@ export const PORTAL_RIM_TUFTS: Record<PortalQuality, number> = {
 
 /** Кущі, що вже читаються деревцями. Стоять поясом ближче до кромки. */
 export const PORTAL_BUSHES: Record<PortalQuality, number> = {
-  high: 22, balanced: 14, low: 6, fallback: 0,
+  // 22 → 56 (ADR-0210). Кущі стали деревами з круглими кронами, і в
+  // еталоні власника острів ними ПИШНИЙ, а не всіяний. Дерево — ≈55
+  // трикутників, тобто 56 дерев — ≈3 тисячі на всю зелень острова.
+  high: 56, balanced: 34, low: 14, fallback: 0,
+};
+
+/**
+ * Кущі щільним кільцем довкола основи кристала (ADR-0210).
+ *
+ * Під кристалом стоїть рушієва підкладка — сірий камінь, що ховає основи
+ * дочірніх кристалів (правило цілісності кріплення, ADR-0135). Прибрати
+ * її не можна. У еталоні власника основу кластера ховає ЗЕЛЕНЬ — тож тут
+ * кущі сідають рівно на її край.
+ */
+export const PORTAL_BASE_BUSHES: Record<PortalQuality, number> = {
+  high: 30, balanced: 20, low: 10, fallback: 0,
 };
 
 /**
@@ -1971,6 +2043,104 @@ function pushTuft(
       seat[2] + along[2] * lean,
     ];
     mesh.push(left, right, tip, [0.5, 0.5, 0.98]);
+  }
+}
+
+
+/*
+ * ── Крона: кругла, а не пучок листків (ADR-0210) ─────────────
+ *
+ * В еталоні власника зелень острова — густі КРУГЛІ кущі й дерева, і саме
+ * вони ховають основу кристала й край плато. Кущ тут був п'ятьма пласкими
+ * листками з однієї точки (`pushTuft`), і з камери 10.4° він читався
+ * пучком трави.
+ *
+ * Крона — ікосаедр, двадцять граней, із розкиданими вершинами й трохи
+ * сплющений. Двадцяти досить: кущ на екрані телефона займає 15–30
+ * пікселів, і більше граней там не розрізнити, а ціна множиться на кожне
+ * дерево. Грань ловить власне світло (`pushLit`), тож крона читається
+ * об'ємом, а не плямою; низ крони притемнений — там, куди небо не
+ * дістає, — і це те, що відокремлює кущ від плато під ним.
+ */
+const ICOSA_T = (1 + Math.sqrt(5)) / 2;
+const ICOSA_VERTICES: readonly Point[] = ([
+  [-1, ICOSA_T, 0], [1, ICOSA_T, 0], [-1, -ICOSA_T, 0], [1, -ICOSA_T, 0],
+  [0, -1, ICOSA_T], [0, 1, ICOSA_T], [0, -1, -ICOSA_T], [0, 1, -ICOSA_T],
+  [ICOSA_T, 0, -1], [ICOSA_T, 0, 1], [-ICOSA_T, 0, -1], [-ICOSA_T, 0, 1],
+] as const).map(([x, y, z]) => {
+  const length = Math.hypot(x, y, z);
+  return [x / length, y / length, z / length] as Point;
+});
+const ICOSA_FACES: readonly (readonly [number, number, number])[] = [
+  [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11],
+  [1, 5, 9], [5, 11, 4], [11, 10, 2], [10, 7, 6], [7, 1, 8],
+  [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9],
+  [4, 9, 5], [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+];
+
+/** Трикутників в одній кроні. Публікується для тестів і бюджету. */
+export const PORTAL_CANOPY_TRIANGLES = ICOSA_FACES.length;
+
+function pushCanopy(
+  mesh: Soup,
+  seed: number,
+  tag: string,
+  centre: Point,
+  radius: number,
+  squash = 0.8,
+): void {
+  const points = ICOSA_VERTICES.map((vertex, index): Point => {
+    // Кожна вершина — своя відстань: рівна куля читається кулькою, а не кущем.
+    const reach = radius * (0.78 + seededUnit(seed, `${tag}:v${index}`) * 0.44);
+    return [
+      centre[0] + vertex[0] * reach,
+      centre[1] + vertex[1] * reach * squash,
+      centre[2] + vertex[2] * reach,
+    ];
+  });
+  const tone = 0.9 + seededUnit(seed, `${tag}:tone`) * 0.22;
+  for (const [ia, ib, ic] of ICOSA_FACES) {
+    const a = points[ia]!;
+    const b = points[ib]!;
+    const c = points[ic]!;
+    // Низ крони в тіні: небо світить згори, а під кроною — сама крона.
+    const height = ((a[1] + b[1] + c[1]) / 3 - centre[1]) / Math.max(1e-6, radius * squash);
+    const underside = 0.62 + 0.38 * Math.min(1, Math.max(0, height * 0.5 + 0.5));
+    pushLit(mesh, a, b, c, tone * underside);
+  }
+}
+
+/**
+ * Дерево: стовбур і дві-три крони.
+ *
+ * Стовбур у тому самому матеріалі, що й зелень, тож коричневим він бути не
+ * може — він темний, і цього досить: на відстані дерево читається темною
+ * рискою під кроною, а не кольором кори.
+ */
+function pushTree(mesh: Soup, seed: number, tag: string, seat: Point, size: number): void {
+  const trunkHeight = size * (0.55 + seededUnit(seed, `${tag}:trunk`) * 0.35);
+  const trunkWidth = size * 0.07;
+  const spin = seededUnit(seed, `${tag}:spin`) * Math.PI * 2;
+  const corners: Point[] = [0, 1, 2, 3].map((k) => {
+    const angle = spin + (k * Math.PI) / 2;
+    return [seat[0] + Math.cos(angle) * trunkWidth, seat[1], seat[2] + Math.sin(angle) * trunkWidth];
+  });
+  const top: Point = [seat[0], seat[1] + trunkHeight, seat[2]];
+  for (let k = 0; k < 4; k += 1) {
+    pushLit(mesh, corners[k]!, corners[(k + 1) % 4]!, top, 0.34);
+  }
+  const blobs = 2 + Math.floor(seededUnit(seed, `${tag}:blobs`) * 2);
+  for (let blob = 0; blob < blobs; blob += 1) {
+    const angle = spin + (blob / blobs) * Math.PI * 2;
+    const spread = blob === 0 ? 0 : size * 0.28;
+    const lift = blob === 0 ? size * 0.12 : 0;
+    const centre: Point = [
+      top[0] + Math.cos(angle) * spread,
+      top[1] + lift,
+      top[2] + Math.sin(angle) * spread,
+    ];
+    const radius = size * (blob === 0 ? 0.46 : 0.34 + seededUnit(seed, `${tag}:r${blob}`) * 0.1);
+    pushCanopy(mesh, seed, `${tag}:c${blob}`, centre, radius);
   }
 }
 
@@ -2124,6 +2294,8 @@ function pushDrape(
 export function buildPortalFloraGeometry(
   seed: number,
   quality: PortalQuality,
+  /** Радіус рушієвої підкладки В ОДИНИЦЯХ ОСТРОВА; 0 — кільця немає. */
+  baseReach = 0,
 ): THREE.BufferGeometry {
   const mesh = soup();
   const tufts = PORTAL_FLORA_TUFTS[quality];
@@ -2247,7 +2419,9 @@ export function buildPortalFloraGeometry(
     const level = 4 + Math.floor(seededUnit(seed, `${tag}:ring`) * 3);
     const cell = crownCell(seed, segment, level, seededUnit(seed, `${tag}:half`) >= 0.5);
     const seat = crownSeat(seed, tag, cell);
-    pushTuft(mesh, seed, tag, seat, 0.058 + seededUnit(seed, `${tag}:size`) * 0.042, 5);
+    // Дерево не росте крізь храм: у еталоні дерева стоять ПОРУЧ із ним.
+    if (Math.hypot(seat[0] - TEMPLE_AT[0], seat[2] - TEMPLE_AT[1]) < 0.26) continue;
+    pushTree(mesh, seed, tag, seat, 0.13 + seededUnit(seed, `${tag}:size`) * 0.07);
   }
 
   /*
@@ -2257,6 +2431,33 @@ export function buildPortalFloraGeometry(
    * читається зрізаним. Сідало береться на ЗОВНІШНЬОМУ кільці плато, а
    * зелень падає назовні й униз — через край.
    */
+  /*
+   * КІЛЬЦЕ ДОВКОЛА ОСНОВИ. Кущ сідає на край підкладки й трохи назовні,
+   * і тоне в плато на третину свого радіуса: так він не висить над
+   * хордою плато (ADR-0140) і не відкриває щілину знизу.
+   */
+  if (baseReach > 0) {
+    const count = PORTAL_BASE_BUSHES[quality];
+    for (let index = 0; index < count; index += 1) {
+      const tag = `island:base:${index}`;
+      const angle = ((index + seededUnit(seed, `${tag}:spin`) * 0.7) / Math.max(1, count)) * Math.PI * 2;
+      const reach = baseReach * (1.02 + seededUnit(seed, `${tag}:reach`) * 0.22);
+      const share = reach / Math.max(1e-6, portalIslandRadiusAt(seed, angle));
+      if (share > 0.9) continue;
+      const x = Math.cos(angle) * reach;
+      const z = Math.sin(angle) * reach;
+      if (Math.hypot(x - TEMPLE_AT[0], z - TEMPLE_AT[1]) < 0.24) continue;
+      /*
+       * Кущі основи БІЛЬШІ й ВИЩІ за дерева навколо: з камери 10.4°
+       * передня стінка підкладки стоїть вище за кущ звичайного розміру, і
+       * перша редакція лишала її видимою над кільцем.
+       */
+      const radius = 0.075 + seededUnit(seed, `${tag}:size`) * 0.045;
+      const ground = portalIslandHeightAt(seed, angle, share);
+      pushCanopy(mesh, seed, tag, [x, ground + radius * 0.7, z], radius, 0.85);
+    }
+  }
+
   const startDrapes = mark();
   const rim = ISLAND_TOP_RINGS.length - 2;
   for (let index = 0; index < PORTAL_RIM_TUFTS[quality]; index += 1) {
@@ -2319,13 +2520,23 @@ export function buildPortalFloraGeometry(
     const tag = `island:driftflora:${index}`;
     if (seededUnit(seed, `${tag}:bare`) < 0.28) continue;
     mesh.float = rock.float;
-    const away = seededUnit(seed, `${tag}:away`) * Math.PI * 2;
-    const reach = rock.size * 0.42 * seededUnit(seed, `${tag}:reach`);
-    pushTuft(mesh, seed, tag, [
-      rock.cx + Math.cos(away) * reach,
-      rock.rise + rock.top * 0.94,
-      rock.cz + Math.sin(away) * reach,
-    ], rock.size * 0.34);
+    /*
+     * КРОНИ, А НЕ ПУЧОК (ADR-0210). У еталоні власника далекі острівці
+     * читаються саме деревами на верхівці — навіть у серпанку. Пучок
+     * трави туман з'їдав цілком, і лишались сірі «шайби». Дві-три крони
+     * дають силует, який туман лише висвітлює, але не стирає.
+     */
+    const trees = 2 + Math.floor(seededUnit(seed, `${tag}:count`) * 2);
+    for (let tree = 0; tree < trees; tree += 1) {
+      const away = seededUnit(seed, `${tag}:away:${tree}`) * Math.PI * 2;
+      const reach = rock.size * 0.45 * seededUnit(seed, `${tag}:reach:${tree}`);
+      const radius = rock.size * (0.16 + seededUnit(seed, `${tag}:r:${tree}`) * 0.1);
+      pushCanopy(mesh, seed, `${tag}:${tree}`, [
+        rock.cx + Math.cos(away) * reach,
+        rock.rise + rock.top * 1.1 + radius * 0.6,
+        rock.cz + Math.sin(away) * reach,
+      ], radius, 0.85);
+    }
   }
 
   const geometry = finish(mesh);
