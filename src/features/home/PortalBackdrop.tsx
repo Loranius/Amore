@@ -16,10 +16,19 @@
 import { type CSSProperties } from 'react';
 import { useTheme } from '@/providers/ThemeProvider';
 import { PORTAL_PALETTES } from './crystal3d/scene/portalScene';
+import { usePaintedSky } from './usePaintedSky';
+import type { HomeArtifact } from './homeArtifact';
 import './portalBackdrop.css';
 
-export function PortalBackdrop() {
+export function PortalBackdrop({ artifact }: { artifact: HomeArtifact }) {
   const { theme } = useTheme();
+  /*
+   * Намальоване небо — лише кристалові (ADR-0210): еталон власника був
+   * саме про його сцену, а в дерева й рифу своє небо. Градієнт під ним
+   * лишається: він видимий, поки воркер малює, і він же — єдине небо без
+   * воркера.
+   */
+  const painting = usePaintedSky(theme, artifact === 'crystal');
   return (
     <>
       <div
@@ -38,6 +47,11 @@ export function PortalBackdrop() {
         } as CSSProperties}
       >
         <div className="portal-backdrop__sky" />
+        <div
+          className="portal-backdrop__painting"
+          data-ready={painting !== null ? 'true' : undefined}
+          style={painting !== null ? { backgroundImage: `url(${painting})` } : undefined}
+        />
       </div>
       <div className="portal-vignette" aria-hidden="true" />
     </>

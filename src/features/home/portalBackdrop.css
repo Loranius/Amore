@@ -184,3 +184,24 @@
    названа тут, бо вона видима, а не випливає з рефакторингу сама
    собою. */
 
+
+/* ── Намальоване небо (ADR-0210) ─────────────────────────────
+   Лежить ПОВЕРХ градієнта й проявляється, коли воркер домалював: до того
+   видно градієнт, тож перший кадр не порожній. `cover` тримає пропорцію
+   на будь-якому екрані; якір по вертикалі — обрій картини (0.55), щоб на
+   широкому екрані обрізались небо й низ, а не сонце за кристалом. */
+.portal-backdrop__painting {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: 50% 55%;
+  background-repeat: no-repeat;
+  opacity: 0;
+  transition: opacity 260ms ease-out;
+}
+.portal-backdrop__painting[data-ready='true'] {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .portal-backdrop__painting { transition: none; }
+}

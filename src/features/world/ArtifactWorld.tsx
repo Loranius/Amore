@@ -194,7 +194,7 @@ export function ArtifactWorld() {
 
   return (
     <div className="artifact-world" data-artifact-world={artifact} aria-hidden="true">
-      <PortalBackdrop />
+      <PortalBackdrop artifact={artifact} />
       <div className="artifact-world__scene">
         {webglSupported ? (
           <CrystalErrorBoundary

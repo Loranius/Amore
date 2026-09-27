@@ -74,12 +74,10 @@ import {
   type PortalCameraFrame,
 } from './portalScene';
 import {
-  PORTAL_CLOUD_BANKS,
   PORTAL_DRIFT_ROCKS,
   PORTAL_HALO_SEGMENTS,
   PORTAL_WATERFALLS,
   PORTAL_ISLAND_RUBBLE,
-  buildPortalCloudGeometry,
   buildPortalDriftGeometry,
   buildPortalFloraGeometry,
   buildPortalHaloGeometry,
@@ -151,10 +149,6 @@ export function PortalEnvironment({
   const temple = useMemo(() => buildPortalTempleGeometry(seed), [seed]);
   const drift = useMemo(
     () => buildPortalDriftGeometry(seed, PORTAL_DRIFT_ROCKS[quality]),
-    [seed, quality],
-  );
-  const clouds = useMemo(
-    () => buildPortalCloudGeometry(seed, PORTAL_CLOUD_BANKS[quality]),
     [seed, quality],
   );
   const flora = useMemo(
@@ -243,14 +237,13 @@ export function PortalEnvironment({
     island.dispose();
     temple.dispose();
     drift.dispose();
-    clouds.dispose();
     // Меш трави тут бракувало від самого ADR-0163: він перебудовується на
     // зміну профілю якості, і кожна попередня геометрія лишалась у пам'яті
     // драйвера. Тепер він найважчий із п'яти, тож пропуск було б і видно.
     flora.dispose();
     falls.dispose();
     halo.dispose();
-  }, [island, temple, drift, clouds, flora, falls, halo]);
+  }, [island, temple, drift, flora, falls, halo]);
 
   return (
     <>
@@ -377,21 +370,12 @@ export function PortalEnvironment({
         </mesh>
 
       {/*
-        Море хмар — друга половина тієї самої фрази. Прозоре трохи, щоб
-        читалось повітрям, і без запису глибини: хмари стоять найдалі за
-        все в сцені, тож нічого й не мають перекривати.
+        МОРЕ ХМАР ТЕПЕР НАМАЛЬОВАНЕ (ADR-0210). Тут стояв меш із пласких
+        пелюсток, і поруч із намальованим небом він читався тим, чим був:
+        білими плитами, що висять за кристалом. Море дає картина в
+        `.portal-backdrop__painting` — з об'ємом, освітленням від сонця й
+        повітряною перспективою, яких пелюстки не мали.
       */}
-        <mesh geometry={clouds} frustumCulled={false} renderOrder={-1}>
-          <meshBasicMaterial
-            color={palette.cloudSea}
-            vertexColors
-            transparent
-            opacity={palette.cloudOpacity}
-            depthWrite={false}
-            fog={false}
-            side={THREE.DoubleSide}
-          />
-        </mesh>
       </group>
 
       {/* Небо над островом — єдине, що відрізняє день від ночі: удень
