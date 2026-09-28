@@ -15,6 +15,7 @@ import { PortalStage } from '../../crystal3d/scene/PortalStage';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from '../../crystal3d/evolution/EvolutionRuntimeProbe';
 import { readQuality } from '../../crystal3d/evolution/useEvolutionCrystalPipeline';
 import { crystalV2GrowthEvents } from '../../crystal3d/v2/crystalV2Frame';
+import { dioramaFrameHeight, dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
 import { ReefV2World } from './ReefV2World';
 import { reefV2Frame } from './reefV2Frame';
 import { useReefV2 } from './useReefV2';
@@ -57,7 +58,7 @@ export default function ReefV2Scene() {
   const noBearings = useMemo<readonly number[]>(() => [], []);
   // Острівець діорами ширший за риф (на ньому ще морські зірки біля
   // підніжжя), тож камера кадрує за ним, а не лише за коралами (ADR-0220).
-  const island = frame && state ? Math.max(frame.reach * 1.25, state.model.radius * frame.scale * 1.55) : 0;
+  const island = frame && state ? dioramaIslandRadius(Math.max(frame.reach * 1.1, state.model.radius * frame.scale * 1.55)) : 0;
 
   if (error) {
     console.error('[Reef v2] rollback to the previous reef:', error);
@@ -99,9 +100,9 @@ export default function ReefV2Scene() {
           theme={theme}
           quality={quality}
           reduceMotion={reduceMotion}
-          artifactSceneRadius={Math.max(frame.reach, island * 0.92)}
-          crystalsSceneRadius={Math.max(frame.reach, island * 0.92)}
-          artifactSceneHeight={frame.height}
+          artifactSceneRadius={Math.max(frame.reach, island * 0.95)}
+          crystalsSceneRadius={Math.max(frame.reach, island * 0.95)}
+          artifactSceneHeight={dioramaFrameHeight(frame.height)}
           veinBearings={noBearings}
           veinReach={0}
           pose={pose}

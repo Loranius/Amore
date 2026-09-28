@@ -60,3 +60,28 @@ export const DIORAMA_SHADE = /* glsl */ `
     return c + mix(base, vec3(1.0), 0.4) * rim * 0.3;
   }
 `;
+
+/**
+ * Радіус острівця — ОДИН для всіх трьох видів (власник: «острів рифу й
+ * дерева зрівняй в один розмір з островом кристала, щоб усе виглядало
+ * органічно»). Більшим він стає лише тоді, коли предметові на ньому
+ * забракло місця (`need` — скільки просить сам вид), тож з роками острів
+ * росте разом із тим, що на ньому стоїть, а не за примхою виду.
+ */
+export const DIORAMA_ISLAND_RADIUS = 1.3;
+
+export function dioramaIslandRadius(need: number): number {
+  return Math.max(DIORAMA_ISLAND_RADIUS, Number.isFinite(need) ? need : 0);
+}
+
+/**
+ * Висота кадру діорами — теж одна на всі види. Камера кадрує за висотою
+ * предмета, тож низький риф і молоде дерево знімались ближче за кристал, і
+ * однакові острівці виглядали різними. Окремо кадр росте лише тоді, коли
+ * предмет з роками переріс спільну висоту.
+ */
+export const DIORAMA_FRAME_HEIGHT = 1.7;
+
+export function dioramaFrameHeight(own: number): number {
+  return Math.max(DIORAMA_FRAME_HEIGHT, Number.isFinite(own) ? own : 0);
+}

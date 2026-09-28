@@ -15,6 +15,7 @@ import { PortalStage } from '../scene/PortalStage';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from '../evolution/EvolutionRuntimeProbe';
 import { readQuality } from '../evolution/useEvolutionCrystalPipeline';
 import { crystalV2GrowthEvents } from '../v2/crystalV2Frame';
+import { dioramaFrameHeight, dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
 import { TreeV2World } from './TreeV2World';
 import { treeV2Frame } from './treeV2Frame';
 import { useTreeV2 } from './useTreeV2';
@@ -55,6 +56,8 @@ export default function TreeV2Scene() {
   const geometry = state?.geometry;
   const frame = useMemo(() => (geometry ? treeV2Frame(geometry) : null), [geometry]);
   const noBearings = useMemo<readonly number[]>(() => [], []);
+  // Острів того самого розміру, що в кристала й рифу (ADR-0220).
+  const island = frame ? dioramaIslandRadius(frame.reach * 0.9) : 0;
 
   if (error) {
     console.error('[Tree v2] rollback to the previous tree:', error);
@@ -93,9 +96,9 @@ export default function TreeV2Scene() {
           theme={theme}
           quality={quality}
           reduceMotion={reduceMotion}
-          artifactSceneRadius={frame.reach}
-          crystalsSceneRadius={frame.reach}
-          artifactSceneHeight={frame.height}
+          artifactSceneRadius={Math.max(frame.reach, island * 0.95)}
+          crystalsSceneRadius={Math.max(frame.reach, island * 0.95)}
+          artifactSceneHeight={dioramaFrameHeight(frame.height)}
           veinBearings={noBearings}
           veinReach={0}
           pose={pose}
@@ -111,7 +114,7 @@ export default function TreeV2Scene() {
             scale={frame.scale}
             theme={theme}
             reduceMotion={reduceMotion}
-            island={Math.max(0.95, frame.reach * 1.1)}
+            island={island}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

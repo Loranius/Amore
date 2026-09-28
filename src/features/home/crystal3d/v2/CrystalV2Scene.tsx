@@ -20,6 +20,7 @@ import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from '../evolutio
 import { readQuality } from '../evolution/useEvolutionCrystalPipeline';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import { Diorama } from '@/features/home/diorama/Diorama';
+import { dioramaFrameHeight, dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
 import { CrystalIsland } from './CrystalIsland';
 import { CrystalV2Object } from './CrystalV2Object';
 import { linearColour } from './crystalV2Material';
@@ -66,7 +67,7 @@ export default function CrystalV2Scene() {
   const noBearings = useMemo<readonly number[]>(() => [], []);
   // Острів за референсом (ADR-0221): ширший за колонію, щоб по краю стали
   // арки й колони, а центр лишився кристалу.
-  const island = frame ? Math.max(1.2, frame.reach * 1.55) : 0;
+  const island = frame ? dioramaIslandRadius(frame.reach * 1.3) : 0;
 
   if (error) {
     console.error('[Crystal v2] rollback to the Evolution pipeline:', error);
@@ -113,7 +114,7 @@ export default function CrystalV2Scene() {
           reduceMotion={reduceMotion}
           artifactSceneRadius={Math.max(frame.reach, island * 0.95)}
           crystalsSceneRadius={Math.max(frame.reach, island * 0.95)}
-          artifactSceneHeight={frame.height}
+          artifactSceneHeight={dioramaFrameHeight(frame.height)}
           veinBearings={noBearings}
           veinReach={frame.geodeRadius}
           pose={pose}

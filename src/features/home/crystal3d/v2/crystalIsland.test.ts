@@ -52,6 +52,21 @@ describe('острів кристала', () => {
     expect(isle.ruinTop).toBeGreaterThan(R * 0.5);
   });
 
+  it('між землею під плитами й скелею немає щілини (регресія: крізь тріщину видно нутро)', () => {
+    // Край землі й верхнє кільце скелі мусять бути тими самими точками.
+    const { positions, paint } = isle.island;
+    const key = (v: number) => `${positions[v * 3]!.toFixed(6)}:${positions[v * 3 + 1]!.toFixed(6)}:${positions[v * 3 + 2]!.toFixed(6)}`;
+    const dirt = new Set<string>();
+    const cliff = new Set<string>();
+    for (let v = 0; v < paint.length; v += 1) {
+      if (paint[v] === PAINT.dirt) dirt.add(key(v));
+      if (paint[v] === PAINT.cliff) cliff.add(key(v));
+    }
+    const rim = [...dirt].filter((k) => Math.hypot(Number(k.split(':')[0]), Number(k.split(':')[2])) > R * 0.5);
+    expect(rim.length).toBeGreaterThan(0);
+    for (const k of rim) expect(cliff.has(k)).toBe(true);
+  });
+
   it('детерміновано: та сама дата — побітово той самий острів', () => {
     const again = buildCrystalIsland('2022-12-26', R);
     expect(Array.from(again.island.positions)).toEqual(Array.from(isle.island.positions));

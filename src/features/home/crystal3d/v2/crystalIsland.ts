@@ -244,9 +244,13 @@ export function buildCrystalIsland(seed: string, radius: number): CrystalIsland 
   ];
   const cliffRing = (li: number) => Array.from({ length: SEG }, (_, j): V3 => {
     const L = layers[li]!;
-    const jitter = li === 0 ? 1 : 0.8 + 0.4 * unit(seed, `isle:cliff${li}:${j}:r`);
+    // Верхнє кільце скелі — ТІ САМІ вершини, що й край землі під плитами:
+    // між ними була щілина в 0.04 радіуса, і крізь неї видно нутро острова
+    // (власник, знімок із телефона).
+    if (li === 0) return dirt[j]!;
+    const jitter = 0.8 + 0.4 * unit(seed, `isle:cliff${li}:${j}:r`);
     const a = ((j + (li % 2) * 0.5) / SEG) * Math.PI * 2;
-    return polar(rimR(j) * L.r * jitter, a, R * L.y * (li === 0 ? 1 : 0.85 + 0.3 * unit(seed, `isle:cliff${li}:${j}:y`)));
+    return polar(rimR(j) * L.r * jitter, a, R * L.y * (0.85 + 0.3 * unit(seed, `isle:cliff${li}:${j}:y`)));
   });
   const cliffs = layers.map((_, li) => cliffRing(li));
   for (let li = 0; li + 1 < cliffs.length; li += 1) {
