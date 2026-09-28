@@ -34,7 +34,7 @@ function basis(d: V3): [V3, V3] {
 
 /** Висота кожної форми в частках розміру колонії: з неї — верх рифу. */
 export const REEF_FORM_HEIGHT: Record<ReefForm, number> = {
-  brain: 0.6, branch: 1, fan: 1.1, tube: 0.9, table: 0.5, finger: 0.85,
+  brain: 0.4, branch: 1, fan: 1.1, tube: 0.9, table: 0.5, finger: 0.85,
 };
 
 export function reefSurfaceY(model: ReefV2Model, d: number): number {
@@ -260,8 +260,10 @@ export function reefV2ColonyTriangles(model: ReefV2Model, place: ReefV2Placement
       for (const [a, b, c] of ICO.faces) {
         const pts = [a, b, c].map((i) => {
           const v = ICO.verts[i]!;
-          const k = s * 0.5 * (0.9 + 0.2 * unit(seed, `${key}:v${i}`));
-          return L([v[0] * k, 0.28 * s + Math.max(v[1], -0.4) * k * 0.7, v[2] * k]);
+          // Мозковик — 0.32 розміру, а не 0.5: великі кулі домінували над
+          // рифом (власник, 2026-09-28: «зменш великі мозковики»).
+          const k = s * 0.32 * (0.9 + 0.2 * unit(seed, `${key}:v${i}`));
+          return L([v[0] * k, 0.18 * s + Math.max(v[1], -0.4) * k * 0.7, v[2] * k]);
         });
         tris.push([pts[0]!, pts[1]!, pts[2]!]);
       }

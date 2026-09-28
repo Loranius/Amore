@@ -16,7 +16,7 @@ from .hashing import unit
 from .tree_geometry import ICO_FACES, ICO_VERTS, _add, _basis, _mul, _norm
 
 # Висота кожної форми в частках розміру колонії: з неї — верх рифу.
-FORM_HEIGHT = {"brain": 0.6, "branch": 1.0, "fan": 1.1, "tube": 0.9, "table": 0.5, "finger": 0.85}
+FORM_HEIGHT = {"brain": 0.4, "branch": 1.0, "fan": 1.1, "tube": 0.9, "table": 0.5, "finger": 0.85}
 
 
 def surface_y(model: dict[str, Any], d: float) -> float:
@@ -197,8 +197,10 @@ def colony_triangles(model: dict[str, Any], place: dict[str, Any]):
             pts = []
             for i in (a, b, cc):
                 v = ICO_VERTS[i]
-                k = s * 0.5 * (0.9 + 0.2 * unit(seed, f"{key}:v{i}"))
-                pts.append(L((v[0] * k, 0.28 * s + max(v[1], -0.4) * k * 0.7, v[2] * k)))
+                # Мозковик — 0.32 розміру, а не 0.5: великі кулі домінували над
+                # рифом (власник, 2026-09-28: «зменш великі мозковики»).
+                k = s * 0.32 * (0.9 + 0.2 * unit(seed, f"{key}:v{i}"))
+                pts.append(L((v[0] * k, 0.18 * s + max(v[1], -0.4) * k * 0.7, v[2] * k)))
             tris.append(tuple(pts))
     elif form == "branch":
         tris += prism(L((0, 0, 0)), L((0, 0.4 * s, 0)), 0.08 * s, 0.06 * s)
