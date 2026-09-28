@@ -53,8 +53,13 @@ describe('небо порталу (ADR-0165)', () => {
         const colours = portalBackdropColours(artifact, theme);
         expect(colours.top).toBe(DIORAMA_PALETTES[artifact][theme].top);
         expect(colours.bottom).toBe(DIORAMA_PALETTES[artifact][theme].bottom);
+        // Віньєтка — з неба того ж виду, а не нічна фіолетова старого
+        // кристала (`rgba(8, 4, 16, …)`), яку дерево успадковувало (регресія).
+        expect(colours.vignette).toMatch(/^rgba\(\d+, \d+, \d+, 0\.28\)$/);
+        expect(colours.vignette).not.toContain('8, 4, 16');
       }
     }
+    expect(portalBackdropColours('tree', 'dark').vignette).not.toBe(portalBackdropColours('crystal', 'dark').vignette);
     const css = readFileSync(fileURLToPath(new URL('../../portalBackdrop.css', import.meta.url)), 'utf8');
     expect(css).not.toContain('portal-backdrop__painting');
     expect(css).toContain('var(--portal-sky-top)');

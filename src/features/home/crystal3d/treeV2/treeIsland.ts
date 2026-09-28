@@ -174,17 +174,37 @@ export function buildTreeIsland(seed: string, radius: number): TreeIsland {
   }
 
   // ── Плющ: латки на краю й пасма, що звисають по скелі ─────
+  // Пасмо лягає на СПРАВЖНЮ поверхню скелі: радіус на кожній висоті береться
+  // з кілець підошви в цьому напрямку. Перша версія вгадувала його лінійним
+  // звуженням, а кільця мають власний розкид ±20% — і пасма висіли в повітрі
+  // збоку від скелі або ховались у ній (власник: «не прилягають»).
+  const surfaceAt = (a: number, y: number) => {
+    const profile = shells.map((ring) => {
+      let best = ring[0]!;
+      let gap = Infinity;
+      for (const v of ring) {
+        const d = Math.abs(Math.atan2(Math.sin(Math.atan2(v[2], v[0]) - a), Math.cos(Math.atan2(v[2], v[0]) - a)));
+        if (d < gap) { gap = d; best = v; }
+      }
+      return { r: Math.hypot(best[0], best[2]), y: best[1] };
+    });
+    for (let li = 0; li + 1 < profile.length; li += 1) {
+      const top = profile[li]!;
+      const low = profile[li + 1]!;
+      if (y <= top.y && y >= low.y) return top.r + ((low.r - top.r) * (top.y - y)) / Math.max(1e-6, top.y - low.y);
+    }
+    return profile[profile.length - 1]!.r;
+  };
   for (let k = 0; k < 18; k += 1) {
     const key = `tree-isle:strand${k}`;
     const j = Math.floor(unit(seed, `${key}:j`) * SEG);
     const a = ((j + 0.5) / SEG) * Math.PI * 2;
-    const r = rimR(j) * 1.02;
     const length = 2 + Math.floor(unit(seed, `${key}:len`) * 6);
-    ivy(p, seed, `${key}:top`, polar(r, a, -R * 0.02), R * 0.08);
+    ivy(p, seed, `${key}:top`, polar(surfaceAt(a, -R * 0.02) + R * 0.02, a, -R * 0.02), R * 0.08);
     for (let d = 1; d <= length; d += 1) {
       const y = -R * 0.04 - d * R * 0.065;
-      const rr = r * (1 - 0.045 * d) + R * 0.03;
-      ivy(p, seed, `${key}:${d}`, polar(rr, a + (unit(seed, `${key}:${d}:a`) - 0.5) * 0.08, y), R * (0.065 - d * 0.005));
+      const ad = a + (unit(seed, `${key}:${d}:a`) - 0.5) * 0.08;
+      ivy(p, seed, `${key}:${d}`, polar(surfaceAt(ad, y) + R * 0.015, ad, y), R * (0.065 - d * 0.005));
     }
   }
 
@@ -199,7 +219,9 @@ export function buildTreeIsland(seed: string, radius: number): TreeIsland {
     const size = R * (0.06 + 0.08 * unit(seed, `${key}:s`));
     chunk(debris, seed, key, polar(r, a, y), size, TREE_PAINT.cliff);
     // Деякі уламки — з клаптем трави зверху, як відколоті від острова.
-    if (unit(seed, `${key}:grass`) < 0.5) chunk(debris, seed, `${key}:top`, polar(r, a, y + size * 0.7), size * 0.7, TREE_PAINT.grass, 0, 0.35);
+    // Клапоть лежить НА камені, врізаний у його верх: з відступом 0.7 він
+    // висів над уламком окремою пластинкою.
+    if (unit(seed, `${key}:grass`) < 0.5) chunk(debris, seed, `${key}:top`, polar(r, a, y + size * 0.62), size * 0.72, TREE_PAINT.grass, 0, 0.3);
   }
 
   return { island: p.build(), debris: debris.build() };

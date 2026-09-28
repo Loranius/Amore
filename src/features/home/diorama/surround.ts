@@ -215,14 +215,9 @@ export function buildTreeSurround(seed: string): IslandMesh {
     const r = 80 + 50 * unit(seed, `${key}:r`);
     floatingIslet(p, seed, key, polar(r, a, -12 + 34 * unit(seed, `${key}:y`)), 3 + 6 * unit(seed, `${key}:s`), k % 3 === 0 ? T_ROCK : T_FAR);
   }
-  for (let k = 0; k < 6; k += 1) {
-    const key = `sky:low${k}`;
-    const a = unit(seed, `${key}:a`) * TAU;
-    // Ближні — лише під островом і дрібні: з боку камери вони пропливали
-    // б перед об'єктивом величезними.
-    const r = 10 + 16 * unit(seed, `${key}:r`);
-    floatingIslet(p, seed, key, polar(r, a, SURROUND_BELOW - 9 - 10 * unit(seed, `${key}:y`)), 0.5 + 0.7 * unit(seed, `${key}:s`), T_ROCK);
-  }
+  // Ближніх дрібних острівців під островом більше немає: згори вони лягали
+  // поруч з островом зеленими латками й читались сміттям (власник, як і
+  // брили печери в кристала). Небо — хмари й далекі острівці.
   return p.build();
 }
 

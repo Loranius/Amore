@@ -65,6 +65,56 @@ describe('острів дерева', () => {
     expect(lowest).toBeGreaterThan(-R * 1.5);
   });
 
+  it('плющ лежить на скелі, а не висить поруч у повітрі (регресія)', () => {
+    // Для кожного листка під краєм — промінь від осі на його висоті в його
+    // напрямку; найдальший перетин із гранями підошви — поверхня скелі.
+    const { positions, paint } = isle.island;
+    const faces: number[] = [];
+    for (let t = 0; t < paint.length; t += 3) {
+      if (paint[t] === TREE_PAINT.cliff || paint[t] === TREE_PAINT.soil || paint[t] === TREE_PAINT.grass) faces.push(t);
+    }
+    const surface = (a: number, y: number) => {
+      const d = [Math.cos(a), 0, Math.sin(a)];
+      let best = 0;
+      for (const t of faces) {
+        const v = (k: number) => [positions[(t + k) * 3]!, positions[(t + k) * 3 + 1]!, positions[(t + k) * 3 + 2]!];
+        const [p0, p1, p2] = [v(0), v(1), v(2)];
+        const e1 = [p1[0]! - p0[0]!, p1[1]! - p0[1]!, p1[2]! - p0[2]!];
+        const e2 = [p2[0]! - p0[0]!, p2[1]! - p0[1]!, p2[2]! - p0[2]!];
+        const h = [d[1]! * e2[2]! - d[2]! * e2[1]!, d[2]! * e2[0]! - d[0]! * e2[2]!, d[0]! * e2[1]! - d[1]! * e2[0]!];
+        const det = e1[0]! * h[0]! + e1[1]! * h[1]! + e1[2]! * h[2]!;
+        if (Math.abs(det) < 1e-9) continue;
+        const s = [-p0[0]!, y - p0[1]!, -p0[2]!];
+        const u = (s[0]! * h[0]! + s[1]! * h[1]! + s[2]! * h[2]!) / det;
+        if (u < 0 || u > 1) continue;
+        const q = [s[1]! * e1[2]! - s[2]! * e1[1]!, s[2]! * e1[0]! - s[0]! * e1[2]!, s[0]! * e1[1]! - s[1]! * e1[0]!];
+        const w = (d[0]! * q[0]! + d[1]! * q[1]! + d[2]! * q[2]!) / det;
+        if (w < 0 || u + w > 1) continue;
+        best = Math.max(best, (e2[0]! * q[0]! + e2[1]! * q[1]! + e2[2]! * q[2]!) / det);
+      }
+      return best;
+    };
+    const gaps: number[] = [];
+    for (let v = 0; v < paint.length; v += 3) {
+      if (paint[v] !== TREE_PAINT.ivy) continue;
+      const y = positions[v * 3 + 1]!;
+      if (y > -R * 0.08) continue;
+      const x = positions[v * 3]!;
+      const z = positions[v * 3 + 2]!;
+      gaps.push(Math.hypot(x, z) - surface(Math.atan2(z, x), y));
+    }
+    expect(gaps.length).toBeGreaterThan(50);
+    // Пасмо лягає на поверхню: 90% листків — у вузькій смузі біля неї, і
+    // майже нічого не сховано в камені. Стара версія вгадувала радіус
+    // лінійним звуженням: смуга була ~0.2R, найглибші 5% листків сиділи в
+    // камені на 0.13–0.17R, а інші відрізки того ж пасма стирчали назовні.
+    const sorted = [...gaps].sort((a, b) => a - b);
+    const p05 = sorted[Math.floor(0.05 * (sorted.length - 1))]!;
+    const p95 = sorted[Math.floor(0.95 * (sorted.length - 1))]!;
+    expect(p05).toBeGreaterThan(-R * 0.06);
+    expect(p95 - p05).toBeLessThan(R * 0.13);
+  });
+
   it('детерміновано: та сама дата — побітово той самий острів', () => {
     const again = buildTreeIsland('2022-12-26', R);
     expect(Array.from(again.island.positions)).toEqual(Array.from(isle.island.positions));

@@ -2,23 +2,22 @@
 // Дерево v2 — матеріали світу (ADR-0218).
 // ------------------------------------------------------------
 // Уся сцена «намальована, а не освітлена», як кристал v2: тон грані —
-// колір × ключ × власний зсув, туман до кольору обрію, пласкі грані з
-// похідних позиції. Одна мова для дерева, трави, пагорбів і неба, тож
-// нічого не виглядає вклеєним з іншої гри.
+// колір × м'яке світло діорами (ADR-0220) × власний зсув, пласкі грані з
+// похідних позиції. Туману немає, як і в острова й неба (ADR-0224): туман
+// старої луки тонув дерево в кольорі свого обрію, і на далекому зумі
+// дерево ставало фіолетовим над незайманим островом.
 //
-// Дві пори доби — один світ (PRODUCT.md §7): світла тема — золота година,
-// темна — місячна ніч, де головні — світлячки.
+// Небо дерева денне в обох темах (artifactThemes.css): світла тема —
+// ясний день, темна — вечірнє світло того ж дня, а не ніч.
 // ============================================================
 import * as THREE from 'three';
 import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 
-export interface MeadowPalette {
+export interface TreePalette {
   bark: string;
   leaf: string;
   leafAutumn: string;
   grass: string;
-  /** Дорівнює кольору обрію неба: луг тане в небо без шва. */
-  fog: string;
   key: string;
   keyStrength: number;
   ambient: number;
@@ -26,13 +25,12 @@ export interface MeadowPalette {
   fireflyStrength: number;
 }
 
-export const MEADOW_PALETTES: Record<'light' | 'dark', MeadowPalette> = {
+export const TREE_PALETTES: Record<'light' | 'dark', TreePalette> = {
   light: {
     bark: '#8c6149',
     leaf: '#86cc4a',
     leafAutumn: '#f4a64e',
     grass: '#7fcf5e',
-    fog: '#ffcf9e',
     key: '#fff1d6',
     keyStrength: 1.0,
     ambient: 0.55,
@@ -45,9 +43,9 @@ export const MEADOW_PALETTES: Record<'light' | 'dark', MeadowPalette> = {
     leaf: '#7cc044',
     leafAutumn: '#ee9a4a',
     grass: '#74c258',
-    fog: '#3c2f5e',
-    key: '#c9cdff',
-    keyStrength: 0.75,
+    // Вечірнє тепле світло, а не місячне синє старої луки.
+    key: '#ffe0bf',
+    keyStrength: 0.9,
     ambient: 0.52,
     firefly: '#fff0a0',
     fireflyStrength: 1.0,
@@ -55,19 +53,16 @@ export const MEADOW_PALETTES: Record<'light' | 'dark', MeadowPalette> = {
 };
 
 /** Ключ — ліворуч згори спереду, як у кристала й у двійника. */
-export const MEADOW_KEY = new THREE.Vector3(-0.55, 0.75, 0.4).normalize();
+export const TREE_KEY = new THREE.Vector3(-0.55, 0.75, 0.4).normalize();
 
 const colour = (hex: string) => new THREE.Color(hex);
 
-/* Спільні шматки GLSL: пласка нормаль, світло й туман. */
+/* Спільні шматки GLSL: пласка нормаль і світло. */
 const LIT = /* glsl */ `
   uniform vec3 uKey;
   uniform vec3 uKeyColour;
   uniform float uKeyStrength;
   uniform float uAmbient;
-  uniform vec3 uFog;
-  uniform float uFogNear;
-  uniform float uFogFar;
   vec3 flatNormal(vec3 world) {
     vec3 n = normalize(cross(dFdx(world), dFdy(world)));
     if (dot(n, cameraPosition - world) < 0.0) n = -n;
@@ -79,21 +74,14 @@ const LIT = /* glsl */ `
   vec3 lit(vec3 base, vec3 n) {
     return dioramaShade(base, n, normalize(cameraPosition - vWorld)) * mix(vec3(1.0), uKeyColour, 0.25 * uKeyStrength);
   }
-  vec3 fogged(vec3 c, vec3 world) {
-    float f = smoothstep(uFogNear, uFogFar, length(cameraPosition - world));
-    return mix(c, uFog, f);
-  }
 `;
 
-function litUniforms(p: MeadowPalette, fogNear: number, fogFar: number) {
+function litUniforms(p: TreePalette) {
   return {
-    uKey: { value: MEADOW_KEY.clone() },
+    uKey: { value: TREE_KEY.clone() },
     uKeyColour: { value: colour(p.key) },
     uKeyStrength: { value: p.keyStrength },
     uAmbient: { value: p.ambient },
-    uFog: { value: colour(p.fog) },
-    uFogNear: { value: fogNear },
-    uFogFar: { value: fogFar },
   };
 }
 
@@ -103,9 +91,9 @@ const END = /* glsl */ `
 `;
 
 /** Деревина: тон грані, темніше донизу (земля не підсвічує корінь). */
-export function createWoodMaterial(p: MeadowPalette, fogNear: number, fogFar: number): THREE.ShaderMaterial {
+export function createWoodMaterial(p: TreePalette): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
-    uniforms: { ...litUniforms(p, fogNear, fogFar), uBark: { value: colour(p.bark) } },
+    uniforms: { ...litUniforms(p), uBark: { value: colour(p.bark) } },
     vertexShader: /* glsl */ `
       attribute float tone;
       varying vec3 vWorld;
@@ -124,7 +112,7 @@ export function createWoodMaterial(p: MeadowPalette, fogNear: number, fogFar: nu
       ${LIT}
       void main() {
         vec3 c = lit(uBark * vTone, flatNormal(vWorld));
-        gl_FragColor = vec4(fogged(c, vWorld), 1.0);
+        gl_FragColor = vec4(c, 1.0);
         ${END}
       }
     `,
@@ -135,10 +123,10 @@ export function createWoodMaterial(p: MeadowPalette, fogNear: number, fogFar: nu
  * Листя: зелене або осіннє на кластер, тон грані, світло неба на верхніх
  * гранях і вітер — повільне гойдання, тим більше, чим вище над землею.
  */
-export function createLeafMaterial(p: MeadowPalette, fogNear: number, fogFar: number, ground: number): THREE.ShaderMaterial {
+export function createLeafMaterial(p: TreePalette, ground: number): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     uniforms: {
-      ...litUniforms(p, fogNear, fogFar),
+      ...litUniforms(p),
       uLeaf: { value: colour(p.leaf) },
       uAutumn: { value: colour(p.leafAutumn) },
       // Верх кластерів жовтіє на сонці, як лаймова крона референсу (ADR-0222).
@@ -181,7 +169,7 @@ export function createLeafMaterial(p: MeadowPalette, fogNear: number, fogFar: nu
         vec3 base = mix(uLeaf, uAutumn, vAutumn) * vTone;
         base = mix(base, uSunLeaf * vTone, smoothstep(0.35, 0.95, n.y) * 0.45 * (1.0 - vAutumn));
         vec3 c = lit(base, n) + base * pow(max(0.0, n.y), 3.0) * 0.18;
-        gl_FragColor = vec4(fogged(c, vWorld), 1.0);
+        gl_FragColor = vec4(c, 1.0);
         ${END}
       }
     `,
@@ -235,10 +223,10 @@ export function createBlossomMaterial(colours: readonly string[] = BLOSSOM_COLOU
 }
 
 /** Трава: пучки інстансами; верхівка світліша й гойдається. */
-export function createGrassMaterial(p: MeadowPalette, fogNear: number, fogFar: number): THREE.ShaderMaterial {
+export function createGrassMaterial(p: TreePalette): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
-    uniforms: { ...litUniforms(p, fogNear, fogFar), uGrass: { value: colour(p.grass) }, uTime: { value: 0 }, uWind: { value: 1 } },
+    uniforms: { ...litUniforms(p), uGrass: { value: colour(p.grass) }, uTime: { value: 0 }, uWind: { value: 1 } },
     vertexShader: /* glsl */ `
       uniform float uTime;
       uniform float uWind;
@@ -264,7 +252,7 @@ export function createGrassMaterial(p: MeadowPalette, fogNear: number, fogFar: n
       void main() {
         vec3 base = uGrass * mix(0.7, 1.25, clamp(vTip * 4.0, 0.0, 1.0));
         vec3 c = base * (uAmbient + uKeyColour * uKeyStrength * 0.55);
-        gl_FragColor = vec4(fogged(c, vWorld), 1.0);
+        gl_FragColor = vec4(c, 1.0);
         ${END}
       }
     `,

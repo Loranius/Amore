@@ -10,17 +10,13 @@ import { TreeIsland } from './TreeIsland';
 import { treeIslandBase, treeIslandGround } from './treeIsland';
 import {
   FLOWER_COLOURS,
-  MEADOW_PALETTES,
+  TREE_PALETTES,
   createBlossomMaterial,
   createGlowPointsMaterial,
   createGrassMaterial,
   createLeafMaterial,
   createWoodMaterial,
 } from './treeV2Materials';
-
-// Діорама близька й уся в кадрі: туман лише далеко за нею (ADR-0220).
-const FOG_NEAR = 30;
-const FOG_FAR = 90;
 
 function toneGeometry(positions: Float32Array, tone: Float32Array, extra?: Record<string, Float32Array>) {
   const g = new THREE.BufferGeometry();
@@ -48,7 +44,7 @@ function flowerGeometry(positions: Float32Array, tint: Float32Array, scale: numb
   const octa = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
   const faces = [[0, 2, 4], [4, 2, 1], [1, 2, 5], [5, 2, 0], [4, 3, 0], [1, 3, 4], [5, 3, 1], [0, 3, 5]];
   for (let k = 0; k < tint.length; k += 1) {
-    // Луг моделі ширший за острівець діорами: квіти стискаються радіально
+    // Квіти моделі розкидані ширше за острів: вони стискаються радіально
     // до його краю (ADR-0220), порядок і густота лишаються ті самі.
     const squeeze = Math.min(1, (island * 0.88) / Math.max(1e-6, outer * scale));
     const x = positions[k * 3]! * squeeze;
@@ -82,14 +78,15 @@ interface TreeV2WorldProps {
 }
 
 /**
- * Луг, небо, пагорби, трава — і дерево на них.
+ * Дерево на своєму острові (ADR-0222) у небі з хмарами й острівцями
+ * (ADR-0224): тло діорами, острів, трава й квіти на куполі, дерево.
  *
  * Земля стоїть на тій самій лінії, що й острів кристала
  * (`PORTAL_GROUND_Y`), тож камера порталу кадрує дерево тими самими
  * правилами, що й кристал, і жест повороту той самий.
  */
 export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island }: TreeV2WorldProps) {
-  const palette = MEADOW_PALETTES[theme];
+  const palette = TREE_PALETTES[theme];
 
   // ── Світ (не залежить від дерева) ────────────────────────
   const clear = Math.max(0.25, geometry.height * scale * 0.06);
@@ -129,9 +126,9 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
 
   // ── Матеріали ───────────────────────────────────────────
   const materials = useMemo(() => ({
-    grass: createGrassMaterial(palette, FOG_NEAR, FOG_FAR),
-    wood: createWoodMaterial(palette, FOG_NEAR, FOG_FAR),
-    leaves: createLeafMaterial(palette, FOG_NEAR, FOG_FAR, PORTAL_GROUND_Y),
+    grass: createGrassMaterial(palette),
+    wood: createWoodMaterial(palette),
+    leaves: createLeafMaterial(palette, PORTAL_GROUND_Y),
     blossoms: createBlossomMaterial(),
     flowers: createBlossomMaterial(FLOWER_COLOURS),
     fruits: createGlowPointsMaterial('#ffc94a', 1.3, 0.3, false),

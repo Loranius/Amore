@@ -26,7 +26,7 @@ import '../evolution/evolutionPreview.css';
 const EvolutionTreePreviewScene = lazy(() => import('../evolution/EvolutionTreePreviewScene'));
 
 /**
- * Дерево v2: луг у золоту годину (вночі — місячний, зі світлячками), на
+ * Дерево v2 на власному острові в денному небі (ADR-0222, ADR-0224), на
  * тій самій камері й тих самих жестах порталу, що й кристал.
  */
 export default function TreeV2Scene() {
