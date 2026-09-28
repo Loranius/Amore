@@ -1,58 +1,43 @@
 // ============================================================
 // PortalBackdrop — небо й віньєтка навколо 3D-сцени.
 // ------------------------------------------------------------
-// Раніше цей компонент малював усю декорацію: зорі, підлогу, колони,
-// серпанок — пласкими шарами з паралаксом за вказівником. Вони давали
-// натяк на глибину, але не могли зійтися з артефактом, бо той живе в
-// WebGL-камері: варто було крутнути орбіту, і кристал їхав по нерухомій
-// картинці.
+// Це те, що видно, ПОКИ сцена вантажиться (чанк, дані, шейдери), і
+// єдине небо без WebGL. Тож воно мусить бути ТИМ САМИМ небом, яке потім
+// намалює діорама (ADR-0220), — інакше при кожному перемиканні між
+// кристалом, деревом і рифом спершу блимає чуже.
 //
-// Тепер уся геометрія сцени — у тому ж <Canvas>, що й кристал
-// (crystal3d/scene/). Тут лишились рівно два шари, які в 3D коштували б
-// дорожче, ніж дають: градієнт неба (він же — видимий фон, поки полотно
-// вантажиться, і єдиний фон без WebGL) і віньєтка, яка в 3D була б
-// повноекранним постпроцесом.
+// Так і було: тут жили палітра й намальована картина неба ПОПЕРЕДНЬОГО
+// кристала (ADR-0165, ADR-0210), і власник бачив їх між перемиканнями
+// («сміття, яке лишилось від попереднього варіанту кристала, його фон і
+// кольори»). Тепер кольори беруться з `DIORAMA_PALETTES` обраного виду.
 // ============================================================
 import { type CSSProperties } from 'react';
 import { useTheme } from '@/providers/ThemeProvider';
-import { PORTAL_PALETTES } from './crystal3d/scene/portalPalette';
-import { usePaintedSky, usePaintedSkyShape } from './usePaintedSky';
+import { DIORAMA_PALETTES } from './diorama/dioramaStyle';
 import type { HomeArtifact } from './homeArtifact';
 import './portalBackdrop.css';
 
+export function portalBackdropColours(artifact: HomeArtifact, theme: 'light' | 'dark') {
+  const palette = DIORAMA_PALETTES[artifact][theme];
+  return { top: palette.top, bottom: palette.bottom, glow: palette.glow };
+}
+
 export function PortalBackdrop({ artifact }: { artifact: HomeArtifact }) {
   const { theme } = useTheme();
-  /*
-   * Намальоване небо — лише кристалові (ADR-0210): еталон власника був
-   * саме про його сцену, а в дерева й рифу своє небо. Градієнт під ним
-   * лишається: він видимий, поки воркер малює, і він же — єдине небо без
-   * воркера.
-   */
-  const shape = usePaintedSkyShape();
-  const painting = usePaintedSky(theme, artifact === 'crystal', shape);
+  const colours = portalBackdropColours(artifact, theme);
   return (
     <>
       <div
         className="portal-backdrop"
         aria-hidden="true"
-        // Небо мусить зустрітися з туманом 3D-сцени в один колір, інакше
-        // на лінії, де далина тане в туман, з'явиться шов. Тримати те саме
-        // значення в двох місцях означало б чекати, поки хтось поправить
-        // одне й забуде інше, — тож УСІ зупинки неба приходять із тієї ж
-        // палітри, що й туман (ADR-0165), а не лише горизонт.
+        data-portal-backdrop={artifact}
         style={{
-          '--portal-sky-deep': PORTAL_PALETTES[theme].skyDeep,
-          '--portal-sky-mid': PORTAL_PALETTES[theme].skyMid,
-          '--portal-sky-glow': PORTAL_PALETTES[theme].skyGlow,
-          '--portal-sky-horizon': PORTAL_PALETTES[theme].fog,
+          '--portal-sky-top': colours.top,
+          '--portal-sky-bottom': colours.bottom,
+          '--portal-sky-glow': colours.glow,
         } as CSSProperties}
       >
         <div className="portal-backdrop__sky" />
-        <div
-          className="portal-backdrop__painting"
-          data-ready={painting !== null ? 'true' : undefined}
-          style={painting !== null ? { backgroundImage: `url(${painting})` } : undefined}
-        />
       </div>
       <div className="portal-vignette" aria-hidden="true" />
     </>

@@ -66,13 +66,17 @@ function branchCoral(p: Painter, seed: string, key: string, base: V3, out: V3, s
 }
 
 /** Трубчасті губки: дві-три шестигранні трубки з одного місця. */
-function tubes(p: Painter, seed: string, key: string, base: V3, size: number) {
+function tubes(p: Painter, seed: string, key: string, base: V3, size: number, normal: V3 = [0, 1, 0]) {
   const n = 2 + Math.floor(unit(seed, `${key}:n`) * 2);
+  // Трубки ростуть від грані назовні й угору, а не строго вгору від
+  // точки, що висить над схилом.
+  const grow = unitV([normal[0] * 0.6, normal[1] * 0.6 + 1, normal[2] * 0.6]);
   for (let k = 0; k < n; k += 1) {
     const a = unit(seed, `${key}:${k}:a`) * Math.PI * 2;
-    const foot: V3 = [base[0] + Math.cos(a) * size * 0.18, base[1], base[2] + Math.sin(a) * size * 0.18];
+    // Ніжка — у камені, на пів трубки глибше за грань.
+    const foot = along([base[0] + Math.cos(a) * size * 0.12, base[1], base[2] + Math.sin(a) * size * 0.12], normal, -size * 0.1);
     const h = size * (0.5 + 0.5 * unit(seed, `${key}:${k}:h`));
-    box(p, foot, [foot[0] + Math.cos(a) * size * 0.1, foot[1] + h, foot[2] + Math.sin(a) * size * 0.1], size * 0.2, size * 0.2, REEF_PAINT.pink, 0.8);
+    box(p, foot, along(foot, grow, h), size * 0.2, size * 0.2, REEF_PAINT.pink, 0.8);
   }
 }
 
@@ -234,30 +238,42 @@ export function buildReefIsland(seed: string, radius: number, rock = radius * 0.
   }
 
   // ── Дика живність на схилах: корали, губки, зірки ─────────
+  // Усе ставиться НА грань скелі: центр справжнього трикутника смуги між
+  // двома кільцями й його нормаль. Перша версія брала вершину кільця й
+  // напрям «назовні по горизонталі», а схил іде всередину й донизу — губки
+  // й зірки висіли у воді, не торкаючись каменю (власник).
+  const onCliff = (li: number, j: number) => {
+    const a = shells[li + 1]![j]!;
+    const b = shells[li]![(j + 1) % SEG]!;
+    const c = shells[li]![j]!;
+    const at: V3 = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3, (a[2] + b[2] + c[2]) / 3];
+    const ab: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const ac: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    let n = unitV([ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]]);
+    if (n[0] * at[0] + n[2] * at[2] < 0) n = [-n[0], -n[1], -n[2]];
+    return { at, n };
+  };
   for (let k = 0; k < 12; k += 1) {
     const key = `reef-isle:wild${k}`;
     const li = 1 + Math.floor(unit(seed, `${key}:l`) * 2);
     const j = Math.floor(unit(seed, `${key}:j`) * SEG);
-    const at = shells[li]![j]!;
-    const out = unitV([at[0], 0, at[2]]);
-    // Основа — трохи В скелі: схил під кільцем іде всередину, і корал,
-    // поставлений назовні, висів у воді окремо від каменю.
-    const base: V3 = [at[0] - out[0] * R * 0.04, at[1], at[2] - out[2] * R * 0.04];
+    const { at, n } = onCliff(li, j);
+    // Основа — ледь у камені, щоб між нею й гранню не лишалось просвіту.
+    const base = along(at, n, -R * 0.015);
     const kind = Math.floor(unit(seed, `${key}:kind`) * 4);
     const size = R * (0.17 + 0.08 * unit(seed, `${key}:s`));
-    if (kind === 0) branchCoral(p, seed, key, base, out, size, REEF_PAINT.pink);
-    else if (kind === 1) branchCoral(p, seed, key, base, out, size, REEF_PAINT.orange);
-    else if (kind === 2) tubes(p, seed, key, base, size * 0.8);
-    // Помпон — кругла м'яка колонія, світліша за зірку.
-    else chunk(p, seed, key, along(base, out, size * 0.05), size * 0.35, REEF_PAINT.orange, 0, 0.9);
+    if (kind === 0) branchCoral(p, seed, key, base, n, size, REEF_PAINT.pink);
+    else if (kind === 1) branchCoral(p, seed, key, base, n, size, REEF_PAINT.orange);
+    else if (kind === 2) tubes(p, seed, key, base, size * 0.8, n);
+    // Помпон — кругла м'яка колонія, наполовину в камені.
+    else chunk(p, seed, key, along(at, n, size * 0.1), size * 0.35, REEF_PAINT.orange, 0, 0.9);
   }
   for (let k = 0; k < 5; k += 1) {
     const key = `reef-isle:star${k}`;
     const li = 2 + Math.floor(unit(seed, `${key}:l`) * 2);
     const j = Math.floor(unit(seed, `${key}:j`) * SEG);
-    const at = shells[li]![j]!;
-    const out = unitV([at[0], -0.2, at[2]]);
-    starfish(p, seed, key, along(at, out, R * 0.06), out, R * (0.05 + 0.02 * unit(seed, `${key}:s`)));
+    const { at, n } = onCliff(li, j);
+    starfish(p, seed, key, along(at, n, R * 0.004), n, R * (0.05 + 0.02 * unit(seed, `${key}:s`)));
   }
 
   // ── Уламки довкола ────────────────────────────────────────

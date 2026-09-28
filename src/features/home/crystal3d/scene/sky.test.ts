@@ -39,42 +39,26 @@ describe('небо порталу (ADR-0165)', () => {
     expect(pitch).toBeGreaterThan(halfFov);
   });
 
-  it('починає небо кольором туману, а не зеніту', () => {
+  it('небо під сценою — те саме небо діорами обраного виду (ADR-0224)', async () => {
     /*
-     * Далеке в кадрі стоїть УГОРІ, і туман фарбує далеке у `fog`. Якщо
-     * верх градієнта не той самий колір, далина тане в один колір на тлі
-     * іншого — і кадр це показав: розрив дальніх хмар із небом був 58.6
-     * з 255 проти 44.9 у ближніх, тобто далина читалась гучніше за
-     * близину, тоді як повітряна перспектива вимагає протилежного.
-     *
-     * Перевіряється сам CSS, а не намір: значення градієнта живуть у
-     * таблиці стилів, і саме там була вада.
+     * Поки сцена вантажиться, видно CSS-небо. Воно мусить бути тим, яке
+     * потім намалює діорама, — інакше між перемиканнями видів блимало
+     * небо й картина попереднього кристала (власник). Регресія: у кожного
+     * виду й теми CSS-небо бере саме його `DIORAMA_PALETTES`.
      */
-    const css = readFileSync(
-      fileURLToPath(new URL('../../portalBackdrop.css', import.meta.url)),
-      'utf8',
-    );
-    const rule = css.slice(css.indexOf('.portal-backdrop__sky {'));
-    const gradient = rule.slice(rule.indexOf('linear-gradient'), rule.indexOf(');', rule.indexOf('linear-gradient')));
-    const stops = [...gradient.matchAll(/var\(--portal-sky-([a-z]+)\)\s+(\d+)%/g)]
-      .map(([, name, percent]) => ({ name, percent: Number(percent) }));
-    expect(stops.map((stop) => stop.percent)).toEqual([...stops.map((stop) => stop.percent)].sort((a, b) => a - b));
-    expect(stops[0]?.name).toBe('horizon');
-    expect(stops.at(-1)?.name).toBe('deep');
+    const { portalBackdropColours } = await import('../../PortalBackdrop');
+    const { DIORAMA_PALETTES } = await import('../../diorama/dioramaStyle');
+    for (const artifact of ['crystal', 'tree', 'reef'] as const) {
+      for (const theme of ['light', 'dark'] as const) {
+        const colours = portalBackdropColours(artifact, theme);
+        expect(colours.top).toBe(DIORAMA_PALETTES[artifact][theme].top);
+        expect(colours.bottom).toBe(DIORAMA_PALETTES[artifact][theme].bottom);
+      }
+    }
+    const css = readFileSync(fileURLToPath(new URL('../../portalBackdrop.css', import.meta.url)), 'utf8');
+    expect(css).not.toContain('portal-backdrop__painting');
+    expect(css).toContain('var(--portal-sky-top)');
   });
-
-  it('дає горизонту неба той самий колір, що й туману сцени', () => {
-    // Дві копії одного кольору розходяться того дня, коли хтось поправить
-    // одну; тому `--portal-sky-horizon` береться з `fog`, а не з літерала.
-    const backdrop = readFileSync(
-      fileURLToPath(new URL('../../PortalBackdrop.tsx', import.meta.url)),
-      'utf8',
-    );
-    expect(backdrop).toContain("'--portal-sky-horizon': PORTAL_PALETTES[theme].fog");
-    expect(backdrop).toContain("'--portal-sky-deep': PORTAL_PALETTES[theme].skyDeep");
-  });
-
-
 
   it('не ставить четвертий канал там, де всі тіла суцільні', () => {
     /*

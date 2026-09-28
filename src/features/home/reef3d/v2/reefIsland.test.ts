@@ -38,8 +38,10 @@ describe('острів рифу', () => {
       if (paint[v] !== REEF_PAINT.orange && paint[v] !== REEF_PAINT.pink) continue;
       wild += 1;
       // Гілка може трохи піднятись над краєм, але не над центром верхівки.
+      // Нижче краю вони на схилі, що сходиться до осі, — там відстань від
+      // осі нічого не каже; над краєм — лише біля нього, не над центром.
       const r = Math.hypot(positions[v * 3]!, positions[v * 3 + 2]!);
-      expect(r).toBeGreaterThan(R * 0.6);
+      if (positions[v * 3 + 1]! > -R * 0.05) expect(r).toBeGreaterThan(R * 0.6);
       expect(positions[v * 3 + 1]!).toBeLessThan(R * 0.2);
     }
     expect(wild).toBeGreaterThan(0);

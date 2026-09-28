@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import { PORTAL_PALETTES } from './portalScene';
@@ -13,45 +12,25 @@ import {
 } from './portalSkyBackdrop';
 
 /*
- * ВИМОГА (ADR-0178): небо в сцені мусить бути ТИМ САМИМ небом, що й у CSS.
- *
- * Воно існує лише заради заломлення — буфер `renderTransmissionPass`
- * містить тільки об'єкти сцени. Але вмикається воно разом із прозорістю
- * тіла, тож якби градієнт розійшовся з CSS, власник побачив би дві зміни
- * одразу й не зміг би сказати, яка з них зіпсувала кадр. Уся користь
- * прапорця тримається на тому, що небо не змінюється.
+ * Небо СТАРОГО острова порталу (ADR-0165/0178) — тепер лише шлях відкату
+ * кристала (ADR-0217). Колись воно мусило збігатися з CSS-небом під
+ * сценою; відколи CSS-небо стало небом діорами обраного виду (ADR-0224),
+ * ця пара розійшлась свідомо, і тут лишились вимоги до самого неба.
  */
 
-const BACKDROP_CSS = readFileSync('src/features/home/portalBackdrop.css', 'utf8');
-
-describe('небо в сцені', () => {
-  it('бере ті самі зупинки, що й CSS-градієнт', () => {
-    /*
-     * Дві копії одного градієнта розійдуться того дня, коли хтось
-     * поправить одну. Тому відсотки звіряються з самим файлом стилів, а
-     * не переписані сюди з пам'яті.
-     */
-    const linear = BACKDROP_CSS.slice(BACKDROP_CSS.indexOf('linear-gradient('));
-    expect(linear).toContain('var(--portal-sky-horizon) 0%');
-    expect(linear).toContain('var(--portal-sky-glow) 22%');
-    expect(linear).toContain('var(--portal-sky-mid) 56%');
-    expect(linear).toContain('var(--portal-sky-deep) 100%');
-
+describe('небо в сцені (шлях відкату)', () => {
+  it('зупинки градієнта йдуть від туману вгорі до глибини внизу', () => {
     expect(PORTAL_SKY_STOPS.map((stop) => stop.at)).toEqual([0, 0.22, 0.56, 1]);
-    // Верх кадру — це далина, і фарбує її туман (ADR-0165). Саме тому
-    // перша зупинка бере `fog`, а не `skyDeep`, і саме так її ставить CSS.
+    // Верх кадру — це далина, і фарбує її туман (ADR-0165).
     expect(PORTAL_SKY_STOPS[0]!.from).toBe('fog');
     expect(PORTAL_SKY_STOPS.at(-1)!.from).toBe('skyDeep');
   });
 
-  it('бере ту саму теплу пляму, що й CSS', () => {
-    expect(BACKDROP_CSS).toContain('120% 40% at 68% 16%');
+  it('тепла пляма — там, де стоїть низьке сонце', () => {
     expect(PORTAL_SKY_GLOW.radiusX).toBe(1.2);
     expect(PORTAL_SKY_GLOW.radiusY).toBe(0.4);
     expect(PORTAL_SKY_GLOW.atX).toBe(0.68);
     expect(PORTAL_SKY_GLOW.atY).toBe(0.16);
-    // `transparent 68%` — і саме на цій частці радіуса пляма закінчується.
-    expect(BACKDROP_CSS).toContain('transparent 68%');
     expect(PORTAL_SKY_GLOW.fadeAt).toBe(0.68);
   });
 

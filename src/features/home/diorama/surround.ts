@@ -8,7 +8,7 @@
 //
 // Тепер оточення — кільце навколо острова, повні тривимірні тіла:
 //   * кристал — давній храм у підземеллі: колонада з арками, зламані
-//     колони, сталактити, стіна печери із самоцвітами;
+//     колони, уламки, що тонуть у повітрі (без стін печери, ADR-0224);
 //   * дерево — небо: хмари, море хмар унизу, летючі острівці з деревцями;
 //   * риф — глибина: скелі-стовпи з арками, ліс водоростей, дно внизу.
 //
@@ -21,7 +21,7 @@
 // Усе — з хешу дати початку; від подій пари не залежить.
 // ============================================================
 import { unit } from '@/engine/species/crystalV2/hash';
-import { Painter, box, chunk, gem, leaf, polar, type IslandMesh, type Paint, type V3 } from '../crystal3d/v2/crystalIsland';
+import { Painter, box, chunk, leaf, polar, type IslandMesh, type Paint, type V3 } from '../crystal3d/v2/crystalIsland';
 
 /**
  * Радіус, ближче за який оточення не підіймається вище `SURROUND_BELOW`.
@@ -54,21 +54,11 @@ function prism(p: Painter, a: V3, b: V3, r0: number, r1: number, paint: Paint, t
   p.band(ring(a, r0), ring(b, r1), paint, (i) => tone * (0.86 + 0.08 * (i % 3)), caps, caps);
 }
 
-/** Конус (сталактит/шпиль) від основи `a` до вістря `tip`. */
-function cone(p: Painter, a: V3, tip: V3, r: number, paint: Paint, tone: number, sides = 6, turn = 0) {
-  for (let i = 0; i < sides; i += 1) {
-    const t0 = turn + (i / sides) * TAU;
-    const t1 = turn + ((i + 1) / sides) * TAU;
-    p.tri([a[0] + Math.cos(t0) * r, a[1], a[2] + Math.sin(t0) * r], [a[0] + Math.cos(t1) * r, a[1], a[2] + Math.sin(t1) * r], tip, paint, tone * (0.8 + 0.1 * (i % 3)));
-  }
-}
-
 // ── Кристал: давній храм у підземеллі ─────────────────────
-/** Фарби кристала: 2 — камінь храму, 7 — скеля печери (плющ і самоцвіти беруть свої). */
-/** Глибина, з якої ростуть колони й стіна печери: далеко в серпанку. */
+/** Фарба кристала: 2 — камінь храму (плющ бере свою). */
+/** Глибина, з якої ростуть колони: далеко в серпанку. */
 export const TEMPLE_DEPTH = -190;
 const STONE = 2 as Paint;
-const CAVE = 7 as Paint;
 
 /** Колона ордера: плінт, фуст, капітель. `broken` — фуст обламаний. */
 function column(p: Painter, seed: string, key: string, base: V3, top: number, r: number, broken: boolean) {
@@ -142,29 +132,8 @@ export function buildCrystalSurround(seed: string): IslandMesh {
     }
   });
 
-  // Стіна печери: нерівні брили кільцем за колонадою, від дна до склепіння.
-  // Храм освітлений кристалами в стінах, а не небом.
-  for (let k = 0; k < 24; k += 1) {
-    const a = (k / 24) * TAU + unit(seed, `cave${k}:a`) * 0.15;
-    const r = 165 + 20 * unit(seed, `cave${k}:r`);
-    for (let s = 0; s < 8; s += 1) {
-      const size = 22 + 12 * unit(seed, `cave${k}:${s}:s`);
-      chunk(p, seed, `cave${k}:${s}`, polar(r + (unit(seed, `cave${k}:${s}:dr`) - 0.5) * 14, a, TEMPLE_DEPTH + 20 + s * 34), size, CAVE);
-    }
-    if (unit(seed, `cave${k}:gem`) < 0.7) {
-      const at = polar(r - 12, a, -30 + 60 * unit(seed, `cave${k}:gy`));
-      gem(p, seed, `cave${k}:gem`, at, [-Math.cos(a), 0.4, -Math.sin(a)], 4 + 4 * unit(seed, `cave${k}:gs`));
-    }
-  }
-  // Склепіння: сталактити звисають згори по всьому колу.
-  for (let k = 0; k < 40; k += 1) {
-    const a = unit(seed, `stal${k}:a`) * TAU;
-    // Далі від осі: згори ближні сталактити лягали темними клинами на шапку.
-    const r = 105 + 65 * unit(seed, `stal${k}:r`);
-    const top = 72 + 10 * unit(seed, `stal${k}:y`);
-    const len = 12 + 26 * unit(seed, `stal${k}:l`);
-    cone(p, polar(r, a, top), polar(r, a, top - len), 2.5 + 3 * unit(seed, `stal${k}:w`), CAVE, 0.9, 6, a);
-  }
+  // Стіни печери й сталактитів більше немає: власник попросив лишити самі
+  // структури храму — колони, арки й уламки, що тонуть у повітрі.
   // Унизу, під островом, пливуть уламки храму: барабани й капітелі.
   for (let k = 0; k < 10; k += 1) {
     const a = unit(seed, `drum${k}:a`) * TAU;
