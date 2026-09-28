@@ -100,6 +100,11 @@ export function resolveChromium() {
  * Що це коштує, названо вголос: рядок у `.env.live` дорівнює паролю. Файл у
  * `.gitignore`, живе стільки, скільки контейнер, і нічого, крім входу, не
  * відмикає — RLS однакова для обох шляхів.
+ *
+ * ТРЕТІЙ ШЛЯХ — ПОШТА Й ПАРОЛЬ (ADR-0228). Коли місце прив'язане до
+ * справжньої пошти, старий акаунт заблоковано, і вхід хешем PIN більше не
+ * працює. Тоді `VISUAL_USER_EMAIL` + `VISUAL_USER_PASSWORD` — ті самі, що на
+ * вкладці «Вхід». Має перевагу над хешем, якщо задано обидва.
  */
 export function readCredentials(cwd = process.cwd()) {
   const env = readEnvFile(join(cwd, '.env.live'), { ...process.env });
@@ -107,11 +112,16 @@ export function readCredentials(cwd = process.cwd()) {
   const pin = env.VISUAL_USER_PIN?.trim();
   const email = env.VISUAL_USER_EMAIL?.trim();
   const hash = env.VISUAL_USER_PIN_HASH?.trim();
+  const password = env.VISUAL_USER_PASSWORD;
   if (!name) {
     throw new Error(
       'Немає VISUAL_USER_NAME. Додай його в середовище або у файл .env.live '
       + '(він у .gitignore).',
     );
+  }
+  if (password) {
+    if (!email) throw new Error('До VISUAL_USER_PASSWORD потрібен VISUAL_USER_EMAIL.');
+    return { name, email, password };
   }
   if (hash) {
     if (!/^[0-9a-f]{64}$/.test(hash)) {
@@ -180,12 +190,14 @@ async function seedSupabaseSession(page, credentials) {
   const token = await fetch(`${url}/auth/v1/token?grant_type=password`, {
     method: 'POST',
     headers: { apikey: key, 'content-type': 'application/json' },
-    body: JSON.stringify({ email: credentials.email, password: credentials.hash }),
+    body: JSON.stringify({ email: credentials.email, password: credentials.password ?? credentials.hash }),
   });
   if (!token.ok) {
     throw new Error(
       `Supabase не дав сесію (${token.status}). Перевір VISUAL_USER_EMAIL і `
-      + 'VISUAL_USER_PIN_HASH — хеш мусить бути тим самим рядком, що в users.pin_hash.',
+      + (credentials.password
+        ? 'VISUAL_USER_PASSWORD — ті самі, що на вкладці «Вхід».'
+        : 'VISUAL_USER_PIN_HASH — хеш мусить бути тим самим рядком, що в users.pin_hash.'),
     );
   }
   const session = await token.json();
@@ -435,7 +447,7 @@ export async function openPortal({ baseUrl, device, tier, theme = null, headed =
    * колись зміниться, застосунок просто лишиться на екрані входу — і без
    * цієї перевірки оснастка знімала б його як «портал».
    */
-  if (credentials.hash) {
+  if (credentials.hash || credentials.password) {
     await seedSupabaseSession(page, credentials);
     await page.goto(baseUrl, { waitUntil: 'load', timeout: 60_000 });
     await page.waitForURL((url) => !url.hash.startsWith('#/login'), { timeout: 30_000 })
