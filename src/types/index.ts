@@ -767,7 +767,7 @@ export type PortalAccountRequest =
  * у портал, до вибору свого місця, до створення пари чи до відмови.
  */
 export type PortalAccountResponse =
-  | { ok: true; registration: 'open' | 'closed' }
+  | { ok: true; registration: 'open' | 'closed'; configured?: boolean }
   | { ok: true; state: 'member'; user: { id: number; name: string } }
   | { ok: true; state: 'claim'; seats: PortalSeat[] }
   | { ok: true; state: 'empty' | 'taken' }

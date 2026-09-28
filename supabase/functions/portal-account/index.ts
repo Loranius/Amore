@@ -23,7 +23,7 @@
 // діє той самий замок: п'ять невдалих спроб — 15 хвилин очікування.
 //
 // ВІДКРИТТЯ РЕЄСТРАЦІЇ — РІШЕННЯ ВЛАСНИКА, А НЕ КОДУ. `ping` каже 'open'
-// лише коли в оточенні функції стоїть PORTAL_REGISTRATION_OPEN=1. Власник
+// лише коли в оточенні функції стоїть PORTAL_REGISTRATION_OPEN=1 (або true). Власник
 // ставить його ПІСЛЯ міграції брами членства й увімкнення хука токена:
 // до того зареєстрований незнайомець бачив би дані пари.
 //
@@ -55,8 +55,14 @@ Deno.serve(async (req) => {
     const action = body?.action;
 
     if (action === "ping") {
-      const open = Deno.env.get("PORTAL_REGISTRATION_OPEN") === "1";
-      return json({ ok: true, registration: open ? "open" : "closed" }, 200);
+      // Значення секрету вводить людина в панелі: пробіл, лапки чи `true`
+      // замість `1` не мусять тихо тримати реєстрацію закритою.
+      const raw = Deno.env.get("PORTAL_REGISTRATION_OPEN");
+      const flag = (raw ?? "").trim().replace(/^["']+|["']+$/g, "").toLowerCase();
+      const open = flag === "1" || flag === "true";
+      // `configured` каже лише, чи секрет із такою назвою взагалі є, —
+      // без його значення: так видно, де помилка, у назві чи у значенні.
+      return json({ ok: true, registration: open ? "open" : "closed", configured: raw !== undefined }, 200);
     }
     if (action !== "link" && action !== "claim") return json({ error: "bad_request" }, 400);
 
