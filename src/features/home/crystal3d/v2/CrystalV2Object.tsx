@@ -50,7 +50,8 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     return buffer;
   }, [geometry]);
 
-  const crystalMaterial = useMemo(() => createCrystalV2Material(rgb, glow), [rgb, glow]);
+  const glassBack = useMemo(() => createCrystalV2Material(rgb, glow, 'back'), [rgb, glow]);
+  const glassFront = useMemo(() => createCrystalV2Material(rgb, glow, 'front'), [rgb, glow]);
   const rockMaterial = useMemo(
     () => createGeodeMaterial(rgb, glow, theme, CRYSTAL_GROUND_BASELINE),
     [rgb, glow, theme],
@@ -70,26 +71,33 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     sparks?.dispose();
   }, [crystals, rocks, sparks]);
   useEffect(() => () => {
-    crystalMaterial.dispose();
+    glassBack.dispose();
+    glassFront.dispose();
     rockMaterial.dispose();
     sparkMaterial.dispose();
-  }, [crystalMaterial, rockMaterial, sparkMaterial]);
+  }, [glassBack, glassFront, rockMaterial, sparkMaterial]);
 
   // Дихання сяйва — повільне й мале: живе, а не блимає. Зменшений рух (§47)
   // лишає його сталим.
   useFrame(({ clock }) => {
     if (reduceMotion) return;
     const t = clock.getElapsedTime();
-    const pulse = crystalMaterial.uniforms.uPulse;
-    if (pulse) pulse.value = 0.85 + 0.15 * Math.sin(t * 0.9);
+    const value = 0.85 + 0.15 * Math.sin(t * 0.9);
+    for (const material of [glassBack, glassFront]) {
+      const pulse = material.uniforms.uPulse;
+      if (pulse) pulse.value = value;
+    }
     sparkMaterial.opacity = 0.7 + 0.3 * Math.sin(t * 1.7);
   });
 
   return (
     <group position={[0, CRYSTAL_GROUND_BASELINE, 0]} scale={scale}>
       <mesh geometry={rocks} material={rockMaterial} />
-      <mesh geometry={crystals} material={crystalMaterial} />
-      {sparks && <points geometry={sparks} material={sparkMaterial} />}
+      {/* Іскри віх — ДО скла: тепер їх видно крізь грані, всередині кристала. */}
+      {sparks && <points geometry={sparks} material={sparkMaterial} renderOrder={2} />}
+      {/* Скло: спершу внутрішня стінка, потім передні грані (див. матеріал). */}
+      <mesh geometry={crystals} material={glassBack} renderOrder={3} />
+      <mesh geometry={crystals} material={glassFront} renderOrder={4} />
     </group>
   );
 }
