@@ -52,6 +52,21 @@ $$;
 revoke all on function public.current_couple_id() from public;
 grant execute on function public.current_couple_id() to anon, authenticated;
 
+-- Учасники своєї пари. Правила для `users` не можуть читати
+-- `couple_members` напряму: у `authenticated` на неї немає прав (знайдено
+-- сухим прогоном).
+create or replace function public.current_couple_user_ids()
+returns setof integer
+language sql
+stable
+security definer
+set search_path = public, auth
+as $$
+  select cm.user_id from public.couple_members cm where cm.couple_id = public.current_couple_id();
+$$;
+revoke all on function public.current_couple_user_ids() from public;
+grant execute on function public.current_couple_user_ids() to anon, authenticated;
+
 -- «Хто я» тепер каже й пару: клієнт кладе файли під її префікс.
 drop function if exists public.portal_me();
 create function public.portal_me()
@@ -167,7 +182,7 @@ end $$;
 drop policy if exists "anon select users" on public.users;
 drop policy if exists users_same_couple on public.users;
 create policy users_same_couple on public.users for select to authenticated
-  using (id in (select cm.user_id from public.couple_members cm where cm.couple_id = (select public.current_couple_id())));
+  using (id in (select public.current_couple_user_ids()));
 
 -- ── 5. Сховище: файл належить парі свого префікса ─────────
 do $$
@@ -233,7 +248,7 @@ begin
 end $$;
 drop policy if exists rpc_couple on public.users;
 create policy rpc_couple on public.users for all to portal_rpc
-  using (id in (select cm.user_id from public.couple_members cm where cm.couple_id = (select public.current_couple_id())));
+  using (id in (select public.current_couple_user_ids()));
 drop policy if exists rpc_couple on public.couples;
 create policy rpc_couple on public.couples for select to portal_rpc
   using (id = (select public.current_couple_id()));
@@ -256,7 +271,7 @@ begin
       and p.prorettype <> 'trigger'::regtype
       and has_function_privilege('authenticated', p.oid, 'execute')
       and p.proname not in (
-        'is_portal_member', 'current_couple_id', 'portal_me', 'storage_object_couple',
+        'is_portal_member', 'current_couple_id', 'current_couple_user_ids', 'portal_me', 'storage_object_couple',
         'app_notification_recipient_allowed', 'wishlist_memory_read_allowed',
         'wishlist_memory_upload_allowed', 'wishlist_memory_delete_allowed'
       )
