@@ -90,6 +90,34 @@ export function reefV2Placements(model: ReefV2Model): ReefV2Placement[] {
   return out;
 }
 
+const UNDERGROWTH_FORMS: readonly ReefForm[] = ['finger', 'brain', 'branch', 'tube', 'finger', 'fan'];
+
+/** Дрібні корали по всьому каменю: форма й відтінок кожного — з хешу. */
+export function reefV2Undergrowth(model: ReefV2Model): ReefV2Placement[] {
+  const seed = model.startDate;
+  const out: ReefV2Placement[] = [];
+  for (let k = 0; k < model.undergrowth; k += 1) {
+    const key = `under${k}`;
+    const a = 2 * Math.PI * unit(seed, `${key}:a`);
+    // Більше до схилів: вершину й так вкривають колонії років.
+    const u = unit(seed, `${key}:d`);
+    // Кожен третій — кільцем біля підніжжя, на межі каменю й піску: інакше
+    // нижній пояс каменю лишався голою смугою.
+    const d = model.radius * (k % 3 === 2 ? 0.92 + 0.26 * u : 0.3 + 0.66 * Math.sqrt(u));
+    const x = Math.cos(a) * d;
+    const z = Math.sin(a) * d;
+    const size = 0.1 + 0.13 * unit(seed, `${key}:s`);
+    const form = UNDERGROWTH_FORMS[Math.min(5, Math.floor(unit(seed, `${key}:f`) * 6))]!;
+    const colony: ReefV2Colony = { year: -1, age: 0, activity: 0, form, size, bodies: 1, azimuth: 0, reach: 0, hue: unit(seed, `${key}:h`) };
+    out.push({
+      colony, body: k, key, size,
+      base: [x, reefSurfaceY(model, d) - 0.02 * size, z],
+      axis: leanDir(model, (Math.atan2(z, x) * 180) / Math.PI, d),
+    });
+  }
+  return out;
+}
+
 function onSurface(model: ReefV2Model, tag: string, lo: number, hi: number): V3 {
   const seed = model.startDate;
   const a = 2 * Math.PI * unit(seed, `${tag}:a`);
@@ -145,6 +173,8 @@ export function reefV2Summary(model: ReefV2Model) {
     top: q(top),
     reach: q(reach),
     firstBase: places[0] ? places[0].base.map(q) : null,
+    undergrowth: model.undergrowth,
+    firstUnder: model.undergrowth ? reefV2Undergrowth(model)[0]!.base.map(q) : null,
     firstAnemone: orn.anemones[0] ? orn.anemones[0].position.map(q) : null,
   };
 }
@@ -335,7 +365,7 @@ export function buildReefV2Geometry(model: ReefV2Model): ReefV2Geometry {
   const coralForm: number[] = [];
   const coralHue: number[] = [];
   const coralRise: number[] = [];
-  for (const place of reefV2Placements(model)) {
+  for (const place of [...reefV2Placements(model), ...reefV2Undergrowth(model)]) {
     const form = FORM_INDEX[place.colony.form];
     const height = REEF_FORM_HEIGHT[place.colony.form] * place.size;
     reefV2ColonyTriangles(model, place).forEach((tri, k) => {

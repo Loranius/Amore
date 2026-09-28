@@ -29,7 +29,7 @@
     "activity": 10.0,
     "age": 3.753671,
     "azimuth": 9.320799,
-    "bodies": 4,
+    "bodies": 5,
     "form": "fan",
     "hue": 0.377511,
     "reach": 0.161212,
@@ -40,7 +40,7 @@
     "activity": 0.0,
     "age": 2.754334,
     "azimuth": 137.91099,
-    "bodies": 1,
+    "bodies": 2,
     "form": "finger",
     "hue": 0.906524,
     "reach": 0.362192,
@@ -51,7 +51,7 @@
     "activity": 0.0,
     "age": 1.75226,
     "azimuth": 276.998556,
-    "bodies": 1,
+    "bodies": 2,
     "form": "finger",
     "hue": 0.451014,
     "reach": 0.413035,
@@ -62,7 +62,7 @@
     "activity": 0.0,
     "age": 0.752924,
     "azimuth": 56.035004,
-    "bodies": 1,
+    "bodies": 2,
     "form": "finger",
     "hue": 0.748271,
     "reach": 0.477456,
@@ -88,11 +88,12 @@
   "seagrass": 0,
   "starfish": 0,
   "startDate": "2022-12-26",
-  "version": "reef-v2/2026-09-28",
+  "undergrowth": 78,
+  "version": "reef-v2/2026-09-28b",
   "years": 3.753671
  },
  "summary": {
-  "bodies": 7,
+  "bodies": 11,
   "colonies": 4,
   "firstAnemone": [
    0.3283,
@@ -104,6 +105,11 @@
    0.3068,
    0.0184
   ],
+  "firstUnder": [
+   -0.3994,
+   0.2554,
+   -0.1309
+  ],
   "forms": [
    "fan",
    "finger",
@@ -111,6 +117,7 @@
    "finger"
   ],
   "reach": 0.7028,
-  "top": 0.7945
+  "top": 0.7945,
+  "undergrowth": 78
  }
 }

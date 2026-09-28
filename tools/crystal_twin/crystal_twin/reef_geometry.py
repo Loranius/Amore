@@ -61,6 +61,31 @@ def placements(model: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
+UNDERGROWTH_FORMS = ("finger", "brain", "branch", "tube", "finger", "fan")
+
+
+def undergrowth(model: dict[str, Any]) -> list[dict[str, Any]]:
+    """Дрібні корали по всьому каменю: форма й відтінок кожного — з хешу."""
+    seed = model["startDate"]
+    out = []
+    for k in range(model["undergrowth"]):
+        key = f"under{k}"
+        a = 2.0 * math.pi * unit(seed, f"{key}:a")
+        # Більше до схилів: вершину й так вкривають колонії років.
+        u = unit(seed, f"{key}:d")
+        # Кожен третій — кільцем біля підніжжя, на межі каменю й піску:
+        # інакше нижній пояс каменю лишався голою смугою.
+        d = model["radius"] * (0.92 + 0.26 * u if k % 3 == 2 else 0.3 + 0.66 * math.sqrt(u))
+        x, z = math.cos(a) * d, math.sin(a) * d
+        size = 0.1 + 0.13 * unit(seed, f"{key}:s")
+        form = UNDERGROWTH_FORMS[min(5, int(unit(seed, f"{key}:f") * 6))]
+        colony = {"year": -1, "form": form, "size": size, "hue": unit(seed, f"{key}:h")}
+        out.append({"colony": colony, "body": k, "key": key, "size": size,
+                    "base": (x, surface_y(model, d) - 0.02 * size, z),
+                    "axis": _lean_dir(model, math.degrees(math.atan2(z, x)), d)})
+    return out
+
+
 def _on_surface(model: dict[str, Any], tag: str, lo: float, hi: float):
     seed = model["startDate"]
     a = 2.0 * math.pi * unit(seed, f"{tag}:a")
@@ -108,6 +133,8 @@ def summary(model: dict[str, Any]) -> dict[str, Any]:
         "top": q(top),
         "reach": q(reach),
         "firstBase": [q(v) for v in places[0]["base"]] if places else None,
+        "undergrowth": len(undergrowth(model)),
+        "firstUnder": [q(v) for v in undergrowth(model)[0]["base"]] if model["undergrowth"] else None,
         "firstAnemone": [q(v) for v in orn["anemones"][0]["position"]] if orn["anemones"] else None,
     }
 

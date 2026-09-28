@@ -13,7 +13,7 @@ import numpy as np
 from PIL import Image
 
 from .hashing import unit
-from .reef_geometry import colony_triangles, ornaments, placements, prism, rock_triangles, summary
+from .reef_geometry import colony_triangles, ornaments, placements, prism, rock_triangles, summary, undergrowth
 
 KEY = np.array([-0.3, 0.9, 0.3])
 KEY = KEY / np.linalg.norm(KEY)
@@ -98,7 +98,7 @@ def render(model: dict[str, Any], width: int = 480, height: int = 640,
              SAND * (0.9 + 0.2 * unit(seed, f"sand{i}")))
     for k, tri in enumerate(rock_triangles(model)):
         draw(tri, ROCK * (0.85 + 0.3 * unit(seed, f"rock:f{k}")))
-    for p in placements(model):
+    for p in placements(model) + undergrowth(model):
         base = form_colour(p["colony"])
         for k, tri in enumerate(colony_triangles(model, p)):
             draw(tri, base * (0.85 + 0.3 * unit(seed, f"{p['key']}:f{k}")))

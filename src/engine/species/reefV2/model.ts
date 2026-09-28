@@ -8,7 +8,7 @@
 // Основа росту — закон голови рифу без змін: `0.25 + 0.75·√(min(1, років/25))`.
 // Решта — по одному ефекту на модуль:
 //
-//   час разом             → розмір кам'яної голови рифу
+//   час разом             → розмір кам'яної голови рифу й підріст на ній
 //   роки разом            → по одній колонії корала на рік; росте з віком
 //   активність року       → розмір колонії й кількість тіл у ній
 //   головний модуль року  → форма колонії (спогади — мозковик, плани —
@@ -41,7 +41,7 @@ import {
   type GiftChannel,
 } from '../crystalV2/model';
 
-export const REEF_V2_VERSION = 'reef-v2/2026-09-28';
+export const REEF_V2_VERSION = 'reef-v2/2026-09-28b';
 
 const HEAD_FULL_TERM_YEARS = 25;
 
@@ -88,6 +88,7 @@ export interface ReefV2Model {
   radius: number;
   rise: number;
   colonies: ReefV2Colony[];
+  undergrowth: number;
   anemones: { id: number; channel: GiftChannel }[];
   clams: number;
   fish: number;
@@ -140,7 +141,8 @@ export function buildReefV2Model(snapshot: CrystalV2Snapshot): ReefV2Model {
       activity: r6(activity),
       form,
       size: r6(size),
-      bodies: 1 + Math.min(4, Math.floor(Math.log2(1 + activity))),
+      // Власник, 2026-09-28: «зроби коралів більше, риф виглядає порожнім».
+      bodies: 2 + Math.min(6, Math.floor(Math.log2(1 + activity))),
       azimuth: r6(mod(k * 137.508 + (unit(seed, `colony${k}:az`) - 0.5) * 24, 360)),
       reach: r6(Math.min(0.82, 0.12 + 0.19 * Math.sqrt(k) + 0.06 * unit(seed, `colony${k}:reach`))),
       hue: r6(unit(seed, `colony${k}:hue`)),
@@ -170,6 +172,9 @@ export function buildReefV2Model(snapshot: CrystalV2Snapshot): ReefV2Model {
     rise: r6(0.6 * head),
     colonies,
     anemones: anemones.slice(-MAX_ANEMONES).map(([, id, channel]) => ({ id, channel })),
+    // Підріст: камінь обростає дрібними коралами з часом (не з подіями) —
+    // порожня історія теж дає живий риф, а не голу брилу.
+    undergrowth: Math.min(140, Math.floor(40 + (100 * (head - 0.25)) / 0.75)),
     clams: Math.min(8, counts.milestones),
     fish: Math.min(40, Math.floor(5 * Math.log1p(counts.media) + 0.5)),
     seagrass: Math.min(120, 4 * counts.daysOff),

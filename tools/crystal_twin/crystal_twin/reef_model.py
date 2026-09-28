@@ -5,7 +5,7 @@
 (`species/reef/colonyFormations.ts`): `0.25 + 0.75·√(min(1, років/25))`,
 швидко на початку й повільно потім, і росте щороку навіть без подій.
 
-    час разом (дні)          → розмір кам'яної голови рифу
+    час разом (дні)          → розмір кам'яної голови рифу й підріст на ній
     роки разом               → по одній колонії корала на рік; росте з віком
     активність року          → розмір колонії свого року й кількість тіл у ній
     головний модуль року     → форма колонії: спогади — мозковик, плани —
@@ -28,7 +28,7 @@ from .calendar import DAYS_PER_YEAR, anniversary, days_between, parse_day, year_
 from .hashing import unit
 from .model import ACTIVITY_WEIGHTS, _dated_items, _gift_channel, r6
 
-REEF_MODEL_VERSION = "reef-v2/2026-09-28"
+REEF_MODEL_VERSION = "reef-v2/2026-09-28b"
 
 # ── Основа росту (не змінена) ────────────────────────────────
 HEAD_FULL_TERM_YEARS = 25.0
@@ -102,7 +102,8 @@ def build_reef_model(snapshot: dict[str, Any]) -> dict[str, Any]:
             "form": form,
             "size": r6(size),
             # Скільки тіл у колонії року: тихий рік — одне, насичений — до п'яти.
-            "bodies": 1 + min(4, int(math.floor(math.log2(1 + activity)))),
+            # Власник, 2026-09-28: «зроби коралів більше, риф виглядає порожнім».
+            "bodies": 2 + min(6, int(math.floor(math.log2(1 + activity)))),
             "azimuth": r6((k * 137.508 + (unit(seed, f"colony{k}:az") - 0.5) * 24.0) % 360.0),
             # Частка радіуса голови, де сидить колонія: перша — біля вершини,
             # кожна наступна — далі, по спіралі (як листя на стеблі).
@@ -132,6 +133,9 @@ def build_reef_model(snapshot: dict[str, Any]) -> dict[str, Any]:
         "rise": r6(rise),
         "colonies": colonies,
         "anemones": [{"id": i, "channel": c} for _, i, c in anemones[-MAX_ANEMONES:]],
+        # Підріст: камінь обростає дрібними коралами з часом (не з подіями) —
+        # порожня історія теж дає живий риф, а не голу брилу.
+        "undergrowth": min(140, int(math.floor(40 + 100 * (head - HEAD_SCALE_MIN) / (HEAD_SCALE_MAX - HEAD_SCALE_MIN)))),
         "clams": min(8, counts["milestones"]),
         "fish": min(40, int(math.floor(5 * math.log1p(counts["media"]) + 0.5))),
         "seagrass": min(120, 4 * counts["daysOff"]),

@@ -38,7 +38,7 @@ class TimeIsTheCurrency(unittest.TestCase):
         previous = None
         for year in range(2023, 2060):
             model = build_reef_model(dict(BASE, asOf=f"{year}-12-27"))
-            now = (model["radius"], len(model["colonies"]), summary(model)["top"])
+            now = (model["radius"], len(model["colonies"]), summary(model)["top"], model["undergrowth"])
             if previous:
                 # Основа росту доростає за 25 років і далі тримає розмір голови;
                 # колоній однаково додається по одній на рік.
@@ -46,6 +46,7 @@ class TimeIsTheCurrency(unittest.TestCase):
                 grow(now[0], previous[0])
                 self.assertEqual(now[1], previous[1] + 1)
                 self.assertGreaterEqual(now[2], previous[2] - 1e-9)
+                self.assertGreaterEqual(now[3], previous[3])
             previous = now
 
     def test_growth_law_is_the_old_one(self):
@@ -62,7 +63,7 @@ class TimeIsTheCurrency(unittest.TestCase):
 
 
 class OneModuleOneEffect(unittest.TestCase):
-    FIELDS = ("radius", "anemones", "clams", "fish", "seagrass", "starfish")
+    FIELDS = ("radius", "undergrowth", "anemones", "clams", "fish", "seagrass", "starfish")
 
     def changed(self, **rows) -> set[str]:
         a, b = with_(), with_(**rows)

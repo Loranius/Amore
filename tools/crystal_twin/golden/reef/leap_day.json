@@ -8,7 +8,7 @@
     "activity": 0.0,
     "age": 5.002156,
     "azimuth": 11.361436,
-    "bodies": 1,
+    "bodies": 2,
     "form": "finger",
     "hue": 0.397875,
     "reach": 0.168281,
@@ -19,7 +19,7 @@
     "activity": 2.0,
     "age": 4.00282,
     "azimuth": 134.103573,
-    "bodies": 2,
+    "bodies": 3,
     "form": "brain",
     "hue": 0.244212,
     "reach": 0.31382,
@@ -30,7 +30,7 @@
     "activity": 0.0,
     "age": 3.003484,
     "azimuth": 273.272596,
-    "bodies": 1,
+    "bodies": 2,
     "form": "finger",
     "hue": 0.661499,
     "reach": 0.411071,
@@ -41,7 +41,7 @@
     "activity": 0.0,
     "age": 2.004148,
     "azimuth": 57.729293,
-    "bodies": 1,
+    "bodies": 2,
     "form": "finger",
     "hue": 0.380523,
     "reach": 0.498772,
@@ -52,7 +52,7 @@
     "activity": 1.0,
     "age": 1.002074,
     "azimuth": 192.562847,
-    "bodies": 2,
+    "bodies": 3,
     "form": "brain",
     "hue": 0.943398,
     "reach": 0.534465,
@@ -63,7 +63,7 @@
     "activity": 0.0,
     "age": 0.002738,
     "azimuth": 318.542916,
-    "bodies": 1,
+    "bodies": 2,
     "form": "finger",
     "hue": 0.288492,
     "reach": 0.594489,
@@ -89,17 +89,23 @@
   "seagrass": 0,
   "starfish": 0,
   "startDate": "2020-02-29",
-  "version": "reef-v2/2026-09-28",
+  "undergrowth": 84,
+  "version": "reef-v2/2026-09-28b",
   "years": 5.002156
  },
  "summary": {
-  "bodies": 8,
+  "bodies": 14,
   "colonies": 6,
   "firstAnemone": null,
   "firstBase": [
    0.1256,
    0.3355,
    0.0252
+  ],
+  "firstUnder": [
+   0.032,
+   0.2381,
+   0.5503
   ],
   "forms": [
    "finger",
@@ -110,6 +116,7 @@
    "finger"
   ],
   "reach": 0.7611,
-  "top": 0.6405
+  "top": 0.6405,
+  "undergrowth": 84
  }
 }
