@@ -113,17 +113,43 @@ function chunk(p: Painter, seed: string, key: string, c: V3, size: number, paint
 }
 
 /**
- * Купа плюща: кілька кавалків листя, що налягають один на одного. Поодинокі
- * кавалки читались зеленим конфеті (перший кадр); у референсі плющ — густі
- * купи й пасма.
+ * Листочок плюща: сплющений октаедр із нахилом — вісім пласких граней.
+ * Дрібний і дешевий, тож купу можна скласти з десятка, а не з трьох
+ * великих кавалків (власник: «дрібніший плющ, як у референсі»).
+ */
+function leaf(p: Painter, seed: string, key: string, c: V3, size: number) {
+  const a = unit(seed, `${key}:turn`) * Math.PI * 2;
+  const tilt = (unit(seed, `${key}:tilt`) - 0.5) * 1.2;
+  const along: V3 = [Math.cos(a) * size, Math.sin(tilt) * size * 0.6, Math.sin(a) * size];
+  const across: V3 = [-Math.sin(a) * size * 0.62, 0, Math.cos(a) * size * 0.62];
+  const up: V3 = [0, size * 0.28, 0];
+  const at = (v: V3, k: number): V3 => [c[0] + v[0] * k, c[1] + v[1] * k, c[2] + v[2] * k];
+  const tip = at(along, 1);
+  const back = at(along, -0.55);
+  const l = at(across, 1);
+  const r = at(across, -1);
+  const t = at(up, 1);
+  const b = at(up, -1);
+  const tone = () => 0.78 + 0.4 * unit(seed, `${key}:${p.positions.length}`);
+  for (const [x, y] of [[tip, l], [l, back], [back, r], [r, tip]] as [V3, V3][]) {
+    p.tri(x, y, t, PAINT.ivy, tone());
+    p.tri(y, x, b, PAINT.ivy, tone() * 0.85);
+  }
+}
+
+/**
+ * Купа плюща: десяток дрібних листочків, що налягають один на одного. Великі
+ * кавалки читались зеленим конфеті, потім — крупною капустою; у референсі
+ * плющ дрібнолистий.
  */
 function ivy(p: Painter, seed: string, key: string, c: V3, size: number) {
-  const n = 3 + Math.floor(unit(seed, `${key}:n`) * 3);
+  // 10–16 листочків середнього розміру: надто дрібні читались цятками.
+  const n = 10 + Math.floor(unit(seed, `${key}:n`) * 7);
   for (let k = 0; k < n; k += 1) {
     const a = unit(seed, `${key}:${k}:a`) * Math.PI * 2;
-    const r = size * 0.55 * unit(seed, `${key}:${k}:r`);
-    const at: V3 = [c[0] + Math.cos(a) * r, c[1] + (unit(seed, `${key}:${k}:y`) - 0.5) * size * 0.6, c[2] + Math.sin(a) * r];
-    chunk(p, seed, `${key}:${k}`, at, size * (0.55 + 0.35 * unit(seed, `${key}:${k}:s`)), PAINT.ivy, 0, 0.75);
+    const r = size * 0.65 * Math.sqrt(unit(seed, `${key}:${k}:r`));
+    const at: V3 = [c[0] + Math.cos(a) * r, c[1] + (unit(seed, `${key}:${k}:y`) - 0.5) * size * 0.8, c[2] + Math.sin(a) * r];
+    leaf(p, seed, `${key}:${k}`, at, size * (0.38 + 0.2 * unit(seed, `${key}:${k}:s`)));
   }
 }
 
@@ -162,6 +188,13 @@ export interface CrystalIsland {
 export function buildCrystalIsland(seed: string, radius: number): CrystalIsland {
   const R = radius;
   const p = new Painter();
+  // Композиція — як на діагональному ракурсі референсу: сходи спереду
+  // праворуч (камера дивиться з +z, екранне «праворуч» — +x), арки
+  // ліворуч і позаду праворуч, уламки колон — позаду ліворуч. Хеш лише
+  // трохи зсуває все разом, щоб острів кожної пари був своїм.
+  const stairA = 1.15 + (unit(seed, 'isle:stairs') - 0.5) * 0.25;
+  const first = stairA + 2.0;
+  const nearStairs = (a: number, gap = 0.32) => Math.abs(Math.atan2(Math.sin(a - stairA), Math.cos(a - stairA))) < gap;
 
   // ── Земля під плитами (видно в щілинах) ───────────────────
   const SEG = 24;
@@ -183,6 +216,8 @@ export function buildCrystalIsland(seed: string, radius: number): CrystalIsland 
       if (ri > 0 && unit(seed, `${key}:gone`) < 0.07) continue;
       const a0 = turn + (k / ring.n) * Math.PI * 2;
       const a1 = turn + ((k + 1) / ring.n) * Math.PI * 2;
+      // Крайні плити поступаються сходам: інакше дві поверхні на одній висоті.
+      if (ri === rings.length - 1 && nearStairs((a0 + a1) / 2, 0.3)) continue;
       const outline: V3[] = ring.r0 === 0
         ? [polar(0, 0, 0), polar(ring.r1 * R, a0, 0), polar(ring.r1 * R, (a0 + a1) / 2, 0), polar(ring.r1 * R, a1, 0)]
         : [polar(ring.r0 * R, a0, 0), polar(ring.r1 * R, a0, 0), polar(ring.r1 * R, (a0 + a1) / 2, 0), polar(ring.r1 * R, a1, 0), polar(ring.r0 * R, a1, 0)];
@@ -235,6 +270,7 @@ export function buildCrystalIsland(seed: string, radius: number): CrystalIsland 
   for (let j = 0; j < SEG; j += 1) {
     if (unit(seed, `isle:rimstone${j}`) < 0.35) continue;
     const a = ((j + 0.5) / SEG) * Math.PI * 2;
+    if (nearStairs(a)) continue;
     chunk(p, seed, `isle:rimstone${j}`, polar(rimR(j) * 0.98, a, R * 0.015), R * (0.03 + 0.025 * unit(seed, `isle:rimstone${j}:s`)), PAINT.cliff, 0, 0.7);
   }
 
@@ -266,11 +302,11 @@ export function buildCrystalIsland(seed: string, radius: number): CrystalIsland 
       ];
       box(p, at(t0), at(t1), pillarW * 0.95, pillarW * 1.05, PAINT.ruin, 0.92 + 0.1 * unit(seed, `${key}:s${s}`));
       // Плющ на арці.
-      if (unit(seed, `${key}:ivy${s}`) < 0.75) {
+      {
         const m = at((t0 + t1) / 2);
-        ivy(p, seed, `${key}:leaf${s}`, [m[0], m[1] + pillarW * 0.3, m[2]], R * 0.075);
+        ivy(p, seed, `${key}:leaf${s}`, [m[0], m[1] + pillarW * 0.3, m[2]], R * 0.1);
         // Пасмо, що звисає з арки.
-        const drops = 1 + Math.floor(unit(seed, `${key}:drop${s}`) * 3);
+        const drops = 2 + Math.floor(unit(seed, `${key}:drop${s}`) * 3);
         for (let d = 1; d <= drops; d += 1) {
           ivy(p, seed, `${key}:hang${s}:${d}`, [m[0], m[1] - d * R * 0.055, m[2]], R * (0.055 - d * 0.006));
         }
@@ -280,25 +316,62 @@ export function buildCrystalIsland(seed: string, radius: number): CrystalIsland 
     // Плющ біля підніжжя колон.
     [left, right].forEach((foot, f) => ivy(p, seed, `${key}:foot${f}`, [foot[0], R * 0.04, foot[2]], R * 0.09));
   };
-  const first = unit(seed, 'isle:arch0') * Math.PI * 2;
   archAt(first, 'isle:arch0');
-  archAt(first + Math.PI * (0.62 + 0.2 * unit(seed, 'isle:arch1')), 'isle:arch1');
+  archAt(stairA - 1.55 - 0.15 * unit(seed, 'isle:arch1'), 'isle:arch1');
   for (let k = 0; k < 3; k += 1) {
     const key = `isle:column${k}`;
-    const a = first + Math.PI * (1.1 + 0.3 * k + 0.1 * unit(seed, `${key}:a`));
+    const a = stairA + 2.75 + 0.45 * k + 0.15 * unit(seed, `${key}:a`);
     const base = polar(R * (0.78 + 0.1 * unit(seed, `${key}:r`)), a, 0);
     const h = R * (0.12 + 0.2 * unit(seed, `${key}:h`));
     box(p, base, [base[0], h, base[2]], pillarW * 0.9, pillarW * 0.9, PAINT.ruin, 0.95);
     ivy(p, seed, `${key}:ivy`, [base[0], h * 0.7, base[2]], R * 0.075);
   }
 
+  // ── Сходи: вирубані в краю острова, спускаються назовні ────
+  // Між двома арками, як у референсі; п'ять сходинок, кожна глибоко в
+  // скелі, щоб знизу не було видно щілин.
+  const radial: V3 = [Math.cos(stairA), 0, Math.sin(stairA)];
+  const side: V3 = [-Math.sin(stairA), 0, Math.cos(stairA)];
+  const stairHalf = R * 0.15;
+  const STEPS = 5;
+  for (let k = 0; k < STEPS; k += 1) {
+    const r0 = R * (0.8 + 0.075 * k);
+    const r1 = r0 + R * 0.075;
+    const top = R * (0.03 - 0.055 * k);
+    const corner = (r: number, s0: number, y: number): V3 => [
+      radial[0] * r + side[0] * s0, y, radial[2] * r + side[2] * s0,
+    ];
+    const outline = (y: number): V3[] => [
+      corner(r0, -stairHalf, y), corner(r1, -stairHalf, y), corner(r1, stairHalf, y), corner(r0, stairHalf, y),
+    ];
+    p.band(outline(-R * 0.3), outline(top), PAINT.ruin, (i) => 0.9 + 0.08 * (i % 2) - 0.03 * k, true);
+  }
+  // Бічні брили й плющ обабіч сходів.
+  for (const sgn of [-1, 1]) {
+    for (let k = 0; k < 3; k += 1) {
+      const r = R * (0.84 + 0.11 * k);
+      const at: V3 = [radial[0] * r + side[0] * sgn * stairHalf * 1.25, R * (0.03 - 0.07 * k), radial[2] * r + side[2] * sgn * stairHalf * 1.25];
+      chunk(p, seed, `isle:stairside${sgn}:${k}`, at, R * 0.045, PAINT.ruin, 0, 0.8);
+      if (unit(seed, `isle:stairivy${sgn}:${k}`) < 0.6) ivy(p, seed, `isle:stairivy${sgn}:${k}`, [at[0], at[1] + R * 0.03, at[2]], R * 0.07);
+    }
+  }
+
+  // ── Латки зелені по краю бруківки (референс: зелень лізе з-під плит) ──
+  for (let k = 0; k < 12; k += 1) {
+    const key = `isle:patch${k}`;
+    const a = (k / 12) * Math.PI * 2 + unit(seed, `${key}:a`) * 0.4;
+    if (nearStairs(a, 0.25)) continue;
+    ivy(p, seed, key, polar(R * (0.86 + 0.08 * unit(seed, `${key}:r`)), a, R * 0.035), R * (0.08 + 0.04 * unit(seed, `${key}:s`)));
+  }
+
   // ── Плющ звисає з краю острова ────────────────────────────
-  for (let k = 0; k < 14; k += 1) {
+  for (let k = 0; k < 20; k += 1) {
     const key = `isle:strand${k}`;
     const j = Math.floor(unit(seed, `${key}:j`) * SEG);
     const a = ((j + 0.5) / SEG) * Math.PI * 2;
+    if (nearStairs(a)) continue;
     const r = rimR(j) * 1.0;
-    const length = 2 + Math.floor(unit(seed, `${key}:len`) * 5);
+    const length = 3 + Math.floor(unit(seed, `${key}:len`) * 5);
     ivy(p, seed, `${key}:top`, polar(r * 0.96, a, R * 0.04), R * 0.08);
     for (let d = 1; d <= length; d += 1) {
       const y = -d * R * 0.065;
