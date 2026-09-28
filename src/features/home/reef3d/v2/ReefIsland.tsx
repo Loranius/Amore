@@ -13,10 +13,10 @@ import { buildReefIsland } from './reefIsland';
 // навколо — `diorama/surround.ts` (ADR-0224).
 // ============================================================
 
-/** Верхівка, скеля, валуни, водорості, лагуна, помаранчевий і рожевий корал, далечінь. */
+/** Верхівка, скеля, валуни, водорості, лагуна, помаранчевий і рожевий корал, далечінь, пісок дна. */
 const REEF_ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
-  light: ['#b3aae6', '#6e68c0', '#8f86da', '#5cbb4c', '#72f0e6', '#ff8a4c', '#ff6fae', '#58a2cc'],
-  dark: ['#7c74c2', '#443e90', '#5d56aa', '#3f9c46', '#4adcea', '#ff7a44', '#ff5fa6', '#123f78'],
+  light: ['#b3aae6', '#6e68c0', '#8f86da', '#5cbb4c', '#72f0e6', '#ff8a4c', '#ff6fae', '#58a2cc', '#ecdcb0'],
+  dark: ['#7c74c2', '#443e90', '#5d56aa', '#3f9c46', '#4adcea', '#ff7a44', '#ff5fa6', '#123f78', '#5f6480'],
 };
 
 const RAY: Record<'light' | 'dark', string> = { light: '#eafcff', dark: '#7fe8ff' };
@@ -43,7 +43,7 @@ export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion }:
   const materials = useMemo(() => ({
     island: createIslandMaterial(REEF_ISLAND_PAINTS[theme]),
     ray: createRayMaterial(RAY[theme]),
-    deep: createIslandMaterial(REEF_ISLAND_PAINTS[theme], { colour: WATER[theme], from: 20, to: 150, strength: 0.82 }),
+    deep: createIslandMaterial(REEF_ISLAND_PAINTS[theme], { colour: WATER[theme], from: 12, to: 120, strength: 0.88, near: 30 }),
   }), [theme]);
   const debrisRef = useRef<THREE.Group>(null);
 
@@ -71,10 +71,10 @@ export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion }:
           key={k}
           lockX
           lockZ
-          position={[Math.cos(k * 1.3 + 1.1) * radius * 2.2, groundY + radius * 2.4, Math.sin(k * 1.3 + 1.1) * radius * 2.2]}
+          position={[Math.cos(k * 1.3 + 1.1) * radius * 2.2, groundY + radius * 4.4, Math.sin(k * 1.3 + 1.1) * radius * 2.2]}
         >
-          <mesh material={materials.ray} rotation={[0, 0, 0.3 - k * 0.05]} renderOrder={-4}>
-            <planeGeometry args={[radius * (0.4 + 0.15 * (k % 2)), radius * 7]} />
+          <mesh material={materials.ray} rotation={[0, 0, 0.2 - k * 0.04]} renderOrder={-4}>
+            <planeGeometry args={[radius * (0.4 + 0.15 * (k % 2)), radius * 5]} />
           </mesh>
         </Billboard>
       ))}

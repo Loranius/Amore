@@ -42,7 +42,7 @@ export function TreeIsland({ seed, theme, radius, groundY, reduceMotion }: TreeI
   const sky = useMemo(() => meshGeometry(buildTreeSurround(seed)), [seed]);
   const material = useMemo(() => createIslandMaterial(TREE_ISLAND_PAINTS[theme]), [theme]);
   const skyMaterial = useMemo(
-    () => createIslandMaterial(TREE_ISLAND_PAINTS[theme], { colour: SKY_AIR[theme], from: 20, to: 160, strength: 0.7 }),
+    () => createIslandMaterial(TREE_ISLAND_PAINTS[theme], { colour: SKY_AIR[theme], from: 12, to: 130, strength: 0.82, near: 30 }),
     [theme],
   );
   const debrisRef = useRef<THREE.Group>(null);

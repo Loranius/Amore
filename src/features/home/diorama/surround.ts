@@ -64,27 +64,29 @@ function cone(p: Painter, a: V3, tip: V3, r: number, paint: Paint, tone: number,
 }
 
 // ── Кристал: давній храм у підземеллі ─────────────────────
-/** Фарби кристала: 2 — камінь храму, 7 — скеля печери, 1 — уламки (плющ і самоцвіти беруть свої). */
+/** Фарби кристала: 2 — камінь храму, 7 — скеля печери (плющ і самоцвіти беруть свої). */
+/** Глибина, з якої ростуть колони й стіна печери: далеко в серпанку. */
+export const TEMPLE_DEPTH = -190;
 const STONE = 2 as Paint;
 const CAVE = 7 as Paint;
-const RUBBLE = 1 as Paint;
 
 /** Колона ордера: плінт, фуст, капітель. `broken` — фуст обламаний. */
 function column(p: Painter, seed: string, key: string, base: V3, top: number, r: number, broken: boolean) {
   const plinth = base[1] + r * 0.9;
   box(p, [base[0], base[1], base[2]], [base[0], plinth, base[2]], r * 2.8, r * 2.8, STONE, 0.9);
-  const end = broken ? base[1] + (top - base[1]) * (0.3 + 0.45 * unit(seed, `${key}:break`)) : top;
-  // Фуст — з барабанів: ледь різний тон, як кладка.
-  const drums = Math.max(2, Math.round((end - plinth) / (r * 5)));
+  // Злам — на висоті острова або вище, а не в безодні, де його не видно.
+  const end = broken ? -8 + (top + 8) * (0.2 + 0.5 * unit(seed, `${key}:break`)) : top;
+  // Фуст — з барабанів: ледь різний тон, як кладка. Колони йдуть глибоко
+  // вниз, тож барабани довгі: інакше самі фусти коштували б 12 тисяч граней.
+  const drums = Math.max(2, Math.round((end - plinth) / (r * 10)));
   for (let d = 0; d < drums; d += 1) {
     const y0 = plinth + ((end - plinth) * d) / drums;
     const y1 = plinth + ((end - plinth) * (d + 1)) / drums;
     prism(p, [base[0], y0, base[2]], [base[0], y1, base[2]], r * (1 - 0.04 * (d / drums)), r * (1 - 0.04 * ((d + 1) / drums)), STONE, 0.92 + 0.12 * unit(seed, `${key}:d${d}`), 8, 0, d === drums - 1);
   }
   if (broken) {
-    // Злам: косий уламок зверху й барабан, що впав до підніжжя.
+    // Злам: косий уламок зверху.
     chunk(p, seed, `${key}:jag`, [base[0], end + r * 0.3, base[2]], r * 1.05, STONE, 0, 0.7);
-    chunk(p, seed, `${key}:fallen`, polar(r * 3.2, unit(seed, `${key}:fa`) * TAU, 0).map((v, i) => v + base[i]!) as V3, r * 1.2, STONE, 0, 0.8);
     return end;
   }
   box(p, [base[0], top, base[2]], [base[0], top + r * 0.7, base[2]], r * 2.5, r * 2.5, STONE, 1.02);
@@ -108,6 +110,8 @@ function arch(p: Painter, seed: string, key: string, a: V3, b: V3, thick: number
 export function buildCrystalSurround(seed: string): IslandMesh {
   const p = new Painter();
   // Колонада: два кільця, внутрішнє нижче й ближче, зовнішнє — аркада.
+  // Колони йдуть глибоко вниз і тонуть у серпанку: дна в храму немає, і
+  // власник попросив, щоб колони його ховали, а не стояли на порожнечі.
   const rings = [
     { n: 16, r: 84, top: 30, rad: 2.2, arches: 0.55, broken: 0.35 },
     { n: 22, r: 122, top: 52, rad: 3.2, arches: 0.8, broken: 0.2 },
@@ -118,17 +122,13 @@ export function buildCrystalSurround(seed: string): IslandMesh {
     for (let k = 0; k < ring.n; k += 1) {
       const key = `temple${ri}:col${k}`;
       const a = turn + (k / ring.n) * TAU + (unit(seed, `${key}:a`) - 0.5) * 0.04;
-      const base = polar(ring.r, a, -36);
+      const base = polar(ring.r, a, TEMPLE_DEPTH);
       const broken = unit(seed, `${key}:broken`) < ring.broken;
       const top = column(p, seed, key, base, ring.top + 6 * (unit(seed, `${key}:h`) - 0.5), ring.rad, broken);
       tops.push({ at: [base[0], top, base[2]], top, whole: !broken });
       // Плющ звисає з капітелі цілих колон.
       if (!broken && unit(seed, `${key}:ivy`) < 0.6) {
         for (let d = 0; d < 5; d += 1) clump(p, seed, `${key}:ivy${d}`, [base[0] + ring.rad * 1.3, top - d * ring.rad * 1.4, base[2]], ring.rad * (1.6 - d * 0.15));
-      }
-      // Самоцвіти біля підніжжя: храм освітлений кристалами, а не небом.
-      if (unit(seed, `${key}:gem`) < 0.5) {
-        gem(p, seed, `${key}:gem`, [base[0] + ring.rad * 2, base[1] + ring.rad, base[2]], [0.3, 1, 0.2], ring.rad * (1.5 + unit(seed, `${key}:gs`)));
       }
     }
     for (let k = 0; k < ring.n; k += 1) {
@@ -143,14 +143,15 @@ export function buildCrystalSurround(seed: string): IslandMesh {
   });
 
   // Стіна печери: нерівні брили кільцем за колонадою, від дна до склепіння.
-  for (let k = 0; k < 30; k += 1) {
-    const a = (k / 30) * TAU + unit(seed, `cave${k}:a`) * 0.15;
+  // Храм освітлений кристалами в стінах, а не небом.
+  for (let k = 0; k < 24; k += 1) {
+    const a = (k / 24) * TAU + unit(seed, `cave${k}:a`) * 0.15;
     const r = 165 + 20 * unit(seed, `cave${k}:r`);
-    for (let s = 0; s < 6; s += 1) {
-      const size = 18 + 12 * unit(seed, `cave${k}:${s}:s`);
-      chunk(p, seed, `cave${k}:${s}`, polar(r + (unit(seed, `cave${k}:${s}:dr`) - 0.5) * 14, a, -70 + s * 30), size, CAVE);
+    for (let s = 0; s < 8; s += 1) {
+      const size = 22 + 12 * unit(seed, `cave${k}:${s}:s`);
+      chunk(p, seed, `cave${k}:${s}`, polar(r + (unit(seed, `cave${k}:${s}:dr`) - 0.5) * 14, a, TEMPLE_DEPTH + 20 + s * 34), size, CAVE);
     }
-    if (unit(seed, `cave${k}:gem`) < 0.5) {
+    if (unit(seed, `cave${k}:gem`) < 0.7) {
       const at = polar(r - 12, a, -30 + 60 * unit(seed, `cave${k}:gy`));
       gem(p, seed, `cave${k}:gem`, at, [-Math.cos(a), 0.4, -Math.sin(a)], 4 + 4 * unit(seed, `cave${k}:gs`));
     }
@@ -158,21 +159,22 @@ export function buildCrystalSurround(seed: string): IslandMesh {
   // Склепіння: сталактити звисають згори по всьому колу.
   for (let k = 0; k < 40; k += 1) {
     const a = unit(seed, `stal${k}:a`) * TAU;
-    const r = 70 + 90 * unit(seed, `stal${k}:r`);
+    // Далі від осі: згори ближні сталактити лягали темними клинами на шапку.
+    const r = 105 + 65 * unit(seed, `stal${k}:r`);
     const top = 72 + 10 * unit(seed, `stal${k}:y`);
     const len = 12 + 26 * unit(seed, `stal${k}:l`);
     cone(p, polar(r, a, top), polar(r, a, top - len), 2.5 + 3 * unit(seed, `stal${k}:w`), CAVE, 0.9, 6, a);
   }
   // Унизу, під островом, пливуть уламки храму: барабани й капітелі.
-  for (let k = 0; k < 16; k += 1) {
+  for (let k = 0; k < 10; k += 1) {
     const a = unit(seed, `drum${k}:a`) * TAU;
     const r = 14 + 34 * unit(seed, `drum${k}:r`);
     const y = SURROUND_BELOW - 4 - 22 * unit(seed, `drum${k}:y`);
-    const w = 0.8 + 1.2 * unit(seed, `drum${k}:w`);
+    const w = 0.5 + 0.8 * unit(seed, `drum${k}:w`);
     const tilt = unit(seed, `drum${k}:t`) * TAU;
     const c = polar(r, a, y);
     const d: V3 = [Math.cos(tilt) * w * 1.6, Math.sin(tilt) * w * 1.2, Math.sin(tilt) * w * 0.8];
-    if (k % 3 === 0) chunk(p, seed, `drum${k}`, c, w * 1.4, RUBBLE);
+    if (k % 3 === 0) chunk(p, seed, `drum${k}`, c, w * 1.2, STONE);
     else box(p, [c[0] - d[0], c[1] - d[1], c[2] - d[2]], [c[0] + d[0], c[1] + d[1], c[2] + d[2]], w * 2, w * 2, STONE, 0.9);
   }
   return p.build();
@@ -244,13 +246,13 @@ export function buildTreeSurround(seed: string): IslandMesh {
     const r = 80 + 50 * unit(seed, `${key}:r`);
     floatingIslet(p, seed, key, polar(r, a, -12 + 34 * unit(seed, `${key}:y`)), 3 + 6 * unit(seed, `${key}:s`), k % 3 === 0 ? T_ROCK : T_FAR);
   }
-  for (let k = 0; k < 10; k += 1) {
+  for (let k = 0; k < 6; k += 1) {
     const key = `sky:low${k}`;
     const a = unit(seed, `${key}:a`) * TAU;
     // Ближні — лише під островом і дрібні: з боку камери вони пропливали
     // б перед об'єктивом величезними.
     const r = 10 + 16 * unit(seed, `${key}:r`);
-    floatingIslet(p, seed, key, polar(r, a, SURROUND_BELOW - 9 - 10 * unit(seed, `${key}:y`)), 0.8 + 1.2 * unit(seed, `${key}:s`), T_ROCK);
+    floatingIslet(p, seed, key, polar(r, a, SURROUND_BELOW - 9 - 10 * unit(seed, `${key}:y`)), 0.5 + 0.7 * unit(seed, `${key}:s`), T_ROCK);
   }
   return p.build();
 }
@@ -262,6 +264,10 @@ const R_ALGAE = 3 as Paint;
 const R_ORANGE = 5 as Paint;
 const R_PINK = 6 as Paint;
 const R_FAR = 7 as Paint;
+/** Дев'ятий слот палітри рифу — пісок дна (`REEF_ISLAND_PAINTS`). */
+const R_SAND = 8 as Paint;
+/** Висота піщаного дна під рифом. */
+export const REEF_FLOOR = -48;
 
 /** Скеля-стовп: стос кавалків, що звужується догори, з шапкою водоростей. */
 function rockPillar(p: Painter, seed: string, key: string, base: V3, top: number, w: number) {
@@ -315,14 +321,35 @@ export function buildReefSurround(seed: string): IslandMesh {
     const r = 72 + 40 * unit(seed, `${key}:r`);
     kelp(p, seed, key, polar(r, a, -55), 35 + 40 * unit(seed, `${key}:h`), 0.5 + 0.5 * unit(seed, `${key}:w`));
   }
-  // Дно внизу: брили, корали й зірки — видно, коли відвести камеру.
-  for (let k = 0; k < 44; k += 1) {
+  // Піщане дно далеко внизу (власник: «пісчане дно, яке видніється
+  // далеко»): диск із пологими дюнами під усім рифом, край тоне в товщі.
+  const RINGS = 10;
+  const SEGS = 36;
+  const dune = (r: number, a: number) => REEF_FLOOR + 2.2 * Math.sin(a * 5 + r * 0.08) * Math.sin(r * 0.11 + unit(seed, 'deep:dune') * 6) + 1.2 * (unit(seed, `deep:sand${Math.round(r)}:${Math.round(a * 10)}`) - 0.5);
+  const sandRing = (i: number) => Array.from({ length: SEGS }, (_, j): V3 => {
+    const r = (i / RINGS) * 190;
+    const a = ((j + (i % 2) * 0.5) / SEGS) * TAU;
+    return polar(r, a, i === 0 ? REEF_FLOOR : dune(r, a));
+  });
+  const sand = Array.from({ length: RINGS + 1 }, (_, i) => sandRing(i));
+  for (let i = 0; i < RINGS; i += 1) {
+    for (let j = 0; j < SEGS; j += 1) {
+      const k = (j + 1) % SEGS;
+      const t = 0.9 + 0.2 * unit(seed, `deep:sandt${i}:${j}`);
+      p.tri(sand[i]![j]!, sand[i + 1]![k]!, sand[i + 1]![j]!, R_SAND, t);
+      if (i > 0) p.tri(sand[i]![j]!, sand[i]![k]!, sand[i + 1]![k]!, R_SAND, t * 0.96);
+    }
+  }
+  // На піску — брили, корали й зірки.
+  for (let k = 0; k < 34; k += 1) {
     const key = `deep:floor${k}`;
     const a = unit(seed, `${key}:a`) * TAU;
     const r = 14 + 120 * Math.sqrt(unit(seed, `${key}:r`));
-    const c = polar(r, a, -40 - 4 * unit(seed, `${key}:y`));
-    chunk(p, seed, key, c, 4 + 5 * unit(seed, `${key}:s`), k % 3 === 0 ? R_BOULDER : R_ROCK, 0, 0.6);
-    if (unit(seed, `${key}:coral`) < 0.4) chunk(p, seed, `${key}:coral`, [c[0], c[1] + 3.5, c[2]], 1.6, k % 2 === 0 ? R_ORANGE : R_PINK, 0, 0.8);
+    const c = polar(r, a, REEF_FLOOR + 1 - 2 * unit(seed, `${key}:y`));
+    // Дрібні: згори ближні брили дна лягали на кадр важкими плямами.
+    const size = 1.8 + 2.4 * unit(seed, `${key}:s`);
+    chunk(p, seed, key, c, size, k % 3 === 0 ? R_BOULDER : R_ROCK, 0, 0.6);
+    if (unit(seed, `${key}:coral`) < 0.4) chunk(p, seed, `${key}:coral`, [c[0], c[1] + size * 0.8, c[2]], size * 0.4, k % 2 === 0 ? R_ORANGE : R_PINK, 0, 0.8);
   }
   return p.build();
 }

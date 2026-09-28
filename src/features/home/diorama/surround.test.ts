@@ -48,6 +48,27 @@ describe.each(cases)('оточення: %s', (_, mesh) => {
   });
 });
 
+it('кристал: колони йдуть далеко вниз і ховають відсутність дна храму', () => {
+  const mesh = cases[0]![1];
+  let lowest = Infinity;
+  for (let v = 1; v < mesh.positions.length; v += 3) lowest = Math.min(lowest, mesh.positions[v]!);
+  expect(lowest).toBeLessThan(-150);
+});
+
+it('риф: піщане дно лежить під усім рифом і тягнеться далеко', () => {
+  const mesh = cases[2]![1];
+  let reach = 0;
+  let underIsland = false;
+  for (let v = 0; v < mesh.paint.length; v += 1) {
+    if (mesh.paint[v] !== 8) continue;
+    const r = Math.hypot(mesh.positions[v * 3]!, mesh.positions[v * 3 + 2]!);
+    reach = Math.max(reach, r);
+    if (r < 1) underIsland = true;
+  }
+  expect(underIsland).toBe(true);
+  expect(reach).toBeGreaterThan(150);
+});
+
 it('детерміновано: та сама дата — побітово те саме оточення', () => {
   expect(Array.from(buildCrystalSurround(SEED).positions)).toEqual(Array.from(cases[0]![1].positions));
   expect(Array.from(buildReefSurround(SEED).positions)).toEqual(Array.from(cases[2]![1].positions));

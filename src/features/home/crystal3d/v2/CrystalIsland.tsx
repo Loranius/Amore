@@ -50,10 +50,20 @@ export interface IslandHaze {
   from: number;
   to: number;
   strength: number;
+  /**
+   * Відстань від камери, ближче за яку оточення тоне в повітрі майже
+   * повністю. Власник (знімки згори): брили й капітелі, що опинились біля
+   * об'єктива, лягали важкими плямами на шапку головної. 0 — вимкнено.
+   */
+  near?: number;
 }
 
-/** Матеріал острова: фарба з палітри (8 кольорів), м'яке світло діорами. */
+/**
+ * Матеріал острова: фарба з палітри, м'яке світло діорами. Палітра — 8
+ * кольорів або більше (риф має дев'ятий — пісок дна, ADR-0224).
+ */
 export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze): THREE.ShaderMaterial {
+  const count = paints.length;
   return new THREE.ShaderMaterial({
     // Обидва боки: віяла кришок плит і кавалків закручені як прийдеться, а
     // нормаль шейдер однаково повертає до камери. Перший кадр показав
@@ -65,7 +75,7 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       uAmbient: { value: 0.52 },
       uTime: { value: 0 },
       uHaze: { value: new THREE.Color(haze?.colour ?? '#000000') },
-      uHazeRange: { value: new THREE.Vector3(haze?.from ?? 1, haze?.to ?? 2, haze?.strength ?? 0) },
+      uHazeRange: { value: new THREE.Vector4(haze?.from ?? 1, haze?.to ?? 2, haze?.strength ?? 0, haze?.near ?? 0) },
     },
     vertexShader: /* glsl */ `
       attribute float paint;
@@ -85,12 +95,12 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       }
     `,
     fragmentShader: /* glsl */ `
-      uniform vec3 uPaint[8];
+      uniform vec3 uPaint[${count}];
       uniform vec3 uKey;
       uniform float uAmbient;
       uniform float uTime;
       uniform vec3 uHaze;
-      uniform vec3 uHazeRange;
+      uniform vec4 uHazeRange;
       varying vec3 vWorld;
       varying float vPaint;
       varying float vTone;
@@ -102,11 +112,16 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
         if (dot(n, view) < 0.0) n = -n;
         int i = int(vPaint + 0.5);
         vec3 base = uPaint[0];
-        for (int k = 1; k < 8; k++) if (k == i) base = uPaint[k];
+        for (int k = 1; k < ${count}; k++) if (k == i) base = uPaint[k];
         vec3 c = dioramaShade(base * vTone, n, view);
         // Самоцвіти в скелі світяться самі й повільно дихають.
         c = mix(c, base * (1.25 + 0.2 * sin(uTime * 1.3 + vWorld.x * 3.0)), vGlow * 0.85);
-        c = mix(c, uHaze, smoothstep(uHazeRange.x, uHazeRange.y, length(vWorld)) * uHazeRange.z);
+        float haze = smoothstep(uHazeRange.x, uHazeRange.y, length(vWorld)) * uHazeRange.z;
+        if (uHazeRange.w > 0.0) {
+          float near = 1.0 - smoothstep(uHazeRange.w * 0.35, uHazeRange.w, distance(cameraPosition, vWorld));
+          haze = max(haze, near * 0.92);
+        }
+        c = mix(c, uHaze, haze);
         gl_FragColor = vec4(c, 1.0);
         ${END}
       }
@@ -163,19 +178,28 @@ export function createRayMaterial(tint: string): THREE.ShaderMaterial {
     uniforms: { uColour: { value: new THREE.Color(tint) }, uTime: { value: 0 } },
     vertexShader: /* glsl */ `
       varying vec2 vUv;
+      varying float vFacing;
       void main() {
         vUv = uv;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        // Промінь — вертикальна смуга світла. Збоку він читається променем,
+        // а згори — смугою, покладеною поперек сцени (власник, знімки з
+        // телефона): що крутіше камера дивиться вниз, то слабший промінь.
+        vec3 view = normalize(cameraPosition - w.xyz);
+        vFacing = 1.0 - smoothstep(0.3, 0.6, abs(view.y));
+        gl_Position = projectionMatrix * viewMatrix * w;
       }
     `,
     fragmentShader: /* glsl */ `
       uniform vec3 uColour;
       uniform float uTime;
       varying vec2 vUv;
+      varying float vFacing;
       void main() {
         float across = smoothstep(0.0, 0.5, vUv.x) * smoothstep(1.0, 0.5, vUv.x);
-        float along = smoothstep(0.0, 0.6, vUv.y);
-        float a = across * along * (0.11 + 0.04 * sin(uTime * 0.5 + vUv.x * 3.0));
+        // Обидва кінці тануть: низ променя не впирається в острів рискою.
+        float along = smoothstep(0.0, 0.45, vUv.y) * smoothstep(1.0, 0.8, vUv.y);
+        float a = across * along * vFacing * (0.11 + 0.04 * sin(uTime * 0.5 + vUv.x * 3.0));
         gl_FragColor = vec4(uColour * a, a);
       }
     `,
@@ -204,7 +228,7 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
   const glowHex = `#${glowColour.getHexString()}`;
   const materials = useMemo(() => ({
     island: createIslandMaterial(ISLAND_PAINTS[theme]),
-    temple: createIslandMaterial(TEMPLE_PAINTS[theme], { colour: CAVE[theme].air, from: 20, to: 170, strength: 0.8 }),
+    temple: createIslandMaterial(TEMPLE_PAINTS[theme], { colour: CAVE[theme].air, from: 12, to: 130, strength: 0.88, near: 30 }),
     ray: createRayMaterial(CAVE[theme].ray),
     core: createGlowMaterial(glowHex, theme === 'dark' ? 1.2 : 0.9),
   }), [theme, glowHex]);
@@ -236,10 +260,10 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
           key={k}
           lockX
           lockZ
-          position={[Math.cos(k * 1.3 + 0.4) * radius * 2.2, groundY + radius * 2.4, Math.sin(k * 1.3 + 0.4) * radius * 2.2]}
+          position={[Math.cos(k * 1.3 + 0.4) * radius * 2.2, groundY + radius * 4.4, Math.sin(k * 1.3 + 0.4) * radius * 2.2]}
         >
-          <mesh material={materials.ray} rotation={[0, 0, -0.35]} renderOrder={-4}>
-            <planeGeometry args={[radius * (0.45 + 0.15 * (k % 2)), radius * 7]} />
+          <mesh material={materials.ray} rotation={[0, 0, -0.2]} renderOrder={-4}>
+            <planeGeometry args={[radius * (0.45 + 0.15 * (k % 2)), radius * 5]} />
           </mesh>
         </Billboard>
       ))}
