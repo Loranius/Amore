@@ -30,7 +30,8 @@ export interface ReefPalette {
 export const REEF_PALETTES: Record<'light' | 'dark', ReefPalette> = {
   light: {
     fog: '#2f8db4',
-    rock: '#c99a86',
+    // Камінь рифу — тієї ж барвінкової гами, що й острів (ADR-0223).
+    rock: '#9a90dc',
     key: '#fff6e0',
     keyStrength: 1.05,
     ambient: 0.58,
@@ -42,7 +43,7 @@ export const REEF_PALETTES: Record<'light' | 'dark', ReefPalette> = {
   },
   dark: {
     fog: '#0b1840',
-    rock: '#4a3c5e',
+    rock: '#5a529e',
     key: '#9fb6ff',
     keyStrength: 0.55,
     ambient: 0.48,

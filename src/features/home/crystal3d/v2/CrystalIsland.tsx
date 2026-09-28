@@ -172,7 +172,7 @@ function createCaveMaterial(far: string, air: string): THREE.ShaderMaterial {
   });
 }
 
-function createRayMaterial(tint: string): THREE.ShaderMaterial {
+export function createRayMaterial(tint: string): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,

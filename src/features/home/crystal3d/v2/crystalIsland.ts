@@ -79,7 +79,7 @@ export class Painter {
 export const polar = (r: number, a: number, y: number): V3 => [Math.cos(a) * r, y, Math.sin(a) * r];
 
 /** Коробка вздовж осі від `a` до `b` з квадратним перерізом `w`×`d`. */
-function box(p: Painter, a: V3, b: V3, w: number, d: number, paint: Paint, tone: number) {
+export function box(p: Painter, a: V3, b: V3, w: number, d: number, paint: Paint, tone: number) {
   const dir: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
   const len = Math.hypot(...dir);
   const u: V3 = [dir[0] / len, dir[1] / len, dir[2] / len];

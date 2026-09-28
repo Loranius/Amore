@@ -5,6 +5,8 @@ import { unit } from '@/engine/species/crystalV2/hash';
 import type { ReefV2Geometry } from '@/engine/species/reefV2/geometry';
 import { Diorama } from '@/features/home/diorama/Diorama';
 import { PORTAL_GROUND_Y } from '../../crystal3d/scene/portalScene';
+import { ReefIsland } from './ReefIsland';
+import { buildReefIsland, reefIslandGround } from './reefIsland';
 import {
   REEF_PALETTES,
   createCoralMaterial,
@@ -107,16 +109,17 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
     }
     return pointsGeometry(out, seed, 'snow');
   }, [seed]);
+  // Бульбашки піднімаються з лагуни острова (ADR-0223) і з двох щілин біля неї.
+  const lagoon = useMemo(() => buildReefIsland(seed, island).lagoon, [seed, island]);
   const bubbles = useMemo(() => {
     const out: number[] = [];
     for (let k = 0; k < 18; k += 1) {
-      const vent = Math.floor(unit(seed, `bubble${k}:v`) * 3);
-      const a = unit(seed, `vent${vent}:a`) * Math.PI * 2;
-      const r = island * (0.55 + 0.35 * unit(seed, `vent${vent}:r`));
-      out.push(Math.cos(a) * r, 0, Math.sin(a) * r);
+      const a = unit(seed, `bubble${k}:a`) * Math.PI * 2;
+      const r = lagoon.r * Math.sqrt(unit(seed, `bubble${k}:r`));
+      out.push(lagoon.x + Math.cos(a) * r, 0.02, lagoon.z + Math.sin(a) * r);
     }
     return pointsGeometry(out, seed, 'bubble');
-  }, [seed, island]);
+  }, [seed, lagoon]);
 
   const materials = useMemo(() => {
     const ground = PORTAL_GROUND_Y;
@@ -146,7 +149,8 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
       const r = Math.hypot(p[0], p[2]) * scale;
       const squeezed = inner + ((r - inner) * (island * 0.9 - inner)) / Math.max(1e-6, outerModel * scale - inner);
       const k = squeezed / Math.max(1e-6, r);
-      dummy.position.set(p[0] * scale * k, 0.01, p[2] * scale * k);
+      // Трава стоїть на куполі верхівки острова (ADR-0223).
+      dummy.position.set(p[0] * scale * k, reefIslandGround(island, squeezed) - 0.005, p[2] * scale * k);
       dummy.rotation.set(0, unit(seed, `grass${i}:turn`) * Math.PI * 2, 0);
       dummy.scale.setScalar(0.14 + 0.2 * unit(seed, `grass${i}:h`));
       dummy.updateMatrix();
@@ -175,7 +179,8 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
 
   return (
     <>
-      <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
+      <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />
+      <ReefIsland seed={seed} theme={theme} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         {geometry.seagrass.length > 0 && (
           <instancedMesh ref={grassRef} args={[tuft, materials.grass, geometry.seagrass.length]} frustumCulled={false} />
