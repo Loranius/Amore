@@ -19,7 +19,9 @@ export interface TreeV2Frame {
 }
 
 export function treeV2Frame(geometry: TreeV2Geometry): TreeV2Frame {
-  const reference = ARTIFACT_FIT_HEIGHT / ADULT_HEIGHT;
+  // Дерево референсу — головне в кадрі, над островом (ADR-0222): доросле
+  // трохи вище за рамку артефакту, острів лишається спільного розміру.
+  const reference = (ARTIFACT_FIT_HEIGHT * 1.45) / ADULT_HEIGHT;
   const contain = ARTIFACT_FIT_WIDTH / Math.max(1e-3, geometry.crownRadius * 2);
   const scale = Math.min(reference, contain);
   return { scale, height: geometry.height * scale, reach: geometry.crownRadius * scale };

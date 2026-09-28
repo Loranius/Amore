@@ -31,7 +31,7 @@ export const DIORAMA_PALETTES: Record<DioramaSpecies, Record<'light' | 'dark', D
     dark: { top: '#15123a', bottom: '#3a2a6e', glow: '#ff8fd6', ground: '#4f6aa6', cliff: '#45427f', mote: '#ffc4f0', moteStrength: 0.9 },
   },
   tree: {
-    light: { top: '#94d3f2', bottom: '#ffe0bd', glow: '#fff6dc', ground: '#9fd66c', cliff: '#c19375', mote: '#fff6c8', moteStrength: 0.5 },
+    light: { top: '#7fc4ef', bottom: '#e2f4fc', glow: '#ffffff', ground: '#9fd66c', cliff: '#c19375', mote: '#fff6c8', moteStrength: 0.5 },
     // Небо дерева ДЕННЕ в будь-якій темі (artifactThemes.css): чорнило шапки над
     // ним темне в обох темах і виміряне проти #7fb8e6. Уночі — вечірня гама
     // того ж світлого неба, а не ніч.

@@ -43,6 +43,13 @@ function deviate(d: V3, angleDeg: number, turnDeg: number): V3 {
 }
 
 export interface TreeV2Branch { start: V3; end: V3; r0: number; r1: number; order: number; key: string }
+/**
+ * Товщина деревини відносно моделі (ADR-0222): референс власника — кремезний
+ * стовбур під круглою кроною. Модель росту (`trunkRadius`) лишається як є,
+ * змінюється лише те, як її зображено; зведення двійника радіусів не містить.
+ */
+export const TREE_GIRTH = 1.5;
+
 export interface TreeV2Cluster { centre: V3; radius: number; key: string }
 
 export function treeV2Skeleton(model: TreeV2Model): { branches: TreeV2Branch[]; clusters: TreeV2Cluster[] } {
@@ -98,8 +105,8 @@ export function treeV2Skeleton(model: TreeV2Model): { branches: TreeV2Branch[]; 
   for (const b of branches) {
     b.start = mul(b.start, s);
     b.end = mul(b.end, s);
-    b.r0 *= model.trunkRadius;
-    b.r1 *= model.trunkRadius;
+    b.r0 *= model.trunkRadius * TREE_GIRTH;
+    b.r1 *= model.trunkRadius * TREE_GIRTH;
   }
   for (const c of clusters) {
     c.centre = mul(c.centre, s);
@@ -111,7 +118,7 @@ export function treeV2Skeleton(model: TreeV2Model): { branches: TreeV2Branch[]; 
 export function treeV2Roots(model: TreeV2Model): Omit<TreeV2Branch, 'order'>[] {
   const seed = model.startDate;
   const n = model.roots;
-  const r = model.trunkRadius;
+  const r = model.trunkRadius * TREE_GIRTH;
   const out: Omit<TreeV2Branch, 'order'>[] = [];
   for (let i = 0; i < n; i += 1) {
     const phi = rad((i * 360) / n + (unit(seed, `root${i}:az`) - 0.5) * 40);

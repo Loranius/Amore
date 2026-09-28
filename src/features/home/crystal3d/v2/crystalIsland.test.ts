@@ -18,7 +18,7 @@ function paints(mesh: ReturnType<typeof buildCrystalIsland>['island']) {
 describe('острів кристала', () => {
   it('має всі частини референсу: бруківку, скелю, руїни, плющ, самоцвіти, землю', () => {
     const used = paints(isle.island);
-    for (const p of Object.values(PAINT)) expect(used.has(p)).toBe(true);
+    for (const p of [PAINT.paving, PAINT.cliff, PAINT.ruin, PAINT.ivy, PAINT.gem, PAINT.dirt]) expect(used.has(p)).toBe(true);
   });
 
   it('трикутники цілі, числа скінченні, атрибути на кожну вершину', () => {

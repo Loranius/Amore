@@ -15,6 +15,8 @@ from typing import Any
 from .hashing import unit
 
 UP = (0.0, 1.0, 0.0)
+# Товщина деревини відносно моделі (ADR-0222) — дзеркало TREE_GIRTH у TS.
+TREE_GIRTH = 1.5
 
 
 def _add(a, b):
@@ -102,7 +104,7 @@ def skeleton(model: dict[str, Any]) -> dict[str, Any]:
     # Масштаб: верх крони — рівно висота моделі.
     top = max([b["end"][1] for b in branches] + [c["centre"][1] + c["radius"] for c in clusters])
     s = model["height"] / top
-    radius_scale = model["trunkRadius"]  # радіуси рахувались від 1.0 у стовбура
+    radius_scale = model["trunkRadius"] * TREE_GIRTH  # радіуси рахувались від 1.0 у стовбура
     for b in branches:
         b["start"] = _mul(b["start"], s)
         b["end"] = _mul(b["end"], s)
@@ -119,7 +121,7 @@ def roots(model: dict[str, Any]) -> list[dict[str, Any]]:
     seed = model["startDate"]
     n = model["roots"]
     out = []
-    r = model["trunkRadius"]
+    r = model["trunkRadius"] * TREE_GIRTH
     for i in range(n):
         phi = math.radians(i * 360.0 / n + (unit(seed, f"root{i}:az") - 0.5) * 40.0)
         length = model["rootReach"] * (0.7 + 0.5 * unit(seed, f"root{i}:len"))

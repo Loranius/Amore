@@ -29,7 +29,7 @@ export interface MeadowPalette {
 export const MEADOW_PALETTES: Record<'light' | 'dark', MeadowPalette> = {
   light: {
     bark: '#8c6149',
-    leaf: '#6cc56a',
+    leaf: '#86cc4a',
     leafAutumn: '#f4a64e',
     grass: '#7fcf5e',
     fog: '#ffcf9e',
@@ -42,7 +42,7 @@ export const MEADOW_PALETTES: Record<'light' | 'dark', MeadowPalette> = {
   dark: {
     // Небо дерева денне й у темній темі (artifactThemes.css) — листя теж.
     bark: '#86594a',
-    leaf: '#62b964',
+    leaf: '#7cc044',
     leafAutumn: '#ee9a4a',
     grass: '#74c258',
     fog: '#3c2f5e',
@@ -141,6 +141,8 @@ export function createLeafMaterial(p: MeadowPalette, fogNear: number, fogFar: nu
       ...litUniforms(p, fogNear, fogFar),
       uLeaf: { value: colour(p.leaf) },
       uAutumn: { value: colour(p.leafAutumn) },
+      // Верх кластерів жовтіє на сонці, як лаймова крона референсу (ADR-0222).
+      uSunLeaf: { value: colour('#e4ec5a') },
       uTime: { value: 0 },
       uWind: { value: 1 },
       uGround: { value: ground },
@@ -169,6 +171,7 @@ export function createLeafMaterial(p: MeadowPalette, fogNear: number, fogFar: nu
     fragmentShader: /* glsl */ `
       uniform vec3 uLeaf;
       uniform vec3 uAutumn;
+      uniform vec3 uSunLeaf;
       varying vec3 vWorld;
       varying float vTone;
       varying float vAutumn;
@@ -176,6 +179,7 @@ export function createLeafMaterial(p: MeadowPalette, fogNear: number, fogFar: nu
       void main() {
         vec3 n = flatNormal(vWorld);
         vec3 base = mix(uLeaf, uAutumn, vAutumn) * vTone;
+        base = mix(base, uSunLeaf * vTone, smoothstep(0.35, 0.95, n.y) * 0.45 * (1.0 - vAutumn));
         vec3 c = lit(base, n) + base * pow(max(0.0, n.y), 3.0) * 0.18;
         gl_FragColor = vec4(fogged(c, vWorld), 1.0);
         ${END}

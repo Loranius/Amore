@@ -21,8 +21,8 @@ const KEY = new THREE.Vector3(-0.45, 0.8, 0.4).normalize();
 
 /** Фарби: бруківка, скеля, камінь руїн, плющ, самоцвіт, земля між плитами. */
 const ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
-  light: ['#dcc3c6', '#6d5c96', '#d9c6c4', '#5fae45', '#ff8fd0', '#7d6878'],
-  dark: ['#a591b0', '#3c3163', '#ad9cba', '#4a9440', '#ff82d2', '#473c57'],
+  light: ['#dcc3c6', '#6d5c96', '#d9c6c4', '#5fae45', '#ff8fd0', '#7d6878', '#ffffff', '#9c86cf'],
+  dark: ['#a591b0', '#3c3163', '#ad9cba', '#4a9440', '#ff82d2', '#473c57', '#d8cff0', '#3a2c6c'],
 };
 
 /** Далекий грот: силуети, що тонуть у повітрі, і промені. */
@@ -32,14 +32,15 @@ const CAVE: Record<'light' | 'dark', { far: string; air: string; ray: string }> 
   dark: { far: '#2e2458', air: '#3a2c6c', ray: '#ffb8ec' },
 };
 
-function createIslandMaterial(theme: 'light' | 'dark'): THREE.ShaderMaterial {
+/** Матеріал острова: фарба з палітри (8 кольорів), м'яке світло діорами. */
+export function createIslandMaterial(paints: readonly string[]): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     // Обидва боки: віяла кришок плит і кавалків закручені як прийдеться, а
     // нормаль шейдер однаково повертає до камери. Перший кадр показав
     // бруківку білою сіткою — кришки відсікались, лишались самі стінки.
     side: THREE.DoubleSide,
     uniforms: {
-      uPaint: { value: ISLAND_PAINTS[theme].map((hex) => new THREE.Color(hex)) },
+      uPaint: { value: paints.map((hex) => new THREE.Color(hex)) },
       uKey: { value: KEY.clone() },
       uAmbient: { value: 0.52 },
       uTime: { value: 0 },
@@ -62,7 +63,7 @@ function createIslandMaterial(theme: 'light' | 'dark'): THREE.ShaderMaterial {
       }
     `,
     fragmentShader: /* glsl */ `
-      uniform vec3 uPaint[6];
+      uniform vec3 uPaint[8];
       uniform vec3 uKey;
       uniform float uAmbient;
       uniform float uTime;
@@ -77,7 +78,7 @@ function createIslandMaterial(theme: 'light' | 'dark'): THREE.ShaderMaterial {
         if (dot(n, view) < 0.0) n = -n;
         int i = int(vPaint + 0.5);
         vec3 base = uPaint[0];
-        for (int k = 1; k < 6; k++) if (k == i) base = uPaint[k];
+        for (int k = 1; k < 8; k++) if (k == i) base = uPaint[k];
         vec3 c = dioramaShade(base * vTone, n, view);
         // Самоцвіти в скелі світяться самі й повільно дихають.
         c = mix(c, base * (1.25 + 0.2 * sin(uTime * 1.3 + vWorld.x * 3.0)), vGlow * 0.85);
@@ -88,7 +89,7 @@ function createIslandMaterial(theme: 'light' | 'dark'): THREE.ShaderMaterial {
   });
 }
 
-function meshGeometry(mesh: IslandMesh) {
+export function meshGeometry(mesh: IslandMesh) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
   g.setAttribute('paint', new THREE.BufferAttribute(mesh.paint, 1));
@@ -224,7 +225,7 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
   }, [seed]);
   const glowHex = `#${glowColour.getHexString()}`;
   const materials = useMemo(() => ({
-    island: createIslandMaterial(theme),
+    island: createIslandMaterial(ISLAND_PAINTS[theme]),
     cave: createCaveMaterial(CAVE[theme].far, CAVE[theme].air),
     ray: createRayMaterial(CAVE[theme].ray),
     core: createGlowMaterial(glowHex, theme === 'dark' ? 1.2 : 0.9),

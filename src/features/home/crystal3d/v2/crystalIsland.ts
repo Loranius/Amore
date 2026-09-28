@@ -14,10 +14,15 @@
 // ============================================================
 import { unit } from '@/engine/species/crystalV2/hash';
 
-type V3 = [number, number, number];
+export type V3 = [number, number, number];
 
 /** Фарби: бруківка, скеля, камінь руїн, плющ, самоцвіт, земля між плитами. */
-export const PAINT = { paving: 0, cliff: 1, ruin: 2, ivy: 3, gem: 4, dirt: 5 } as const;
+/**
+ * Фарби острова. Значення — індекс палітри; острів дерева (ADR-0222) читає ті
+ * самі індекси як траву, скелю, валуни, плющ, квіти й ґрунт, а 6 і 7 — хмари
+ * й далекі острівці.
+ */
+export const PAINT = { paving: 0, cliff: 1, ruin: 2, ivy: 3, gem: 4, dirt: 5, cloud: 6, far: 7 } as const;
 export type Paint = (typeof PAINT)[keyof typeof PAINT];
 
 export interface IslandMesh {
@@ -28,7 +33,7 @@ export interface IslandMesh {
   glow: Float32Array;
 }
 
-class Painter {
+export class Painter {
   readonly positions: number[] = [];
   readonly paint: number[] = [];
   readonly tone: number[] = [];
@@ -71,7 +76,7 @@ class Painter {
   }
 }
 
-const polar = (r: number, a: number, y: number): V3 => [Math.cos(a) * r, y, Math.sin(a) * r];
+export const polar = (r: number, a: number, y: number): V3 => [Math.cos(a) * r, y, Math.sin(a) * r];
 
 /** Коробка вздовж осі від `a` до `b` з квадратним перерізом `w`×`d`. */
 function box(p: Painter, a: V3, b: V3, w: number, d: number, paint: Paint, tone: number) {
@@ -93,7 +98,7 @@ function box(p: Painter, a: V3, b: V3, w: number, d: number, paint: Paint, tone:
 }
 
 /** Гранчастий кавалок: ікосаедр із зсунутими вершинами. */
-function chunk(p: Painter, seed: string, key: string, c: V3, size: number, paint: Paint, glow = 0, squash = 1) {
+export function chunk(p: Painter, seed: string, key: string, c: V3, size: number, paint: Paint, glow = 0, squash = 1) {
   const t = (1 + Math.sqrt(5)) / 2;
   const base: V3[] = [
     [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t],
@@ -117,7 +122,7 @@ function chunk(p: Painter, seed: string, key: string, c: V3, size: number, paint
  * Дрібний і дешевий, тож купу можна скласти з десятка, а не з трьох
  * великих кавалків (власник: «дрібніший плющ, як у референсі»).
  */
-function leaf(p: Painter, seed: string, key: string, c: V3, size: number) {
+export function leaf(p: Painter, seed: string, key: string, c: V3, size: number) {
   const a = unit(seed, `${key}:turn`) * Math.PI * 2;
   const tilt = (unit(seed, `${key}:tilt`) - 0.5) * 1.2;
   const along: V3 = [Math.cos(a) * size, Math.sin(tilt) * size * 0.6, Math.sin(a) * size];
@@ -142,7 +147,7 @@ function leaf(p: Painter, seed: string, key: string, c: V3, size: number) {
  * кавалки читались зеленим конфеті, потім — крупною капустою; у референсі
  * плющ дрібнолистий.
  */
-function ivy(p: Painter, seed: string, key: string, c: V3, size: number) {
+export function ivy(p: Painter, seed: string, key: string, c: V3, size: number) {
   // 10–16 листочків середнього розміру: надто дрібні читались цятками.
   const n = 10 + Math.floor(unit(seed, `${key}:n`) * 7);
   for (let k = 0; k < n; k += 1) {
