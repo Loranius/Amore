@@ -1,14 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 
-const visualUserName = process.env.VISUAL_USER_NAME?.trim();
-const visualUserPin = process.env.VISUAL_USER_PIN?.trim();
-
-async function enterPin(page: Page, pin: string) {
-  for (const digit of pin) {
-    if (!/^\d$/.test(digit)) throw new Error('VISUAL_USER_PIN must contain digits only.');
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
-}
 
 test.describe('Amore mobile visual preview', () => {
   test('captures login and authenticated wishlist', async ({ page }, testInfo) => {
@@ -20,17 +12,16 @@ test.describe('Amore mobile visual preview', () => {
       fullPage: true,
     });
 
-    if (!visualUserName || !visualUserPin) {
+    if (!hasVisualCredentials) {
       testInfo.annotations.push({
         type: 'notice',
         description:
-          'Authenticated wishlist capture skipped. Add VISUAL_USER_NAME and VISUAL_USER_PIN repository secrets.',
+          'Authenticated wishlist capture skipped. Add VISUAL_USER_EMAIL and VISUAL_USER_PASSWORD repository secrets.',
       });
       return;
     }
 
-    await page.getByRole('button', { name: visualUserName, exact: true }).click();
-    await enterPin(page, visualUserPin);
+    await loginByEmail(page);
 
     await page.waitForURL(/#\/?$/, { timeout: 20_000 });
     await page.goto('./#/wishlist', { waitUntil: 'networkidle' });

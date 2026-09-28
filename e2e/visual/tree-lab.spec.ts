@@ -1,10 +1,9 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 import { expectTreeAcceptancePass } from './treeAcceptance';
 
 
 
-const userName = process.env.VISUAL_USER_NAME ?? '';
-const userPin = process.env.VISUAL_USER_PIN ?? '';
 /*
  * СТЕЛІ ЗГУСТКІВ І ЛИСТЯ ЙДУТЬ ЗА `engine/foliage/config.ts`, А НЕ ЗА ПАМ'ЯТТЮ.
  *
@@ -34,11 +33,7 @@ const TREE_MATERIAL_QUANTIZATION = 16;
 
 async function login(page: Page, url: string) {
   await page.goto(url);
-  await page.getByRole('button', { name: userName, exact: true }).click();
-
-  for (const digit of userPin) {
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
+  await loginByEmail(page);
 }
 
 function numericAttribute(value: string | null, name: string): number {
@@ -242,7 +237,7 @@ async function expectRuntimeBudget(preview: Locator) {
 }
 
 test.describe('Tree Species Pixel 8 Pro preview', () => {
-  test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
+  test.skip(!hasVisualCredentials, 'Visual preview credentials are required');
 
   test('keeps the deterministic fixture baseline inside the mobile budget', async ({ page }) => {
     await login(page, '?engine=tree-lab&treeSource=fixture&treeLod=medium#/login');

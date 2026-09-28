@@ -78,8 +78,8 @@ jobs:
       - name: Capture mobile visual preview
         run: npx playwright test
         env:
-          VISUAL_USER_NAME: ${{ secrets.VISUAL_USER_NAME }}
-          VISUAL_USER_PIN: ${{ secrets.VISUAL_USER_PIN }}
+          VISUAL_USER_EMAIL: ${{ secrets.VISUAL_USER_EMAIL }}
+          VISUAL_USER_PASSWORD: ${{ secrets.VISUAL_USER_PASSWORD }}
 
       - name: Upload screenshots, traces and report
         if: failure()

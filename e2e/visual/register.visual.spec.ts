@@ -90,7 +90,7 @@ test.describe('Реєстрація пари на Pixel 8 Pro', () => {
 
     // І двері назад ведуть на вхід, а не в нікуди.
     await page.locator('.reg-next').first().click();
-    await expect(page.locator('.user-select')).toBeVisible();
+    await expect(page.locator('.auth-tabs')).toBeVisible();
 
     expect(sent, 'зайнятий портал не сміє нічого надсилати').toBe(0);
     await page.screenshot({ path: testInfo.outputPath('register-taken.png'), fullPage: true });
@@ -120,13 +120,9 @@ test.describe('Реєстрація пари на Pixel 8 Pro', () => {
       });
     });
 
-    // ── Порожній портал пропонує створити, а не показує пустий список ──
-    await page.goto('./#/login', { waitUntil: 'networkidle' });
-    // Список місць пари — за посиланням старого входу (ADR-0228).
-    await page.getByRole('button', { name: 'Увійти старим PIN-кодом' }).click();
-    await expect(page.locator('.auth-title')).toHaveText('Тут ще нікого немає', { timeout: 20_000 });
-    await expect(page.locator('.user-btn')).toHaveCount(0);
-    await page.locator('a.reg-next').click();
+    // ── Порожній портал: сюди веде «Створити портал» після реєстрації
+    // поштою (стан `empty`, ADR-0228); список місць на вході прибрано.
+    await page.goto('./#/register', { waitUntil: 'networkidle' });
 
     // ── Крок 1: імена ────────────────────────────────────────────────
     await expect(page.locator('.auth-title')).toHaveText('Хто ви двоє?');

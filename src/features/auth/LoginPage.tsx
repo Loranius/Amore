@@ -9,8 +9,9 @@
 // підтвердити старим PIN — так пошта прив'язується до наявної історії, і
 // жоден рядок у базі не губиться.
 //
-// Старий вхід за PIN лишається посиланням під формою: поки пошту не
-// прив'язано, це єдиний шлях Діми й Лєни всередину.
+// Вхід за PIN прибрано з цього екрана (власник, 2026-09-28): обидва місця
+// пари прив'язані до пошти. PIN лишився одноразовим — ним підтверджують
+// місце при першому вході поштою.
 //
 // На тлі — три летючі острівці з кристалом, деревом і рифом, щоразу інші
 // (`AuthIslands.tsx`), вантажаться ліниво: вхід від них не чекає.
@@ -19,8 +20,7 @@ import { Suspense, lazy, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth, type LinkResult } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
-import { useUsers } from '@/features/_shared/useUsers';
-import type { AppUser, PortalSeat } from '@/types';
+import type { PortalSeat } from '@/types';
 import { PortalConfetti } from './PortalConfetti';
 import {
   CODE_RE,
@@ -47,8 +47,6 @@ type Step =
   | { kind: 'claim-pin'; seat: PortalSeat; seats: PortalSeat[] }
   | { kind: 'empty' }
   | { kind: 'taken' }
-  | { kind: 'legacy' }
-  | { kind: 'legacy-pin'; user: AppUser }
   | { kind: 'portal'; name: string };
 
 /** Скільки чекати перед повторним листом — межа Supabase на відправку. */
@@ -110,7 +108,7 @@ function Flow({ tab, step, setStep, switchTab }: FlowProps) {
   switch (step.kind) {
     case 'form':
       return tab === 'login'
-        ? <LoginForm follow={follow} onForgot={() => switchTab('register')} onLegacy={() => setStep({ kind: 'legacy' })} />
+        ? <LoginForm follow={follow} onForgot={() => switchTab('register')} />
         : <EmailForm onSent={(email) => setStep({ kind: 'code', email })} />;
     case 'code':
       return <CodeForm email={step.email} onVerified={() => setStep({ kind: 'password' })} onBack={() => setStep({ kind: 'form' })} />;
@@ -155,10 +153,6 @@ function Flow({ tab, step, setStep, switchTab }: FlowProps) {
           </button>
         </>
       );
-    case 'legacy':
-      return <LegacyPicker onPick={(user) => setStep({ kind: 'legacy-pin', user })} onBack={() => setStep({ kind: 'form' })} />;
-    case 'legacy-pin':
-      return <LegacyPin user={step.user} onDone={(name) => setStep({ kind: 'portal', name })} onBack={() => setStep({ kind: 'legacy' })} />;
     case 'portal':
       return (
         <>
@@ -171,10 +165,9 @@ function Flow({ tab, step, setStep, switchTab }: FlowProps) {
 }
 
 // ── Вхід ─────────────────────────────────────────────────────
-function LoginForm({ follow, onForgot, onLegacy }: {
+function LoginForm({ follow, onForgot }: {
   follow: (result: LinkResult) => string | null;
   onForgot: () => void;
-  onLegacy: () => void;
 }) {
   const { loginWithEmail } = useAuth();
   const [email, setEmail] = useState('');
@@ -215,7 +208,6 @@ function LoginForm({ follow, onForgot, onLegacy }: {
       <button type="submit" className="btn reg-next" disabled={busy}>{busy ? 'Входимо…' : 'Увійти'}</button>
       <div className="auth-links">
         <button type="button" className="auth-link" onClick={onForgot}>Забули пароль?</button>
-        <button type="button" className="auth-link" onClick={onLegacy}>Увійти старим PIN-кодом</button>
       </div>
     </form>
   );
@@ -389,52 +381,7 @@ function PasswordForm({ onSaved }: { onSaved: () => Promise<string | null> }) {
   );
 }
 
-// ── Вибір місця / людини ─────────────────────────────────────
-function SeatPicker({ title, hint, people, onPick, onBack }: {
-  title: string;
-  hint?: string;
-  people: readonly { id: number; name: string }[];
-  onPick: (person: { id: number; name: string }) => void;
-  onBack?: () => void;
-}) {
-  return (
-    <>
-      <h1 className="auth-title">{title}</h1>
-      {hint && <p className="reg-hint">{hint}</p>}
-      <div className="user-select">
-        {people.map((p) => (
-          <button key={p.id} type="button" className="user-btn" onClick={() => onPick(p)}>{p.name}</button>
-        ))}
-      </div>
-      {onBack && <button type="button" className="auth-link" onClick={onBack}>Назад до пошти</button>}
-    </>
-  );
-}
-
-function LegacyPicker({ onPick, onBack }: { onPick: (user: AppUser) => void; onBack: () => void }) {
-  const { data: users, isPending, isError } = useUsers();
-  if (isPending) return <p className="reg-hint">Завантаження…</p>;
-  if (isError) return <p className="reg-problem">Не вдалося завантажити користувачів. Перевір зʼєднання.</p>;
-  if ((users?.length ?? 0) === 0) {
-    return (
-      <>
-        <h1 className="auth-title">Тут ще нікого немає</h1>
-        <Link className="btn reg-next" to="/register">Створити портал</Link>
-        <button type="button" className="auth-link" onClick={onBack}>Назад до пошти</button>
-      </>
-    );
-  }
-  return (
-    <SeatPicker
-      title="Хто сьогодні заходить у портал? 💗"
-      people={users ?? []}
-      onPick={(p) => onPick(p as AppUser)}
-      onBack={onBack}
-    />
-  );
-}
-
-// ── PIN: старий вхід і підтвердження місця ───────────────────
+// ── PIN: підтвердження місця ───────────────────
 function PinPad({ name, hint, onSubmit, onBack }: {
   name: string;
   hint?: string;
@@ -491,23 +438,7 @@ function PinPad({ name, hint, onSubmit, onBack }: {
 function pinProblem(reason: string, retryAfterSeconds?: number): string {
   if (reason === 'locked') return `Забагато спроб, спробуй через ${Math.max(1, Math.ceil((retryAfterSeconds ?? 900) / 60))} хв`;
   if (reason === 'invalid') return 'Невірний PIN, спробуй ще';
-  if (reason === 'moved_to_email') return 'Це місце вже входить поштою й паролем';
   return 'Не вдалося увійти. Спробуй ще раз.';
-}
-
-function LegacyPin({ user, onDone, onBack }: { user: AppUser; onDone: (name: string) => void; onBack: () => void }) {
-  const { login } = useAuth();
-  return (
-    <PinPad
-      name={user.name}
-      onBack={onBack}
-      onSubmit={async (pin) => {
-        const res = await login(user.id, pin);
-        if (res.ok) { onDone(user.name); return null; }
-        return pinProblem(res.reason, res.reason === 'locked' ? res.retryAfterSeconds : undefined);
-      }}
-    />
-  );
 }
 
 function ClaimPin({ seat, onDone, onBack, onNoPin }: {

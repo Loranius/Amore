@@ -1,4 +1,5 @@
 import { expect, test, type Page, type Locator } from '@playwright/test';
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 import { expectTreeAcceptancePass } from './treeAcceptance';
 import { DEFAULT_TREE_GROUND_DETAIL_CONFIG } from '../../src/engine/groundDetail/config';
 
@@ -14,15 +15,9 @@ import { DEFAULT_TREE_GROUND_DETAIL_CONFIG } from '../../src/engine/groundDetail
 const PER_KIND = DEFAULT_TREE_GROUND_DETAIL_CONFIG.maximumInstancesByKindByLod.medium;
 const EXPECTED_INSTANCES = PER_KIND.stone + PER_KIND['fallen-leaf'] + PER_KIND.moss;
 
-const userName = process.env.VISUAL_USER_NAME ?? '';
-const userPin = process.env.VISUAL_USER_PIN ?? '';
-
 async function login(page: Page, url: string) {
   await page.goto(url);
-  await page.getByRole('button', { name: userName, exact: true }).click();
-  for (const digit of userPin) {
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
+  await loginByEmail(page);
 }
 
 function numeric(value: string | null, name: string): number {
@@ -32,7 +27,7 @@ function numeric(value: string | null, name: string): number {
 }
 
 test.describe('Tree Ground Detail Pixel 8 Pro acceptance', () => {
-  test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
+  test.skip(!hasVisualCredentials, 'Visual preview credentials are required');
 
   test('renders stable stones, fallen leaves and moss in one instanced draw call', async ({ page }) => {
     await login(page, '?engine=tree-lab&treeSource=fixture&treeLod=medium#/login');

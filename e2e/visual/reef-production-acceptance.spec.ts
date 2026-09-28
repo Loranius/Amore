@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 
 /*
  * ПЕРША ЖИВА ПЕРЕВІРКА РИФА (ADR-0204).
@@ -37,15 +38,9 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
  * у всіх 61 випадку без винятку.
  */
 
-const userName = process.env.VISUAL_USER_NAME ?? '';
-const userPin = process.env.VISUAL_USER_PIN ?? '';
-
 async function login(page: Page, url: string) {
   await page.goto(url);
-  await page.getByRole('button', { name: userName, exact: true }).click();
-  for (const digit of userPin) {
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
+  await loginByEmail(page);
 }
 
 /** Голова рифа — одна на будь-який вік. */
@@ -131,7 +126,7 @@ async function readReef(reef: Locator): Promise<ReefFacts> {
 }
 
 test.describe('Reef production acceptance Pixel 8 Pro', () => {
-  test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
+  test.skip(!hasVisualCredentials, 'Visual preview credentials are required');
 
   test('builds the couple’s reef and keeps its shape invariants', async ({ page }) => {
     test.slow();

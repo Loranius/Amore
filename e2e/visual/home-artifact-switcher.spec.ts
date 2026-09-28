@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 /*
  * ІМПОРТІВ ІЗ СТАРОЇ ПІДСИСТЕМИ РИФА ТУТ БІЛЬШЕ НЕМАЄ (ADR-0172).
  *
@@ -15,19 +16,13 @@ import { expect, test, type Page } from '@playwright/test';
  * Мораль: мертвий тест не «просто червоний». Він тягне за собою живі.
  */
 
-const userName = process.env.VISUAL_USER_NAME ?? '';
-const userPin = process.env.VISUAL_USER_PIN ?? '';
-
 async function login(page: Page, url: string) {
   await page.goto(url);
-  await page.getByRole('button', { name: userName, exact: true }).click();
-  for (const digit of userPin) {
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
+  await loginByEmail(page);
 }
 
 test.describe('Home artifact switcher Pixel 8 Pro', () => {
-  test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
+  test.skip(!hasVisualCredentials, 'Visual preview credentials are required');
 
   test('switches between the accepted Crystal, Tree and Reef renderers', async ({ page }) => {
     test.slow();

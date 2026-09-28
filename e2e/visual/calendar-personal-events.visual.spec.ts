@@ -1,16 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-
-const visualUserName = process.env.VISUAL_USER_NAME?.trim();
-const visualUserPin = process.env.VISUAL_USER_PIN?.trim();
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 
 async function login(page: Page) {
-  test.skip(!visualUserName || !visualUserPin, 'Visual login secrets are required');
+  test.skip(!hasVisualCredentials, 'Visual login secrets are required');
 
   await page.goto('./#/login', { waitUntil: 'networkidle' });
-  await page.getByRole('button', { name: visualUserName!, exact: true }).click();
-  for (const digit of visualUserPin!) {
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
+  await loginByEmail(page);
   await page.waitForURL(/#\/?$/, { timeout: 20_000 });
 }
 

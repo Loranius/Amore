@@ -91,3 +91,12 @@ describe('сервер тримає ті самі межі, що й екран',
     expect(fn).not.toContain('deleteUser');
   });
 });
+
+describe('екран входу без PIN (власник: обидва місця прив\'язані до пошти)', () => {
+  const page = readFileSync(join(__dirname, 'LoginPage.tsx'), 'utf8');
+
+  it('посилання «Увійти старим PIN-кодом» і список імен пари на вході прибрано', () => {
+    expect(page).not.toContain('Увійти старим PIN-кодом');
+    expect(page).not.toContain('Хто сьогодні заходить у портал');
+  });
+});

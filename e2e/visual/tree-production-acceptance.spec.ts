@@ -1,17 +1,12 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 import { expectTreeAcceptancePass } from './treeAcceptance';
 
 
 
-const userName = process.env.VISUAL_USER_NAME ?? '';
-const userPin = process.env.VISUAL_USER_PIN ?? '';
-
 async function login(page: Page, url: string) {
   await page.goto(url);
-  await page.getByRole('button', { name: userName, exact: true }).click();
-  for (const digit of userPin) {
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
+  await loginByEmail(page);
 }
 
 function numeric(value: string | null, name: string): number {
@@ -99,7 +94,7 @@ async function expectAcceptedContract(preview: Locator) {
 }
 
 test.describe('Tree Production Acceptance Pixel 8 Pro', () => {
-  test.skip(!userName || userPin.length !== 8, 'Visual preview credentials are required');
+  test.skip(!hasVisualCredentials, 'Visual preview credentials are required');
 
   test('publishes one reload-stable fixture contract for the complete tree pipeline', async ({ page }) => {
     await login(page, '?engine=tree-lab&treeSource=fixture&treeLod=medium#/login');

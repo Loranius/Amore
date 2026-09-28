@@ -12,9 +12,8 @@
 // еталонних картинок.
 // ============================================================
 import { expect, test } from '@playwright/test';
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 
-const visualUserName = process.env.VISUAL_USER_NAME;
-const visualUserPin = process.env.VISUAL_USER_PIN;
 
 /**
  * Маршрути з формами. Хеш — бо роутер HashRouter (GitHub Pages).
@@ -36,16 +35,11 @@ const ROUTES = [
 const IGNORED_TYPES = ['checkbox', 'radio', 'range', 'file', 'color', 'button', 'submit', 'reset', 'image'];
 
 async function login(page: import('@playwright/test').Page) {
-  test.skip(!visualUserName || !visualUserPin, 'Visual login secrets are required');
+  test.skip(!hasVisualCredentials, 'Visual login secrets are required');
 
+  // Вхід поштою й паролем (ADR-0228): PIN на екрані входу більше немає.
   await page.goto('/#/login');
-  // Вхід за PIN — посилання під формою пошти (ADR-0228).
-  await page.getByRole('button', { name: 'Увійти старим PIN-кодом' }).click();
-  await expect(page.getByRole('heading', { name: /Хто сьогодні заходить у портал/ })).toBeVisible();
-  await page.getByRole('button', { name: visualUserName!, exact: true }).click();
-  for (const digit of visualUserPin!) {
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
+  await loginByEmail(page);
   await page.waitForURL((url) => !url.hash.includes('/login'), { timeout: 15_000 });
 }
 

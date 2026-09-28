@@ -1,14 +1,6 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import { hasVisualCredentials, loginByEmail } from './emailLogin';
 
-const visualUserName = process.env.VISUAL_USER_NAME?.trim();
-const visualUserPin = process.env.VISUAL_USER_PIN?.trim();
-
-async function enterPin(page: Page, pin: string) {
-  for (const digit of pin) {
-    if (!/^\d$/.test(digit)) throw new Error('VISUAL_USER_PIN must contain digits only.');
-    await page.getByRole('button', { name: digit, exact: true }).click();
-  }
-}
 
 function numberAttribute(value: string | null, name: string): number {
   const parsed = Number(value);
@@ -18,18 +10,17 @@ function numberAttribute(value: string | null, name: string): number {
 
 test.describe('Evolution crystal Pixel 8 Pro acceptance', () => {
   test('renders real module data through the batched preview pipeline', async ({ page }, testInfo) => {
-    if (!visualUserName || !visualUserPin) {
+    if (!hasVisualCredentials) {
       testInfo.annotations.push({
         type: 'notice',
-        description: 'Evolution capture skipped. Add VISUAL_USER_NAME and VISUAL_USER_PIN repository secrets.',
+        description: 'Evolution capture skipped. Add VISUAL_USER_EMAIL and VISUAL_USER_PASSWORD repository secrets.',
       });
       return;
     }
 
     await page.goto('./?engine=evolution#/login', { waitUntil: 'networkidle' });
     await expect(page.locator('.auth-screen')).toBeVisible();
-    await page.getByRole('button', { name: visualUserName, exact: true }).click();
-    await enterPin(page, visualUserPin);
+    await loginByEmail(page);
     await page.waitForURL(/\?engine=evolution#\/?$/, { timeout: 20_000 });
 
     const preview = page.locator('[data-evolution-preview="ready"]');
