@@ -27,9 +27,9 @@ export interface TreePalette {
 
 export const TREE_PALETTES: Record<'light' | 'dark', TreePalette> = {
   light: {
-    bark: '#8c6149',
-    leaf: '#86cc4a',
-    leafAutumn: '#f4a64e',
+    bark: '#8a5236',
+    leaf: '#72c443',
+    leafAutumn: '#f5b83a',
     grass: '#7fcf5e',
     key: '#fff1d6',
     keyStrength: 1.0,
@@ -39,9 +39,9 @@ export const TREE_PALETTES: Record<'light' | 'dark', TreePalette> = {
   },
   dark: {
     // Небо дерева денне й у темній темі (artifactThemes.css) — листя теж.
-    bark: '#86594a',
-    leaf: '#7cc044',
-    leafAutumn: '#ee9a4a',
+    bark: '#7a4a34',
+    leaf: '#68b43e',
+    leafAutumn: '#eaa934',
     grass: '#74c258',
     // Вечірнє тепле світло, а не місячне синє старої луки.
     key: '#ffe0bf',
@@ -167,7 +167,7 @@ export function createLeafMaterial(p: TreePalette, ground: number): THREE.Shader
       void main() {
         vec3 n = flatNormal(vWorld);
         vec3 base = mix(uLeaf, uAutumn, vAutumn) * vTone;
-        base = mix(base, uSunLeaf * vTone, smoothstep(0.35, 0.95, n.y) * 0.45 * (1.0 - vAutumn));
+        base = mix(base, uSunLeaf * vTone, smoothstep(0.35, 0.95, n.y) * 0.2 * (1.0 - vAutumn));
         vec3 c = lit(base, n) + base * pow(max(0.0, n.y), 3.0) * 0.18;
         gl_FragColor = vec4(c, 1.0);
         ${END}

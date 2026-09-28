@@ -23,7 +23,7 @@ export function buildGrassTuft(): Float32Array {
 export interface GrassInstance { x: number; z: number; y: number; scale: number; turn: number }
 
 /** Пучки трави: густіше біля дерева, рідше до краю лугу; не на стовбурі. */
-export function grassInstances(seed: string, clear: number, reach: number, count = 420): GrassInstance[] {
+export function grassInstances(seed: string, clear: number, reach: number, count = 200): GrassInstance[] {
   // Трава лише на острівці діорами (ADR-0220): `reach` — трохи менше за
   // його радіус, щоб пучки не звисали з краю.
   const out: GrassInstance[] = [];

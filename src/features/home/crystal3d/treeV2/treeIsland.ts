@@ -101,42 +101,56 @@ export function buildTreeIsland(seed: string, radius: number): TreeIsland {
   }
 
   // ── Підошва: трав'яний звис, смуга ґрунту, скеля великими гранями ──
-  const layers = [
+  // Гранчастий low-poly за референсом (ADR-0226): звис трави й ґрунт ідуть
+  // за краєм (24 вершини), а скеля під ними — дванадцять сегментів із
+  // сильним розкидом, небагато широких граней, без горбиків-кавалків.
+  const top = [
     { r: 1.0, y: 0, paint: TREE_PAINT.grass },
-    { r: 1.02, y: -0.06, paint: TREE_PAINT.grass },
-    { r: 0.99, y: -0.12, paint: TREE_PAINT.soil },
-    { r: 0.93, y: -0.3, paint: TREE_PAINT.cliff },
-    { r: 0.76, y: -0.54, paint: TREE_PAINT.cliff },
-    { r: 0.5, y: -0.8, paint: TREE_PAINT.cliff },
-    { r: 0.2, y: -1.0, paint: TREE_PAINT.cliff },
+    { r: 1.02, y: -0.05, paint: TREE_PAINT.grass },
+    { r: 0.99, y: -0.1, paint: TREE_PAINT.soil },
   ] as const;
-  const layerRing = (li: number) => Array.from({ length: SEG }, (_, j): V3 => {
+  const topRing = (li: number) => Array.from({ length: SEG }, (_, j): V3 => {
     // Верхнє кільце підошви — ТІ САМІ вершини, що й край трави: інакше
     // між ними щілина, крізь яку видно нутро (регресія острова кристала).
     if (li === 0) return rim[j]!;
-    const L = layers[li]!;
-    const soft = li <= 2 ? 0.04 : 0.4;
-    const jitter = 1 - soft / 2 + soft * unit(seed, `tree-isle:cliff${li}:${j}:r`);
-    const a = ((j + (li >= 3 ? (li % 2) * 0.5 : 0)) / SEG) * Math.PI * 2;
-    return polar(rimR(j) * L.r * jitter, a, R * L.y * (li <= 2 ? 1 : 0.85 + 0.3 * unit(seed, `tree-isle:cliff${li}:${j}:y`)));
+    const L = top[li]!;
+    const jitter = 0.98 + 0.04 * unit(seed, `tree-isle:cliff${li}:${j}:r`);
+    return polar(rimR(j) * L.r * jitter, (j / SEG) * Math.PI * 2, R * L.y);
   });
-  const shells = layers.map((_, li) => layerRing(li));
-  for (let li = 0; li + 1 < shells.length; li += 1) {
-    const paint = layers[li + 1]!.paint;
-    p.band(shells[li + 1]!, shells[li]!, paint, (i) => (paint === TREE_PAINT.cliff ? 1 - 0.1 * (li - 2) : 0.92) * (0.85 + 0.3 * unit(seed, `tree-isle:cliff${li}:${i}:t`)));
+  const UNDER = 12;
+  const under = [
+    { r: 0.9, y: -0.38 },
+    { r: 0.62, y: -0.74 },
+    { r: 0.3, y: -1.02 },
+  ];
+  const deep = under.map((L, li) => Array.from({ length: UNDER }, (_, j): V3 => {
+    const a = ((j + (li % 2) * 0.5) / UNDER) * Math.PI * 2 + (unit(seed, `tree-isle:u${li}:${j}:a`) - 0.5) * 0.18;
+    return polar(R * L.r * (0.82 + 0.36 * unit(seed, `tree-isle:u${li}:${j}:r`)), a, R * L.y * (0.85 + 0.3 * unit(seed, `tree-isle:u${li}:${j}:y`)));
+  }));
+  const shells: V3[][] = [...top.map((_, li) => topRing(li)), ...deep];
+  for (let li = 0; li + 1 < top.length; li += 1) {
+    p.band(shells[li + 1]!, shells[li]!, top[li + 1]!.paint, (i) => 0.92 * (0.85 + 0.3 * unit(seed, `tree-isle:cliff${li}:${i}:t`)));
   }
-  const tip: V3 = [R * 0.04, -R * 1.2, -R * 0.05];
-  const last = shells[shells.length - 1]!;
-  for (let j = 0; j < SEG; j += 1) p.tri(last[(j + 1) % SEG]!, last[j]!, tip, TREE_PAINT.cliff, 0.5 + 0.1 * unit(seed, `tree-isle:tip${j}`));
-
-  // Великі грані референсу: кавалки, втоплені в скелю, ламають її рівні кільця.
-  for (let k = 0; k < 16; k += 1) {
-    const key = `tree-isle:face${k}`;
-    const li = 3 + Math.floor(unit(seed, `${key}:l`) * 3);
-    const j = Math.floor(unit(seed, `${key}:j`) * SEG);
-    const at = shells[li]![j]!;
-    chunk(p, seed, key, [at[0] * 0.96, at[1], at[2] * 0.96], R * (0.12 + 0.08 * unit(seed, `${key}:s`)) * (1.2 - 0.2 * (li - 3)), TREE_PAINT.cliff);
+  const cliffTone = (key: string, depth: number) => (1 - 0.1 * depth) * (0.82 + 0.34 * unit(seed, `tree-isle:ct:${key}`));
+  // Перехід від ґрунту (24 вершини) до скелі (12) — віялом, без щілини.
+  const soil = shells[top.length - 1]!;
+  const first = deep[0]!;
+  for (let i = 0; i < UNDER; i += 1) {
+    const a0 = soil[2 * i]!;
+    const a1 = soil[2 * i + 1]!;
+    const a2 = soil[(2 * i + 2) % SEG]!;
+    const b0 = first[i]!;
+    const b1 = first[(i + 1) % UNDER]!;
+    p.tri(b0, a1, a0, TREE_PAINT.cliff, cliffTone(`t${i}a`, 0));
+    p.tri(b0, b1, a1, TREE_PAINT.cliff, cliffTone(`t${i}b`, 0));
+    p.tri(b1, a2, a1, TREE_PAINT.cliff, cliffTone(`t${i}c`, 0));
   }
+  for (let li = 0; li + 1 < deep.length; li += 1) {
+    p.band(deep[li + 1]!, deep[li]!, TREE_PAINT.cliff, (i) => cliffTone(`${li}:${i}`, li + 1));
+  }
+  const tip: V3 = [R * 0.04, -R * 1.22, -R * 0.05];
+  const last = deep[deep.length - 1]!;
+  for (let j = 0; j < UNDER; j += 1) p.tri(last[(j + 1) % UNDER]!, last[j]!, tip, TREE_PAINT.cliff, 0.55 + 0.12 * unit(seed, `tree-isle:tip${j}`));
 
   // ── Валуни по краю, наполовину в траві ────────────────────
   for (let k = 0; k < 11; k += 1) {
@@ -217,7 +231,7 @@ export function buildTreeIsland(seed: string, radius: number): TreeIsland {
     // Нижче краю острова: над травою уламок пропливав перед деревом.
     const y = R * (-0.9 + 0.7 * unit(seed, `${key}:y`));
     const size = R * (0.06 + 0.08 * unit(seed, `${key}:s`));
-    chunk(debris, seed, key, polar(r, a, y), size, TREE_PAINT.cliff);
+    chunk(debris, seed, key, polar(r, a, y), size, TREE_PAINT.boulder);
     // Деякі уламки — з клаптем трави зверху, як відколоті від острова.
     // Клапоть лежить НА камені, врізаний у його верх: з відступом 0.7 він
     // висів над уламком окремою пластинкою.

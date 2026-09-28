@@ -294,7 +294,7 @@ export function buildTreeV2Geometry(model: TreeV2Model): TreeV2Geometry {
   const leafAutumn: number[] = [];
   for (const c of clusters) {
     const pts = ICO.verts.map((v, i): V3 => {
-      const k = c.radius * (0.82 + 0.3 * unit(seed, `${c.key}:v${i}`));
+      const k = c.radius * 1.14 * (0.82 + 0.3 * unit(seed, `${c.key}:v${i}`));
       return [c.centre[0] + v[0] * k, c.centre[1] + v[1] * k * 0.82, c.centre[2] + v[2] * k];
     });
     const autumn = unit(seed, `${c.key}:autumn`) < model.autumn ? 1 : 0;

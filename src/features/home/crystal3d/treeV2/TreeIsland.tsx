@@ -17,8 +17,8 @@ import { buildTreeIsland } from './treeIsland';
  * вечірнє світло того ж дня, а не ніч.
  */
 const TREE_ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
-  light: ['#8fd14f', '#a8827a', '#b7a4b4', '#4f9e36', '#ff9ad2', '#6b5048', '#ffffff', '#c9b3bf'],
-  dark: ['#80c24a', '#9a7370', '#a592a8', '#468f33', '#ff8cc8', '#5a423e', '#fff1e6', '#b8a2b2'],
+  light: ['#8fd14f', '#b88f94', '#b7a4b4', '#4f9e36', '#ff9ad2', '#6b5048', '#ffffff', '#c9b3bf'],
+  dark: ['#80c24a', '#9a767e', '#a592a8', '#468f33', '#ff8cc8', '#5a423e', '#fff1e6', '#b8a2b2'],
 };
 
 /** Повітря неба: далекі хмари й острівці тонуть у ньому. */

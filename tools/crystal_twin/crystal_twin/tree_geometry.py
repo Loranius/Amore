@@ -224,7 +224,7 @@ def cluster_triangles(seed: str, cluster: dict[str, Any]):
     c, r, key = cluster["centre"], cluster["radius"], cluster["key"]
     pts = []
     for i, v in enumerate(ICO_VERTS):
-        k = r * (0.82 + 0.3 * unit(seed, f"{key}:v{i}"))
+        k = r * 1.14 * (0.82 + 0.3 * unit(seed, f"{key}:v{i}"))
         pts.append((c[0] + v[0] * k, c[1] + v[1] * k * 0.82, c[2] + v[2] * k))
     return [(pts[a], pts[b], pts[cc]) for a, b, cc in ICO_FACES]
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { TREE_PAINT, buildTreeIsland, treeIslandGround } from './treeIsland';
 
 // ============================================================
-// Острів дерева за референсом власника (ADR-0222). Тести тримають те, що
+// Острів дерева за референсом власника (ADR-0222, гранчастий — ADR-0226). Тести тримають те, що
 // видно оком: є всі частини референсу, острів детермінований, числа цілі,
 // між травою й скелею немає щілини, а в центрі, де росте дерево, лише трава.
 // ============================================================
@@ -113,6 +113,23 @@ describe('острів дерева', () => {
     const p95 = sorted[Math.floor(0.95 * (sorted.length - 1))]!;
     expect(p05).toBeGreaterThan(-R * 0.06);
     expect(p95 - p05).toBeLessThan(R * 0.13);
+  });
+
+  it('підошва — великі грані за референсом (ADR-0226): глибше ґрунту кільця не густіші за 12 вершин', () => {
+    const { positions, paint } = isle.island;
+    const rings = new Map<number, Set<string>>();
+    for (let v = 0; v < paint.length; v += 1) {
+      if (paint[v] !== TREE_PAINT.cliff) continue;
+      const y = positions[v * 3 + 1]!;
+      // Край, спідниця й ґрунт тримають 24 вершини, щоб стулитися з травою без щілини.
+      if (y > -R * 0.2) continue;
+      const band = Math.round(y / (R * 0.3));
+      const set = rings.get(band) ?? new Set<string>();
+      set.add(`${positions[v * 3]!.toFixed(5)}:${y.toFixed(5)}:${positions[v * 3 + 2]!.toFixed(5)}`);
+      rings.set(band, set);
+    }
+    expect(rings.size).toBeGreaterThan(2);
+    for (const set of rings.values()) expect(set.size).toBeLessThanOrEqual(13);
   });
 
   it('детерміновано: та сама дата — побітово той самий острів', () => {
