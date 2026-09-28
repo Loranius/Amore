@@ -246,7 +246,56 @@ export function reefV2RockTriangles(model: ReefV2Model): Tri[] {
   return ICO.faces.map(([a, b, c]) => [pts[a]!, pts[b]!, pts[c]!]);
 }
 
-/** Трикутники одного тіла колонії в координатах рифу. */
+/** Ікосаедр без поділу: 20 великих граней — гранчастий помпон. */
+const ICO20: { verts: V3[]; faces: [number, number, number][] } = (() => {
+  const t = (1 + Math.sqrt(5)) / 2;
+  const verts = ([
+    [-1, t, 0], [1, t, 0], [-1, -t, 0], [1, -t, 0], [0, -1, t], [0, 1, t],
+    [0, -1, -t], [0, 1, -t], [t, 0, -1], [t, 0, 1], [-t, 0, -1], [-t, 0, 1],
+  ] as V3[]).map(norm);
+  const faces: [number, number, number][] = [
+    [0, 11, 5], [0, 5, 1], [0, 1, 7], [0, 7, 10], [0, 10, 11], [1, 5, 9], [5, 11, 4], [11, 10, 2],
+    [10, 7, 6], [7, 1, 8], [3, 9, 4], [3, 4, 2], [3, 2, 6], [3, 6, 8], [3, 8, 9], [4, 9, 5],
+    [2, 4, 11], [6, 2, 10], [8, 6, 7], [9, 8, 1],
+  ];
+  return { verts, faces };
+})();
+
+/** Гранчасте лезо: основа, два плечі, вістря й ребро посередині — 4 грані. */
+function blade(base: V3, tip: V3, side: V3, width: number, ridge: V3): Tri[] {
+  const at = (k: number): V3 => add(base, mul([tip[0] - base[0], tip[1] - base[1], tip[2] - base[2]], k));
+  const left = add(at(0.4), mul(side, width));
+  const right = add(at(0.4), mul(side, -width));
+  const mid = add(at(0.45), ridge);
+  return [[base, left, mid], [base, mid, right], [left, tip, mid], [mid, tip, right]];
+}
+
+/** Пластина з неправильного многокутника: верх, низ і бічні грані. */
+function plate(centre: V3, radii: number[], thickness: number, turn: number): Tri[] {
+  const n = radii.length;
+  const ring = (y: number) => radii.map((r, i): V3 => {
+    const a = turn + (2 * Math.PI * i) / n;
+    return [centre[0] + Math.cos(a) * r, centre[1] + y, centre[2] + Math.sin(a) * r];
+  });
+  const top = ring(thickness);
+  const low = ring(0);
+  const up: V3 = [centre[0], centre[1] + thickness, centre[2]];
+  const tris: Tri[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const j = (i + 1) % n;
+    tris.push([up, top[j]!, top[i]!], [centre, low[i]!, low[j]!], [low[i]!, top[i]!, top[j]!], [low[i]!, top[j]!, low[j]!]);
+  }
+  return tris;
+}
+
+/**
+ * Трикутники одного тіла колонії в координатах рифу.
+ *
+ * Стиль — гранчастий low-poly за референсом власника (ADR-0225): кожна
+ * форма складена з кількох великих пласких граней, а не з гладкої кулі чи
+ * тонких трубочок. Висоти форм ті самі (`REEF_FORM_HEIGHT`): від них
+ * рахується кадр і зведення двійника, і вони не змінились.
+ */
 export function reefV2ColonyTriangles(model: ReefV2Model, place: ReefV2Placement): Tri[] {
   const seed = model.startDate;
   const s = place.size;
@@ -255,72 +304,90 @@ export function reefV2ColonyTriangles(model: ReefV2Model, place: ReefV2Placement
   const y = place.axis;
   const L = (p: V3): V3 => add(place.base, add(add(mul(x, p[0]), mul(y, p[1])), mul(z, p[2])));
   const tris: Tri[] = [];
+  const toWorld = (list: Tri[]) => list.map((t): Tri => [L(t[0]), L(t[1]), L(t[2])]);
   switch (place.colony.form) {
-    case 'brain':
-      for (const [a, b, c] of ICO.faces) {
-        const pts = [a, b, c].map((i) => {
-          const v = ICO.verts[i]!;
-          // Мозковик — 0.32 розміру, а не 0.5: великі кулі домінували над
-          // рифом (власник, 2026-09-28: «зменш великі мозковики»).
-          const k = s * 0.32 * (0.9 + 0.2 * unit(seed, `${key}:v${i}`));
-          return L([v[0] * k, 0.18 * s + Math.max(v[1], -0.4) * k * 0.7, v[2] * k]);
-        });
-        tris.push([pts[0]!, pts[1]!, pts[2]!]);
+    case 'brain': {
+      // Помпон: гранчасте ядро з двадцяти граней і колючки врізнобіч.
+      const c: V3 = [0, 0.17 * s, 0];
+      const pts = ICO20.verts.map((v, i): V3 => {
+        const k = s * 0.19 * (0.85 + 0.3 * unit(seed, `${key}:v${i}`));
+        return [c[0] + v[0] * k, c[1] + Math.max(v[1], -0.5) * k * 0.85, c[2] + v[2] * k];
+      });
+      for (const [a, b, d] of ICO20.faces) tris.push([L(pts[a]!), L(pts[b]!), L(pts[d]!)]);
+      for (let i = 0; i < 7; i += 1) {
+        const phi = rad(i * (360 / 7) + 30 * unit(seed, `${key}:sp${i}`));
+        const th = rad(20 + 55 * unit(seed, `${key}:st${i}`));
+        const d: V3 = [Math.sin(th) * Math.cos(phi), Math.cos(th), Math.sin(th) * Math.sin(phi)];
+        const from = add(c, mul(d, 0.13 * s));
+        tris.push(...prism(L(from), L(add(c, mul(d, 0.25 * s))), 0.06 * s, 0.002 * s, 4));
       }
       break;
-    case 'branch':
-      tris.push(...prism(L([0, 0, 0]), L([0, 0.4 * s, 0]), 0.08 * s, 0.06 * s));
+    }
+    case 'branch': {
+      // Гіллястий: товсті чотиригранні гілки з гострими кінчиками.
+      tris.push(...prism(L([0, 0, 0]), L([0, 0.4 * s, 0]), 0.12 * s, 0.09 * s, 4));
       for (let i = 0; i < 4; i += 1) {
         const phi = rad(i * 90 + 360 * unit(seed, `${key}:b${i}`));
         const th = rad(25 + 20 * unit(seed, `${key}:t${i}`));
         const d: V3 = [Math.sin(th) * Math.cos(phi), Math.cos(th), Math.sin(th) * Math.sin(phi)];
         const mid: V3 = [d[0] * 0.35 * s, 0.4 * s + d[1] * 0.35 * s, d[2] * 0.35 * s];
-        tris.push(...prism(L([0, 0.4 * s, 0]), L(mid), 0.06 * s, 0.045 * s));
+        tris.push(...prism(L([0, 0.4 * s, 0]), L(mid), 0.09 * s, 0.07 * s, 4));
         for (const j of [-1, 1]) {
           const tip: V3 = [
             mid[0] + (d[0] + j * 0.35 * Math.sin(phi)) * 0.3 * s,
             mid[1] + 0.28 * s,
             mid[2] + (d[2] - j * 0.35 * Math.cos(phi)) * 0.3 * s,
           ];
-          tris.push(...prism(L(mid), L(tip), 0.045 * s, 0.02 * s));
+          tris.push(...prism(L(mid), L(tip), 0.065 * s, 0.004 * s, 4));
         }
       }
       break;
+    }
     case 'fan': {
-      const rings: [number, number][] = [[0.35, 7], [0.7, 9], [1.05, 11]];
-      let prev: V3[] = [L([0, 0.05 * s, 0])];
-      rings.forEach(([radius, n], ri) => {
-        const cur: V3[] = [];
-        for (let i = 0; i < n; i += 1) {
-          const ang = rad(-65 + (130 * i) / (n - 1));
-          const wobble = 0.06 * s * (unit(seed, `${key}:w${ri}:${i}`) - 0.5);
-          cur.push(L([Math.sin(ang) * radius * s, 0.05 * s + Math.cos(ang) * radius * s, wobble]));
-        }
-        for (let i = 0; i < n - 1; i += 1) {
-          const j0 = Math.min(prev.length - 1, Math.floor((i * (prev.length - 1)) / Math.max(1, n - 2)));
-          const j1 = Math.min(prev.length - 1, Math.floor(((i + 1) * (prev.length - 1)) / Math.max(1, n - 2)));
-          tris.push([prev[j0]!, cur[i]!, cur[i + 1]!]);
-          if (j1 !== j0) tris.push([prev[j0]!, cur[i + 1]!, prev[j1]!]);
-        }
-        prev = cur;
-      });
+      // Пучок лез (як водорості й м'які корали референсу): кожне лезо —
+      // чотири грані з ребром посередині.
+      const n = 5 + Math.floor(unit(seed, `${key}:n`) * 3);
+      for (let i = 0; i < n; i += 1) {
+        const phi = rad(i * (360 / n) + 40 * unit(seed, `${key}:bp${i}`));
+        const th = rad(8 + 28 * unit(seed, `${key}:bt${i}`));
+        const len = s * (0.8 + 0.3 * unit(seed, `${key}:bl${i}`));
+        const d: V3 = [Math.sin(th) * Math.cos(phi), Math.cos(th), Math.sin(th) * Math.sin(phi)];
+        const base: V3 = [Math.cos(phi) * 0.06 * s, 0, Math.sin(phi) * 0.06 * s];
+        const side: V3 = [-Math.sin(phi), 0, Math.cos(phi)];
+        const out: V3 = [Math.cos(phi), 0, Math.sin(phi)];
+        tris.push(...toWorld(blade(base, add(base, mul(d, len)), side, 0.11 * s, mul(out, 0.05 * s))));
+      }
       break;
     }
     case 'tube':
+      // Трубки-губки з розкритим вінцем.
       for (let i = 0; i < 4; i += 1) {
         const phi = rad(i * 90 + 40 * unit(seed, `${key}:p${i}`));
         const off = 0.14 * s * (0.4 + unit(seed, `${key}:o${i}`));
-        const h = s * (0.5 + 0.4 * unit(seed, `${key}:h${i}`));
-        const r = s * (0.08 + 0.05 * unit(seed, `${key}:r${i}`));
+        const h = s * (0.5 + 0.35 * unit(seed, `${key}:h${i}`));
+        const r = s * (0.09 + 0.05 * unit(seed, `${key}:r${i}`));
         const b0: V3 = [Math.cos(phi) * off, 0, Math.sin(phi) * off];
-        tris.push(...prism(L(b0), L([b0[0] * 1.3, h, b0[2] * 1.3]), r, r * 1.15, 6, true));
+        const top: V3 = [b0[0] * 1.3, h, b0[2] * 1.3];
+        tris.push(...prism(L(b0), L(top), r, r * 1.05, 5));
+        tris.push(...prism(L(top), L([top[0] * 1.05, h + 0.05 * s, top[2] * 1.05]), r * 1.05, r * 1.35, 5));
       }
       break;
-    case 'table':
-      tris.push(...prism(L([0, 0, 0]), L([0, 0.36 * s, 0]), 0.1 * s, 0.07 * s));
-      tris.push(...prism(L([0, 0.36 * s, 0]), L([0, 0.46 * s, 0]), 0.75 * s, 0.8 * s, 7, true));
+    case 'table': {
+      // Стос пластин на короткій ніжці.
+      tris.push(...prism(L([0, 0, 0]), L([0, 0.3 * s, 0]), 0.1 * s, 0.07 * s, 5));
+      const count = 2 + Math.floor(unit(seed, `${key}:plates`) * 2);
+      for (let k = 0; k < count; k += 1) {
+        const radius = 0.42 * s * (1 - 0.22 * k);
+        const radii = Array.from({ length: 7 }, (_, i) => radius * (0.75 + 0.45 * unit(seed, `${key}:pl${k}:${i}`)));
+        const shift = 0.08 * s * k;
+        const a = rad(360 * unit(seed, `${key}:ps${k}`));
+        const centre: V3 = [Math.cos(a) * shift, 0.3 * s + k * 0.075 * s, Math.sin(a) * shift];
+        tris.push(...toWorld(plate(centre, radii, 0.05 * s, a)));
+      }
       break;
+    }
     default:
+      // Пальці: чотиригранні, з вістрям.
       for (let i = 0; i < 6; i += 1) {
         const phi = rad(i * 60 + 30 * unit(seed, `${key}:p${i}`));
         const off = 0.2 * s * unit(seed, `${key}:o${i}`);
@@ -328,9 +395,9 @@ export function reefV2ColonyTriangles(model: ReefV2Model, place: ReefV2Placement
         const lean = 0.25 * h;
         const b0: V3 = [Math.cos(phi) * off, 0, Math.sin(phi) * off];
         const top: V3 = [b0[0] + Math.cos(phi) * lean, h, b0[2] + Math.sin(phi) * lean];
-        tris.push(...prism(L(b0), L(top), 0.07 * s, 0.05 * s));
-        const tip: V3 = [top[0] + Math.cos(phi) * 0.02 * s, h + 0.08 * s, top[2] + Math.sin(phi) * 0.02 * s];
-        tris.push(...prism(L(top), L(tip), 0.05 * s, 0.001));
+        tris.push(...prism(L(b0), L(top), 0.08 * s, 0.06 * s, 4));
+        const tip: V3 = [top[0] + Math.cos(phi) * 0.02 * s, h + 0.1 * s, top[2] + Math.sin(phi) * 0.02 * s];
+        tris.push(...prism(L(top), L(tip), 0.06 * s, 0.002 * s, 4));
       }
   }
   return tris;

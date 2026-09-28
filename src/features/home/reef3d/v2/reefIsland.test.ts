@@ -1,20 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { REEF_PAINT, buildReefIsland, reefIslandGround } from './reefIsland';
+import { REEF_PAINT, REEF_WILD_PAINTS, buildReefIsland, inReefWater, reefIslandGround } from './reefIsland';
 
 // ============================================================
-// Острів рифу за референсом власника (ADR-0223). Тести тримають те, що
-// видно оком: є всі частини референсу, острів детермінований, край без
-// щілини, а верхівку в центрі, де ростуть корали пари, займає лише камінь —
-// дикі корали лише на схилах (колір на верхівці заробляє пара, ADR-0219).
+// Острів рифу — гранчастий low-poly за референсом власника (ADR-0225,
+// раніше ADR-0223). Тести тримають те, що видно оком: є всі частини
+// референсу, острів детермінований, край без щілини, підошва великими
+// гранями, а камінь у центрі, де ростуть корали пари, вільний від дикої
+// живності (колір там заробляє пара, ADR-0219).
 // ============================================================
 
 const R = 1.3;
 const isle = buildReefIsland('2022-12-26', R);
 
 describe('острів рифу', () => {
-  it('має всі частини референсу: верхівку, скелю, валуни, водорості, лагуну, корали (глибина — в оточенні, ADR-0224)', () => {
+  it('має всі частини референсу: плато, скелю, арку й камені, водорості, воду, корали, губки, пластини', () => {
     const used = new Set(Array.from(isle.island.paint));
-    for (const p of Object.values(REEF_PAINT)) if (p !== REEF_PAINT.far) expect(used.has(p)).toBe(true);
+    // Далечінь і пісок — в оточенні (ADR-0224), не на острові.
+    for (const p of Object.values(REEF_PAINT)) if (p !== REEF_PAINT.far && p !== REEF_PAINT.sand) expect(used.has(p)).toBe(true);
   });
 
   it('трикутники цілі, числа скінченні, атрибути на кожну вершину', () => {
@@ -31,27 +33,49 @@ describe('острів рифу', () => {
     for (let v = 0; v < paint.length; v += 1) if (glow[v]! > 0) expect(paint[v]).toBe(REEF_PAINT.lagoon);
   });
 
-  it('дикі корали не ростуть на верхівці: вони на схилах, під краєм', () => {
+  it('дика живність не стоїть на камені рифу, де ростуть корали пари', () => {
     const { positions, paint } = isle.island;
+    const rock = R * 0.65;
     let wild = 0;
     for (let v = 0; v < paint.length; v += 1) {
-      if (paint[v] !== REEF_PAINT.orange && paint[v] !== REEF_PAINT.pink) continue;
+      if (!REEF_WILD_PAINTS.includes(paint[v]!)) continue;
       wild += 1;
-      // Гілка може трохи піднятись над краєм, але не над центром верхівки.
-      // Нижче краю вони на схилі, що сходиться до осі, — там відстань від
-      // осі нічого не каже; над краєм — лише біля нього, не над центром.
-      const r = Math.hypot(positions[v * 3]!, positions[v * 3 + 2]!);
-      if (positions[v * 3 + 1]! > -R * 0.05) expect(r).toBeGreaterThan(R * 0.6);
-      expect(positions[v * 3 + 1]!).toBeLessThan(R * 0.2);
+      // Схили під краєм — не камінь рифу: там губки й зірки на своєму місці.
+      if (positions[v * 3 + 1]! < -R * 0.02) continue;
+      expect(Math.hypot(positions[v * 3]!, positions[v * 3 + 2]!)).toBeGreaterThan(rock);
     }
-    expect(wild).toBeGreaterThan(0);
+    expect(wild).toBeGreaterThan(100);
+  });
+
+  it('вода — канал за каменем рифу, а камінь рифу старшого віку туди не заходить', () => {
+    expect(isle.water.inner).toBeGreaterThan(R * 0.65);
+    expect(isle.water.outer).toBeLessThanOrEqual(R * 0.9 + 1e-9);
+    const older = buildReefIsland('2022-12-26', R, R * 0.8);
+    expect(older.water.inner).toBeGreaterThan(R * 0.8);
+    // Бульбашки піднімаються з самої води.
+    expect(inReefWater(isle.water, isle.lagoon.x, isle.lagoon.z)).toBe(true);
+  });
+
+  it('підошва — великі грані: під краєм менше вершин, ніж по краю', () => {
+    const { positions, paint } = isle.island;
+    const rings = new Map<number, Set<string>>();
+    for (let v = 0; v < paint.length; v += 1) {
+      if (paint[v] !== REEF_PAINT.cliff) continue;
+      const y = positions[v * 3 + 1]!;
+      if (y > -R * 0.05) continue;
+      const band = Math.round(y / (R * 0.4));
+      const set = rings.get(band) ?? new Set<string>();
+      set.add(`${positions[v * 3]!.toFixed(5)}:${y.toFixed(5)}:${positions[v * 3 + 2]!.toFixed(5)}`);
+      rings.set(band, set);
+    }
+    for (const set of rings.values()) expect(set.size).toBeLessThanOrEqual(24);
   });
 
   it('у центрі, де ростуть корали пари, лише камінь верхівки', () => {
     const { positions, paint } = isle.island;
     for (let v = 0; v < paint.length; v += 1) {
       if (paint[v] === REEF_PAINT.top || positions[v * 3 + 1]! < 0) continue;
-      expect(Math.hypot(positions[v * 3]!, positions[v * 3 + 2]!)).toBeGreaterThan(R * 0.4);
+      expect(Math.hypot(positions[v * 3]!, positions[v * 3 + 2]!)).toBeGreaterThan(R * 0.45);
     }
   });
 
@@ -82,5 +106,6 @@ describe('острів рифу', () => {
     const again = buildReefIsland('2022-12-26', R);
     expect(Array.from(again.island.positions)).toEqual(Array.from(isle.island.positions));
     expect(again.lagoon).toEqual(isle.lagoon);
+    expect(again.water).toEqual(isle.water);
   });
 });

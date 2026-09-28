@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CrystalV2Snapshot } from '../crystalV2/model';
-import { buildReefV2Geometry, reefV2Summary } from './geometry';
+import { REEF_FORM_HEIGHT, buildReefV2Geometry, reefV2ColonyTriangles, reefV2Placements, reefV2Summary, type ReefV2Placement } from './geometry';
 import { buildReefV2Model, reefHeadScaleV2 } from './model';
 
 // ============================================================
@@ -100,5 +100,22 @@ describe('риф v2: меш', () => {
   it('детерміновано: той самий знімок — побітово та сама геометрія', () => {
     const again = buildReefV2Geometry(buildReefV2Model(read('fixtures/busy.json') as CrystalV2Snapshot));
     expect(Array.from(again.corals.positions)).toEqual(Array.from(geometry.corals.positions));
+  });
+
+  it('гранчастий low-poly (ADR-0225): форма в межах своєї висоти й складена з небагатьох граней', () => {
+    // Висота форми — з неї рахуються кадр і зведення двійника; нова форма
+    // не може її перерости. І кожне тіло — десятки граней, а не сотні:
+    // згладжена куля з 80 граней читалась пастельною кулькою, не гранями.
+    const forms = ['brain', 'branch', 'fan', 'tube', 'table', 'finger'] as const;
+    const base = reefV2Placements(model)[0]!;
+    for (const form of forms) {
+      const place: ReefV2Placement = { ...base, base: [0, 0, 0], axis: [0, 1, 0], colony: { ...base.colony, form } };
+      const tris = reefV2ColonyTriangles(model, place);
+      let top = 0;
+      for (const t of tris) for (const v of t) top = Math.max(top, v[1]);
+      expect(top, form).toBeLessThanOrEqual(REEF_FORM_HEIGHT[form] * place.size * 1.13);
+      expect(top, form).toBeGreaterThan(REEF_FORM_HEIGHT[form] * place.size * 0.6);
+      expect(tris.length, form).toBeLessThanOrEqual(120);
+    }
   });
 });

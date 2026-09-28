@@ -23,7 +23,11 @@ export type V3 = [number, number, number];
  * й далекі острівці.
  */
 export const PAINT = { paving: 0, cliff: 1, ruin: 2, ivy: 3, gem: 4, dirt: 5, cloud: 6, far: 7 } as const;
-export type Paint = (typeof PAINT)[keyof typeof PAINT];
+/**
+ * Індекс фарби. Кристал має вісім слотів (`PAINT`), але палітра матеріалу
+ * острова будь-якої довжини: риф має ще пісок, бірюзу й жовтий (ADR-0225).
+ */
+export type Paint = number;
 
 export interface IslandMesh {
   positions: Float32Array;

@@ -6,7 +6,7 @@ import type { ReefV2Geometry } from '@/engine/species/reefV2/geometry';
 import { Diorama } from '@/features/home/diorama/Diorama';
 import { PORTAL_GROUND_Y } from '../../crystal3d/scene/portalScene';
 import { ReefIsland } from './ReefIsland';
-import { buildReefIsland, reefIslandGround } from './reefIsland';
+import { buildReefIsland, inReefWater, reefIslandGround } from './reefIsland';
 import {
   REEF_PALETTES,
   createCoralMaterial,
@@ -17,9 +17,6 @@ import {
   createSeagrassMaterial,
 } from './reefV2Materials';
 
-// Діорама близька й уся в кадрі: туман лише далеко за нею (ADR-0220).
-const FOG_NEAR = 30;
-const FOG_FAR = 90;
 /** Риба: ромб тіла й трикутник хвоста; голова вздовж +x. */
 function buildFishGeometry(fish: ReefV2Geometry['fish'], seed: string) {
   const body = new Float32Array([
@@ -110,7 +107,9 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
     return pointsGeometry(out, seed, 'snow');
   }, [seed]);
   // Бульбашки піднімаються з лагуни острова (ADR-0223) і з двох щілин біля неї.
-  const lagoon = useMemo(() => buildReefIsland(seed, island, rockRadius).lagoon, [seed, island, rockRadius]);
+  const built = useMemo(() => buildReefIsland(seed, island, rockRadius), [seed, island, rockRadius]);
+  const lagoon = built.lagoon;
+  const water = built.water;
   const bubbles = useMemo(() => {
     const out: number[] = [];
     for (let k = 0; k < 18; k += 1) {
@@ -124,12 +123,12 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
   const materials = useMemo(() => {
     const ground = PORTAL_GROUND_Y;
     return {
-      rock: createSeabedMaterial(palette, palette.rock, FOG_NEAR, FOG_FAR, ground),
-      star: createSeabedMaterial(palette, '#ff9a5a', FOG_NEAR, FOG_FAR, ground),
-      corals: createCoralMaterial(palette, FOG_NEAR, FOG_FAR, ground),
-      critters: createCritterMaterial(palette, FOG_NEAR, FOG_FAR, ground),
-      grass: createSeagrassMaterial(palette, FOG_NEAR, FOG_FAR, ground),
-      fish: createFishMaterial(palette, FOG_NEAR, FOG_FAR, ground),
+      rock: createSeabedMaterial(palette, palette.rock, ground),
+      star: createSeabedMaterial(palette, '#ff9a5a', ground),
+      corals: createCoralMaterial(palette, ground),
+      critters: createCritterMaterial(palette, ground),
+      grass: createSeagrassMaterial(palette, ground),
+      fish: createFishMaterial(palette, ground),
       pearls: createGlowMaterial('#fff4d6', 1.4, 0.18, 'still'),
       snow: createGlowMaterial(palette.snow, palette.snowStrength, 0.05, 'snow'),
       bubbles: createGlowMaterial('#e6fbff', 0.6, 0.07, 'bubbles'),
@@ -153,14 +152,14 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
       dummy.position.set(p[0] * scale * k, reefIslandGround(island, squeezed) - 0.005, p[2] * scale * k);
       dummy.rotation.set(0, unit(seed, `grass${i}:turn`) * Math.PI * 2, 0);
       // Трава не росте з води лагуни: там вона стирчала з бірюзи.
-      const wet = Math.hypot(p[0] * scale * k - lagoon.x, p[2] * scale * k - lagoon.z) < lagoon.r * 1.1;
+      const wet = inReefWater(water, p[0] * scale * k, p[2] * scale * k, 0.03);
       dummy.scale.setScalar(wet ? 0 : 0.14 + 0.2 * unit(seed, `grass${i}:h`));
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [geometry, scale, seed, island, rockRadius, lagoon]);
+  }, [geometry, scale, seed, island, rockRadius, water]);
 
   useEffect(() => () => {
     for (const g of [rock, corals, critters, starfish, pearls, fish, tuft, snow, bubbles]) g?.dispose();

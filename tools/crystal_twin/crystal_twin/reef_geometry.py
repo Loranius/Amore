@@ -182,66 +182,113 @@ def _local(base, frame, p):
     return _add(base, _add(_add(_mul(x, p[0]), _mul(y, p[1])), _mul(z, p[2])))
 
 
+_T = (1 + math.sqrt(5)) / 2
+# Ікосаедр без поділу: 20 великих граней — гранчастий помпон (дзеркало ICO20 у TS).
+ICO20_VERTS = [_norm(v) for v in [
+    (-1, _T, 0), (1, _T, 0), (-1, -_T, 0), (1, -_T, 0), (0, -1, _T), (0, 1, _T),
+    (0, -1, -_T), (0, 1, -_T), (_T, 0, -1), (_T, 0, 1), (-_T, 0, -1), (-_T, 0, 1),
+]]
+ICO20_FACES = [
+    (0, 11, 5), (0, 5, 1), (0, 1, 7), (0, 7, 10), (0, 10, 11), (1, 5, 9), (5, 11, 4), (11, 10, 2),
+    (10, 7, 6), (7, 1, 8), (3, 9, 4), (3, 4, 2), (3, 2, 6), (3, 6, 8), (3, 8, 9), (4, 9, 5),
+    (2, 4, 11), (6, 2, 10), (8, 6, 7), (9, 8, 1),
+]
+
+
+def _blade(base, tip, side, width, ridge):
+    """Гранчасте лезо: основа, два плечі, вістря й ребро посередині — 4 грані."""
+    at = lambda k: _add(base, _mul((tip[0] - base[0], tip[1] - base[1], tip[2] - base[2]), k))  # noqa: E731
+    left = _add(at(0.4), _mul(side, width))
+    right = _add(at(0.4), _mul(side, -width))
+    mid = _add(at(0.45), ridge)
+    return [(base, left, mid), (base, mid, right), (left, tip, mid), (mid, tip, right)]
+
+
+def _plate(centre, radii, thickness, turn):
+    """Пластина з неправильного многокутника: верх, низ і бічні грані."""
+    n = len(radii)
+
+    def ring(y):
+        return [(centre[0] + math.cos(turn + 2 * math.pi * i / n) * r, centre[1] + y,
+                 centre[2] + math.sin(turn + 2 * math.pi * i / n) * r) for i, r in enumerate(radii)]
+
+    top, low = ring(thickness), ring(0.0)
+    up = (centre[0], centre[1] + thickness, centre[2])
+    tris = []
+    for i in range(n):
+        j = (i + 1) % n
+        tris += [(up, top[j], top[i]), (centre, low[i], low[j]), (low[i], top[i], top[j]), (low[i], top[j], low[j])]
+    return tris
+
+
 def colony_triangles(model: dict[str, Any], place: dict[str, Any]):
-    """Трикутники колонії в координатах рифу."""
+    """Трикутники колонії в координатах рифу — гранчастий low-poly (ADR-0225)."""
     seed = model["startDate"]
     c = place["colony"]
     s = place["size"]
     key = place["key"]
     fr = _frame(place["axis"])
     L = lambda p: _local(place["base"], fr, p)  # noqa: E731
+    world = lambda ts: [(L(t[0]), L(t[1]), L(t[2])) for t in ts]  # noqa: E731
     tris = []
     form = c["form"]
     if form == "brain":
-        for a, b, cc in ICO_FACES:
-            pts = []
-            for i in (a, b, cc):
-                v = ICO_VERTS[i]
-                # Мозковик — 0.32 розміру, а не 0.5: великі кулі домінували над
-                # рифом (власник, 2026-09-28: «зменш великі мозковики»).
-                k = s * 0.32 * (0.9 + 0.2 * unit(seed, f"{key}:v{i}"))
-                pts.append(L((v[0] * k, 0.18 * s + max(v[1], -0.4) * k * 0.7, v[2] * k)))
-            tris.append(tuple(pts))
+        cc = (0.0, 0.17 * s, 0.0)
+        pts = []
+        for i, v in enumerate(ICO20_VERTS):
+            k = s * 0.19 * (0.85 + 0.3 * unit(seed, f"{key}:v{i}"))
+            pts.append((cc[0] + v[0] * k, cc[1] + max(v[1], -0.5) * k * 0.85, cc[2] + v[2] * k))
+        for a, b, d in ICO20_FACES:
+            tris.append((L(pts[a]), L(pts[b]), L(pts[d])))
+        for i in range(7):
+            phi = math.radians(i * (360 / 7) + 30 * unit(seed, f"{key}:sp{i}"))
+            th = math.radians(20 + 55 * unit(seed, f"{key}:st{i}"))
+            d = (math.sin(th) * math.cos(phi), math.cos(th), math.sin(th) * math.sin(phi))
+            tris += prism(L(_add(cc, _mul(d, 0.13 * s))), L(_add(cc, _mul(d, 0.25 * s))), 0.06 * s, 0.002 * s, 4)
     elif form == "branch":
-        tris += prism(L((0, 0, 0)), L((0, 0.4 * s, 0)), 0.08 * s, 0.06 * s)
+        tris += prism(L((0, 0, 0)), L((0, 0.4 * s, 0)), 0.12 * s, 0.09 * s, 4)
         for i in range(4):
             phi = math.radians(i * 90 + 360 * unit(seed, f"{key}:b{i}"))
             th = math.radians(25 + 20 * unit(seed, f"{key}:t{i}"))
             d = (math.sin(th) * math.cos(phi), math.cos(th), math.sin(th) * math.sin(phi))
             mid = (d[0] * 0.35 * s, 0.4 * s + d[1] * 0.35 * s, d[2] * 0.35 * s)
-            tris += prism(L((0, 0.4 * s, 0)), L(mid), 0.06 * s, 0.045 * s)
+            tris += prism(L((0, 0.4 * s, 0)), L(mid), 0.09 * s, 0.07 * s, 4)
             for j in (-1, 1):
                 tip = (mid[0] + (d[0] + j * 0.35 * math.sin(phi)) * 0.3 * s,
                        mid[1] + 0.28 * s,
                        mid[2] + (d[2] - j * 0.35 * math.cos(phi)) * 0.3 * s)
-                tris += prism(L(mid), L(tip), 0.045 * s, 0.02 * s)
+                tris += prism(L(mid), L(tip), 0.065 * s, 0.004 * s, 4)
     elif form == "fan":
-        rings = [(0.35, 7), (0.7, 9), (1.05, 11)]
-        prev = [L((0, 0.05 * s, 0))]
-        for ri, (radius, n) in enumerate(rings):
-            cur = []
-            for i in range(n):
-                ang = math.radians(-65 + 130 * i / (n - 1))
-                wobble = 0.06 * s * (unit(seed, f"{key}:w{ri}:{i}") - 0.5)
-                cur.append(L((math.sin(ang) * radius * s, 0.05 * s + math.cos(ang) * radius * s, wobble)))
-            for i in range(n - 1):
-                j0 = min(len(prev) - 1, int(i * (len(prev) - 1) / max(1, n - 2)))
-                j1 = min(len(prev) - 1, int((i + 1) * (len(prev) - 1) / max(1, n - 2)))
-                tris.append((prev[j0], cur[i], cur[i + 1]))
-                if j1 != j0:
-                    tris.append((prev[j0], cur[i + 1], prev[j1]))
-            prev = cur
+        n = 5 + int(unit(seed, f"{key}:n") * 3)
+        for i in range(n):
+            phi = math.radians(i * (360 / n) + 40 * unit(seed, f"{key}:bp{i}"))
+            th = math.radians(8 + 28 * unit(seed, f"{key}:bt{i}"))
+            ln = s * (0.8 + 0.3 * unit(seed, f"{key}:bl{i}"))
+            d = (math.sin(th) * math.cos(phi), math.cos(th), math.sin(th) * math.sin(phi))
+            base = (math.cos(phi) * 0.06 * s, 0.0, math.sin(phi) * 0.06 * s)
+            side = (-math.sin(phi), 0.0, math.cos(phi))
+            out = (math.cos(phi), 0.0, math.sin(phi))
+            tris += world(_blade(base, _add(base, _mul(d, ln)), side, 0.11 * s, _mul(out, 0.05 * s)))
     elif form == "tube":
         for i in range(4):
             phi = math.radians(i * 90 + 40 * unit(seed, f"{key}:p{i}"))
             off = 0.14 * s * (0.4 + unit(seed, f"{key}:o{i}"))
-            h = s * (0.5 + 0.4 * unit(seed, f"{key}:h{i}"))
-            r = s * (0.08 + 0.05 * unit(seed, f"{key}:r{i}"))
+            h = s * (0.5 + 0.35 * unit(seed, f"{key}:h{i}"))
+            r = s * (0.09 + 0.05 * unit(seed, f"{key}:r{i}"))
             b0 = (math.cos(phi) * off, 0, math.sin(phi) * off)
-            tris += prism(L(b0), L((b0[0] * 1.3, h, b0[2] * 1.3)), r, r * 1.15, 6, caps=True)
+            top = (b0[0] * 1.3, h, b0[2] * 1.3)
+            tris += prism(L(b0), L(top), r, r * 1.05, 5)
+            tris += prism(L(top), L((top[0] * 1.05, h + 0.05 * s, top[2] * 1.05)), r * 1.05, r * 1.35, 5)
     elif form == "table":
-        tris += prism(L((0, 0, 0)), L((0, 0.36 * s, 0)), 0.1 * s, 0.07 * s)
-        tris += prism(L((0, 0.36 * s, 0)), L((0, 0.46 * s, 0)), 0.75 * s, 0.8 * s, 7, caps=True)
+        tris += prism(L((0, 0, 0)), L((0, 0.3 * s, 0)), 0.1 * s, 0.07 * s, 5)
+        count = 2 + int(unit(seed, f"{key}:plates") * 2)
+        for k in range(count):
+            radius = 0.42 * s * (1 - 0.22 * k)
+            radii = [radius * (0.75 + 0.45 * unit(seed, f"{key}:pl{k}:{i}")) for i in range(7)]
+            shift = 0.08 * s * k
+            a = math.radians(360 * unit(seed, f"{key}:ps{k}"))
+            centre = (math.cos(a) * shift, 0.3 * s + k * 0.075 * s, math.sin(a) * shift)
+            tris += world(_plate(centre, radii, 0.05 * s, a))
     else:  # finger
         for i in range(6):
             phi = math.radians(i * 60 + 30 * unit(seed, f"{key}:p{i}"))
@@ -250,7 +297,7 @@ def colony_triangles(model: dict[str, Any], place: dict[str, Any]):
             lean = 0.25 * h
             b0 = (math.cos(phi) * off, 0, math.sin(phi) * off)
             top = (b0[0] + math.cos(phi) * lean, h, b0[2] + math.sin(phi) * lean)
-            tris += prism(L(b0), L(top), 0.07 * s, 0.05 * s)
-            tip = (top[0] + math.cos(phi) * 0.02 * s, h + 0.08 * s, top[2] + math.sin(phi) * 0.02 * s)
-            tris += prism(L(top), L(tip), 0.05 * s, 0.001)
+            tris += prism(L(b0), L(top), 0.08 * s, 0.06 * s, 4)
+            tip = (top[0] + math.cos(phi) * 0.02 * s, h + 0.1 * s, top[2] + math.sin(phi) * 0.02 * s)
+            tris += prism(L(top), L(tip), 0.06 * s, 0.002 * s, 4)
     return tris

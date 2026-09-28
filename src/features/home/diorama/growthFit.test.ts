@@ -11,7 +11,7 @@ import { crystalV2Frame } from '../crystal3d/v2/crystalV2Frame';
 import { treeV2Frame } from '../crystal3d/treeV2/treeV2Frame';
 import { treeIslandBase, treeIslandGround } from '../crystal3d/treeV2/treeIsland';
 import { reefV2Frame } from '../reef3d/v2/reefV2Frame';
-import { buildReefIsland, reefIslandGround } from '../reef3d/v2/reefIsland';
+import { buildReefIsland, inReefWater, reefIslandGround } from '../reef3d/v2/reefIsland';
 import { dioramaIslandRadius } from './dioramaStyle';
 
 // ============================================================
@@ -72,18 +72,16 @@ describe.each(cases)('%s, %i', (history, year) => {
     expect(above / total).toBeGreaterThanOrEqual(0.7);
   });
 
-  it('риф: лагуна й арка стоять за каменем, на якому ростуть колонії пари', () => {
+  it('риф: вода й арка стоять за каменем, на якому ростуть колонії пари', () => {
     const model = buildReefV2Model(snap);
     const frame = reefV2Frame(buildReefV2Geometry(model));
     const rock = model.radius * frame.scale;
     const island = dioramaIslandRadius(Math.max(frame.reach * 1.1, rock * 1.55));
-    const { lagoon } = buildReefIsland(model.startDate, island, rock);
-    expect(Math.hypot(lagoon.x, lagoon.z) - lagoon.r).toBeGreaterThan(rock);
+    const { water } = buildReefIsland(model.startDate, island, rock);
+    expect(water.inner).toBeGreaterThan(rock);
     // Жодна колонія років не стоїть основою у воді.
     for (const place of reefV2Placements(model)) {
-      const x = place.base[0] * frame.scale;
-      const z = place.base[2] * frame.scale;
-      expect(Math.hypot(x - lagoon.x, z - lagoon.z)).toBeGreaterThan(lagoon.r);
+      expect(inReefWater(water, place.base[0] * frame.scale, place.base[2] * frame.scale)).toBe(false);
     }
   });
 
