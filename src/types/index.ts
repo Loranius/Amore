@@ -754,8 +754,12 @@ export type DbNotifyRequest = {
 export type DbNotifyResponse = { ok: boolean };
 
 /** Мапа ім'я функції → контракт. Джерело правди для invokeFn<K>. */
-/** Місце в парі, яке ще чекає на пошту (ADR-0228). */
-export interface PortalSeat { id: number; name: string }
+/**
+ * Місце в парі, яке ще чекає на пошту (ADR-0228). Без імені: його бачить
+ * кожен, хто підтвердив пошту, тож місце знаходять за статтю, а PIN
+ * доводить, що воно твоє.
+ */
+export interface PortalSeat { id: number; gender: 'male' | 'female' | null }
 
 export type PortalAccountRequest =
   | { action: 'ping' }

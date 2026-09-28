@@ -49,3 +49,19 @@ export function normaliseEmail(raw: string): string {
 export function isEmail(raw: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(normaliseEmail(raw));
 }
+
+export type SeatGender = 'male' | 'female';
+
+export const GENDER_TEXT: Record<SeatGender, string> = { male: 'Чоловік', female: 'Жінка' };
+
+/**
+ * Місце за статтю. Місце без позначки (пару створено до ADR-0228 без
+ * статі) підходить будь-якій відповіді — інакше його не можна було б
+ * прив'язати взагалі. `null` — такого місця немає: портал уже має пару.
+ */
+export function seatForGender<T extends { id: number; gender: SeatGender | null }>(
+  seats: readonly T[],
+  gender: SeatGender,
+): T | null {
+  return seats.find((s) => s.gender === gender) ?? seats.find((s) => s.gender === null) ?? null;
+}

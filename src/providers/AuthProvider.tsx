@@ -39,7 +39,7 @@ export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
 /** Результат спроби входу — те, що PinPad показує користувачу. */
 export type LoginResult =
-  | { ok: true }
+  | { ok: true; name?: string }
   | { ok: false; reason: 'invalid' | 'error' | 'moved_to_email' }
   | { ok: false; reason: 'locked'; retryAfterSeconds: number };
 
@@ -251,7 +251,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, reason: 'error' };
       }
       enter(appUser);
-      return { ok: true };
+      return { ok: true, name: appUser.name };
     }
     if (!res.ok && res.error === 'locked') {
       return { ok: false, reason: 'locked', retryAfterSeconds: res.retryAfterSeconds ?? 900 };

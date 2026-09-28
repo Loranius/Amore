@@ -7,7 +7,7 @@
 //
 //   { action: 'ping' }                      → { ok, registration: 'open' | 'closed' }
 //   { action: 'link' }       + Bearer токен → { ok, state: 'member', user }
-//                                             | { ok, state: 'claim', seats }
+//                                             | { ok, state: 'claim', seats: [{ id, gender }] }
 //                                             | { ok, state: 'empty' }
 //                                             | { ok, state: 'taken' }
 //   { action: 'claim', user_id, pin } + Bearer → { ok, user } | { error }
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
 
     const { data: users, error: usersErr } = await admin
       .from("users")
-      .select("id, name, email, auth_user_id");
+      .select("id, name, email, auth_user_id, gender");
     if (usersErr) {
       console.error("portal-account: users select error:", usersErr);
       return json({ error: "server_error" }, 500);
@@ -93,11 +93,15 @@ Deno.serve(async (req) => {
       return json({ error: "server_error" }, 500);
     }
     const memberIds = new Set((members ?? []).map((m) => m.user_id as number));
-    const rows = (users ?? []) as { id: number; name: string; email: string | null; auth_user_id: string | null }[];
+    const rows = (users ?? []) as {
+      id: number; name: string; email: string | null; auth_user_id: string | null; gender: string | null;
+    }[];
     const mine = rows.find((u) => (u.email ?? "").toLowerCase() === email);
     const seats = rows
       .filter((u) => memberIds.has(u.id) && (u.email ?? "").toLowerCase().endsWith(SEAT_DOMAIN))
-      .map((u) => ({ id: u.id, name: u.name }))
+      // Без імен: місця бачить кожен, хто підтвердив пошту, а імена пари
+      // незнайомцю знати ні до чого. Людина обирає стать, PIN доводить решту.
+      .map((u) => ({ id: u.id, gender: u.gender }))
       .sort((a, b) => a.id - b.id);
 
     if (action === "link") {

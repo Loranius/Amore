@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { CODE_RE, isEmail, passwordProblems } from './accountRules';
+import { CODE_RE, isEmail, passwordProblems, seatForGender } from './accountRules';
 
 // ============================================================
 // Правила акаунта за поштою (ADR-0228). Вимога власника дослівно:
@@ -50,6 +50,23 @@ describe('пошта й код', () => {
   });
 });
 
+describe('місце в парі за статтю (власник: «питання про стать, а не імена»)', () => {
+  const seats = [{ id: 1, gender: 'male' as const }, { id: 2, gender: 'female' as const }];
+
+  it('чоловік — місце чоловіка, жінка — місце жінки', () => {
+    expect(seatForGender(seats, 'male')?.id).toBe(1);
+    expect(seatForGender(seats, 'female')?.id).toBe(2);
+  });
+
+  it('місця такої статі немає — портал не ваш (null), а не чуже місце', () => {
+    expect(seatForGender([{ id: 2, gender: 'female' as const }], 'male')).toBeNull();
+  });
+
+  it('місце без позначки статі підходить будь-якій відповіді — інакше його не прив\'язати', () => {
+    expect(seatForGender([{ id: 3, gender: null }], 'female')?.id).toBe(3);
+  });
+});
+
 describe('сервер тримає ті самі межі, що й екран', () => {
   const fn = readFileSync(join(__dirname, '../../../supabase/functions/portal-account/index.ts'), 'utf8');
 
@@ -57,6 +74,11 @@ describe('сервер тримає ті самі межі, що й екран',
     expect(fn).toContain('const SEAT_DOMAIN = "@portal.app"');
     expect(fn).toContain('register_pin_attempt');
     expect(fn).toContain('const PIN_RE = /^\\d{8}$/');
+  });
+
+  it('місця віддає зі статтю й без імен — незнайомцю імена пари ні до чого (регресія)', () => {
+    expect(fn).toContain('.map((u) => ({ id: u.id, gender: u.gender }))');
+    expect(fn).not.toContain('.map((u) => ({ id: u.id, name: u.name }))');
   });
 
   it('хто кличе — з токена, а не з тіла запиту', () => {

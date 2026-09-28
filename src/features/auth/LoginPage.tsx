@@ -24,6 +24,9 @@ import type { AppUser, PortalSeat } from '@/types';
 import { PortalConfetti } from './PortalConfetti';
 import {
   CODE_RE,
+  GENDER_TEXT,
+  seatForGender,
+  type SeatGender,
   PASSWORD_PROBLEM_TEXT,
   PASSWORD_RULES,
   isEmail,
@@ -41,7 +44,7 @@ type Step =
   | { kind: 'code'; email: string }
   | { kind: 'password' }
   | { kind: 'claim'; seats: PortalSeat[] }
-  | { kind: 'claim-pin'; seat: PortalSeat }
+  | { kind: 'claim-pin'; seat: PortalSeat; seats: PortalSeat[] }
   | { kind: 'empty' }
   | { kind: 'taken' }
   | { kind: 'legacy' }
@@ -115,15 +118,23 @@ function Flow({ tab, step, setStep, switchTab }: FlowProps) {
       return <PasswordForm onSaved={async () => follow(await linkAccount())} />;
     case 'claim':
       return (
-        <SeatPicker
-          title="Хто ви в цій парі?"
-          hint="Пошта прив'яжеться до вашої історії — спогади, плани й артефакт лишаться на місці. Підтвердіть старим PIN-кодом."
-          people={step.seats}
-          onPick={(seat) => setStep({ kind: 'claim-pin', seat })}
+        <GenderPicker
+          onPick={(gender) => {
+            const seat = seatForGender(step.seats, gender);
+            // Місця такої статі немає — отже, це не ваш портал.
+            setStep(seat ? { kind: 'claim-pin', seat, seats: step.seats } : { kind: 'taken' });
+          }}
         />
       );
     case 'claim-pin':
-      return <ClaimPin seat={step.seat} onDone={(name) => setStep({ kind: 'portal', name })} onBack={() => setStep({ kind: 'form' })} />;
+      return (
+        <ClaimPin
+          seat={step.seat}
+          onDone={(name) => setStep({ kind: 'portal', name })}
+          onBack={() => setStep({ kind: 'claim', seats: step.seats })}
+          onNoPin={() => setStep({ kind: 'taken' })}
+        />
+      );
     case 'empty':
       return (
         <>
@@ -499,18 +510,47 @@ function LegacyPin({ user, onDone, onBack }: { user: AppUser; onDone: (name: str
   );
 }
 
-function ClaimPin({ seat, onDone, onBack }: { seat: PortalSeat; onDone: (name: string) => void; onBack: () => void }) {
+function ClaimPin({ seat, onDone, onBack, onNoPin }: {
+  seat: PortalSeat;
+  onDone: (name: string) => void;
+  onBack: () => void;
+  onNoPin: () => void;
+}) {
   const { claimSeat } = useAuth();
   return (
-    <PinPad
-      name={seat.name}
-      hint="Старий PIN-код цього місця — востаннє. Далі вхід поштою й паролем."
-      onBack={onBack}
-      onSubmit={async (pin) => {
-        const res = await claimSeat(seat.id, pin);
-        if (res.ok) { onDone(seat.name); return null; }
-        return pinProblem(res.reason, res.reason === 'locked' ? res.retryAfterSeconds : undefined);
-      }}
-    />
+    <>
+      <PinPad
+        name="Ваш PIN-код"
+        hint="Той, яким ви заходили в портал досі, — востаннє. Далі вхід поштою й паролем."
+        onBack={onBack}
+        onSubmit={async (pin) => {
+          const res = await claimSeat(seat.id, pin);
+          if (res.ok) { onDone(res.name ?? ''); return null; }
+          return pinProblem(res.reason, res.reason === 'locked' ? res.retryAfterSeconds : undefined);
+        }}
+      />
+      <button type="button" className="auth-link" onClick={onNoPin}>У мене немає PIN-коду</button>
+    </>
+  );
+}
+
+/**
+ * Перше питання після пароля для пошти, ще не прив'язаної до місця.
+ * Стать, а не імена пари (власник): питання «Хто ви в цій парі? Діма /
+ * Лєна» загнало б незнайомця в ступор і показало б йому чужі імена.
+ */
+function GenderPicker({ onPick }: { onPick: (gender: SeatGender) => void }) {
+  return (
+    <>
+      <h1 className="auth-title">Хто ви?</h1>
+      <p className="reg-hint">Так портал знайде ваше місце в парі. Спогади, плани й артефакт лишаться на місці.</p>
+      <div className="user-select">
+        {(['male', 'female'] as const).map((gender) => (
+          <button key={gender} type="button" className="user-btn" onClick={() => onPick(gender)}>
+            {GENDER_TEXT[gender]}
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
