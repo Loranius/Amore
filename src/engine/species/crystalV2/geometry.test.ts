@@ -82,10 +82,33 @@ describe('кристал v2: геометрія', () => {
       const b = point(rocks, t * 3 + 1);
       const c = point(rocks, t * 3 + 2);
       const n = cross(sub(b, a), sub(c, a));
-      // Верх каменя дивиться вгору, низ — униз.
-      const top = Math.max(a[1], b[1], c[1]) > 0.1 * Math.abs(Math.min(a[1], b[1], c[1]));
+      // Верх брили дивиться вгору, низ — униз; низ — це трикутник із
+      // підошвою під землею (брила тепер висока, ADR-0220).
+      const top = Math.min(a[1], b[1], c[1]) >= 0;
       expect(Math.sign(n[1])).toBe(top ? 1 : -1);
     }
+  });
+
+  it('верхівка НЕ рівна (регресія: «не подобається верхівка з геометрично рівними гранями»)', () => {
+    // Колишні яруси були кільцями плеча, стиснутими до осі: грані вершини
+    // виходили однаковими поясами. Тепер кінчик зміщений, а грані — різні.
+    const alone = buildCrystalV2Geometry({ ...busy, children: [] });
+    const { positions, triangles } = alone.crystals;
+    const shoulder = busy.monarch.height - busy.monarch.tierHeights.reduce((s, h) => s + h, 0);
+    const areas: number[] = [];
+    let apex: V3 = [0, -Infinity, 0];
+    for (let t = 0; t < triangles; t += 1) {
+      const a = point(positions, t * 3);
+      const b = point(positions, t * 3 + 1);
+      const c = point(positions, t * 3 + 2);
+      for (const p of [a, b, c]) if (p[1] > apex[1]) apex = p;
+      if (Math.min(a[1], b[1], c[1]) < shoulder - 1e-6) continue;
+      areas.push(norm(cross(sub(b, a), sub(c, a))) / 2);
+    }
+    expect(areas.length).toBeGreaterThanOrEqual(6);
+    expect(Math.max(...areas) / Math.min(...areas)).toBeGreaterThan(1.5);
+    expect(Math.hypot(apex[0], apex[2])).toBeGreaterThan(0.02);
+    expect(apex[1]).toBeCloseTo(busy.monarch.height, 5);
   });
 
   it('основи заглиблені в жеоду: нижня точка кожного тіла — під землею', () => {

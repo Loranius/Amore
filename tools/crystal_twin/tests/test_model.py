@@ -209,7 +209,8 @@ class Geometry(unittest.TestCase):
     def test_every_face_is_planar(self):
         model = build_model(fixture("busy"))
         m = model["monarch"]
-        faces = body(m["sides"], m["height"], m["tierHeights"], m["apex"], bury=0.3)
+        faces = body(model["startDate"], "monarch", m["sides"], m["height"], sum(m["tierHeights"]),
+                     m["apex"], m["tiers"], bury=0.3)
         by_face: dict[int, list[np.ndarray]] = {}
         for tri, face, _ in faces:
             by_face.setdefault(face, []).extend(tri)

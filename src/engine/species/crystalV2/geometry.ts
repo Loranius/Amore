@@ -88,22 +88,98 @@ function ring(sides: readonly (readonly [number, number])[]): V3[] {
   });
 }
 
+/**
+ * Верхівка кристала — НЕ концентричні яруси (ADR-0217, поправка «г»).
+ *
+ * Власник: «мені не подобається верхівка з геометрично рівними гранями».
+ * Яруси були кільцями плеча, стиснутими до осі, — звідси однакові
+ * паралельні пояси, як у заточеного олівця. Справжній кварц і
+ * лоуполі-самоцвіти закінчуються інакше: вершина зміщена від осі, кінчик —
+ * не точка, а коротке ребро або кілька точок на різній висоті, і грані
+ * мають різний розмір.
+ *
+ * Тут кінчик — `ridge` точок (1…4; у монарха це правило «плани → грані
+ * вершини»), розкиданих довкола зміщеної вершини на різній висоті. Кожна
+ * вершина плеча дивиться на найближчу точку кінчика; де сусідні вершини
+ * плеча дивляться на різні точки, між ними лягає перехідний трикутник.
+ * Кожна грань — ОДИН трикутник, тож пласка за побудовою, і кожна своя.
+ */
+function crown(
+  seed: string,
+  tag: string,
+  top: V3[],
+  y1: number,
+  tip: number,
+  apex: readonly [number, number],
+  ridge: number,
+  radius: number,
+): [V3, V3, V3][] {
+  const ax = apex[0];
+  const az = apex[1];
+  const theta0 = unit(seed, `${tag}:ridge:turn`) * Math.PI * 2;
+  const q: V3[] = [];
+  for (let k = 0; k < ridge; k += 1) {
+    const th = theta0 + (k * 2 * Math.PI) / ridge + (unit(seed, `${tag}:ridge${k}:a`) - 0.5) * (Math.PI / ridge) * 0.6;
+    const rho = ridge === 1 ? 0 : radius * (0.3 + 0.16 * unit(seed, `${tag}:ridge${k}:r`));
+    const h = k === 0 ? y1 + tip : y1 + tip * (0.62 + 0.26 * unit(seed, `${tag}:ridge${k}:h`));
+    q.push([ax + Math.cos(th) * rho, h, az + Math.sin(th) * rho]);
+  }
+  const angleOf = (p: V3) => Math.atan2(p[2] - az, p[0] - ax);
+  const owner = top.map((p) => {
+    if (ridge === 1) return 0;
+    let best = 0;
+    let bestGap = Infinity;
+    q.forEach((r, k) => {
+      const d = Math.abs(Math.atan2(Math.sin(angleOf(p) - angleOf(r)), Math.cos(angleOf(p) - angleOf(r))));
+      if (d < bestGap) { bestGap = d; best = k; }
+    });
+    return best;
+  });
+  const tris: [V3, V3, V3][] = [];
+  const n = top.length;
+  for (let i = 0; i < n; i += 1) {
+    const j = (i + 1) % n;
+    let k = owner[i]!;
+    const b = owner[j]!;
+    // Кінчик по колу: від точки вершини i до точки вершини j.
+    let guard = 0;
+    while (k !== b && guard < ridge) {
+      const next = (k + 1) % ridge;
+      tris.push([top[i]!, q[k]!, q[next]!]);
+      k = next;
+      guard += 1;
+    }
+    tris.push([top[i]!, top[j]!, q[b]!]);
+  }
+  for (let k = 1; k + 1 < ridge; k += 1) tris.push([q[0]!, q[k]!, q[k + 1]!]);
+  // Закрут назовні: від точки всередині тіла під плечем.
+  const inside: V3 = [ax * 0.5, y1 - 0.2 * tip, az * 0.5];
+  return tris.map(([a, b, c]) => {
+    const e1: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const e2: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const nrm: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const m: V3 = [(a[0] + b[0] + c[0]) / 3 - inside[0], (a[1] + b[1] + c[1]) / 3 - inside[1], (a[2] + b[2] + c[2]) / 3 - inside[2]];
+    return nrm[0] * m[0] + nrm[1] * m[1] + nrm[2] * m[2] >= 0 ? [a, b, c] : [a, c, b];
+  });
+}
+
 function body(
+  seed: string,
+  tag: string,
   sides: readonly (readonly [number, number])[],
   height: number,
-  tierHeights: readonly number[],
+  tip: number,
   apex: readonly [number, number],
+  ridge: number,
   bury: number,
 ): Tri[] {
   const base = ring(sides);
   const n = base.length;
-  const tip = tierHeights.reduce((sum, h) => sum + h, 0);
   const y0 = -bury;
   const y1 = height - tip;
   const lift = (p: V3, y: number): V3 => [p[0], y, p[2]];
-  const shoulder = base;
   const bottom = base.map((p) => lift([p[0] * FOOT, 0, p[2] * FOOT], y0));
-  const top = shoulder.map((p) => lift(p, y1));
+  const top = base.map((p) => lift(p, y1));
   const tris: Tri[] = [];
   let face = 0;
   for (let i = 0; i < n; i += 1) {
@@ -112,28 +188,10 @@ function body(
     tris.push(outward(bottom[i]!, top[j]!, top[i]!, face, QUAD_B));
     face += 1;
   }
-  const tiers = tierHeights.length;
-  let prev = top;
-  let y = y1;
-  for (let t = 0; t < tiers; t += 1) {
-    const s = 1 - (t + 1) / tiers;
-    y += tierHeights[t]!;
-    const next = shoulder.map((p): V3 => [
-      p[0] * s + apex[0] * (1 - s),
-      y,
-      p[2] * s + apex[1] * (1 - s),
-    ]);
-    for (let i = 0; i < n; i += 1) {
-      const j = (i + 1) % n;
-      if (s > 1e-9) {
-        tris.push(outward(prev[i]!, prev[j]!, next[j]!, face, QUAD_A));
-        tris.push(outward(prev[i]!, next[j]!, next[i]!, face, QUAD_B));
-      } else {
-        tris.push(outward(prev[i]!, prev[j]!, next[i]!, face, TRI));
-      }
-      face += 1;
-    }
-    prev = next;
+  const radius = Math.max(...base.map((p) => Math.hypot(p[0], p[2])));
+  for (const points of crown(seed, tag, top, y1, tip, apex, ridge, radius)) {
+    tris.push({ points, face, edges: TRI });
+    face += 1;
   }
   return tris;
 }
@@ -160,14 +218,26 @@ export function buildCrystalV2Geometry(model: CrystalV2Model): CrystalV2Geometry
   const m = model.monarch;
   const bodies: { key: string; tris: Tri[]; height: number }[] = [{
     key: 'monarch',
-    tris: body(m.sides, m.height, m.tierHeights, m.apex, 0.12 * m.height),
+    // Вершина зміщена вчетверо далі, ніж у моделі: ±0.08 радіуса на екрані
+    // не читались зовсім, кінчик стояв по центру. Точок кінчика — стільки,
+    // скільки ярусів дали плани (ADR-0217).
+    tris: body(seed, 'monarch', m.sides, m.height, m.tierHeights.reduce((sum, h) => sum + h, 0),
+      [m.apex[0] * 4, m.apex[1] * 4], m.tiers, 0.12 * m.height),
     height: m.height,
   }];
   const sparks: number[] = [];
   let reach = m.radius;
   for (const child of model.children) {
     const tip = child.radius * 1.28;
-    const tris = body(child.sides, child.height, [tip], [0, 0], 0.12 * child.height);
+    // Кінчик кристала року — теж не рівна піраміда: зміщена вершина й одна
+    // або дві точки, з хешу року.
+    const key = `year${child.year}`;
+    const apexShift: [number, number] = [
+      (unit(seed, `${key}:apex:x`) - 0.5) * 0.5 * child.radius,
+      (unit(seed, `${key}:apex:z`) - 0.5) * 0.5 * child.radius,
+    ];
+    const tris = body(seed, key, child.sides, child.height, tip, apexShift,
+      1 + Math.floor(unit(seed, `${key}:ridge`) * 2), 0.12 * child.height);
     const az = (child.azimuth * Math.PI) / 180;
     const offset: V3 = [Math.cos(az) * child.distance, 0, Math.sin(az) * child.distance];
     const place = (p: V3): V3 => {
@@ -216,16 +286,22 @@ export function buildCrystalV2Geometry(model: CrystalV2Model): CrystalV2Geometry
   for (let i = 0; i < COUNT; i += 1) {
     const a = ((i + unit(seed, `rock${i}:a`)) / COUNT) * Math.PI * 2;
     const d = geodeRadius * (0.55 + 0.5 * unit(seed, `rock${i}:d`));
-    const size = 0.16 + 0.14 * unit(seed, `rock${i}:s`);
+    const size = 0.14 + 0.12 * unit(seed, `rock${i}:s`);
     const cx = Math.cos(a) * d;
     const cz = Math.sin(a) * d;
-    const topP: V3 = [cx, size * 0.7, cz];
+    // Гранчасті брили, а не пласкі скалки: у діорамі (ADR-0220) низькі
+    // темні уламки читались конфеті. Вершина брили зсунута з центру.
+    const topP: V3 = [
+      cx + (unit(seed, `rock${i}:tx`) - 0.5) * size * 0.6,
+      size * 1.0,
+      cz + (unit(seed, `rock${i}:tz`) - 0.5) * size * 0.6,
+    ];
     const bottomP: V3 = [cx, -size, cz];
     const around: V3[] = [];
     for (let j = 0; j < 5; j += 1) {
       const b = a + (j / 5) * Math.PI * 2 + unit(seed, `rock${i}:${j}`);
       const rr = size * (0.8 + 0.5 * unit(seed, `rock${i}:r${j}`));
-      around.push([cx + Math.cos(b) * rr, size * 0.05, cz + Math.sin(b) * rr]);
+      around.push([cx + Math.cos(b) * rr, size * (0.25 + 0.2 * unit(seed, `rock${i}:y${j}`)), cz + Math.sin(b) * rr]);
     }
     for (let j = 0; j < 5; j += 1) {
       const k = (j + 1) % 5;

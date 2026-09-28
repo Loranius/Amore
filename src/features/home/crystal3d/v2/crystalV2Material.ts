@@ -12,6 +12,7 @@
 // «обмилок», якого власник не хоче.
 // ============================================================
 import * as THREE from 'three';
+import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 
 const VERTEX = /* glsl */ `
   attribute float faceTone;
@@ -138,14 +139,16 @@ const ROCK_FRAGMENT = /* glsl */ `
   uniform vec3 uColour;
   uniform vec3 uKey;
   uniform float uGlow;
+  uniform float uAmbient;
   varying vec3 vWorld;
   varying float vTone;
+  ${DIORAMA_SHADE}
   void main() {
     vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
     vec3 view = normalize(cameraPosition - vWorld);
     if (dot(n, view) < 0.0) n = -n;
-    float light = max(0.0, dot(n, uKey));
-    vec3 colour = uRock * vTone * (0.38 + 0.62 * light);
+    // Пастельна брила діорами (ADR-0220): м'яке світло замість різкого.
+    vec3 colour = dioramaShade(uRock * vTone, n, view);
     // Світло з-поміж каменів: сяйво кристала на низі жеоди.
     colour += uColour * uGlow * 0.18 * (1.0 - smoothstep(0.0, 0.25, vWorld.y - uGround));
     gl_FragColor = vec4(colour, 1.0);
@@ -195,7 +198,9 @@ export function createGeodeMaterial(
     vertexShader: ROCK_VERTEX,
     fragmentShader: ROCK_FRAGMENT,
     uniforms: {
-      uRock: { value: new THREE.Color(theme === 'dark' ? '#3b3547' : '#6d6475') },
+      // Тон скелі острівця діорами, а не темний граніт: камінь — частина острова.
+      uRock: { value: new THREE.Color(theme === 'dark' ? '#5c579a' : '#b4a7e2') },
+      uAmbient: { value: 0.55 },
       uColour: { value: linearColour(rgb) },
       uKey: { value: KEY.clone() },
       uGlow: { value: glow },
