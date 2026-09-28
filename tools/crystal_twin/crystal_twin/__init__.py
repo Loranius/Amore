@@ -7,4 +7,4 @@
 роках і звіт, який модуль що дав.
 """
 
-MODEL_VERSION = "crystal-v2/2026-09-28"
+MODEL_VERSION = "crystal-v2/2026-09-28b"

@@ -223,8 +223,11 @@ def build_model(snapshot: dict[str, Any]) -> dict[str, Any]:
             continue
         mix = per_year.get(k, {kind: 0 for kind in ACTIVITY_WEIGHTS})
         activity = sum(ACTIVITY_WEIGHTS[kind] * mix[kind] for kind in ACTIVITY_WEIGHTS)
-        share = 0.14 + 0.08 * math.log1p(age) + 0.045 * math.log1p(activity)
-        child_h = height * min(0.55, max(0.12, share))
+        # Друза, а не монолит із камінцями: у еталоні сусіди монарха — пів
+        # його висоти й більше (2026-09-28). Раніше стеля 0.55 і мала база
+        # давали живій історії кристали в чверть монарха.
+        share = 0.20 + 0.10 * math.log1p(age) + 0.05 * math.log1p(activity)
+        child_h = height * min(0.70, max(0.15, share))
         child_r = child_h * CHILD_SLENDERNESS
         places_share = (ACTIVITY_WEIGHTS["places"] * mix["places"]) / activity if activity > 0 else 0.0
         children.append({
@@ -235,8 +238,11 @@ def build_model(snapshot: dict[str, Any]) -> dict[str, Any]:
             "height": r6(child_h),
             "radius": r6(child_r),
             "azimuth": r6((k * 137.508 + (unit(seed, f"child{k}:az") - 0.5) * 20.0) % 360.0),
-            "distance": r6(radius + 0.14 + 0.09 * math.sqrt(k)),
-            "lean": r6(14.0 + 22.0 * places_share),
+            # Кристал року виростає БІЛЯ НІГ монарха (його основа — 0.5
+            # плеча) і розходиться віялом, як друза в еталоні, а не стоїть
+            # окремо поруч. Нахил і далі дають місця — лише віяло ширше.
+            "distance": r6(0.62 * radius + 0.62 * child_r + 0.04 + 0.03 * math.sqrt(k)),
+            "lean": r6(30.0 + 25.0 * places_share),
             "sparks": min(5, mix["milestones"]),
             "sides": _sides(seed, f"child{k}", child_r),
         })

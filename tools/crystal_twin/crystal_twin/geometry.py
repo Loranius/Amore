@@ -18,24 +18,16 @@ import numpy as np
 from .hashing import unit
 
 
-# Фаска: частка кожного ребра шестикутника, зрізана з обох кінців, і
-# звуження призми догори. Те саме, що в `geometry.ts` (ADR-0217, 2026-09-28:
-# «занадто громіздкий і низькополігональний»). Фаска — пласка грань.
-BEVEL = 0.16
-TAPER = 0.88
+# Веретено, а не стовп: нижнє кільце — FOOT плеча (еталон
+# low_poly_dirt_crystals; те саме, що в `geometry.ts`). Фаски немає.
+FOOT = 0.5
 
 
 def _ring(sides: list[list[float]]) -> np.ndarray:
-    corners = []
+    pts = []
     for angle, reach in sides:
         a = math.radians(angle)
-        corners.append(np.array([math.cos(a) * reach, 0.0, math.sin(a) * reach]))
-    n = len(corners)
-    pts = []
-    for i in range(n):
-        p = corners[i]
-        pts.append(p + (corners[(i - 1) % n] - p) * BEVEL)
-        pts.append(p + (corners[(i + 1) % n] - p) * BEVEL)
+        pts.append([math.cos(a) * reach, 0.0, math.sin(a) * reach])
     return np.array(pts)
 
 
@@ -56,8 +48,8 @@ def body(sides, height, tier_heights, apex, bury) -> list[tuple[np.ndarray, int,
     faces: list[tuple[np.ndarray, int]] = []
     face = 0
     n = len(ring0)
-    bottom = ring0 + np.array([0, y0, 0])
-    shoulder = ring0 * TAPER
+    bottom = ring0 * FOOT + np.array([0, y0, 0])
+    shoulder = ring0
     top = shoulder + np.array([0, y1, 0])
     for i in range(n):
         j = (i + 1) % n

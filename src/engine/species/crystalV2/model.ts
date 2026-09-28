@@ -34,7 +34,7 @@ import {
 } from './calendar';
 import { unit } from './hash';
 
-export const CRYSTAL_V2_VERSION = 'crystal-v2/2026-09-28';
+export const CRYSTAL_V2_VERSION = 'crystal-v2/2026-09-28b';
 
 const SIDES = 6;
 
@@ -305,8 +305,11 @@ export function buildCrystalV2Model(snapshot: CrystalV2Snapshot): CrystalV2Model
     if (age <= 0 && k > 0) continue;
     const mix = perYear.get(k) ?? zeroCounts();
     const activity = ACTIVITY_KINDS.reduce((sum, kind) => sum + ACTIVITY_WEIGHTS[kind] * mix[kind], 0);
-    const share = 0.14 + 0.08 * Math.log1p(age) + 0.045 * Math.log1p(activity);
-    const childHeight = height * Math.min(0.55, Math.max(0.12, share));
+    // Друза, а не монолит із камінцями: у еталоні сусіди монарха — пів
+    // його висоти й більше (2026-09-28). Раніше стеля 0.55 і мала база
+    // давали живій історії кристали в чверть монарха.
+    const share = 0.2 + 0.1 * Math.log1p(age) + 0.05 * Math.log1p(activity);
+    const childHeight = height * Math.min(0.7, Math.max(0.15, share));
     const childRadius = childHeight * CHILD_SLENDERNESS;
     const placesShare = activity > 0 ? (ACTIVITY_WEIGHTS.places * mix.places) / activity : 0;
     children.push({
@@ -317,8 +320,11 @@ export function buildCrystalV2Model(snapshot: CrystalV2Snapshot): CrystalV2Model
       height: r6(childHeight),
       radius: r6(childRadius),
       azimuth: r6(mod(k * 137.508 + (unit(seed, `child${k}:az`) - 0.5) * 20, 360)),
-      distance: r6(radius + 0.14 + 0.09 * Math.sqrt(k)),
-      lean: r6(14 + 22 * placesShare),
+      // Кристал року виростає БІЛЯ НІГ монарха (його основа — 0.5 плеча) і
+      // розходиться віялом, як друза в еталоні, а не стоїть окремо поруч.
+      // Нахил і далі дають місця — лише віяло ширше.
+      distance: r6(0.62 * radius + 0.62 * childRadius + 0.04 + 0.03 * Math.sqrt(k)),
+      lean: r6(30 + 25 * placesShare),
       sparks: Math.min(5, mix.milestones),
       sides: sides(seed, `child${k}`, childRadius),
     });
