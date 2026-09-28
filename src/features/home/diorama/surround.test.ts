@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { IslandMesh } from '../crystal3d/v2/crystalIsland';
-import { SURROUND_BELOW, SURROUND_CLEAR, buildCrystalSurround, buildReefSurround, buildTreeSurround } from './surround';
+import { REEF_FLOOR, REEF_FLOOR_CLEAR, SURROUND_BELOW, SURROUND_CLEAR, buildCrystalSurround, buildReefSurround, buildTreeSurround } from './surround';
 
 // ============================================================
 // Оточення на 360° (ADR-0224). Власник: «фонові структури лише з одного
@@ -67,6 +67,17 @@ it('риф: піщане дно лежить під усім рифом і тя�
   }
   expect(underIsland).toBe(true);
   expect(reach).toBeGreaterThan(150);
+});
+
+it('риф: під камерою чистий пісок — брили й корали дна лише за колом камери (регресія)', () => {
+  const mesh = cases[2]![1];
+  for (let v = 0; v < mesh.paint.length; v += 1) {
+    const y = mesh.positions[v * 3 + 1]!;
+    if (mesh.paint[v] === 8 || y > REEF_FLOOR + 12) continue;
+    // Усе, що стоїть на дні й не є піском, — далі за коло, де ходить камера
+    // (кавалок сягає ~1.25 свого розміру в боки).
+    expect(Math.hypot(mesh.positions[v * 3]!, mesh.positions[v * 3 + 2]!)).toBeGreaterThan(REEF_FLOOR_CLEAR - 6);
+  }
 });
 
 it('детерміновано: та сама дата — побітово те саме оточення', () => {

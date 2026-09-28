@@ -268,6 +268,8 @@ const R_FAR = 7 as Paint;
 const R_SAND = 8 as Paint;
 /** Висота піщаного дна під рифом. */
 export const REEF_FLOOR = -48;
+/** Радіус чистого піску під рифом: камера ходить до 45 одиниць від осі. */
+export const REEF_FLOOR_CLEAR = 60;
 
 /** Скеля-стовп: стос кавалків, що звужується догори, з шапкою водоростей. */
 function rockPillar(p: Painter, seed: string, key: string, base: V3, top: number, w: number) {
@@ -340,11 +342,13 @@ export function buildReefSurround(seed: string): IslandMesh {
       if (i > 0) p.tri(sand[i]![j]!, sand[i]![k]!, sand[i + 1]![k]!, R_SAND, t * 0.96);
     }
   }
-  // На піску — брили, корали й зірки.
+  // На піску — брили, корали й зірки, але лише ДАЛІ за коло, де ходить
+  // камера: згори брили під самою камерою лягали на кадр плямами (власник).
+  // Під островом і камерою — чистий пісок.
   for (let k = 0; k < 34; k += 1) {
     const key = `deep:floor${k}`;
     const a = unit(seed, `${key}:a`) * TAU;
-    const r = 14 + 120 * Math.sqrt(unit(seed, `${key}:r`));
+    const r = REEF_FLOOR_CLEAR + (180 - REEF_FLOOR_CLEAR) * Math.sqrt(unit(seed, `${key}:r`));
     const c = polar(r, a, REEF_FLOOR + 1 - 2 * unit(seed, `${key}:y`));
     // Дрібні: згори ближні брили дна лягали на кадр важкими плямами.
     const size = 1.8 + 2.4 * unit(seed, `${key}:s`);
