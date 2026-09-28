@@ -27,12 +27,14 @@ interface ReefIslandProps {
   seed: string;
   theme: 'light' | 'dark';
   radius: number;
+  /** Радіус каменю рифу в сцені: за ним стоять лагуна й арка. */
+  rock: number;
   groundY: number;
   reduceMotion: boolean;
 }
 
-export function ReefIsland({ seed, theme, radius, groundY, reduceMotion }: ReefIslandProps) {
-  const built = useMemo(() => buildReefIsland(seed, radius), [seed, radius]);
+export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion }: ReefIslandProps) {
+  const built = useMemo(() => buildReefIsland(seed, radius, rock), [seed, radius, rock]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Глибина навколо острова на всі 360° (ADR-0224): скелі з арками, ліс

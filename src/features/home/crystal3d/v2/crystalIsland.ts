@@ -396,7 +396,8 @@ export function buildCrystalIsland(seed: string, radius: number): CrystalIsland 
     const key = `isle:debris${k}`;
     const a = (k / 7) * Math.PI * 2 + unit(seed, `${key}:a`) * 0.6;
     const r = R * (1.35 + 0.6 * unit(seed, `${key}:r`));
-    const y = R * (-0.9 + 1.4 * unit(seed, `${key}:y`));
+    // Нижче краю острова: уламок над бруківкою пропливав перед кристалом.
+    const y = R * (-1.0 + 0.8 * unit(seed, `${key}:y`));
     chunk(debris, seed, key, polar(r, a, y), R * (0.07 + 0.08 * unit(seed, `${key}:s`)), PAINT.cliff);
   }
 

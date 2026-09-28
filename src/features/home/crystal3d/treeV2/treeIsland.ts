@@ -23,13 +23,27 @@ export const TREE_PAINT = { grass: 0, cliff: 1, boulder: 2, ivy: 3, flower: 4, s
 /** Купол трави: наскільки центр вищий за край, у частках радіуса. */
 export const TREE_ISLAND_DOME = 0.07;
 
+/** Плаский верх купола в частках радіуса: на ньому стоїть дерево з корінням. */
+export const TREE_ISLAND_PLATEAU = 0.4;
+
 /**
  * Висота трави над точкою на відстані `r` від осі. Купол гладкий, тож
  * трава й квіти, що стоять на ньому, беруть висоту звідси, а не вгадують.
+ *
+ * Центр — ПЛАСКИЙ, і дерево стоїть на ньому (`treeIslandBase`). Перший
+ * купол був опуклим від самої осі, дерево — на нулі, і коріння, яке
+ * лежить майже на землі, ховалось під травою: ефект «місць» пари
+ * (ADR-0218) зникав з кадру. Регресійний тест тримає коріння над травою.
  */
 export function treeIslandGround(radius: number, r: number): number {
   const t = Math.min(1, r / Math.max(1e-6, radius));
-  return radius * TREE_ISLAND_DOME * (1 - t * t) + RIM_Y;
+  const s = Math.max(0, (t - TREE_ISLAND_PLATEAU) / (1 - TREE_ISLAND_PLATEAU));
+  return radius * TREE_ISLAND_DOME * (1 - s * s) + RIM_Y;
+}
+
+/** Висота, на яку піднято дерево: верх пласкої середини купола. */
+export function treeIslandBase(radius: number): number {
+  return treeIslandGround(radius, 0);
 }
 
 const RIM_Y = 0.004;
@@ -180,7 +194,8 @@ export function buildTreeIsland(seed: string, radius: number): TreeIsland {
     const key = `tree-isle:debris${k}`;
     const a = (k / 6) * Math.PI * 2 + unit(seed, `${key}:a`) * 0.6;
     const r = R * (1.35 + 0.55 * unit(seed, `${key}:r`));
-    const y = R * (-0.8 + 1.2 * unit(seed, `${key}:y`));
+    // Нижче краю острова: над травою уламок пропливав перед деревом.
+    const y = R * (-0.9 + 0.7 * unit(seed, `${key}:y`));
     const size = R * (0.06 + 0.08 * unit(seed, `${key}:s`));
     chunk(debris, seed, key, polar(r, a, y), size, TREE_PAINT.cliff);
     // Деякі уламки — з клаптем трави зверху, як відколоті від острова.

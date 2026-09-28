@@ -20,9 +20,14 @@ import { Painter, box, chunk, ivy, polar, type IslandMesh, type V3 } from '../..
 /** Індекси палітри острова рифу (ті самі слоти, що й `PAINT` кристала). */
 export const REEF_PAINT = { top: 0, cliff: 1, boulder: 2, algae: 3, lagoon: 4, orange: 5, pink: 6, far: 7 } as const;
 
-/** Верхівка — ледь опуклий купол, як у дерева, але нижчий. */
-export const REEF_ISLAND_DOME = 0.04;
-const RIM_Y = 0.004;
+/**
+ * Верхівка ПЛАСКА й ледь нижча за нуль моделі. Перший варіант був
+ * опуклим куполом над нулем, а морські зірки й молюски моделі (ADR-0219)
+ * лежать на y = 0 — купол їх ховав, і те, що пара заробила, не було видно.
+ * Регресійний тест тримає верхівку під нулем моделі.
+ */
+export const REEF_ISLAND_DOME = 0;
+const RIM_Y = -0.004;
 const SEG = 24;
 
 export function reefIslandGround(radius: number, r: number): number {
@@ -92,7 +97,12 @@ function starfish(p: Painter, seed: string, key: string, c: V3, normal: V3, size
   }
 }
 
-export function buildReefIsland(seed: string, radius: number): ReefIsland {
+/**
+ * @param rock радіус каменю рифу в сцені — там ростуть колонії пари; типово
+ *   0.65 радіуса острова, як у молодого рифу (`ReefV2Scene`: острів ≥ 1.55
+ *   каменю).
+ */
+export function buildReefIsland(seed: string, radius: number, rock = radius * 0.65): ReefIsland {
   const R = radius;
   const p = new Painter();
   // Композиція за референсом: арка позаду праворуч, лагуна спереду ліворуч
@@ -153,9 +163,13 @@ export function buildReefIsland(seed: string, radius: number): ReefIsland {
   }
 
   // ── Лагуна: бірюзова вода в кам'яній чаші ─────────────────
-  const lagoonR = R * 0.24;
-  const lc = polar(R * 0.7, lagoonA, 0);
-  const lagoonY = reefIslandGround(R, R * 0.7) + R * 0.006;
+  // Лагуна й арка стоять ЗА каменем рифу, на якому ростуть колонії пари:
+  // голова рифу росте з роками (ADR-0219), і на фіксованих частках радіуса
+  // колонії старшого рифу стали б у воду й під арку.
+  const lagoonR = Math.max(R * 0.1, Math.min(R * 0.24, (R * 0.95 - rock - R * 0.03) / 2));
+  const lagoonAt = Math.max(R * 0.7, rock + R * 0.03 + lagoonR);
+  const lc = polar(lagoonAt, lagoonA, 0);
+  const lagoonY = reefIslandGround(R, lagoonAt) + R * 0.006;
   const water = Array.from({ length: 10 }, (_, i): V3 => {
     const a = (i / 10) * Math.PI * 2;
     const r = lagoonR * (0.85 + 0.25 * unit(seed, `reef-isle:lagoon${i}`));
@@ -171,7 +185,7 @@ export function buildReefIsland(seed: string, radius: number): ReefIsland {
   }
 
   // ── Арка: півколо круглих каменів, обвите водоростями ─────
-  const archC = polar(R * 0.74, archA, 0);
+  const archC = polar(Math.max(R * 0.74, rock + R * 0.12), archA, 0);
   const tangent: V3 = [-Math.sin(archA), 0, Math.cos(archA)];
   const half = R * 0.3;
   const height = R * 0.42;
@@ -226,14 +240,16 @@ export function buildReefIsland(seed: string, radius: number): ReefIsland {
     const j = Math.floor(unit(seed, `${key}:j`) * SEG);
     const at = shells[li]![j]!;
     const out = unitV([at[0], 0, at[2]]);
-    const base: V3 = [at[0] + out[0] * R * 0.02, at[1], at[2] + out[2] * R * 0.02];
+    // Основа — трохи В скелі: схил під кільцем іде всередину, і корал,
+    // поставлений назовні, висів у воді окремо від каменю.
+    const base: V3 = [at[0] - out[0] * R * 0.04, at[1], at[2] - out[2] * R * 0.04];
     const kind = Math.floor(unit(seed, `${key}:kind`) * 4);
     const size = R * (0.17 + 0.08 * unit(seed, `${key}:s`));
     if (kind === 0) branchCoral(p, seed, key, base, out, size, REEF_PAINT.pink);
     else if (kind === 1) branchCoral(p, seed, key, base, out, size, REEF_PAINT.orange);
     else if (kind === 2) tubes(p, seed, key, base, size * 0.8);
     // Помпон — кругла м'яка колонія, світліша за зірку.
-    else chunk(p, seed, key, along(base, out, size * 0.2), size * 0.35, REEF_PAINT.orange, 0, 0.9);
+    else chunk(p, seed, key, along(base, out, size * 0.05), size * 0.35, REEF_PAINT.orange, 0, 0.9);
   }
   for (let k = 0; k < 5; k += 1) {
     const key = `reef-isle:star${k}`;
@@ -249,7 +265,7 @@ export function buildReefIsland(seed: string, radius: number): ReefIsland {
   for (let k = 0; k < 6; k += 1) {
     const key = `reef-isle:debris${k}`;
     const a = (k / 6) * Math.PI * 2 + unit(seed, `${key}:a`) * 0.6;
-    chunk(debris, seed, key, polar(R * (1.35 + 0.55 * unit(seed, `${key}:r`)), a, R * (-0.9 + 1.3 * unit(seed, `${key}:y`))), R * (0.06 + 0.07 * unit(seed, `${key}:s`)), REEF_PAINT.cliff);
+    chunk(debris, seed, key, polar(R * (1.35 + 0.55 * unit(seed, `${key}:r`)), a, R * (-1.0 + 0.8 * unit(seed, `${key}:y`))), R * (0.06 + 0.07 * unit(seed, `${key}:s`)), REEF_PAINT.cliff);
   }
 
   return { island: p.build(), debris: debris.build(), lagoon: { x: lc[0], z: lc[2], r: lagoonR } };

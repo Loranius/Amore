@@ -110,7 +110,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
     return pointsGeometry(out, seed, 'snow');
   }, [seed]);
   // Бульбашки піднімаються з лагуни острова (ADR-0223) і з двох щілин біля неї.
-  const lagoon = useMemo(() => buildReefIsland(seed, island).lagoon, [seed, island]);
+  const lagoon = useMemo(() => buildReefIsland(seed, island, rockRadius).lagoon, [seed, island, rockRadius]);
   const bubbles = useMemo(() => {
     const out: number[] = [];
     for (let k = 0; k < 18; k += 1) {
@@ -152,13 +152,15 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
       // Трава стоїть на куполі верхівки острова (ADR-0223).
       dummy.position.set(p[0] * scale * k, reefIslandGround(island, squeezed) - 0.005, p[2] * scale * k);
       dummy.rotation.set(0, unit(seed, `grass${i}:turn`) * Math.PI * 2, 0);
-      dummy.scale.setScalar(0.14 + 0.2 * unit(seed, `grass${i}:h`));
+      // Трава не росте з води лагуни: там вона стирчала з бірюзи.
+      const wet = Math.hypot(p[0] * scale * k - lagoon.x, p[2] * scale * k - lagoon.z) < lagoon.r * 1.1;
+      dummy.scale.setScalar(wet ? 0 : 0.14 + 0.2 * unit(seed, `grass${i}:h`));
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [geometry, scale, seed, island, rockRadius]);
+  }, [geometry, scale, seed, island, rockRadius, lagoon]);
 
   useEffect(() => () => {
     for (const g of [rock, corals, critters, starfish, pearls, fish, tuft, snow, bubbles]) g?.dispose();
@@ -180,7 +182,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
   return (
     <>
       <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />
-      <ReefIsland seed={seed} theme={theme} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
+      <ReefIsland seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         {geometry.seagrass.length > 0 && (
           <instancedMesh ref={grassRef} args={[tuft, materials.grass, geometry.seagrass.length]} frustumCulled={false} />

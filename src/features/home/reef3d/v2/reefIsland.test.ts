@@ -61,6 +61,8 @@ describe('острів рифу', () => {
     const cliff = new Set<string>();
     for (let v = 0; v < paint.length; v += 1) {
       if (Math.abs(positions[v * 3 + 1]! - rimY) > 1e-6) continue;
+      // Верхівка пласка: на висоті краю лежать і внутрішні кільця — беремо лише край.
+      if (Math.hypot(positions[v * 3]!, positions[v * 3 + 2]!) < R * 0.9) continue;
       if (paint[v] === REEF_PAINT.top) top.add(key(v));
       if (paint[v] === REEF_PAINT.cliff) cliff.add(key(v));
     }

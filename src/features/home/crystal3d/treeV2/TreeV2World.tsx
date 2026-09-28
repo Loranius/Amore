@@ -7,7 +7,7 @@ import { PORTAL_GROUND_Y } from '../scene/portalScene';
 import { Diorama } from '@/features/home/diorama/Diorama';
 import { buildGrassTuft, grassInstances } from './meadow';
 import { TreeIsland } from './TreeIsland';
-import { treeIslandGround } from './treeIsland';
+import { treeIslandBase, treeIslandGround } from './treeIsland';
 import {
   FLOWER_COLOURS,
   MEADOW_PALETTES,
@@ -54,7 +54,8 @@ function flowerGeometry(positions: Float32Array, tint: Float32Array, scale: numb
     const x = positions[k * 3]! * squeeze;
     const z = positions[k * 3 + 2]! * squeeze;
     // Квітка стоїть на куполі трави (ADR-0222), а не на рівній землі.
-    const ground = (0.03 + treeIslandGround(island, Math.hypot(x, z) * scale)) / scale;
+    // Група дерева піднята на пласку середину купола — віднімаємо підйом.
+    const ground = (0.03 + treeIslandGround(island, Math.hypot(x, z) * scale) - treeIslandBase(island)) / scale;
     for (const face of faces) {
       for (const i of face) {
         const v = octa[i]!;
@@ -181,7 +182,8 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
       <TreeIsland seed={seed} theme={theme} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         <instancedMesh ref={grassRef} args={[tuft, materials.grass, grass.length]} frustumCulled={false} />
-        <group scale={scale}>
+        {/* Дерево стоїть на пласкій середині купола, а не під нею (ADR-0222). */}
+        <group position={[0, treeIslandBase(island), 0]} scale={scale}>
           <mesh geometry={wood} material={materials.wood} />
           <mesh geometry={leaves} material={materials.leaves} />
           {blossoms && <mesh geometry={blossoms} material={materials.blossoms} />}
