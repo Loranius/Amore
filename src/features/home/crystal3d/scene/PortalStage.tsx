@@ -94,6 +94,12 @@ export interface PortalStageProps {
    * цього прозоре тіло показує білий прямокутник (ADR-0178).
    */
   sky?: boolean | undefined;
+  /**
+   * Чий світ довкола. `island` — летючий острів кристала; `none` — лише
+   * камера, жести й світло, а світ малює сам вид (дерево v2, ADR-0218:
+   * «дерево — луг», PRODUCT.md, а не острів кристала).
+   */
+  world?: 'island' | 'none' | undefined;
   children: ReactNode;
 }
 
@@ -112,6 +118,7 @@ export function PortalStage({
   allowOrbit = true,
   freeCamera = false,
   sky = false,
+  world = 'island',
   children,
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
@@ -223,7 +230,7 @@ export function PortalStage({
           (`portalIsland.ts`), а не освітлений. */}
       <hemisphereLight args={[palette.rootLight, palette.groundBounce, palette.hemisphere]} />
 
-      <PortalEnvironment
+      {world === 'island' && <PortalEnvironment
         seed={seed}
         theme={theme}
         quality={quality}
@@ -232,7 +239,7 @@ export function PortalStage({
         aspect={aspect}
         veinBearings={veinBearings}
         veinReach={veinReach}
-      />
+      />}
       <PortalCameraRig
         frame={frame}
         controls={controls}

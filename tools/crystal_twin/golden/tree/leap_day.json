@@ -1,0 +1,43 @@
+{
+ "model": {
+  "asOf": "2025-03-01",
+  "autumn": 0.0,
+  "blossoms": [],
+  "counts": {
+   "daysOff": 0,
+   "events": 0,
+   "media": 0,
+   "memories": 3,
+   "milestones": 0,
+   "places": 0,
+   "plans": 0,
+   "wishes": 0
+  },
+  "days": 1827,
+  "fireflies": 0,
+  "flowers": 0,
+  "fruits": 0,
+  "height": 2.149073,
+  "leafiness": 0.838629,
+  "lean": 2.040988,
+  "leanAzimuth": 259.397992,
+  "limbs": 3,
+  "orders": 3,
+  "progress": 0.386898,
+  "rootReach": 0.193417,
+  "roots": 3,
+  "startDate": "2020-02-29",
+  "trunkRadius": 0.085259,
+  "version": "tree-v2/2026-09-28",
+  "years": 5.002156
+ },
+ "summary": {
+  "branches": 29,
+  "clusters": 24,
+  "crownRadius": 1.145,
+  "firstBlossom": null,
+  "meadowRadius": 3.066,
+  "reach": 0.9187,
+  "top": 2.1491
+ }
+}

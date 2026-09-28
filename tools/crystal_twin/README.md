@@ -49,3 +49,16 @@ python3 -m unittest discover -s tests                  # або: npm run test:tw
 Правка в `crystal_twin/model.py` без такої самої в `crystalV2/model.ts`
 (і навпаки) впаде на звірці з `golden/`. Порядок: правиш обидва, ганяєш
 `python3 -m crystal_twin golden`, пояснюєш зміну змісту в ADR.
+
+## Дерево v2 (ADR-0218)
+
+Той самий двійник рахує й дерево: `tree_model.py` (модель, один модуль —
+один ефект, основа росту ADR-0090), `tree_geometry.py` (скелет, крона,
+коріння, квіти, плоди, світлячки, польові квіти), `tree_render.py`.
+
+```bash
+python3 -m crystal_twin tree fixtures/busy.json          # модель + зведення
+python3 -m crystal_twin tree-render fixtures/busy.json --out tree.png
+python3 -m crystal_twin tree-growth private/real.json --out tree-growth.png
+python3 -m crystal_twin golden                           # і golden/tree/*.json
+```

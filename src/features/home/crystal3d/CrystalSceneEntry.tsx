@@ -8,7 +8,7 @@ const TreeLabPreviewScene = lazy(() => import('./treeLab/TreeLabPreviewScene'));
 // Дерево в порталі — те, що бачить пара. Лабораторія лишається за прапорцем:
 // у ній видно бюджети, приймальний статус і джерело даних, і викидати цей
 // інструмент разом із рамкою було б втратою.
-const EvolutionTreePreviewScene = lazy(() => import('./evolution/EvolutionTreePreviewScene'));
+const TreeV2Scene = lazy(() => import('./treeV2/TreeV2Scene'));
 
 type RenderableHomeArtifact = Exclude<HomeArtifact, 'reef'>;
 
@@ -39,9 +39,11 @@ export default function CrystalSceneEntry({ artifact }: CrystalSceneEntryProps) 
   if (artifact === 'tree') {
     return (
       <Suspense fallback={<CrystalPlaceholder />}>
+        {/* Дерево v2 (ADR-0218). Старе дерево — шлях відкату, його вантажить
+            сама v2 при збої; лабораторія лишилась за прапорцем. */}
         {isTreeLabPreviewEnabled(search)
           ? <TreeLabPreviewScene />
-          : <EvolutionTreePreviewScene />}
+          : <TreeV2Scene />}
       </Suspense>
     );
   }

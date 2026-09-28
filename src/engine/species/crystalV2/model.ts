@@ -64,7 +64,7 @@ const ACTIVITY_WEIGHTS: ActivityCounts = {
 
 /** Цілі кольору; червоний розгорнутий як 360°, щоб жодна дуга не йшла через жовтий. */
 const GIFT_TARGETS = { red: 360, blue: 240, green: 120 } as const;
-type GiftChannel = keyof typeof GIFT_TARGETS;
+export type GiftChannel = keyof typeof GIFT_TARGETS;
 const GIFT_ORDER: readonly GiftChannel[] = ['red', 'blue', 'green'];
 const OWN_HUE_START = 260;
 const OWN_HUE_STEP = 14;
@@ -153,12 +153,12 @@ function zeroCounts(): ActivityCounts {
   return { memories: 0, plans: 0, wishes: 0, events: 0, milestones: 0, places: 0, media: 0, daysOff: 0 };
 }
 
-interface Dated {
+export interface Dated {
   kind: ActivityKind;
   day: CivilDay;
 }
 
-function datedItems(snapshot: CrystalV2Snapshot, start: CivilDay, asOf: CivilDay): Dated[] {
+export function datedItems(snapshot: CrystalV2Snapshot, start: CivilDay, asOf: CivilDay): Dated[] {
   const items: Dated[] = [];
   const from = dayNumber(start);
   const to = dayNumber(asOf);
@@ -183,7 +183,7 @@ function datedItems(snapshot: CrystalV2Snapshot, start: CivilDay, asOf: CivilDay
   return items;
 }
 
-function giftChannel(
+export function giftChannel(
   wish: NonNullable<CrystalV2Snapshot['wishes']>[number],
   partners: CrystalV2Snapshot['partners'],
 ): GiftChannel {

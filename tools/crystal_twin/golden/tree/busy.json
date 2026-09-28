@@ -1,0 +1,108 @@
+{
+ "model": {
+  "asOf": "2026-09-27",
+  "autumn": 0.25,
+  "blossoms": [
+   {
+    "channel": "green",
+    "id": 0,
+    "year": 0
+   },
+   {
+    "channel": "red",
+    "id": 1,
+    "year": 0
+   },
+   {
+    "channel": "blue",
+    "id": 2,
+    "year": 0
+   },
+   {
+    "channel": "green",
+    "id": 3,
+    "year": 0
+   },
+   {
+    "channel": "blue",
+    "id": 4,
+    "year": 0
+   },
+   {
+    "channel": "red",
+    "id": 5,
+    "year": 1
+   },
+   {
+    "channel": "green",
+    "id": 6,
+    "year": 1
+   },
+   {
+    "channel": "red",
+    "id": 7,
+    "year": 1
+   },
+   {
+    "channel": "blue",
+    "id": 8,
+    "year": 1
+   },
+   {
+    "channel": "green",
+    "id": 9,
+    "year": 1
+   },
+   {
+    "channel": "blue",
+    "id": 10,
+    "year": 1
+   },
+   {
+    "channel": "red",
+    "id": 11,
+    "year": 2
+   }
+  ],
+  "counts": {
+   "daysOff": 60,
+   "events": 10,
+   "media": 185,
+   "memories": 37,
+   "milestones": 3,
+   "places": 6,
+   "plans": 9,
+   "wishes": 12
+  },
+  "days": 1371,
+  "fireflies": 31,
+  "flowers": 90,
+  "fruits": 3,
+  "height": 1.776667,
+  "leafiness": 1.063759,
+  "lean": 4.145291,
+  "leanAzimuth": 115.983109,
+  "limbs": 6,
+  "orders": 3,
+  "progress": 0.30681,
+  "rootReach": 0.22213,
+  "roots": 5,
+  "startDate": "2022-12-26",
+  "trunkRadius": 0.066928,
+  "version": "tree-v2/2026-09-28",
+  "years": 3.753671
+ },
+ "summary": {
+  "branches": 50,
+  "clusters": 42,
+  "crownRadius": 1.0248,
+  "firstBlossom": [
+   0.4032,
+   1.0253,
+   0.4139
+  ],
+  "meadowRadius": 2.9698,
+  "reach": 0.7082,
+  "top": 1.7767
+ }
+}

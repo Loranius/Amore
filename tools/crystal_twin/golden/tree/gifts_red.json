@@ -1,0 +1,73 @@
+{
+ "model": {
+  "asOf": "2026-09-27",
+  "autumn": 0.25,
+  "blossoms": [
+   {
+    "channel": "red",
+    "id": 0,
+    "year": 0
+   },
+   {
+    "channel": "red",
+    "id": 1,
+    "year": 0
+   },
+   {
+    "channel": "red",
+    "id": 2,
+    "year": 0
+   },
+   {
+    "channel": "red",
+    "id": 3,
+    "year": 0
+   },
+   {
+    "channel": "red",
+    "id": 4,
+    "year": 0
+   }
+  ],
+  "counts": {
+   "daysOff": 0,
+   "events": 0,
+   "media": 0,
+   "memories": 0,
+   "milestones": 0,
+   "places": 0,
+   "plans": 0,
+   "wishes": 5
+  },
+  "days": 1371,
+  "fireflies": 0,
+  "flowers": 0,
+  "fruits": 0,
+  "height": 1.776667,
+  "leafiness": 0.7,
+  "lean": 4.145291,
+  "leanAzimuth": 115.983109,
+  "limbs": 3,
+  "orders": 3,
+  "progress": 0.30681,
+  "rootReach": 0.1599,
+  "roots": 3,
+  "startDate": "2022-12-26",
+  "trunkRadius": 0.066928,
+  "version": "tree-v2/2026-09-28",
+  "years": 3.753671
+ },
+ "summary": {
+  "branches": 29,
+  "clusters": 24,
+  "crownRadius": 0.9602,
+  "firstBlossom": [
+   0.5802,
+   1.1817,
+   -0.1906
+  ],
+  "meadowRadius": 2.9181,
+  "reach": 0.6897,
+  "top": 1.7767
+ }
+}
