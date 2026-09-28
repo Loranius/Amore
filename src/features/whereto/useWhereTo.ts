@@ -76,8 +76,9 @@ async function callFinder(
   region: string,
   avoid: string[],
   freeDays: FreeDayInfo[],
+  names: string[],
 ): Promise<WhereToEvent[]> {
-  const body = { city, region, avoid, freeDays };
+  const body = { city, region, avoid, freeDays, names };
   let data;
   try {
     data = await invokeFn('events-finder', body);
@@ -98,7 +99,7 @@ export function useEventsSearch() {
   return useMutation({
     mutationFn: async (v: { location: WhereToLocation; avoid: string[] }): Promise<WhereToEvent[]> => {
       const freeDays = await loadFreeDays(users);
-      return callFinder(v.location.city, v.location.region, v.avoid, freeDays);
+      return callFinder(v.location.city, v.location.region, v.avoid, freeDays, users.map((u) => u.name));
     },
   });
 }

@@ -62,3 +62,15 @@ describe('tg-commands: команди в межах пари того, хто п
     expect(src).not.toContain('target.name === "Лєна"');
   });
 });
+
+describe('events-finder: імена пари з запиту, а не вшиті', () => {
+  const src = fn('events-finder');
+  it('у запиті до ШІ немає «Діма і Лєна»', () => {
+    expect(src).not.toContain('Діма і Лєна');
+    expect(src).toContain('coupleLabel(names)');
+  });
+  it('клієнт передає імена своєї пари', () => {
+    const hook = readFileSync(join(__dirname, '../features/whereto/useWhereTo.ts'), 'utf8');
+    expect(hook).toContain('const body = { city, region, avoid, freeDays, names }');
+  });
+});

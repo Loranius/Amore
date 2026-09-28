@@ -740,6 +740,8 @@ export interface EventsFinderRequest {
   region: string;
   avoid: string[];
   freeDays: FreeDayInfo[];
+  /** Імена людей пари: функція більше не вшиває «Діма і Лєна» (ADR-0229). */
+  names: string[];
 }
 
 /** Один результат events-finder. */
