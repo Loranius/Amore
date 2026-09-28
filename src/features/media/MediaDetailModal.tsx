@@ -10,18 +10,20 @@ import { ModalClose } from '@/components/ui/ModalClose';
 import { FilmIcon } from '@/components/icons/NavIcon';
 import { PencilIcon, PlayIcon } from '@/components/icons/UiIcon';
 import { useTmdbDetails } from './useTmdb';
-import type { MediaItemRow } from '@/types';
-import type { ReviewWho } from './useMedia';
+import { usePeople } from '@/features/_shared/useUsers';
+import type { MediaItem } from '@/types';
+import { reviewOf, type ReviewWho } from './useMedia';
 
 interface MediaDetailModalProps {
-  item: MediaItemRow;
+  item: MediaItem;
   onClose: () => void;
-  onEdit: (item: MediaItemRow) => void;
-  onReview: (item: MediaItemRow, who: ReviewWho) => void;
+  onEdit: (item: MediaItem) => void;
+  onReview: (item: MediaItem, who: ReviewWho) => void;
 }
 
 export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetailModalProps) {
   const { data: details, isPending } = useTmdbDetails(item);
+  const people = usePeople();
   const [playTrailer, setPlayTrailer] = useState(false);
 
   useEffect(() => {
@@ -108,16 +110,17 @@ export function MediaDetailModal({ item, onClose, onEdit, onReview }: MediaDetai
               * відгук із цієї модалки. Головна дія екрана деталей була
               * найдрібнішою річчю на ньому.
               */}
-            {(['dima', 'lena'] as ReviewWho[]).map((who) => {
-              const rating = who === 'dima' ? item.rating_dima : item.rating_lena;
-              const comment = who === 'dima' ? item.comment_dima : item.comment_lena;
-              const name = who === 'dima' ? 'Діма' : 'Лєна';
+            {people.map((person) => {
+              const review = reviewOf(item, person.id);
+              const rating = review?.rating ?? null;
+              const comment = review?.comment ?? null;
+              const name = person.displayName;
               return (
                 <button
-                  key={who}
+                  key={person.id}
                   type="button"
                   className="media-detail-review-row"
-                  onClick={() => onReview(item, who)}
+                  onClick={() => onReview(item, person.id)}
                   aria-label={rating || comment
                     ? `Змінити відгук: ${name}`
                     : `Додати відгук: ${name}`}

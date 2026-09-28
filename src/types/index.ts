@@ -262,16 +262,30 @@ export interface EventRow {
   star_color: string | null;
 }
 
+/**
+ * Відгук людини на фільм, серіал чи книгу (ADR-0229): рядок на
+ * `(media_id, user_id)`. До цього відгуки жили колонками
+ * `rating_dima/rating_lena/…` — схемою під двох конкретних людей.
+ */
+export interface MediaReviewRow {
+  media_id: number;
+  user_id: number;
+  rating: number | null;
+  comment: string | null;
+  updated_at: string;
+}
+
+/** Елемент вотчліста разом із відгуками людей пари. */
+export interface MediaItem extends MediaItemRow {
+  reviews: MediaReviewRow[];
+}
+
 export interface MediaItemRow {
   id: number;
   type: MediaType;
   title: string;
   status: MediaStatus;
   poster_url: string | null;
-  rating_dima: number | null;
-  rating_lena: number | null;
-  comment_dima: string | null;
-  comment_lena: string | null;
   created_by: number | null;
   created_at: string;
   /**
@@ -548,6 +562,7 @@ export interface Database {
       users:              TableDef<UsersRow, 'name'>;
       events:             TableDef<EventRow, 'title' | 'date', 'is_milestone'>;
       media_items:        TableDef<MediaItemRow, 'type' | 'title' | 'status'>;
+      media_reviews:      TableDef<MediaReviewRow, 'media_id' | 'user_id'>;
       swipe_votes:        TableDef<SwipeVoteRow, 'user_id' | 'tmdb_id' | 'title' | 'direction'>;
       shopping_items:     TableDef<ShoppingItemRow, 'title' | 'category'>;
       settings:           TableDef<SettingsRow, 'key' | 'value'>;
@@ -803,7 +818,7 @@ export type EdgeFunctionName = keyof EdgeFunctions;
 /** Таблиці, на які підписується клієнт (публікація supabase_realtime). */
 export type RealtimeTable =
   | 'events'
-  | 'media_items' | 'dishes' | 'wishlist_items'
+  | 'media_items' | 'media_reviews' | 'dishes' | 'wishlist_items'
   | 'shopping_items' | 'photo_calendar' | 'work_schedule'
   | 'map_pins' | 'user_locations'
   | 'memories' | 'memory_moments' | 'memory_links' | 'memory_days'

@@ -2,8 +2,8 @@
 // useMedia — дані вкладки «Вотчліст» (порт media.js даних)
 // ------------------------------------------------------------
 // Запит media_items за типом + мутації. Постер: HEIC-normalize +
-// compress → Storage. Відгук (rating/comment Діми/Лєни) пишеться
-// типобезпечно через явну гілку who → колонка (без рядкових ключів).
+// compress → Storage. Відгук — рядок `media_reviews` на людину
+// (ADR-0229), а не колонка на ім'я: пара може бути будь-якою.
 // ============================================================
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, publicUrl } from '@/lib/supabase';
@@ -12,7 +12,7 @@ import { compress, normalize } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
 import { nextFinishedAt } from './mediaConstants';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import type { MediaItemRow, MediaType, MediaStatus, InsertRow, TmdbSearchResult } from '@/types';
+import type { MediaItem, MediaItemRow, MediaReviewRow, MediaType, MediaStatus, InsertRow, TmdbSearchResult } from '@/types';
 import { couplePath } from '@/lib/couplePath';
 
 const BUCKET = 'media-posters';
@@ -20,15 +20,38 @@ const BUCKET = 'media-posters';
 /** Годинник одним місцем — щоб мутації не розводили два різні «зараз». */
 const nowIso = () => new Date().toISOString();
 
-async function loadItems(type: MediaType): Promise<MediaItemRow[]> {
+/** Приєднує відгуки до рядків; порядок відгуків — за людиною, стабільний. */
+export function attachReviews(
+  rows: readonly MediaItemRow[],
+  reviews: readonly MediaReviewRow[],
+): MediaItem[] {
+  const byMedia = new Map<number, MediaReviewRow[]>();
+  for (const r of reviews) byMedia.set(r.media_id, [...(byMedia.get(r.media_id) ?? []), r]);
+  return rows.map((row) => ({
+    ...row,
+    reviews: (byMedia.get(row.id) ?? []).slice().sort((a, b) => a.user_id - b.user_id),
+  }));
+}
+
+async function loadItems(type: MediaType): Promise<MediaItem[]> {
   const { data, error } = await supabase
     .from('media_items')
-    .select(
-      'id,type,title,status,poster_url,rating_dima,rating_lena,comment_dima,comment_lena,created_by,created_at,finished_at',
-    )
+    .select('id,type,title,status,poster_url,created_by,created_at,finished_at')
     .eq('type', type);
   if (error) throw error;
-  return data ?? [];
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+  const { data: reviews, error: reviewError } = await supabase
+    .from('media_reviews')
+    .select('media_id,user_id,rating,comment,updated_at')
+    .in('media_id', rows.map((r) => r.id));
+  if (reviewError) throw reviewError;
+  return attachReviews(rows, reviews ?? []);
+}
+
+/** Відгук конкретної людини на елемент, або null. */
+export function reviewOf(item: MediaItem, userId: number): MediaReviewRow | null {
+  return item.reviews.find((r) => r.user_id === userId) ?? null;
 }
 
 export function useMediaItems(type: MediaType) {
@@ -96,7 +119,8 @@ export async function uploadPoster(file: File, type: MediaType, itemId: number):
   return publicUrl(BUCKET, path);
 }
 
-export type ReviewWho = 'dima' | 'lena';
+/** Хто лишає відгук — id людини пари. */
+export type ReviewWho = number;
 
 export function useMediaMutations(type: MediaType) {
   const client = useQueryClient();
@@ -146,7 +170,8 @@ export function useMediaMutations(type: MediaType) {
     onError: () => toast.show('Помилка додавання'),
   });
 
-  // Відгук: рейтинг + коментар обраного автора (типобезпечно, без рядкових ключів).
+  // Відгук обраної людини пари: порожній відгук — видалення рядка, а не
+  // рядок із двома null, щоб «є відгук» означало одне й те саме скрізь.
   const saveReview = useMutation({
     mutationFn: async (v: {
       id: number;
@@ -154,11 +179,19 @@ export function useMediaMutations(type: MediaType) {
       rating: number | null;
       comment: string | null;
     }) => {
-      const patch =
-        v.who === 'dima'
-          ? { rating_dima: v.rating, comment_dima: v.comment }
-          : { rating_lena: v.rating, comment_lena: v.comment };
-      const { error } = await supabase.from('media_items').update(patch).eq('id', v.id);
+      const { error } =
+        v.rating === null && v.comment === null
+          ? await supabase.from('media_reviews').delete().eq('media_id', v.id).eq('user_id', v.who)
+          : await supabase.from('media_reviews').upsert(
+              {
+                media_id: v.id,
+                user_id: v.who,
+                rating: v.rating,
+                comment: v.comment,
+                updated_at: nowIso(),
+              },
+              { onConflict: 'media_id,user_id' },
+            );
       if (error) throw error;
     },
     onSuccess: invalidate,

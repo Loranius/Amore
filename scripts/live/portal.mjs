@@ -926,6 +926,11 @@ export async function tapSelector(page, selector, { after = 1200 } = {}) {
   const box = await page.evaluate((css) => {
     const node = document.querySelector(css);
     if (node === null) return null;
+    // Клік іде за координатами, тож елемент нижче екрана спершу треба
+    // прокрутити в кадр: інакше клік падав у точку поза вікном, нічого
+    // не відкривав — а тап звітував про успіх (виміряно на картці
+    // вотчліста, 2026-09-28).
+    node.scrollIntoView({ block: 'center', inline: 'center' });
     const rect = node.getBoundingClientRect();
     return [rect.x + rect.width / 2, rect.y + rect.height / 2];
   }, selector);

@@ -8,6 +8,7 @@
 import { StarIcon } from '@/components/icons/UiIcon';
 import { useMemo, useState } from 'react';
 import { useConfirm } from '@/providers/ConfirmProvider';
+import { useCurrentUser } from '@/providers/AuthProvider';
 import { TabBar } from '@/components/ui/TabBar';
 import { STATUS_CONFIG, STATUS_ORDER, MEDIA_TYPES, TYPE_LABELS } from './mediaConstants';
 import { useMediaItems, useMediaMutations, type ReviewWho } from './useMedia';
@@ -20,13 +21,14 @@ import { PageHeader } from '@/components/ui/PageHeader';
 import { ChevronDownIcon, SwapIcon } from '@/components/icons/UiIcon';
 import { MediaFormModal, AddFromSearchModal } from './MediaModals';
 import { SwipeDeck } from '@/features/swipe/SwipeDeck';
-import type { MediaItemRow, MediaType, MediaStatus, TmdbSearchResult } from '@/types';
+import type { MediaItem, MediaType, MediaStatus, TmdbSearchResult } from '@/types';
 import { useWorldModule } from '@/features/world/useWorldModule';
 
 type Filter = 'all' | MediaStatus;
-type ReviewTarget = { item: MediaItemRow; who: ReviewWho };
+type ReviewTarget = { item: MediaItem; who: ReviewWho };
 
 export function MediaPage() {
+  const me = useCurrentUser();
   // Світ позаду, як у вішліста й планів (ADR-0215).
   const worldVisible = useWorldModule();
   const [type, setType] = useState<MediaType>('movie');
@@ -35,9 +37,9 @@ export function MediaPage() {
   const [swipeOpen, setSwipeOpen] = useState(false);
 
   // Модальні стани.
-  const [detail, setDetail] = useState<MediaItemRow | null>(null);
+  const [detail, setDetail] = useState<MediaItem | null>(null);
   const [review, setReview] = useState<ReviewTarget | null>(null);
-  const [form, setForm] = useState<{ item: MediaItemRow | null } | null>(null);
+  const [form, setForm] = useState<{ item: MediaItem | null } | null>(null);
   const [fromSearch, setFromSearch] = useState<TmdbSearchResult | null>(null);
 
   const { data: items = [], isPending } = useMediaItems(type);
@@ -52,7 +54,7 @@ export function MediaPage() {
   };
 
   const avgRating = useMemo(() => {
-    const all = items.flatMap((i) => [i.rating_dima, i.rating_lena]).filter((r): r is number => !!r);
+    const all = items.flatMap((i) => i.reviews.map((r) => r.rating)).filter((r): r is number => r !== null);
     return all.length ? (all.reduce((a, b) => a + b, 0) / all.length).toFixed(1) : null;
   }, [items]);
 
@@ -208,7 +210,7 @@ export function MediaPage() {
               key={item.id}
               item={item}
               onOpen={setDetail}
-              onReview={(it) => setReview({ item: it, who: 'dima' })}
+              onReview={(it) => setReview({ item: it, who: me.id })}
               onDelete={onDelete}
             />
           ))}

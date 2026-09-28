@@ -1,33 +1,36 @@
 // ============================================================
 // ReviewPanel — відгук (порт openReviewPanel)
 // ------------------------------------------------------------
-// Автор (Діма/Лєна) + оцінка 1–10 + коментар. Перемикання автора
+// Автор (хтось із пари) + оцінка 1–10 + коментар. Перемикання автора
 // підтягує його поточні значення.
 // ============================================================
 import { useState } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
-import type { MediaItemRow } from '@/types';
-import type { ReviewWho } from './useMedia';
+import { usePeople } from '@/features/_shared/useUsers';
+import type { MediaItem } from '@/types';
+import { reviewOf, type ReviewWho } from './useMedia';
 
 interface ReviewPanelProps {
-  item: MediaItemRow;
-  preselect?: ReviewWho;
+  item: MediaItem;
+  /** Чий відгук відкрити першим — id людини пари. */
+  preselect: ReviewWho;
   onClose: () => void;
   onSave: (v: { id: number; who: ReviewWho; rating: number | null; comment: string | null }) => void;
 }
 
-export function ReviewPanel({ item, preselect = 'dima', onClose, onSave }: ReviewPanelProps) {
+export function ReviewPanel({ item, preselect, onClose, onSave }: ReviewPanelProps) {
+  const people = usePeople();
   const [who, setWho] = useState<ReviewWho>(preselect);
-  const curRating = who === 'dima' ? item.rating_dima : item.rating_lena;
-  const curComment = who === 'dima' ? item.comment_dima : item.comment_lena;
+  const current = reviewOf(item, who);
 
-  const [score, setScore] = useState<number | null>(curRating);
-  const [comment, setComment] = useState(curComment ?? '');
+  const [score, setScore] = useState<number | null>(current?.rating ?? null);
+  const [comment, setComment] = useState(current?.comment ?? '');
 
   const switchWho = (w: ReviewWho) => {
+    const next = reviewOf(item, w);
     setWho(w);
-    setScore(w === 'dima' ? item.rating_dima : item.rating_lena);
-    setComment((w === 'dima' ? item.comment_dima : item.comment_lena) ?? '');
+    setScore(next?.rating ?? null);
+    setComment(next?.comment ?? '');
   };
 
   const save = () => {
@@ -49,12 +52,16 @@ export function ReviewPanel({ item, preselect = 'dima', onClose, onSave }: Revie
         <div className="form-field">
           <span>Хто залишає відгук</span>
           <div className="chips">
-            <button type="button" className={`chip${who === 'dima' ? ' active' : ''}`} onClick={() => switchWho('dima')}>
-              Діма
-            </button>
-            <button type="button" className={`chip${who === 'lena' ? ' active' : ''}`} onClick={() => switchWho('lena')}>
-              Лєна
-            </button>
+            {people.map((person) => (
+              <button
+                key={person.id}
+                type="button"
+                className={`chip${who === person.id ? ' active' : ''}`}
+                onClick={() => switchWho(person.id)}
+              >
+                {person.displayName}
+              </button>
+            ))}
           </div>
         </div>
 

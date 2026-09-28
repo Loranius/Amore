@@ -79,6 +79,8 @@ export const realtimeInvalidation: Record<
 > = {
   events: [qk.events()],
   media_items: [qk.media()],
+  // Відгук партнера — частина того самого рядка вотчліста (ADR-0229).
+  media_reviews: [qk.media()],
   dishes: [qk.dishes()],
   wishlist_items: [['wishlist']],
   shopping_items: [qk.shopping()],

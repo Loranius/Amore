@@ -5,20 +5,25 @@ import { StarIcon } from '@/components/icons/UiIcon';
 import { FilmIcon } from '@/components/icons/NavIcon';
 import { PencilIcon, PlusIcon, TrashIcon } from '@/components/icons/UiIcon';
 import { STATUS_CONFIG } from './mediaConstants';
-import type { MediaItemRow } from '@/types';
+import { usePeople } from '@/features/_shared/useUsers';
+import type { MediaItem } from '@/types';
 
 interface MediaCardProps {
-  item: MediaItemRow;
-  onOpen: (item: MediaItemRow) => void;
-  onReview: (item: MediaItemRow) => void;
+  item: MediaItem;
+  onOpen: (item: MediaItem) => void;
+  onReview: (item: MediaItem) => void;
   onDelete: (id: number) => void;
 }
 
 export function MediaCard({ item, onOpen, onReview, onDelete }: MediaCardProps) {
   const statusLabel = STATUS_CONFIG[item.type][item.status];
-  const rD = item.rating_dima ? `${item.rating_dima}/10` : null;
-  const rL = item.rating_lena ? `${item.rating_lena}/10` : null;
-  const hasReviews = rD || rL || item.comment_dima || item.comment_lena;
+  const people = usePeople();
+  const hasReviews = item.reviews.length > 0;
+  // Оцінки — у порядку людей пари, з першою літерою підпису замість
+  // вшитих «Д:»/«Л:».
+  const ratings = people
+    .map((person) => ({ person, rating: item.reviews.find((r) => r.user_id === person.id)?.rating ?? null }))
+    .filter((one): one is { person: typeof one.person; rating: number } => one.rating !== null);
 
   return (
     <div className="media-card">
@@ -37,10 +42,13 @@ export function MediaCard({ item, onOpen, onReview, onDelete }: MediaCardProps) 
           {hasReviews ? <PencilIcon size={14} /> : <PlusIcon size={14} />}
           <span>Відгук</span>
         </button>
-        {(rD || rL) && (
+        {ratings.length > 0 && (
           <div className="media-ratings-mini">
-            {rD && <span className="media-rating-mini"><StarIcon size={11} /> Д: {rD}</span>}
-            {rL && <span className="media-rating-mini"><StarIcon size={11} /> Л: {rL}</span>}
+            {ratings.map(({ person, rating }) => (
+              <span key={person.id} className="media-rating-mini" title={person.displayName}>
+                <StarIcon size={11} /> {person.displayName.slice(0, 1)}: {rating}/10
+              </span>
+            ))}
           </div>
         )}
       </div>
