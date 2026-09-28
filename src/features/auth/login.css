@@ -1,0 +1,146 @@
+/* ============================================================
+   Вхід і реєстрація за поштою (ADR-0228).
+   ------------------------------------------------------------
+   Стоїть на `.auth-screen`/`.auth-card` і полях реєстрації
+   (`register.css`); нових токенів, радіусів і тривалостей немає.
+
+   The Rare Colour Rule: колір несе стан — обрана вкладка (кант і текст
+   `--accent`), виконане правило пароля (`--ok`), помилка (`--danger`).
+   The Two Accents Rule: `--accent` лише на тексті й лінії; заливку під
+   білим тексом малює спільний `.btn`. The Shadow Is A Shadow: нових
+   тіней немає. One Blur: розмиття немає — під карткою живе тло з
+   острівцями, і його видно чистим навколо картки, а не крізь неї.
+   ============================================================ */
+
+.auth-islands {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.auth-card--account {
+  gap: 16px;
+}
+
+.auth-tabs {
+  inline-size: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-block-end: 1px solid var(--border);
+}
+
+.auth-tab {
+  min-block-size: 44px;
+  background: none;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  color: var(--muted);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.auth-tab[aria-selected='true'] {
+  color: var(--accent);
+  border-block-end-color: var(--accent);
+}
+.auth-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.auth-form {
+  inline-size: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+
+.auth-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 18px;
+}
+
+.auth-link {
+  min-block-size: 44px;
+  background: none;
+  border: 0;
+  padding: 0 4px;
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.auth-link:disabled {
+  color: var(--muted);
+  cursor: default;
+}
+.auth-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+.auth-email {
+  color: var(--text);
+  word-break: break-all;
+}
+
+.auth-code-field {
+  align-items: center;
+}
+.auth-code {
+  max-inline-size: 220px;
+  text-align: center;
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.35em;
+  padding-inline-start: calc(14px + 0.35em);
+  font-variant-numeric: tabular-nums;
+}
+
+.auth-rules {
+  inline-size: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: start;
+  font-size: 13.5px;
+  line-height: 1.35;
+  color: var(--muted);
+}
+.auth-rules li {
+  display: flex;
+  gap: 8px;
+}
+.auth-rules li::before {
+  content: '○';
+  flex: none;
+}
+.auth-rules li.is-ok {
+  color: var(--ok);
+}
+.auth-rules li.is-ok::before {
+  content: '✓';
+}
+
+.auth-pin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+.auth-pin.shake { animation: shakeX 0.4s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-pin.shake { animation: none; }
+}

@@ -69,6 +69,13 @@ Deno.serve(async (req) => {
 
     if (!success) return json({ error: "invalid" }, 401);
 
+    // Місце вже прив'язане до справжньої пошти (ADR-0228, `portal-account`):
+    // старий акаунт заблоковано, тож тихий вхід паролем-хешем упав би
+    // безіменною помилкою. Кажемо прямо: заходь поштою й паролем.
+    if (!String(user.email ?? "").toLowerCase().endsWith("@portal.app")) {
+      return json({ error: "moved_to_email" }, 409);
+    }
+
     return json({ ok: true, email: user.email, password: user.pin_hash }, 200);
   } catch (e) {
     console.error("auth-pin:", e);

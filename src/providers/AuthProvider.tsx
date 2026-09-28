@@ -1,6 +1,15 @@
 // ============================================================
-// AUTH PROVIDER — вибір користувача + PIN + тиха Supabase-сесія
+// AUTH PROVIDER — пошта й пароль (ADR-0228) + старий вхід за PIN
 // ------------------------------------------------------------
+// ВХІД ЗА ПОШТОЮ (ADR-0228). Реєстрація: код із шести цифр на пошту
+// (`signInWithOtp` → `verifyOtp`), потім пароль (`updateUser`). Вхід:
+// `signInWithPassword`. Після будь-якого з них `portal-account` каже, чиє
+// це місце в парі; лише член пари стає `authenticated` у цьому провайдері.
+// Незнайомець лишається із сесією Supabase, але без доступу до даних —
+// це тримає брама членства в базі, а не цей файл.
+//
+// СТАРИЙ ВХІД ЗА PIN лишається для місць, до яких ще не прив'язали пошту
+// (Діма й Лєна до першого входу поштою):
 // Порт modules/auth.js у React-контекст. Логіка входу незмінна:
 //   1) invokeFn('auth-pin', {user_id, pin}) — сервер звіряє PIN
 //      (клієнт не бачить pin_hash) і рахує невдалі спроби;
@@ -22,7 +31,7 @@ import {
 } from 'react';
 import { supabase, invokeFn } from '@/lib/supabase';
 import { toAppUser } from '@/lib/guards';
-import type { AppUser } from '@/types';
+import type { AppUser, PortalSeat } from '@/types';
 
 const SESSION_KEY = 'portal_session_user_id';
 
@@ -31,14 +40,42 @@ export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 /** Результат спроби входу — те, що PinPad показує користувачу. */
 export type LoginResult =
   | { ok: true }
-  | { ok: false; reason: 'invalid' | 'error' }
+  | { ok: false; reason: 'invalid' | 'error' | 'moved_to_email' }
   | { ok: false; reason: 'locked'; retryAfterSeconds: number };
+
+/**
+ * Куди веде акаунт за поштою після входу чи підтвердження (ADR-0228).
+ * `claim` — місце в парі чекає, щоб його підтвердили старим PIN.
+ */
+export type LinkResult =
+  | { ok: true; state: 'member' }
+  | { ok: true; state: 'claim'; seats: PortalSeat[] }
+  | { ok: true; state: 'empty' | 'taken' }
+  | { ok: false; reason: 'error' };
+
+export type EmailLoginResult =
+  | LinkResult
+  | { ok: false; reason: 'invalid_credentials' | 'email_unconfirmed' | 'rate_limited' };
+
+export type CodeResult =
+  | { ok: true }
+  | { ok: false; reason: 'rate_limited' | 'not_found' | 'invalid_code' | 'error' };
 
 interface AuthContextValue {
   user: AppUser | null;
   status: AuthStatus;
   /** userId + 8-значний PIN. Не кидає — повертає структурований результат. */
   login: (userId: number, pin: string) => Promise<LoginResult>;
+  /** Чи відкрита реєстрація нових акаунтів (рішення власника на сервері). */
+  registrationOpen: () => Promise<boolean>;
+  loginWithEmail: (email: string, password: string) => Promise<EmailLoginResult>;
+  /** Надсилає код із шести цифр; `create` — чи можна створити новий акаунт. */
+  sendCode: (email: string, create: boolean) => Promise<CodeResult>;
+  verifyCode: (email: string, code: string) => Promise<CodeResult>;
+  setPassword: (password: string) => Promise<CodeResult>;
+  /** Після пароля: чиє це місце. `member` одразу відчиняє портал. */
+  linkAccount: () => Promise<LinkResult>;
+  claimSeat: (userId: number, pin: string) => Promise<LoginResult>;
   logout: () => Promise<void>;
 }
 
@@ -107,10 +144,121 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { ok: false, reason: 'locked', retryAfterSeconds: res.retryAfterSeconds ?? 900 };
       }
       if (res.error === 'invalid') return { ok: false, reason: 'invalid' };
+      if (res.error === 'moved_to_email') return { ok: false, reason: 'moved_to_email' };
       return { ok: false, reason: 'error' };
     },
     [clearLocalSession, signInSilently],
   );
+
+  // ── Пошта й пароль (ADR-0228) ──────────────────────────────
+  const enter = useCallback((appUser: AppUser) => {
+    localStorage.setItem(SESSION_KEY, String(appUser.id));
+    setUser(appUser);
+    setStatus('authenticated');
+  }, []);
+
+  const registrationOpen = useCallback(async (): Promise<boolean> => {
+    try {
+      const res = await invokeFn('portal-account', { action: 'ping' });
+      return 'registration' in res && res.registration === 'open';
+    } catch (e) {
+      // Функція ще не розгорнута — реєстрація, отже, ще не відкрита.
+      console.warn('portal-account ping:', e);
+      return false;
+    }
+  }, []);
+
+  const linkAccount = useCallback(async (): Promise<LinkResult> => {
+    let res;
+    try {
+      res = await invokeFn('portal-account', { action: 'link' });
+    } catch (e) {
+      console.error('portal-account link transport error:', e);
+      return { ok: false, reason: 'error' };
+    }
+    if (!res.ok || !('state' in res)) return { ok: false, reason: 'error' };
+    if (res.state === 'member') {
+      const appUser = toAppUser(res.user);
+      if (!appUser) return { ok: false, reason: 'error' };
+      // Токен міг бути виданий ще до того, як пошта стала членом пари, —
+      // тоді хук дав роль аноніма. Свіжий токен несе вже `authenticated`.
+      await supabase.auth.refreshSession().catch(() => {});
+      enter(appUser);
+      return { ok: true, state: 'member' };
+    }
+    if (res.state === 'claim') return { ok: true, state: 'claim', seats: res.seats };
+    return { ok: true, state: res.state };
+  }, [enter]);
+
+  const loginWithEmail = useCallback(async (email: string, password: string): Promise<EmailLoginResult> => {
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) {
+      if (error.code === 'email_not_confirmed') return { ok: false, reason: 'email_unconfirmed' };
+      if (error.code === 'over_request_rate_limit') return { ok: false, reason: 'rate_limited' };
+      if (error.code === 'invalid_credentials' || error.status === 400) return { ok: false, reason: 'invalid_credentials' };
+      console.error('signInWithPassword:', error);
+      return { ok: false, reason: 'error' };
+    }
+    return linkAccount();
+  }, [linkAccount]);
+
+  const sendCode = useCallback(async (email: string, create: boolean): Promise<CodeResult> => {
+    const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: create } });
+    if (!error) return { ok: true };
+    if (error.code === 'over_email_send_rate_limit' || error.code === 'over_request_rate_limit' || error.status === 429) {
+      return { ok: false, reason: 'rate_limited' };
+    }
+    // Без дозволу створювати акаунт Supabase відмовляє незнайомій пошті.
+    if (error.code === 'otp_disabled' || error.code === 'signup_disabled' || error.code === 'user_not_found') {
+      return { ok: false, reason: 'not_found' };
+    }
+    console.error('signInWithOtp:', error);
+    return { ok: false, reason: 'error' };
+  }, []);
+
+  const verifyCode = useCallback(async (email: string, code: string): Promise<CodeResult> => {
+    const { error } = await supabase.auth.verifyOtp({ email, token: code, type: 'email' });
+    if (!error) return { ok: true };
+    if (error.code === 'otp_expired' || error.status === 403 || error.status === 400) return { ok: false, reason: 'invalid_code' };
+    if (error.status === 429) return { ok: false, reason: 'rate_limited' };
+    console.error('verifyOtp:', error);
+    return { ok: false, reason: 'error' };
+  }, []);
+
+  const setPassword = useCallback(async (password: string): Promise<CodeResult> => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (!error) return { ok: true };
+    console.error('updateUser password:', error);
+    return { ok: false, reason: 'error' };
+  }, []);
+
+  const claimSeat = useCallback(async (userId: number, pin: string): Promise<LoginResult> => {
+    let res;
+    try {
+      res = await invokeFn('portal-account', { action: 'claim', user_id: userId, pin });
+    } catch (e) {
+      console.error('portal-account claim transport error:', e);
+      return { ok: false, reason: 'error' };
+    }
+    if (res.ok && 'user' in res && !('state' in res)) {
+      const appUser = toAppUser(res.user);
+      if (!appUser) return { ok: false, reason: 'error' };
+      // Пошта щойно стала членом пари: без свіжого токена хук тримав би
+      // роль аноніма, і перший же запит до даних повернув би порожнечу.
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('refreshSession after claim:', error);
+        return { ok: false, reason: 'error' };
+      }
+      enter(appUser);
+      return { ok: true };
+    }
+    if (!res.ok && res.error === 'locked') {
+      return { ok: false, reason: 'locked', retryAfterSeconds: res.retryAfterSeconds ?? 900 };
+    }
+    if (!res.ok && res.error === 'invalid') return { ok: false, reason: 'invalid' };
+    return { ok: false, reason: 'error' };
+  }, [enter]);
 
   // ── Вихід ───────────────────────────────────────────────────
   const logout = useCallback(async () => {
@@ -140,6 +288,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (async () => {
       const savedId = localStorage.getItem(SESSION_KEY);
       if (!savedId) {
+        // Сесія за поштою без збереженого місця (інший пристрій, очищене
+        // сховище): питаємо базу, чиє це місце, а не вгадуємо.
+        const {
+          data: { session: live },
+        } = await supabase.auth.getSession();
+        if (live) {
+          const { data: me } = await supabase.rpc('portal_me');
+          const appUser = Array.isArray(me) ? toAppUser(me[0]) : null;
+          if (appUser) {
+            localStorage.setItem(SESSION_KEY, String(appUser.id));
+            setUser(appUser);
+            setStatus('authenticated');
+            return;
+          }
+        }
         setStatus('unauthenticated');
         return;
       }
@@ -175,8 +338,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearLocalSession]);
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, login, logout }),
-    [user, status, login, logout],
+    () => ({
+      user, status, login, logout,
+      registrationOpen, loginWithEmail, sendCode, verifyCode, setPassword, linkAccount, claimSeat,
+    }),
+    [user, status, login, logout, registrationOpen, loginWithEmail, sendCode, verifyCode, setPassword, linkAccount, claimSeat],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

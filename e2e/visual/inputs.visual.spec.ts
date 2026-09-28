@@ -39,6 +39,8 @@ async function login(page: import('@playwright/test').Page) {
   test.skip(!visualUserName || !visualUserPin, 'Visual login secrets are required');
 
   await page.goto('/#/login');
+  // Вхід за PIN — посилання під формою пошти (ADR-0228).
+  await page.getByRole('button', { name: 'Увійти старим PIN-кодом' }).click();
   await expect(page.getByRole('heading', { name: /Хто сьогодні заходить у портал/ })).toBeVisible();
   await page.getByRole('button', { name: visualUserName!, exact: true }).click();
   for (const digit of visualUserPin!) {

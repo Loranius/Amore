@@ -75,6 +75,8 @@ interface TreeV2WorldProps {
   reduceMotion: boolean;
   /** Радіус острівця діорами в одиницях сцени (ADR-0220). */
   island: number;
+  /** Без діорами й оточення — острівець на тлі входу (ADR-0228). */
+  bare?: boolean;
 }
 
 /**
@@ -85,7 +87,7 @@ interface TreeV2WorldProps {
  * (`PORTAL_GROUND_Y`), тож камера порталу кадрує дерево тими самими
  * правилами, що й кристал, і жест повороту той самий.
  */
-export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island }: TreeV2WorldProps) {
+export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island, bare = false }: TreeV2WorldProps) {
   const palette = TREE_PALETTES[theme];
 
   // ── Світ (не залежить від дерева) ────────────────────────
@@ -175,8 +177,8 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
 
   return (
     <>
-      <Diorama species="tree" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />
-      <TreeIsland seed={seed} theme={theme} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
+      {!bare && <Diorama species="tree" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />}
+      <TreeIsland bare={bare} seed={seed} theme={theme} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         <instancedMesh ref={grassRef} args={[tuft, materials.grass, grass.length]} frustumCulled={false} />
         {/* Дерево стоїть на пласкій середині купола, а не під нею (ADR-0222). */}

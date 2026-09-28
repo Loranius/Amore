@@ -625,7 +625,8 @@ export type AuthPinResponse =
   | { ok: true; email: string; password: string }
   | {
       ok?: false;
-      error: 'invalid' | 'locked' | 'bad_request' | 'server_error';
+      /** `moved_to_email` — місце вже прив'язане до пошти (ADR-0228). */
+      error: 'invalid' | 'locked' | 'bad_request' | 'server_error' | 'moved_to_email';
       retryAfterSeconds?: number;
     };
 
@@ -753,9 +754,36 @@ export type DbNotifyRequest = {
 export type DbNotifyResponse = { ok: boolean };
 
 /** Мапа ім'я функції → контракт. Джерело правди для invokeFn<K>. */
+/** Місце в парі, яке ще чекає на пошту (ADR-0228). */
+export interface PortalSeat { id: number; name: string }
+
+export type PortalAccountRequest =
+  | { action: 'ping' }
+  | { action: 'link' }
+  | { action: 'claim'; user_id: number; pin: string };
+
+/**
+ * Відповідь `portal-account`. `state` у `link` каже, куди вести людину:
+ * у портал, до вибору свого місця, до створення пари чи до відмови.
+ */
+export type PortalAccountResponse =
+  | { ok: true; registration: 'open' | 'closed' }
+  | { ok: true; state: 'member'; user: { id: number; name: string } }
+  | { ok: true; state: 'claim'; seats: PortalSeat[] }
+  | { ok: true; state: 'empty' | 'taken' }
+  | { ok: true; user: { id: number; name: string } }
+  | {
+      ok?: false;
+      error:
+        | 'bad_request' | 'unauthenticated' | 'email_unconfirmed' | 'email_taken'
+        | 'seat_unavailable' | 'invalid' | 'locked' | 'server_error';
+      retryAfterSeconds?: number;
+    };
+
 export interface EdgeFunctions {
   'auth-pin':          { Body: AuthPinRequest; Response: AuthPinResponse };
   'couple-register':   { Body: CoupleRegisterRequest; Response: CoupleRegisterResponse };
+  'portal-account':    { Body: PortalAccountRequest; Response: PortalAccountResponse };
   'culinary-ai':       { Body: CulinaryAiRequest; Response: CulinaryDish };
   'shopping-parse':    { Body: ShoppingParseRequest; Response: ShoppingParseResponse };
   'events-finder':     { Body: EventsFinderRequest; Response: EventsFinderResponse };

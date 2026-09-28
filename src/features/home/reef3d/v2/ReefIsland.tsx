@@ -5,6 +5,7 @@ import type * as THREE from 'three';
 import { createIslandMaterial, createRayMaterial, meshGeometry } from '../../crystal3d/v2/CrystalIsland';
 import { buildReefSurround } from '@/features/home/diorama/surround';
 import { buildReefIsland } from './reefIsland';
+import { EMPTY_MESH } from '../../crystal3d/v2/crystalIsland';
 
 // ============================================================
 // Острів рифу за референсом власника (ADR-0223): барвінкова скеля клином,
@@ -36,15 +37,17 @@ interface ReefIslandProps {
   rock: number;
   groundY: number;
   reduceMotion: boolean;
+  /** Лише острів, без глибини й променів — острівець на тлі входу (ADR-0228). */
+  bare?: boolean;
 }
 
-export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion }: ReefIslandProps) {
+export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false }: ReefIslandProps) {
   const built = useMemo(() => buildReefIsland(seed, radius, rock), [seed, radius, rock]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Глибина навколо острова на всі 360° (ADR-0224): скелі з арками, ліс
   // водоростей, дно внизу.
-  const far = useMemo(() => meshGeometry(buildReefSurround(seed)), [seed]);
+  const far = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildReefSurround(seed)), [seed, bare]);
   const materials = useMemo(() => ({
     island: createIslandMaterial(REEF_ISLAND_PAINTS[theme]),
     ray: createRayMaterial(RAY[theme]),
@@ -67,11 +70,13 @@ export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion }:
 
   return (
     <>
-      <group position={[0, groundY, 0]}>
-        <mesh geometry={far} material={materials.deep} frustumCulled={false} />
-      </group>
+      {!bare && (
+        <group position={[0, groundY, 0]}>
+          <mesh geometry={far} material={materials.deep} frustumCulled={false} />
+        </group>
+      )}
       {/* Промені з поверхні: падають згори навскоси крізь товщу води. */}
-      {[0, 1, 2, 3, 4].map((k) => (
+      {!bare && [0, 1, 2, 3, 4].map((k) => (
         <Billboard
           key={k}
           lockX

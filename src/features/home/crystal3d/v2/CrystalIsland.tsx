@@ -4,7 +4,7 @@ import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 import { buildCrystalSurround } from '@/features/home/diorama/surround';
-import { buildCrystalIsland, type IslandMesh } from './crystalIsland';
+import { EMPTY_MESH, buildCrystalIsland, type IslandMesh } from './crystalIsland';
 
 // ============================================================
 // Острів кристала за референсом власника (ADR-0221, гранчастий — ADR-0227):
@@ -222,14 +222,16 @@ interface CrystalIslandProps {
   /** Висота монарха в сцені — сяйво під нього. */
   crystalHeight: number;
   reduceMotion: boolean;
+  /** Лише острів, без храму й променів — острівець на тлі входу (ADR-0228). */
+  bare?: boolean;
 }
 
-export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crystalHeight, reduceMotion }: CrystalIslandProps) {
+export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crystalHeight, reduceMotion, bare = false }: CrystalIslandProps) {
   const built = useMemo(() => buildCrystalIsland(seed, radius), [seed, radius]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Давній храм у підземеллі навколо острова, на всі 360° (ADR-0224).
-  const temple = useMemo(() => meshGeometry(buildCrystalSurround(seed)), [seed]);
+  const temple = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildCrystalSurround(seed)), [seed, bare]);
   const glowHex = `#${glowColour.getHexString()}`;
   const materials = useMemo(() => ({
     island: createIslandMaterial(ISLAND_PAINTS[theme]),
@@ -259,10 +261,10 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
 
   return (
     <>
-      <mesh geometry={temple} material={materials.temple} frustumCulled={false} />
+      {!bare && <mesh geometry={temple} material={materials.temple} frustumCulled={false} />}
       {/* Промені з розлому в склепінні: стоять кільцем і повертаються до
           камери лише навколо вертикалі — збоку вони більше не дошки. */}
-      {[0, 1, 2, 3, 4].map((k) => (
+      {!bare && [0, 1, 2, 3, 4].map((k) => (
         <Billboard
           key={k}
           lockX

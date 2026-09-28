@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import type * as THREE from 'three';
 import { createIslandMaterial, meshGeometry } from '../v2/CrystalIsland';
+import { EMPTY_MESH } from '../v2/crystalIsland';
 import { buildTreeSurround } from '@/features/home/diorama/surround';
 import { buildTreeIsland } from './treeIsland';
 
@@ -31,15 +32,17 @@ interface TreeIslandProps {
   radius: number;
   groundY: number;
   reduceMotion: boolean;
+  /** Лише острів, без неба довкола — острівець на тлі входу (ADR-0228). */
+  bare?: boolean;
 }
 
-export function TreeIsland({ seed, theme, radius, groundY, reduceMotion }: TreeIslandProps) {
+export function TreeIsland({ seed, theme, radius, groundY, reduceMotion, bare = false }: TreeIslandProps) {
   const built = useMemo(() => buildTreeIsland(seed, radius), [seed, radius]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Небо навколо острова на всі 360° (ADR-0224): хмари, море хмар унизу,
   // летючі острівці з деревцями.
-  const sky = useMemo(() => meshGeometry(buildTreeSurround(seed)), [seed]);
+  const sky = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildTreeSurround(seed)), [seed, bare]);
   const material = useMemo(() => createIslandMaterial(TREE_ISLAND_PAINTS[theme]), [theme]);
   const skyMaterial = useMemo(
     () => createIslandMaterial(TREE_ISLAND_PAINTS[theme], { colour: SKY_AIR[theme], from: 12, to: 130, strength: 0.82, near: 30 }),
@@ -64,9 +67,11 @@ export function TreeIsland({ seed, theme, radius, groundY, reduceMotion }: TreeI
 
   return (
     <>
-      <group ref={skyRef} position={[0, groundY, 0]}>
-        <mesh geometry={sky} material={skyMaterial} frustumCulled={false} />
-      </group>
+      {!bare && (
+        <group ref={skyRef} position={[0, groundY, 0]}>
+          <mesh geometry={sky} material={skyMaterial} frustumCulled={false} />
+        </group>
+      )}
       <group position={[0, groundY, 0]}>
         <mesh geometry={island} material={material} />
         <group ref={debrisRef}>

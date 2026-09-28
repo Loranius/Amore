@@ -37,6 +37,14 @@ export interface IslandMesh {
   glow: Float32Array;
 }
 
+/** Порожня сітка: для частин сцени, яких у «голому» режимі немає. */
+export const EMPTY_MESH: IslandMesh = {
+  positions: new Float32Array(0),
+  paint: new Float32Array(0),
+  tone: new Float32Array(0),
+  glow: new Float32Array(0),
+};
+
 export class Painter {
   readonly positions: number[] = [];
   readonly paint: number[] = [];

@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:db": "bash supabase/tests/run-membership-gate.sh",
     "test:twin": "cd tools/crystal_twin && python3 -m unittest discover -s tests",
     "verify:pages-build": "node scripts/verify-pages-build.mjs",
     "live": "node scripts/live/shot.mjs",

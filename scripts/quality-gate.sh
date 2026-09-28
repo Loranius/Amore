@@ -44,8 +44,11 @@ GATES=(typecheck test test:twin build verify:pages-build)
 
 # Не ворота, і чому саме:
 #   dev, preview   — запускають сервер і не завершуються;
-#   live, live:diff — жива перевірка очима, потребує `.env.live` і браузера.
-NOT_GATES=(dev preview live live:diff)
+#   live, live:diff — жива перевірка очима, потребує `.env.live` і браузера;
+#   test:db        — потребує бінарників PostgreSQL (initdb, pg_ctl), яких
+#                    немає в кожному середовищі; запускати при зміні міграцій
+#                    доступу (ADR-0228).
+NOT_GATES=(dev preview live live:diff test:db)
 
 require_json() {
   [[ -f package.json ]] || { echo "Немає package.json — ворота ні до чого прикласти." >&2; exit 1; }

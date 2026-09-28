@@ -122,6 +122,8 @@ test.describe('Реєстрація пари на Pixel 8 Pro', () => {
 
     // ── Порожній портал пропонує створити, а не показує пустий список ──
     await page.goto('./#/login', { waitUntil: 'networkidle' });
+    // Список місць пари — за посиланням старого входу (ADR-0228).
+    await page.getByRole('button', { name: 'Увійти старим PIN-кодом' }).click();
     await expect(page.locator('.auth-title')).toHaveText('Тут ще нікого немає', { timeout: 20_000 });
     await expect(page.locator('.user-btn')).toHaveCount(0);
     await page.locator('a.reg-next').click();
