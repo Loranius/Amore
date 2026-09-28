@@ -1,5 +1,5 @@
 import { useEffect, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { CrystalV2Geometry } from '@/engine/species/crystalV2/geometry';
 import type { CrystalV2Model } from '@/engine/species/crystalV2/model';
@@ -50,20 +50,51 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     return buffer;
   }, [geometry]);
 
-  const glassBack = useMemo(() => createCrystalV2Material(rgb, glow, 'back'), [rgb, glow]);
-  const glassFront = useMemo(() => createCrystalV2Material(rgb, glow, 'front'), [rgb, glow]);
+  const crystalMaterial = useMemo(() => createCrystalV2Material(rgb, glow), [rgb, glow]);
   const rockMaterial = useMemo(
     () => createGeodeMaterial(rgb, glow, theme, CRYSTAL_GROUND_BASELINE),
     [rgb, glow, theme],
   );
-  const sparkMaterial = useMemo(() => new THREE.PointsMaterial({
-    color: linearColour(rgb).lerp(new THREE.Color(1, 1, 1), 0.7),
-    size: 0.07,
-    sizeAttenuation: true,
+  // Іскри віх лежать на осі кристала року, а кристал тепер суцільний
+  // (ADR-0227): кожну виносимо до камери на радіус найтовщого тіла року,
+  // тож вона блищить на грані, а не ховається в ній. Острів знизу
+  // значно товщий, тож крізь нього іскри не просвічують.
+  const sparkLift = useMemo(() => Math.max(0, ...model.children.map((c) => c.radius)) * 1.15, [model]);
+  const sparkMaterial = useMemo(() => new THREE.ShaderMaterial({
     transparent: true,
     depthWrite: false,
     blending: THREE.AdditiveBlending,
-  }), [rgb]);
+    uniforms: {
+      uColour: { value: linearColour(rgb).lerp(new THREE.Color(1, 1, 1), 0.7) },
+      uLift: { value: sparkLift },
+      uSize: { value: 0.07 },
+      // Половина висоти буфера в пікселях — як `sizeAttenuation` у three.
+      uHalfHeight: { value: 400 },
+      uOpacity: { value: 1 },
+    },
+    vertexShader: /* glsl */ `
+      uniform float uLift;
+      uniform float uSize;
+      uniform float uHalfHeight;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0);
+        // Одиниці моделі → одиниці виду: група масштабована.
+        float scale = length(modelViewMatrix[0].xyz);
+        mv.xyz += normalize(-mv.xyz) * uLift * scale;
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = uSize * scale * uHalfHeight / -mv.z;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColour;
+      uniform float uOpacity;
+      void main() {
+        float r = length(gl_PointCoord - 0.5) * 2.0;
+        float a = smoothstep(1.0, 0.2, r) * uOpacity;
+        gl_FragColor = vec4(uColour * a, a);
+      }
+    `,
+  }), [rgb, sparkLift]);
 
   useEffect(() => () => {
     crystals.dispose();
@@ -71,33 +102,31 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     sparks?.dispose();
   }, [crystals, rocks, sparks]);
   useEffect(() => () => {
-    glassBack.dispose();
-    glassFront.dispose();
+    crystalMaterial.dispose();
     rockMaterial.dispose();
     sparkMaterial.dispose();
-  }, [glassBack, glassFront, rockMaterial, sparkMaterial]);
+  }, [crystalMaterial, rockMaterial, sparkMaterial]);
 
   // Дихання сяйва — повільне й мале: живе, а не блимає. Зменшений рух (§47)
   // лишає його сталим.
+  const halfHeight = useThree((state) => (state.size.height * state.viewport.dpr) / 2);
+  useEffect(() => { sparkMaterial.uniforms.uHalfHeight!.value = halfHeight; }, [sparkMaterial, halfHeight]);
+
   useFrame(({ clock }) => {
     if (reduceMotion) return;
     const t = clock.getElapsedTime();
     const value = 0.85 + 0.15 * Math.sin(t * 0.9);
-    for (const material of [glassBack, glassFront]) {
-      const pulse = material.uniforms.uPulse;
-      if (pulse) pulse.value = value;
-    }
-    sparkMaterial.opacity = 0.7 + 0.3 * Math.sin(t * 1.7);
+    const pulse = crystalMaterial.uniforms.uPulse;
+    if (pulse) pulse.value = value;
+    sparkMaterial.uniforms.uOpacity!.value = 0.7 + 0.3 * Math.sin(t * 1.7);
   });
 
   return (
     <group position={[0, CRYSTAL_GROUND_BASELINE, 0]} scale={scale}>
       <mesh geometry={rocks} material={rockMaterial} />
-      {/* Іскри віх — ДО скла: тепер їх видно крізь грані, всередині кристала. */}
+      {/* Суцільний гранчастий кристал (ADR-0227); іскри віх — після нього. */}
+      <mesh geometry={crystals} material={crystalMaterial} />
       {sparks && <points geometry={sparks} material={sparkMaterial} renderOrder={2} />}
-      {/* Скло: спершу внутрішня стінка, потім передні грані (див. матеріал). */}
-      <mesh geometry={crystals} material={glassBack} renderOrder={3} />
-      <mesh geometry={crystals} material={glassFront} renderOrder={4} />
     </group>
   );
 }

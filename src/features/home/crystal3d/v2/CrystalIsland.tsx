@@ -7,9 +7,9 @@ import { buildCrystalSurround } from '@/features/home/diorama/surround';
 import { buildCrystalIsland, type IslandMesh } from './crystalIsland';
 
 // ============================================================
-// Острів кристала за референсом власника (ADR-0221): бруківка, скеля з
-// самоцвітами, руїни з плющем, уламки, сяйво в основі кристала й далекий
-// грот із променями. Геометрія — `crystalIsland.ts`; тут лише фарби.
+// Острів кристала за референсом власника (ADR-0221, гранчастий — ADR-0227):
+// світлі плити, білі колони з плющем, фіолетова підошва великими гранями,
+// кавалки, м'яке сяйво в основі кристала й далекий храм із променями. Геометрія — `crystalIsland.ts`; тут лише фарби.
 // ============================================================
 
 const END = /* glsl */ `
@@ -20,9 +20,14 @@ const END = /* glsl */ `
 const KEY = new THREE.Vector3(-0.45, 0.8, 0.4).normalize();
 
 /** Фарби: бруківка, скеля, камінь руїн, плющ, самоцвіт, земля між плитами. */
+/**
+ * Гранчастий low-poly за референсом (ADR-0227): плити майже білі з лілом,
+ * колони — теплий білий камінь, підошва — насичений фіолетовий, плющ
+ * соковито-зелений.
+ */
 const ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
-  light: ['#dcc3c6', '#6d5c96', '#d9c6c4', '#5fae45', '#ff8fd0', '#7d6878', '#ffffff', '#9c86cf'],
-  dark: ['#a591b0', '#3c3163', '#ad9cba', '#4a9440', '#ff82d2', '#473c57', '#d8cff0', '#3a2c6c'],
+  light: ['#e9e3f0', '#6b62d2', '#f2eee8', '#5cbf45', '#ff8fd0', '#b3a8cc', '#ffffff', '#9c86cf'],
+  dark: ['#b4abc9', '#4a42a6', '#d2cbd8', '#4aa53e', '#ff82d2', '#6c6388', '#d8cff0', '#3a2c6c'],
 };
 
 /**
@@ -230,7 +235,9 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
     island: createIslandMaterial(ISLAND_PAINTS[theme]),
     temple: createIslandMaterial(TEMPLE_PAINTS[theme], { colour: CAVE[theme].air, from: 12, to: 130, strength: 0.88, near: 30 }),
     ray: createRayMaterial(CAVE[theme].ray),
-    core: createGlowMaterial(glowHex, theme === 'dark' ? 1.2 : 0.9),
+    // Сяйво в основі — м'яке біле, як у референсі: кристал суцільний, і
+    // яскравий ореол кольору колонії розмивав би його грані.
+    core: createGlowMaterial(glowHex, theme === 'dark' ? 0.6 : 0.4),
   }), [theme, glowHex]);
   const debrisRef = useRef<THREE.Group>(null);
 
