@@ -111,6 +111,7 @@ export default function TreeV2Scene() {
             scale={frame.scale}
             theme={theme}
             reduceMotion={reduceMotion}
+            island={Math.max(0.95, frame.reach * 1.1)}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

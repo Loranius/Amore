@@ -4,21 +4,21 @@ import * as THREE from 'three';
 import { unit } from '@/engine/species/crystalV2/hash';
 import type { TreeV2Geometry } from '@/engine/species/treeV2/geometry';
 import { PORTAL_GROUND_Y } from '../scene/portalScene';
-import { buildGrassTuft, buildMeadow, grassInstances, meadowHeight } from './meadow';
+import { Diorama } from '@/features/home/diorama/Diorama';
+import { buildGrassTuft, grassInstances } from './meadow';
 import {
   FLOWER_COLOURS,
   MEADOW_PALETTES,
   createBlossomMaterial,
   createGlowPointsMaterial,
   createGrassMaterial,
-  createGroundMaterial,
   createLeafMaterial,
-  createSkyMaterial,
   createWoodMaterial,
 } from './treeV2Materials';
 
-const FOG_NEAR = 9;
-const FOG_FAR = 48;
+// Діорама близька й уся в кадрі: туман лише далеко за нею (ADR-0220).
+const FOG_NEAR = 30;
+const FOG_FAR = 90;
 
 function toneGeometry(positions: Float32Array, tone: Float32Array, extra?: Record<string, Float32Array>) {
   const g = new THREE.BufferGeometry();
@@ -39,18 +39,19 @@ function pointsGeometry(positions: Float32Array, seed: string, tag: string) {
 }
 
 /** Польові квіти вихідних: крихітні октаедри над травою, колір за індексом. */
-function flowerGeometry(positions: Float32Array, tint: Float32Array, scale: number) {
+function flowerGeometry(positions: Float32Array, tint: Float32Array, scale: number, island: number, outer: number) {
   const out: number[] = [];
   const channel: number[] = [];
   const s = 0.045;
   const octa = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
   const faces = [[0, 2, 4], [4, 2, 1], [1, 2, 5], [5, 2, 0], [4, 3, 0], [1, 3, 4], [5, 3, 1], [0, 3, 5]];
   for (let k = 0; k < tint.length; k += 1) {
-    const x = positions[k * 3]!;
-    const z = positions[k * 3 + 2]!;
-    // Купол лугу опускається від дерева: квітка стоїть на ЗЕМЛІ під собою,
-    // а не на висоті центру (перший кадр показав їх у повітрі).
-    const ground = meadowHeight(Math.hypot(x, z) * scale) / scale;
+    // Луг моделі ширший за острівець діорами: квіти стискаються радіально
+    // до його краю (ADR-0220), порядок і густота лишаються ті самі.
+    const squeeze = Math.min(1, (island * 0.88) / Math.max(1e-6, outer * scale));
+    const x = positions[k * 3]! * squeeze;
+    const z = positions[k * 3 + 2]! * squeeze;
+    const ground = 0.03 / scale;
     for (const face of faces) {
       for (const i of face) {
         const v = octa[i]!;
@@ -72,6 +73,8 @@ interface TreeV2WorldProps {
   scale: number;
   theme: 'light' | 'dark';
   reduceMotion: boolean;
+  /** Радіус острівця діорами в одиницях сцени (ADR-0220). */
+  island: number;
 }
 
 /**
@@ -81,16 +84,12 @@ interface TreeV2WorldProps {
  * (`PORTAL_GROUND_Y`), тож камера порталу кадрує дерево тими самими
  * правилами, що й кристал, і жест повороту той самий.
  */
-export function TreeV2World({ seed, geometry, scale, theme, reduceMotion }: TreeV2WorldProps) {
+export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island }: TreeV2WorldProps) {
   const palette = MEADOW_PALETTES[theme];
 
   // ── Світ (не залежить від дерева) ────────────────────────
-  const meadow = useMemo(() => {
-    const mesh = buildMeadow(seed);
-    return toneGeometry(mesh.positions, mesh.tone);
-  }, [seed]);
   const clear = Math.max(0.25, geometry.height * scale * 0.06);
-  const grass = useMemo(() => grassInstances(seed, clear), [seed, clear]);
+  const grass = useMemo(() => grassInstances(seed, clear, island * 0.85), [seed, clear, island]);
   const tuft = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(buildGrassTuft(), 3));
@@ -112,8 +111,8 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion }: Tree
     return g;
   }, [geometry]);
   const flowers = useMemo(
-    () => (geometry.flowers.tint.length > 0 ? flowerGeometry(geometry.flowers.positions, geometry.flowers.tint, scale) : null),
-    [geometry, scale],
+    () => (geometry.flowers.tint.length > 0 ? flowerGeometry(geometry.flowers.positions, geometry.flowers.tint, scale, island, geometry.meadowRadius) : null),
+    [geometry, scale, island],
   );
   const fruits = useMemo(
     () => (geometry.fruits.length > 0 ? pointsGeometry(geometry.fruits, seed, 'fruit') : null),
@@ -126,8 +125,6 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion }: Tree
 
   // ── Матеріали ───────────────────────────────────────────
   const materials = useMemo(() => ({
-    sky: createSkyMaterial(palette),
-    meadow: createGroundMaterial(palette, FOG_NEAR, FOG_FAR, palette.ground),
     grass: createGrassMaterial(palette, FOG_NEAR, FOG_FAR),
     wood: createWoodMaterial(palette, FOG_NEAR, FOG_FAR),
     leaves: createLeafMaterial(palette, FOG_NEAR, FOG_FAR, PORTAL_GROUND_Y),
@@ -155,8 +152,8 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion }: Tree
   }, [grass]);
 
   useEffect(() => () => {
-    for (const g of [meadow, tuft, wood, leaves, blossoms, flowers, fruits, fireflies]) g?.dispose();
-  }, [meadow, tuft, wood, leaves, blossoms, flowers, fruits, fireflies]);
+    for (const g of [tuft, wood, leaves, blossoms, flowers, fruits, fireflies]) g?.dispose();
+  }, [tuft, wood, leaves, blossoms, flowers, fruits, fireflies]);
   useEffect(() => () => {
     for (const m of Object.values(materials)) m.dispose();
   }, [materials]);
@@ -176,11 +173,8 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion }: Tree
 
   return (
     <>
-      <mesh material={materials.sky} renderOrder={-10} frustumCulled={false}>
-        <sphereGeometry args={[80, 24, 16]} />
-      </mesh>
+      <Diorama species="tree" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
-        <mesh geometry={meadow} material={materials.meadow} />
         <instancedMesh ref={grassRef} args={[tuft, materials.grass, grass.length]} frustumCulled={false} />
         <group scale={scale}>
           <mesh geometry={wood} material={materials.wood} />

@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { unit } from '@/engine/species/crystalV2/hash';
 import type { ReefV2Geometry } from '@/engine/species/reefV2/geometry';
+import { Diorama } from '@/features/home/diorama/Diorama';
 import { PORTAL_GROUND_Y } from '../../crystal3d/scene/portalScene';
 import {
   REEF_PALETTES,
@@ -12,44 +13,11 @@ import {
   createGlowMaterial,
   createSeabedMaterial,
   createSeagrassMaterial,
-  createWaterDomeMaterial,
 } from './reefV2Materials';
 
-const FOG_NEAR = 4;
-const FOG_FAR = 26;
-const SEABED_RINGS = [0.6, 1.4, 2.4, 3.6, 5, 7, 10, 15, 24, 40];
-
-/** Дно: кільця клаптів із пологими дюнами; центр — на лінії землі. */
-function buildSeabed(seed: string) {
-  const out: number[] = [];
-  const tone: number[] = [];
-  const SEG = 40;
-  const point = (i: number, j: number): number[] => {
-    const r = i === 0 ? 0 : SEABED_RINGS[i - 1]!;
-    const a = ((j + (i % 2) * 0.5) / SEG) * Math.PI * 2;
-    const dune = i < 2 ? 0 : Math.sin(a * 3 + r * 0.7) * 0.05 + (unit(seed, `sand${i}:${j}`) - 0.5) * 0.04;
-    return [Math.cos(a) * r, dune - 0.02, Math.sin(a) * r];
-  };
-  for (let i = 0; i < SEABED_RINGS.length; i += 1) {
-    for (let j = 0; j < SEG; j += 1) {
-      const k = (j + 1) % SEG;
-      const a = point(i, j);
-      const b = point(i, k);
-      const c = point(i + 1, j);
-      const d = point(i + 1, k);
-      const t1 = 0.9 + 0.2 * unit(seed, `sand${i}:${j}:t1`);
-      const t2 = 0.9 + 0.2 * unit(seed, `sand${i}:${j}:t2`);
-      out.push(...a, ...d, ...c);
-      tone.push(t1, t1, t1);
-      if (i > 0) {
-        out.push(...a, ...b, ...d);
-        tone.push(t2, t2, t2);
-      }
-    }
-  }
-  return { positions: new Float32Array(out), tone: new Float32Array(tone) };
-}
-
+// Діорама близька й уся в кадрі: туман лише далеко за нею (ADR-0220).
+const FOG_NEAR = 30;
+const FOG_FAR = 90;
 /** Риба: ромб тіла й трикутник хвоста; голова вздовж +x. */
 function buildFishGeometry(fish: ReefV2Geometry['fish'], seed: string) {
   const body = new Float32Array([
@@ -90,6 +58,10 @@ interface ReefV2WorldProps {
   scale: number;
   theme: 'light' | 'dark';
   reduceMotion: boolean;
+  /** Радіус острівця діорами в одиницях сцени (ADR-0220). */
+  island: number;
+  /** Радіус кам'яної голови рифу в одиницях сцени. */
+  rockRadius: number;
 }
 
 /**
@@ -97,13 +69,9 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius }: ReefV2WorldProps) {
   const palette = REEF_PALETTES[theme];
 
-  const seabed = useMemo(() => {
-    const mesh = buildSeabed(seed);
-    return tonedGeometry(mesh.positions, { tone: mesh.tone });
-  }, [seed]);
   const rock = useMemo(() => tonedGeometry(geometry.rock.positions, { tone: geometry.rock.tone }), [geometry]);
   const corals = useMemo(() => tonedGeometry(geometry.corals.positions, {
     tone: geometry.corals.tone, form: geometry.corals.form, hue: geometry.corals.hue, rise: geometry.corals.rise,
@@ -144,17 +112,15 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion }: Reef
     for (let k = 0; k < 18; k += 1) {
       const vent = Math.floor(unit(seed, `bubble${k}:v`) * 3);
       const a = unit(seed, `vent${vent}:a`) * Math.PI * 2;
-      const r = 1.6 + unit(seed, `vent${vent}:r`) * 1.5;
+      const r = island * (0.55 + 0.35 * unit(seed, `vent${vent}:r`));
       out.push(Math.cos(a) * r, 0, Math.sin(a) * r);
     }
     return pointsGeometry(out, seed, 'bubble');
-  }, [seed]);
+  }, [seed, island]);
 
   const materials = useMemo(() => {
     const ground = PORTAL_GROUND_Y;
     return {
-      dome: createWaterDomeMaterial(palette),
-      sand: createSeabedMaterial(palette, palette.sand, FOG_NEAR, FOG_FAR, ground),
       rock: createSeabedMaterial(palette, palette.rock, FOG_NEAR, FOG_FAR, ground),
       star: createSeabedMaterial(palette, '#ff9a5a', FOG_NEAR, FOG_FAR, ground),
       corals: createCoralMaterial(palette, FOG_NEAR, FOG_FAR, ground),
@@ -172,8 +138,15 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion }: Reef
     const mesh = grassRef.current;
     if (!mesh) return;
     const dummy = new THREE.Object3D();
+    // Морська трава моделі сягає далі за острівець: стискаємо радіально
+    // між підніжжям рифу й краєм острівця (ADR-0220).
+    const inner = rockRadius * 1.02;
+    const outerModel = (rockRadius / scale) * 1.02 + 2.2;
     geometry.seagrass.forEach((p, i) => {
-      dummy.position.set(p[0] * scale, 0, p[2] * scale);
+      const r = Math.hypot(p[0], p[2]) * scale;
+      const squeezed = inner + ((r - inner) * (island * 0.9 - inner)) / Math.max(1e-6, outerModel * scale - inner);
+      const k = squeezed / Math.max(1e-6, r);
+      dummy.position.set(p[0] * scale * k, 0.01, p[2] * scale * k);
       dummy.rotation.set(0, unit(seed, `grass${i}:turn`) * Math.PI * 2, 0);
       dummy.scale.setScalar(0.14 + 0.2 * unit(seed, `grass${i}:h`));
       dummy.updateMatrix();
@@ -181,11 +154,11 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion }: Reef
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [geometry, scale, seed]);
+  }, [geometry, scale, seed, island, rockRadius]);
 
   useEffect(() => () => {
-    for (const g of [seabed, rock, corals, critters, starfish, pearls, fish, tuft, snow, bubbles]) g?.dispose();
-  }, [seabed, rock, corals, critters, starfish, pearls, fish, tuft, snow, bubbles]);
+    for (const g of [rock, corals, critters, starfish, pearls, fish, tuft, snow, bubbles]) g?.dispose();
+  }, [rock, corals, critters, starfish, pearls, fish, tuft, snow, bubbles]);
   useEffect(() => () => {
     for (const m of Object.values(materials)) m.dispose();
   }, [materials]);
@@ -202,11 +175,8 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion }: Reef
 
   return (
     <>
-      <mesh material={materials.dome} renderOrder={-10} frustumCulled={false}>
-        <sphereGeometry args={[80, 32, 20]} />
-      </mesh>
+      <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
-        <mesh geometry={seabed} material={materials.sand} />
         {geometry.seagrass.length > 0 && (
           <instancedMesh ref={grassRef} args={[tuft, materials.grass, geometry.seagrass.length]} frustumCulled={false} />
         )}

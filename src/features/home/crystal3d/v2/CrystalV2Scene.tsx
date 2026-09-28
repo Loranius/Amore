@@ -18,6 +18,8 @@ import {
 } from '../scene/portalScene';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from '../evolution/EvolutionRuntimeProbe';
 import { readQuality } from '../evolution/useEvolutionCrystalPipeline';
+import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
+import { Diorama } from '@/features/home/diorama/Diorama';
 import { CrystalV2Object } from './CrystalV2Object';
 import { crystalV2Frame, crystalV2GrowthEvents } from './crystalV2Frame';
 import { useCrystalV2 } from './useCrystalV2';
@@ -97,7 +99,7 @@ export default function CrystalV2Scene() {
         frameloop={frameloop}
         dpr={[1, crystalRenderScale(quality, typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
         camera={{ position: [0, 0.685, 7.1], fov: 42 }}
-        gl={{ alpha: true, antialias: quality !== 'fallback' }}
+        gl={{ alpha: false, antialias: quality !== 'fallback' }}
       >
         <PortalStage
           seed={hash32(model.startDate)}
@@ -114,7 +116,17 @@ export default function CrystalV2Scene() {
           allowOrbit={region === 'centre'}
           freeCamera={freeCameraActive}
           motionMode={motionMode}
+          // Діорама замість летючого острова (ADR-0220, стиль AbyssRium).
+          world="none"
         >
+          <Diorama
+            species="crystal"
+            theme={theme}
+            seed={model.startDate}
+            radius={Math.max(1.1, frame.reach * 1.15)}
+            groundY={CRYSTAL_GROUND_BASELINE}
+            reduceMotion={reduceMotion}
+          />
           <CrystalV2Object
             model={model}
             geometry={state.geometry}

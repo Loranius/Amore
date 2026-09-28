@@ -12,12 +12,10 @@
 // планктон світяться самі (біолюмінесценція).
 // ============================================================
 import * as THREE from 'three';
+import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 
 export interface ReefPalette {
-  surface: string;
-  deep: string;
   fog: string;
-  sand: string;
   rock: string;
   key: string;
   keyStrength: number;
@@ -31,14 +29,11 @@ export interface ReefPalette {
 
 export const REEF_PALETTES: Record<'light' | 'dark', ReefPalette> = {
   light: {
-    surface: '#9fe6ee',
-    deep: '#1b6f98',
     fog: '#2f8db4',
-    sand: '#ecd9a9',
     rock: '#c99a86',
     key: '#fff6e0',
     keyStrength: 1.05,
-    ambient: 0.45,
+    ambient: 0.58,
     caustics: 0.4,
     glow: 0.05,
     seagrass: '#4fa267',
@@ -46,14 +41,11 @@ export const REEF_PALETTES: Record<'light' | 'dark', ReefPalette> = {
     snowStrength: 0.35,
   },
   dark: {
-    surface: '#27407e',
-    deep: '#050a22',
     fog: '#0b1840',
-    sand: '#39456a',
     rock: '#4a3c5e',
     key: '#9fb6ff',
     keyStrength: 0.55,
-    ambient: 0.3,
+    ambient: 0.48,
     caustics: 0.18,
     glow: 0.55,
     seagrass: '#2b5a55',
@@ -100,12 +92,14 @@ const WATER = /* glsl */ `
     float c2 = abs(sin(b.x + sin(b.y * 1.1)) * sin(b.y + sin(b.x * 1.4)));
     return pow(1.0 - min(c1, c2), 6.0);
   }
+  ${DIORAMA_SHADE}
   vec3 underwater(vec3 base, vec3 n, vec3 world) {
-    float key = max(0.0, dot(n, uKey));
-    // Світло слабне з глибиною: верх рифу світліший за підніжжя.
-    float depthLight = 0.75 + 0.25 * clamp((world.y - uGround) / 1.5, 0.0, 1.0);
-    vec3 c = base * (uAmbient + uKeyColour * uKeyStrength * pow(key, 1.1) * depthLight);
-    c += uKeyColour * caustic(world.xz, uTime) * uCaustics * max(0.0, n.y);
+    // М'яке пастельне світло діорами (ADR-0220), трохи тоноване кольором
+    // підводного світла; світло слабне до підніжжя, каустики — лише зверху.
+    float depthLight = 0.85 + 0.15 * clamp((world.y - uGround) / 1.5, 0.0, 1.0);
+    vec3 c = dioramaShade(base, n, normalize(cameraPosition - world)) * depthLight
+           * mix(vec3(1.0), uKeyColour, 0.25 * uKeyStrength);
+    c += uKeyColour * caustic(world.xz, uTime) * uCaustics * 0.6 * max(0.0, n.y);
     return c;
   }
   vec3 fogged(vec3 c, vec3 world) {
@@ -140,48 +134,6 @@ const BASIC_VERTEX = /* glsl */ `
     gl_Position = projectionMatrix * viewMatrix * w;
   }
 `;
-
-/** Товща води: світла поверхня вгорі, глибина внизу, м'які промені. */
-export function createWaterDomeMaterial(p: ReefPalette): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    uniforms: {
-      uSurface: { value: colour(p.surface) },
-      uDeep: { value: colour(p.deep) },
-      uFog: { value: colour(p.fog) },
-      uTime: { value: 0 },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vDir;
-      void main() {
-        vDir = normalize(position);
-        vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        gl_Position = p.xyww;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform vec3 uSurface;
-      uniform vec3 uDeep;
-      uniform vec3 uFog;
-      uniform float uTime;
-      varying vec3 vDir;
-      void main() {
-        float h = vDir.y;
-        // Біля обрію вода дорівнює туману (дно тоне в ньому без шва),
-        // угорі світлішає до поверхні, унизу темнішає до глибини.
-        vec3 c = h > 0.0 ? mix(uFog, uSurface, smoothstep(0.02, 0.7, h)) : mix(uFog, uDeep, smoothstep(0.0, 0.5, -h));
-        // Промені світла з поверхні: віяло смуг, що повільно гойдаються.
-        float ang = atan(vDir.x, vDir.z);
-        float rays = pow(max(0.0, sin(ang * 9.0 + sin(uTime * 0.15) * 0.8)), 8.0)
-                   + pow(max(0.0, sin(ang * 5.0 - uTime * 0.07)), 10.0);
-        c += uSurface * rays * 0.12 * smoothstep(0.05, 0.6, h);
-        gl_FragColor = vec4(c, 1.0);
-        ${END}
-      }
-    `,
-  });
-}
 
 /** Пісок і камінь: колір × тон грані, світло згори, каустики, туман. */
 export function createSeabedMaterial(p: ReefPalette, base: string, fogNear: number, fogFar: number, ground: number): THREE.ShaderMaterial {

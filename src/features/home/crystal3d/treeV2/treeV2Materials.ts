@@ -10,13 +10,9 @@
 // темна — місячна ніч, де головні — світлячки.
 // ============================================================
 import * as THREE from 'three';
+import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 
 export interface MeadowPalette {
-  skyTop: string;
-  skyHorizon: string;
-  sun: string;
-  sunGlow: number;
-  ground: string;
   bark: string;
   leaf: string;
   leafAutumn: string;
@@ -28,45 +24,33 @@ export interface MeadowPalette {
   ambient: number;
   firefly: string;
   fireflyStrength: number;
-  stars: number;
 }
 
 export const MEADOW_PALETTES: Record<'light' | 'dark', MeadowPalette> = {
   light: {
-    skyTop: '#4f8fd6',
-    skyHorizon: '#ffcf9e',
-    sun: '#fff0c8',
-    sunGlow: 0.9,
-    ground: '#79ad4e',
-    bark: '#6e4b36',
-    leaf: '#4f9a47',
-    leafAutumn: '#e3902f',
-    grass: '#6ea648',
+    bark: '#8c6149',
+    leaf: '#6cc56a',
+    leafAutumn: '#f4a64e',
+    grass: '#7fcf5e',
     fog: '#ffcf9e',
     key: '#fff1d6',
     keyStrength: 1.0,
-    ambient: 0.42,
+    ambient: 0.55,
     firefly: '#ffd98a',
     fireflyStrength: 0.45,
-    stars: 0,
   },
   dark: {
-    skyTop: '#0a0f2c',
-    skyHorizon: '#3c2f5e',
-    sun: '#e6e4ff',
-    sunGlow: 0.35,
-    ground: '#2c4a33',
-    bark: '#3d2c26',
-    leaf: '#2f6040',
-    leafAutumn: '#8a5a2e',
-    grass: '#2e5236',
+    // Небо дерева денне й у темній темі (artifactThemes.css) — листя теж.
+    bark: '#86594a',
+    leaf: '#62b964',
+    leafAutumn: '#ee9a4a',
+    grass: '#74c258',
     fog: '#3c2f5e',
     key: '#c9cdff',
     keyStrength: 0.75,
-    ambient: 0.32,
+    ambient: 0.52,
     firefly: '#fff0a0',
     fireflyStrength: 1.0,
-    stars: 1,
   },
 };
 
@@ -89,10 +73,11 @@ const LIT = /* glsl */ `
     if (dot(n, cameraPosition - world) < 0.0) n = -n;
     return n;
   }
+  ${DIORAMA_SHADE}
+  // М'яке пастельне світло діорами (ADR-0220). Кожен шейдер, що кличе
+  // lit(), оголошує varying vWorld перед цим шматком.
   vec3 lit(vec3 base, vec3 n) {
-    float key = max(0.0, dot(n, uKey));
-    float sky = 0.5 + 0.5 * n.y;
-    return base * (uAmbient * (0.6 + 0.4 * sky) + uKeyColour * uKeyStrength * pow(key, 1.2));
+    return dioramaShade(base, n, normalize(cameraPosition - vWorld)) * mix(vec3(1.0), uKeyColour, 0.25 * uKeyStrength);
   }
   vec3 fogged(vec3 c, vec3 world) {
     float f = smoothstep(uFogNear, uFogFar, length(cameraPosition - world));
@@ -116,90 +101,6 @@ const END = /* glsl */ `
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
 `;
-
-/** Небо: градієнт від обрію до зеніту, сонце (або місяць) і зорі вночі. */
-export function createSkyMaterial(p: MeadowPalette): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    uniforms: {
-      uTop: { value: colour(p.skyTop) },
-      uHorizon: { value: colour(p.skyHorizon) },
-      uSun: { value: colour(p.sun) },
-      uSunGlow: { value: p.sunGlow },
-      uSunDir: { value: new THREE.Vector3(-0.62, 0.22, -0.75).normalize() },
-      uStars: { value: p.stars },
-    },
-    vertexShader: /* glsl */ `
-      varying vec3 vDir;
-      void main() {
-        vDir = normalize(position);
-        vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-        gl_Position = p.xyww;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform vec3 uTop;
-      uniform vec3 uHorizon;
-      uniform vec3 uSun;
-      uniform float uSunGlow;
-      uniform vec3 uSunDir;
-      uniform float uStars;
-      varying vec3 vDir;
-      float hash(vec3 p) { return fract(sin(dot(p, vec3(12.9898, 78.233, 37.719))) * 43758.5453); }
-      void main() {
-        float h = clamp(vDir.y, -0.2, 1.0);
-        // Камера дивиться трохи вниз: верх кадру — це лише h ≈ 0.2, тож
-        // синь мусить набиратись низько, інакше небо все — колір обрію.
-        vec3 c = mix(uHorizon, uTop, smoothstep(-0.02, 0.3, h));
-        float s = max(0.0, dot(vDir, uSunDir));
-        // Широке сяйво — лише над обрієм: на самому обрії небо мусить дорівнювати
-        // туману лугу, інакше між ними видно шов (виміряно: 47 проти 35 зі 255).
-        float above = smoothstep(0.0, 0.14, h);
-        c += uSun * (pow(s, 900.0) * 1.6 + (pow(s, 24.0) * 0.35 + pow(s, 4.0) * 0.12) * uSunGlow * above);
-        if (uStars > 0.5 && h > 0.05) {
-          vec3 cell = floor(vDir * 160.0);
-          float star = step(0.9965, hash(cell)) * smoothstep(0.05, 0.4, h);
-          c += vec3(star) * 0.9;
-        }
-        gl_FragColor = vec4(c, 1.0);
-        ${END}
-      }
-    `,
-  });
-}
-
-/** Земля й пагорби: колір на вершину (`tone`), пласкі грані, туман. */
-export function createGroundMaterial(p: MeadowPalette, fogNear: number, fogFar: number, base: string): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    // Луг видно згори, пагорби — зсередини кільця; обидва боки дешевші за
-    // суперечку про закрут, а нормаль шейдер однаково повертає до камери.
-    side: THREE.DoubleSide,
-    uniforms: { ...litUniforms(p, fogNear, fogFar), uBase: { value: colour(base) } },
-    vertexShader: /* glsl */ `
-      attribute float tone;
-      varying vec3 vWorld;
-      varying float vTone;
-      void main() {
-        vec4 w = modelMatrix * vec4(position, 1.0);
-        vWorld = w.xyz;
-        vTone = tone;
-        gl_Position = projectionMatrix * viewMatrix * w;
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform vec3 uBase;
-      varying vec3 vWorld;
-      varying float vTone;
-      ${LIT}
-      void main() {
-        vec3 c = lit(uBase * vTone, flatNormal(vWorld));
-        gl_FragColor = vec4(fogged(c, vWorld), 1.0);
-        ${END}
-      }
-    `,
-  });
-}
 
 /** Деревина: тон грані, темніше донизу (земля не підсвічує корінь). */
 export function createWoodMaterial(p: MeadowPalette, fogNear: number, fogFar: number): THREE.ShaderMaterial {

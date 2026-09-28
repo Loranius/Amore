@@ -55,6 +55,9 @@ export default function ReefV2Scene() {
   const geometry = state?.geometry;
   const frame = useMemo(() => (geometry ? reefV2Frame(geometry) : null), [geometry]);
   const noBearings = useMemo<readonly number[]>(() => [], []);
+  // Острівець діорами ширший за риф (на ньому ще морські зірки біля
+  // підніжжя), тож камера кадрує за ним, а не лише за коралами (ADR-0220).
+  const island = frame && state ? Math.max(frame.reach * 1.25, state.model.radius * frame.scale * 1.55) : 0;
 
   if (error) {
     console.error('[Reef v2] rollback to the previous reef:', error);
@@ -96,8 +99,8 @@ export default function ReefV2Scene() {
           theme={theme}
           quality={quality}
           reduceMotion={reduceMotion}
-          artifactSceneRadius={frame.reach}
-          crystalsSceneRadius={frame.reach}
+          artifactSceneRadius={Math.max(frame.reach, island * 0.92)}
+          crystalsSceneRadius={Math.max(frame.reach, island * 0.92)}
           artifactSceneHeight={frame.height}
           veinBearings={noBearings}
           veinReach={0}
@@ -114,6 +117,8 @@ export default function ReefV2Scene() {
             scale={frame.scale}
             theme={theme}
             reduceMotion={reduceMotion}
+            island={island}
+            rockRadius={model.radius * frame.scale}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
