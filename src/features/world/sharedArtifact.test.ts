@@ -30,7 +30,9 @@ describe('вибір живе в settings, а не на пристрої', () =>
     expect(SHARED_ARTIFACT_KEY).toBe('home_artifact');
     expect(module).toContain("from('settings')");
     expect(module).toContain('upsert(');
-    expect(module).toContain("onConflict: 'key'");
+    // Ключ налаштувань — на пару (ADR-0229): голий `'key'` після кроку B
+    // не має відповідного обмеження в базі, і запис падав би.
+    expect(module).toContain("onConflict: 'couple_id,key'");
   });
 
   it('провайдер більше не читає й не пише localStorage напряму', () => {

@@ -114,7 +114,7 @@ serve(async (req) => {
     // яке колись видалили крон daily-reminder.
     const { data: events, error: evErr } = await sb
       .from("events")
-      .select("id,title,description,date,yearly,type,person_user_id")
+      .select("id,title,description,date,yearly,type,person_user_id,couple_id")
       .neq("type", "other");
 
     if (evErr) throw evErr;
@@ -125,15 +125,28 @@ serve(async (req) => {
     // тут лише логуємо: половина нагадувань краща за жодного.
     const { data: plansData, error: planErr } = await sb
       .from("plans")
-      .select("id,title,description,start_date,date_precision,status,confirmed");
+      .select("id,title,description,start_date,date_precision,status,confirmed,couple_id");
     if (planErr) console.error("plans read failed:", planErr);
     const plans = plansData || [];
 
-    // ── Отримуємо отримувачів ─────────────────────────────────
+    // ── Отримуємо отримувачів — ПО ПАРАХ (ADR-0229) ───────────
+    // Нагадування про подію пари йде лише її учасникам. До ADR-0229 тут
+    // бралися всі користувачі порталу — з другою парою її річниці й плани
+    // приходили б у Telegram чужим людям.
     const { data: users } = await sb
       .from("users")
       .select("id,name,chat_id");
+    const { data: members } = await sb
+      .from("couple_members")
+      .select("couple_id,user_id");
     const recipients = (users || []).filter((u: any) => u.chat_id);
+    const byCouple = new Map<number, any[]>();
+    for (const m of members || []) {
+      const user = recipients.find((u: any) => u.id === m.user_id);
+      if (!user) continue;
+      byCouple.set(m.couple_id, [...(byCouple.get(m.couple_id) ?? []), user]);
+    }
+    const recipientsOf = (coupleId: number | null | undefined) => (coupleId ? byCouple.get(coupleId) ?? [] : []);
 
     if (!recipients.length) {
       return new Response(
@@ -178,8 +191,9 @@ serve(async (req) => {
 
       if (!kind) continue; // ця подія сьогодні не нагадується
 
-      const targets = reminderTargets(ev, recipients);
-      skippedSelf += recipients.length - targets.length;
+      const coupleRecipients = recipientsOf(ev.couple_id);
+      const targets = reminderTargets(ev, coupleRecipients);
+      skippedSelf += coupleRecipients.length - targets.length;
 
       for (const t of targets) {
         await sendTelegram(t.recipient.chat_id, buildText(ev, displayDate, kind, t.personName));
@@ -199,7 +213,7 @@ serve(async (req) => {
       if (!kind) continue;
 
       const displayDate = fmtDateUA(plan.start_date as string);
-      for (const t of reminderTargets({}, recipients)) {
+      for (const t of reminderTargets({}, recipientsOf((plan as any).couple_id))) {
         await sendTelegram(t.recipient.chat_id, buildText(plan as any, displayDate, kind, null));
         messages += 1;
       }

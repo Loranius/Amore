@@ -251,7 +251,7 @@ export function useHistorySweep(): HistorySweep {
     mutationFn: async (date: string) => {
       const { error } = await supabase
         .from('settings')
-        .upsert({ key: 'relationship_start_date', value: date }, { onConflict: 'key' });
+        .upsert({ key: 'relationship_start_date', value: date }, { onConflict: 'couple_id,key' });
       if (error) throw error;
       try {
         // Той самий ключ, яким головна малює лічильник до приходу мережі.
@@ -510,7 +510,7 @@ export function useHistorySweep(): HistorySweep {
         .from('settings')
         .upsert(
           { key: DECLARED_COUNTS_KEY, value: serializeDeclaredCounts(next) },
-          { onConflict: 'key' },
+          { onConflict: 'couple_id,key' },
         );
       if (error) throw error;
     },

@@ -6,6 +6,7 @@ import { useToast } from '@/providers/ToastProvider';
 import type { PlaceCandidate } from './momentPlace';
 import { ensurePlacePin } from './placePins';
 import type { InsertRow, MapPinRow, MemoryMomentRow, MemoryRow } from '@/types';
+import { couplePath } from '@/lib/couplePath';
 
 // ============================================================
 // Спогади: моменти, їхні фото й місця.
@@ -198,7 +199,7 @@ async function uploadPhotos(
       console.warn('[Спогади] стиснення не вдалося, вантажу оригінал:', e);
     }
 
-    const path = storagePath(momentId, startOrder + index, item.file, ext);
+    const path = await couplePath(storagePath(momentId, startOrder + index, item.file, ext));
     const { error: upErr } = await supabase.storage
       .from(MEMORIES_BUCKET)
       .upload(path, blob, { cacheControl: '31536000', upsert: false, contentType });

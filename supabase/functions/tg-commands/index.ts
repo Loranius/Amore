@@ -85,21 +85,37 @@ async function send(chatId: number | string, text: string) {
 }
 
 // ── Користувачі ──────────────────────────────────────────────
-async function findUserByChat(chatId: number) {
-  const { data } = await db.from("users").select("id,name,chat_id").eq("chat_id", chatId).maybeSingle();
-  return data;
+// Бот працює з правами сервера й бачить усі пари, тож кожна команда
+// звужується до пари того, хто пише (ADR-0229). До цього «партнером»
+// ставав будь-хто, окрім себе, а покупки й страви бралися в усіх.
+type Me = { id: number; name: string; chat_id: number | null; gender: string | null; couple_id: number };
+
+async function findUserByChat(chatId: number): Promise<Me | null> {
+  const { data } = await db.from("users").select("id,name,chat_id,gender").eq("chat_id", chatId).maybeSingle();
+  if (!data) return null;
+  const { data: member } = await db.from("couple_members").select("couple_id").eq("user_id", data.id).maybeSingle();
+  if (!member) return null;
+  return { ...data, couple_id: member.couple_id };
 }
 
-async function findPartner(userId: number) {
-  const { data } = await db.from("users").select("id,name,chat_id").neq("id", userId).limit(1).maybeSingle();
+async function coupleUserIds(coupleId: number): Promise<number[]> {
+  const { data } = await db.from("couple_members").select("user_id").eq("couple_id", coupleId);
+  return (data || []).map((m) => m.user_id);
+}
+
+async function findPartner(me: Me) {
+  const ids = (await coupleUserIds(me.couple_id)).filter((id) => id !== me.id);
+  if (!ids.length) return null;
+  const { data } = await db.from("users").select("id,name,chat_id,gender").eq("id", ids[0]).maybeSingle();
   return data;
 }
 
 // ── /shopping ────────────────────────────────────────────
-async function cmdShopping(chatId: number) {
+async function cmdShopping(chatId: number, coupleId: number) {
   const { data, error } = await db
     .from("shopping_items")
     .select("title,qty,category")
+    .eq("couple_id", coupleId)
     .eq("bought", false);
 
   if (error) { await send(chatId, "⚠️ Не вдалось завантажити список покупок."); return; }
@@ -151,10 +167,11 @@ async function cmdWishlist(chatId: number, partner: { id: number; name: string }
 }
 
 // ── /sizes, /sizes_partner ──────────────────────────────────
-async function cmdSizes(chatId: number, target: { id: number; name: string }) {
+async function cmdSizes(chatId: number, target: { id: number; name: string; gender?: string | null }) {
   const { data } = await db.from("user_sizes").select("*").eq("user_id", target.id).maybeSingle();
   const sz = data || {};
-  const isFemale = target.name === "Лєна";
+  // Стать з рядка, а не з імені: імена пар різні (ADR-0229).
+  const isFemale = target.gender === "female";
 
   let text = `<b>📏 Розміри — ${esc(target.name)}</b>\n\n`;
   text += `<b>Базові габарити</b>\n`;
@@ -204,8 +221,8 @@ async function cmdMovie(chatId: number) {
 }
 
 // ── /food ────────────────────────────────────────────────
-async function cmdFood(chatId: number) {
-  const { data, error } = await db.from("dishes").select("title,recipe");
+async function cmdFood(chatId: number, coupleId: number) {
+  const { data, error } = await db.from("dishes").select("title,recipe").eq("couple_id", coupleId);
   if (error) { await send(chatId, "⚠️ Не вдалось завантажити список страв."); return; }
   if (!data || !data.length) { await send(chatId, "🍽 Пул страв порожній — збережи улюблені в Кулінарії!"); return; }
 
@@ -226,9 +243,8 @@ async function cmdFood(chatId: number) {
 }
 
 // ── /weekends (найближчі спільні вихідні) ───────────────────
-async function cmdWeekends(chatId: number) {
-  const { data: users } = await db.from("users").select("id");
-  const userIds = (users || []).map((u) => u.id);
+async function cmdWeekends(chatId: number, coupleId: number) {
+  const userIds = await coupleUserIds(coupleId);
   if (userIds.length < 2) { await send(chatId, "⚠️ Не вдалось визначити обох користувачів."); return; }
 
   const today = new Date();
@@ -237,6 +253,7 @@ async function cmdWeekends(chatId: number) {
   const { data, error } = await db
     .from("work_schedule")
     .select("date,user_id,mark")
+    .eq("couple_id", coupleId)
     .eq("mark", "Х")
     .gte("date", todayStr)
     .order("date", { ascending: true })
@@ -269,12 +286,12 @@ async function cmdWeekends(chatId: number) {
 }
 
 // ── Роутинг команд ───────────────────────────────────────
-async function handleCommand(cmd: string, chatId: number, user: { id: number; name: string }) {
-  const partner = await findPartner(user.id);
+async function handleCommand(cmd: string, chatId: number, user: Me) {
+  const partner = await findPartner(user);
 
   switch (cmd) {
     case "shopping":
-      return cmdShopping(chatId);
+      return cmdShopping(chatId, user.couple_id);
     case "wishlist":
       return cmdWishlist(chatId, partner);
     case "sizes":
@@ -285,9 +302,9 @@ async function handleCommand(cmd: string, chatId: number, user: { id: number; na
     case "movie":
       return cmdMovie(chatId);
     case "food":
-      return cmdFood(chatId);
+      return cmdFood(chatId, user.couple_id);
     case "weekends":
-      return cmdWeekends(chatId);
+      return cmdWeekends(chatId, user.couple_id);
     case "start":
     case "help":
       return send(chatId, `Привіт, ${esc(user.name)}! 💗\n\n${COMMANDS_HELP}`);

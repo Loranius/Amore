@@ -27,6 +27,7 @@ import { qk } from '@/lib/queryKeys';
 import { compress, normalize } from '@/lib/images';
 import { useToast } from '@/providers/ToastProvider';
 import { randomToken } from '@/lib/entropy';
+import { couplePath, listCoupleRoot } from '@/lib/couplePath';
 
 export const POLAROID_BUCKET = 'family_photos';
 
@@ -47,18 +48,14 @@ export function usePolaroidPhotos() {
   return useQuery({
     queryKey: [...qk.photos(), 'manager'],
     queryFn: async (): Promise<PolaroidPhoto[]> => {
-      const { data, error } = await supabase.storage
-        .from(POLAROID_BUCKET)
-        .list('', { limit: 200, sortBy: { column: 'created_at', order: 'desc' } });
-      if (error) throw error;
       /*
-       * Фільтр за розширенням — він же й межа з профілем: портрети лежать
-       * у ПАПЦІ `profile/`, а папка приходить у цей листинг одним записом
-       * без розширення й відсівається тут (ADR-0180 §5).
+       * Фільтр за розширенням (у `listCoupleRoot`) — він же й межа з
+       * профілем: портрети лежать у ПАПЦІ `profile/`, а папка приходить у
+       * листинг одним записом без розширення й відсівається (ADR-0180 §5).
+       * `name` — повний шлях, бо видалення бере саме його.
        */
-      return (data ?? [])
-        .filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f.name))
-        .map((f) => ({ name: f.name, url: publicUrl(POLAROID_BUCKET, f.name) }));
+      const files = await listCoupleRoot(POLAROID_BUCKET, 200);
+      return files.map((f) => ({ name: f.path, url: publicUrl(POLAROID_BUCKET, f.path) }));
     },
   });
 }
@@ -86,7 +83,7 @@ export function usePolaroidMutations() {
        * дістали б однакове ім'я, і друга затерла б першу. Причина кидка
        * названа в `lib/entropy.ts`.
        */
-      const name = `photo_${Date.now()}_${randomToken()}.${ext}`;
+      const name = await couplePath(`photo_${Date.now()}_${randomToken()}.${ext}`);
       const { error } = await supabase.storage
         .from(POLAROID_BUCKET)
         .upload(name, blob, { upsert: false, contentType });

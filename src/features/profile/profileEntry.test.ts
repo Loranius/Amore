@@ -222,15 +222,18 @@ describe('портрет просить у сховища свій розмір'
 });
 
 describe('портрет не потрапляє в пул фото кристала', () => {
-  it('лежить у вкладеній папці, а пул читає корінь бакета', () => {
+  it('лежить у вкладеній папці, а пул читає лише корінь пари', () => {
     /*
-     * `usePhotoPool` викликає `list('')` і бере лише файли з розширенням
-     * картинки. Вкладена папка приходить туди одним записом БЕЗ
-     * розширення й відсіюється. Якби портрет ліг у корінь, обличчя
-     * почали б з'являтися на полароїдах кристала.
+     * `usePhotoPool` читає «корінь пари» (`listCoupleRoot`: корінь кошика
+     * й `c<пара>/`, ADR-0229) і бере лише файли з розширенням картинки.
+     * Портрет лежить глибше — `c<пара>/profile/…`, — тож папка приходить
+     * одним записом БЕЗ розширення й відсіюється. Якби портрет ліг у
+     * корінь пари, обличчя почали б з'являтися на полароїдах кристала.
      */
-    expect(read('features', 'profile', 'useProfile.ts')).toContain("PROFILE_FOLDER = 'profile'");
+    const profile = read('features', 'profile', 'useProfile.ts');
+    expect(profile).toContain("PROFILE_FOLDER = 'profile'");
+    expect(profile).toContain('couplePath(`${PROFILE_FOLDER}/');
     const home = read('features', 'home', 'useHome.ts');
-    expect(home).toContain(".list(''");
+    expect(home).toContain('listCoupleRoot(PHOTO_BUCKET');
   });
 });

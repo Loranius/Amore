@@ -12,6 +12,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { PlanCategory, PlanDatePrecision, PlanRow, PlanStatus, PlanTaskRow } from '@/types';
 import { randomToken } from '@/lib/entropy';
+import { couplePath } from '@/lib/couplePath';
 
 const PLAN_COLUMNS = 'id,title,description,category,status,cover_url,url,start_date,end_date,start_time,date_precision,location_name,place_id,budget,proposed_by,confirmed,created_by,created_at,updated_at,completed_at';
 const TASK_COLUMNS = 'id,plan_id,title,assigned_to,due_date,done,done_at,sort_order,created_at';
@@ -62,7 +63,7 @@ async function uploadPlanCover(file: File, userId: number): Promise<UploadedPlan
   }
 
   const unique = `${Date.now().toString(36)}${randomToken()}`;
-  const path = `${userId}/${unique}.${ext}`;
+  const path = await couplePath(`${userId}/${unique}.${ext}`);
   const { error } = await supabase.storage
     .from(PLAN_COVERS_BUCKET)
     .upload(path, blob, { upsert: false, contentType });

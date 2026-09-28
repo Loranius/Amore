@@ -42,7 +42,7 @@ export function useSaveLocation() {
     mutationFn: async (loc: WhereToLocation) => {
       const { error } = await supabase
         .from('settings')
-        .upsert({ key: SETTING_KEY, value: JSON.stringify(loc) }, { onConflict: 'key' });
+        .upsert({ key: SETTING_KEY, value: JSON.stringify(loc) }, { onConflict: 'couple_id,key' });
       if (error) throw error;
     },
     onSuccess: () => void client.invalidateQueries({ queryKey: [...qk.settings(), SETTING_KEY] }),

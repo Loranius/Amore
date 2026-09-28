@@ -17,6 +17,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { normalizeMemoryDate } from './memoriesDate';
 import type { MemoryDayRow, MemoryLinkRow, MemoryPrecision, MemoryRow, MemorySource } from '@/types';
 import { randomToken } from '@/lib/entropy';
+import { couplePath } from '@/lib/couplePath';
 
 export const MEMORIES_BUCKET = 'photo-calendar';
 
@@ -140,7 +141,7 @@ async function uploadOne(input: UploadMemoryInput): Promise<MemoryRow> {
   // Унікальне ім'я замість `date_userId`: на одну дату тепер може
   // припадати скільки завгодно знімків, і старий шлях їх би затирав.
   const unique = `${Date.now().toString(36)}${randomToken()}`;
-  const path = `${y}/${m}/${memoryDate}_${input.userId}_${unique}.${ext}`;
+  const path = await couplePath(`${y}/${m}/${memoryDate}_${input.userId}_${unique}.${ext}`);
 
   const { error: upErr } = await supabase.storage
     .from(MEMORIES_BUCKET)
@@ -283,7 +284,7 @@ export function useMemoriesMutations() {
     mutationFn: async (v: { date: string; description: string | null; userId: number }) => {
       const { error } = await supabase.from('memory_days').upsert(
         { memory_date: v.date, description: v.description, updated_by: v.userId },
-        { onConflict: 'memory_date' },
+        { onConflict: 'couple_id,memory_date' },
       );
       if (error) throw error;
     },

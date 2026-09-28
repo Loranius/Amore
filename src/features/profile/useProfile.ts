@@ -16,6 +16,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { birthdayEventTitle, profileSettingKey, serialiseProfile, type UserProfile } from './profileModel';
 import type { InsertRow } from '@/types';
+import { couplePath } from '@/lib/couplePath';
 
 /**
  * Бакет той самий, що й у полароїда, але ПАПКА окрема.
@@ -46,7 +47,7 @@ export function useSaveProfile() {
         .from('settings')
         .upsert(
           { key: profileSettingKey(userId), value: serialiseProfile(profile) },
-          { onConflict: 'key' },
+          { onConflict: 'couple_id,key' },
         );
       if (settingsError) throw settingsError;
 
@@ -134,7 +135,7 @@ export function useUploadProfilePhoto() {
       } catch (error) {
         console.warn('useUploadProfilePhoto: стиснення не вдалося, ллю оригінал', error);
       }
-      const name = `${PROFILE_FOLDER}/${userId}.${ext}`;
+      const name = await couplePath(`${PROFILE_FOLDER}/${userId}.${ext}`);
       const { error } = await supabase.storage
         .from(PHOTO_BUCKET)
         .upload(name, blob, { upsert: true, contentType });

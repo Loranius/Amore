@@ -158,7 +158,12 @@ Deno.serve(async (req) => {
      */
     const { error: startErr } = await supabase
       .from("settings")
-      .upsert({ key: "relationship_start_date", value: startedAt }, { onConflict: "key" });
+      .upsert(
+        // Функція працює з правами сервера: пари з токена тут немає, тож
+        // `couple_id` передаємо явно — ключ налаштувань тепер «на пару» (ADR-0229).
+        { couple_id: couple.id, key: "relationship_start_date", value: startedAt },
+        { onConflict: "couple_id,key" },
+      );
     if (startErr) {
       console.error("couple-register: settings upsert error:", startErr);
       await rollback();

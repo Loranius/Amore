@@ -5,6 +5,7 @@ import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { supabase, publicUrl } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
+import { listCoupleRoot } from '@/lib/couplePath';
 
 const START_LS = 'amore:startDate';
 
@@ -101,16 +102,11 @@ export function usePhotoPool() {
     queryKey: qk.photos(),
     staleTime: 10 * 60_000,
     queryFn: async (): Promise<PhotoAsset[]> => {
-      const { data, error } = await supabase.storage
-        .from(PHOTO_BUCKET)
-        .list('', { limit: 50, sortBy: { column: 'created_at', order: 'desc' } });
-      if (error) throw error;
-      return (data ?? [])
-        .filter((f) => /\.(jpe?g|png|webp|gif)$/i.test(f.name))
-        .map((f) => ({
-          url: publicUrl(PHOTO_BUCKET, f.name),
-          date: typeof f.created_at === 'string' ? f.created_at.slice(0, 10) : null,
-        }));
+      const files = await listCoupleRoot(PHOTO_BUCKET, 50);
+      return files.map((f) => ({
+        url: publicUrl(PHOTO_BUCKET, f.path),
+        date: f.created_at ? f.created_at.slice(0, 10) : null,
+      }));
     },
   });
 }

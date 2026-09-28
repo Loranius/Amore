@@ -5,6 +5,7 @@ import {
   type WishlistStoredVisual,
 } from './wishlistProcessedImageRegistry';
 import type { WishlistImagePreference } from './wishlistImagePreference';
+import { couplePath } from '@/lib/couplePath';
 
 const BUCKET = 'wishlist-photos';
 const PUBLIC_PATH_MARKER = `/storage/v1/object/public/${BUCKET}/`;
@@ -50,7 +51,7 @@ async function persistForSession(input: {
       if (input.visual.mode !== 'photo-cover') {
         const blob = await dataUrlBlob(input.visual.src);
         const extension = blob.type.includes('png') ? 'png' : 'webp';
-        uploadedPath = `processed/${input.wishId}/visual-${crypto.randomUUID()}.${extension}`;
+        uploadedPath = await couplePath(`processed/${input.wishId}/visual-${crypto.randomUUID()}.${extension}`);
         const { error } = await supabase.storage.from(BUCKET).upload(uploadedPath, blob, {
           upsert: false,
           contentType: blob.type,

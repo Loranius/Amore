@@ -94,7 +94,7 @@ export function useSaveSharedArtifact() {
     client.setQueryData(sharedArtifactKey, artifact);
     const { error } = await supabase
       .from('settings')
-      .upsert({ key: SHARED_ARTIFACT_KEY, value: artifact }, { onConflict: 'key' });
+      .upsert({ key: SHARED_ARTIFACT_KEY, value: artifact }, { onConflict: 'couple_id,key' });
     if (error) {
       console.error('shared artifact save failed:', error);
       return { ok: false };

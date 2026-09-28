@@ -13,6 +13,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { nextFinishedAt } from './mediaConstants';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { MediaItemRow, MediaType, MediaStatus, InsertRow, TmdbSearchResult } from '@/types';
+import { couplePath } from '@/lib/couplePath';
 
 const BUCKET = 'media-posters';
 
@@ -83,7 +84,7 @@ export async function uploadPoster(file: File, type: MediaType, itemId: number):
   } catch (e) {
     console.warn('uploadPoster compress error:', e);
   }
-  const path = `${type}-${itemId}-${Date.now()}.${ext}`;
+  const path = await couplePath(`${type}-${itemId}-${Date.now()}.${ext}`);
   const { error } = await supabase.storage.from(BUCKET).upload(path, blob, {
     upsert: true,
     contentType,

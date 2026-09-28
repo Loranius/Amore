@@ -19,6 +19,7 @@ import { reverseGeocode } from '@/lib/geo';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import type { MapPinRow, PinCategory, InsertRow } from '@/types';
+import { couplePath } from '@/lib/couplePath';
 
 const BUCKET = 'map-photos';
 
@@ -52,7 +53,7 @@ export function useMapPins() {
  */
 export async function uploadPinPhoto(file: File, pinId: number): Promise<string> {
   const { blob, ext, contentType } = await compress(file, 1080, 0.75);
-  const path = `pin-${pinId}-${Date.now()}.${ext}`;
+  const path = await couplePath(`pin-${pinId}-${Date.now()}.${ext}`);
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, blob, { upsert: true, contentType });
