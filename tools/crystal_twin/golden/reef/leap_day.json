@@ -1,0 +1,115 @@
+{
+ "model": {
+  "anemones": [],
+  "asOf": "2025-03-01",
+  "clams": 0,
+  "colonies": [
+   {
+    "activity": 0.0,
+    "age": 5.002156,
+    "azimuth": 11.361436,
+    "bodies": 1,
+    "form": "finger",
+    "hue": 0.397875,
+    "reach": 0.168281,
+    "size": 0.359212,
+    "year": 0
+   },
+   {
+    "activity": 2.0,
+    "age": 4.00282,
+    "azimuth": 134.103573,
+    "bodies": 2,
+    "form": "brain",
+    "hue": 0.244212,
+    "reach": 0.31382,
+    "size": 0.390438,
+    "year": 1
+   },
+   {
+    "activity": 0.0,
+    "age": 3.003484,
+    "azimuth": 273.272596,
+    "bodies": 1,
+    "form": "finger",
+    "hue": 0.661499,
+    "reach": 0.411071,
+    "size": 0.318716,
+    "year": 2
+   },
+   {
+    "activity": 0.0,
+    "age": 2.004148,
+    "azimuth": 57.729293,
+    "bodies": 1,
+    "form": "finger",
+    "hue": 0.380523,
+    "reach": 0.498772,
+    "size": 0.289999,
+    "year": 3
+   },
+   {
+    "activity": 1.0,
+    "age": 1.002074,
+    "azimuth": 192.562847,
+    "bodies": 2,
+    "form": "brain",
+    "hue": 0.943398,
+    "reach": 0.534465,
+    "size": 0.28061,
+    "year": 4
+   },
+   {
+    "activity": 0.0,
+    "age": 0.002738,
+    "azimuth": 318.542916,
+    "bodies": 1,
+    "form": "finger",
+    "hue": 0.288492,
+    "reach": 0.594489,
+    "size": 0.180273,
+    "year": 5
+   }
+  ],
+  "counts": {
+   "daysOff": 0,
+   "events": 0,
+   "media": 0,
+   "memories": 3,
+   "milestones": 0,
+   "places": 0,
+   "plans": 0,
+   "wishes": 0
+  },
+  "days": 1827,
+  "fish": 0,
+  "head": 0.585483,
+  "radius": 0.761127,
+  "rise": 0.35129,
+  "seagrass": 0,
+  "starfish": 0,
+  "startDate": "2020-02-29",
+  "version": "reef-v2/2026-09-28",
+  "years": 5.002156
+ },
+ "summary": {
+  "bodies": 8,
+  "colonies": 6,
+  "firstAnemone": null,
+  "firstBase": [
+   0.1256,
+   0.3355,
+   0.0252
+  ],
+  "forms": [
+   "finger",
+   "brain",
+   "finger",
+   "finger",
+   "brain",
+   "finger"
+  ],
+  "reach": 0.7611,
+  "top": 0.6405
+ }
+}

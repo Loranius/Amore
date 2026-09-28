@@ -43,7 +43,8 @@ import {
 import './artifactWorld.css';
 
 const CrystalScene = lazy(() => import('../home/crystal3d/CrystalSceneEntry'));
-const ReefScene = lazy(() => import('../home/reef3d/world/ReefWorldScene'));
+// Риф v2 (ADR-0219). Старий риф — його шлях відкату, вантажить його сама v2.
+const ReefScene = lazy(() => import('../home/reef3d/v2/ReefV2Scene'));
 
 /*
  * ТУТ ЖИЛИ `storedArtifact` І `persistArtifact` — читання й запис у

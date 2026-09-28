@@ -51,7 +51,7 @@ export type ActivityCounts = Record<ActivityKind, number>;
  * записів мають дати червня–вересня 2026. Рік роздувався б фільмами, яких
  * того року не дивились; медіа дає лише сяйво (сумою).
  */
-const ACTIVITY_WEIGHTS: ActivityCounts = {
+export const ACTIVITY_WEIGHTS: ActivityCounts = {
   memories: 1,
   plans: 2,
   wishes: 2,

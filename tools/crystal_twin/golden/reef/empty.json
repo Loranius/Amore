@@ -1,0 +1,91 @@
+{
+ "model": {
+  "anemones": [],
+  "asOf": "2026-09-27",
+  "clams": 0,
+  "colonies": [
+   {
+    "activity": 0.0,
+    "age": 3.753671,
+    "azimuth": 9.320799,
+    "bodies": 1,
+    "form": "finger",
+    "hue": 0.377511,
+    "reach": 0.161212,
+    "size": 0.335892,
+    "year": 0
+   },
+   {
+    "activity": 0.0,
+    "age": 2.754334,
+    "azimuth": 137.91099,
+    "bodies": 1,
+    "form": "finger",
+    "hue": 0.906524,
+    "reach": 0.362192,
+    "size": 0.312291,
+    "year": 1
+   },
+   {
+    "activity": 0.0,
+    "age": 1.75226,
+    "azimuth": 276.998556,
+    "bodies": 1,
+    "form": "finger",
+    "hue": 0.451014,
+    "reach": 0.413035,
+    "size": 0.281242,
+    "year": 2
+   },
+   {
+    "activity": 0.0,
+    "age": 0.752924,
+    "azimuth": 56.035004,
+    "bodies": 1,
+    "form": "finger",
+    "hue": 0.748271,
+    "reach": 0.477456,
+    "size": 0.236129,
+    "year": 3
+   }
+  ],
+  "counts": {
+   "daysOff": 0,
+   "events": 0,
+   "media": 0,
+   "memories": 0,
+   "milestones": 0,
+   "places": 0,
+   "plans": 0,
+   "wishes": 0
+  },
+  "days": 1371,
+  "fish": 0,
+  "head": 0.540616,
+  "radius": 0.702801,
+  "rise": 0.32437,
+  "seagrass": 0,
+  "starfish": 0,
+  "startDate": "2022-12-26",
+  "version": "reef-v2/2026-09-28",
+  "years": 3.753671
+ },
+ "summary": {
+  "bodies": 4,
+  "colonies": 4,
+  "firstAnemone": null,
+  "firstBase": [
+   0.1118,
+   0.3101,
+   0.0184
+  ],
+  "forms": [
+   "finger",
+   "finger",
+   "finger",
+   "finger"
+  ],
+  "reach": 0.7028,
+  "top": 0.5953
+ }
+}

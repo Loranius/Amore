@@ -62,3 +62,13 @@ python3 -m crystal_twin tree-render fixtures/busy.json --out tree.png
 python3 -m crystal_twin tree-growth private/real.json --out tree-growth.png
 python3 -m crystal_twin golden                           # і golden/tree/*.json
 ```
+
+## Риф v2 (ADR-0219)
+
+`reef_model.py` (основа — закон голови рифу, колонія на рік, форма — від
+головного модуля року), `reef_geometry.py`, `reef_render.py`.
+
+```bash
+python3 -m crystal_twin reef fixtures/busy.json
+python3 -m crystal_twin reef-growth private/real.json --out reef-growth.png
+```

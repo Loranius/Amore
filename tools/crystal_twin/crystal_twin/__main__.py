@@ -8,6 +8,9 @@
   tree        — модель дерева v2 у JSON (ADR-0218)
   tree-render — картинка дерева на дату знімка
   tree-growth — смуга: дерево на кожну річницю й на сьогодні
+  reef        — модель рифу v2 у JSON (ADR-0219)
+  reef-render — картинка рифу на дату знімка
+  reef-growth — смуга: риф на кожну річницю й на сьогодні
 """
 from __future__ import annotations
 
@@ -26,6 +29,10 @@ from .tree_geometry import summary as tree_summary
 from .tree_model import build_tree_model
 from .tree_render import framing as tree_framing
 from .tree_render import render as tree_render
+from .reef_geometry import summary as reef_summary
+from .reef_model import build_reef_model
+from .reef_render import framing as reef_framing
+from .reef_render import render as reef_render
 
 ROOT = Path(__file__).resolve().parent.parent
 
@@ -34,7 +41,7 @@ def _load(path: str) -> dict:
     return json.loads(Path(path).read_text(encoding="utf-8"))
 
 
-def _growth(snapshot: dict, out: str, tree: bool = False) -> None:
+def _growth(snapshot: dict, out: str, species: str = "crystal") -> None:
     start = parse_day(snapshot["startDate"])
     as_of = parse_day(snapshot["asOf"])
     days = []
@@ -44,7 +51,11 @@ def _growth(snapshot: dict, out: str, tree: bool = False) -> None:
         k += 1
     days.append(as_of)
     frames = []
-    build, draw, frame = (build_tree_model, tree_render, tree_framing) if tree else (build_model, render, framing)
+    build, draw, frame = {
+        "crystal": (build_model, render, framing),
+        "tree": (build_tree_model, tree_render, tree_framing),
+        "reef": (build_reef_model, reef_render, reef_framing),
+    }[species]
     final = frame(build(snapshot))
     for day in days:
         view = dict(snapshot, asOf=day.isoformat())
@@ -69,11 +80,17 @@ def _golden() -> None:
         payload = {"model": tree, "summary": tree_summary(tree)}
         target.write_text(json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
         print(f"golden/tree/{fixture.name}")
+        reef = build_reef_model(_load(str(fixture)))
+        target = ROOT / "golden" / "reef" / fixture.name
+        target.parent.mkdir(exist_ok=True)
+        payload = {"model": reef, "summary": reef_summary(reef)}
+        target.write_text(json.dumps(payload, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"golden/reef/{fixture.name}")
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="crystal_twin")
-    parser.add_argument("command", choices=["model", "report", "render", "growth", "golden", "tree", "tree-render", "tree-growth"])
+    parser.add_argument("command", choices=["model", "report", "render", "growth", "golden", "tree", "tree-render", "tree-growth", "reef", "reef-render", "reef-growth"])
     parser.add_argument("snapshot", nargs="?")
     parser.add_argument("--out")
     args = parser.parse_args(argv)
@@ -99,7 +116,15 @@ def main(argv: list[str] | None = None) -> int:
     elif args.command == "tree-render":
         tree_render(build_tree_model(snapshot)).save(args.out or "tree.png")
     elif args.command == "tree-growth":
-        _growth(snapshot, args.out or "tree-growth.png", tree=True)
+        _growth(snapshot, args.out or "tree-growth.png", "tree")
+    elif args.command == "reef":
+        model = build_reef_model(snapshot)
+        text = json.dumps({"model": model, "summary": reef_summary(model)}, ensure_ascii=False, indent=1, sort_keys=True)
+        Path(args.out).write_text(text, encoding="utf-8") if args.out else print(text)
+    elif args.command == "reef-render":
+        reef_render(build_reef_model(snapshot)).save(args.out or "reef.png")
+    elif args.command == "reef-growth":
+        _growth(snapshot, args.out or "reef-growth.png", "reef")
     return 0
 
 
