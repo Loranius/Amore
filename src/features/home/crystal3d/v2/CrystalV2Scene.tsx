@@ -20,7 +20,9 @@ import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from '../evolutio
 import { readQuality } from '../evolution/useEvolutionCrystalPipeline';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import { Diorama } from '@/features/home/diorama/Diorama';
+import { CrystalIsland } from './CrystalIsland';
 import { CrystalV2Object } from './CrystalV2Object';
+import { linearColour } from './crystalV2Material';
 import { crystalV2Frame, crystalV2GrowthEvents } from './crystalV2Frame';
 import { useCrystalV2 } from './useCrystalV2';
 import '../evolution/evolutionPreview.css';
@@ -62,6 +64,9 @@ export default function CrystalV2Scene() {
   const geometry = state?.geometry;
   const frame = useMemo(() => (geometry ? crystalV2Frame(geometry) : null), [geometry]);
   const noBearings = useMemo<readonly number[]>(() => [], []);
+  // Острів за референсом (ADR-0221): ширший за колонію, щоб по краю стали
+  // арки й колони, а центр лишився кристалу.
+  const island = frame ? Math.max(1.2, frame.reach * 1.55) : 0;
 
   if (error) {
     console.error('[Crystal v2] rollback to the Evolution pipeline:', error);
@@ -106,8 +111,8 @@ export default function CrystalV2Scene() {
           theme={theme}
           quality={quality}
           reduceMotion={reduceMotion}
-          artifactSceneRadius={frame.reach}
-          crystalsSceneRadius={frame.reach}
+          artifactSceneRadius={Math.max(frame.reach, island * 0.95)}
+          crystalsSceneRadius={Math.max(frame.reach, island * 0.95)}
           artifactSceneHeight={frame.height}
           veinBearings={noBearings}
           veinReach={frame.geodeRadius}
@@ -123,8 +128,18 @@ export default function CrystalV2Scene() {
             species="crystal"
             theme={theme}
             seed={model.startDate}
-            radius={Math.max(1.1, frame.reach * 1.15)}
+            radius={island}
             groundY={CRYSTAL_GROUND_BASELINE}
+            reduceMotion={reduceMotion}
+            base={false}
+          />
+          <CrystalIsland
+            seed={model.startDate}
+            theme={theme}
+            radius={island}
+            groundY={CRYSTAL_GROUND_BASELINE}
+            glowColour={linearColour(model.colour.rgb)}
+            crystalHeight={frame.height}
             reduceMotion={reduceMotion}
           />
           <CrystalV2Object

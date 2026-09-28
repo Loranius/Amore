@@ -155,13 +155,18 @@ interface DioramaProps {
   /** Висота землі (верхівки острівця) у сцені. */
   groundY: number;
   reduceMotion: boolean;
+  /**
+   * Чи малювати спільний острівець. Кристал має власний острів за
+   * референсом власника (ADR-0221) і бере з діорами лише тло й частинки.
+   */
+  base?: boolean;
 }
 
 /**
  * Спільна діорама трьох видів (ADR-0220): тло з сяйвом, острівець під
  * предметом і частинки світла. Предмет ставить на острівець сама сцена.
  */
-export function Diorama({ species, theme, seed, radius, groundY, reduceMotion }: DioramaProps) {
+export function Diorama({ species, theme, seed, radius, groundY, reduceMotion, base: showBase = true }: DioramaProps) {
   const palette = DIORAMA_PALETTES[species][theme];
   const size = useThree((state) => state.size);
   const base = useMemo(() => {
@@ -209,7 +214,7 @@ export function Diorama({ species, theme, seed, radius, groundY, reduceMotion }:
         <sphereGeometry args={[80, 32, 20]} />
       </mesh>
       <group position={[0, groundY, 0]}>
-        <mesh geometry={base} material={materials.base} />
+        {showBase && <mesh geometry={base} material={materials.base} />}
         <points geometry={motes} material={materials.motes} frustumCulled={false} />
       </group>
     </>

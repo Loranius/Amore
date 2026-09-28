@@ -25,9 +25,10 @@ export interface DioramaPalette {
 
 export const DIORAMA_PALETTES: Record<DioramaSpecies, Record<'light' | 'dark', DioramaPalette>> = {
   crystal: {
-    // Верх темніший: шапка головної над ним — білі літери (перший кадр).
-    light: { top: '#7085d8', bottom: '#f5cde5', glow: '#ffe8f7', ground: '#bfe6c8', cliff: '#a597d6', mote: '#ffffff', moteStrength: 0.55 },
-    dark: { top: '#141a4a', bottom: '#3b2466', glow: '#ff8fd6', ground: '#4f6aa6', cliff: '#45427f', mote: '#ffc4f0', moteStrength: 0.9 },
+    // Сутінковий фіолетовий грот референсу власника (ADR-0221). Верх темний:
+    // шапка головної над ним — білі літери.
+    light: { top: '#4f4596', bottom: '#b69ad8', glow: '#ffd6f2', ground: '#bfe6c8', cliff: '#a597d6', mote: '#ffe6f8', moteStrength: 0.7 },
+    dark: { top: '#15123a', bottom: '#3a2a6e', glow: '#ff8fd6', ground: '#4f6aa6', cliff: '#45427f', mote: '#ffc4f0', moteStrength: 0.9 },
   },
   tree: {
     light: { top: '#94d3f2', bottom: '#ffe0bd', glow: '#fff6dc', ground: '#9fd66c', cliff: '#c19375', mote: '#fff6c8', moteStrength: 0.5 },
