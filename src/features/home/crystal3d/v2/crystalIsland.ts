@@ -159,7 +159,7 @@ export function ivy(p: Painter, seed: string, key: string, c: V3, size: number) 
 }
 
 /** Маленький кристал, що стирчить зі скелі: шестигранна призма з вістрям. */
-function gem(p: Painter, seed: string, key: string, base: V3, dir: V3, size: number) {
+export function gem(p: Painter, seed: string, key: string, base: V3, dir: V3, size: number) {
   const l = Math.hypot(...dir);
   const u: V3 = [dir[0] / l, dir[1] / l, dir[2] / l];
   const ref: V3 = Math.abs(u[1]) < 0.95 ? [0, 1, 0] : [1, 0, 0];

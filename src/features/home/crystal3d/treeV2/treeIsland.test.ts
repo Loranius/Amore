@@ -11,13 +11,13 @@ const R = 1.3;
 const isle = buildTreeIsland('2022-12-26', R);
 
 describe('острів дерева', () => {
-  it('має всі частини референсу: траву, скелю, валуни, плющ, квіти, ґрунт, хмари, далекі острівці', () => {
-    const used = new Set([...Array.from(isle.island.paint), ...Array.from(isle.sky.paint)]);
-    for (const p of Object.values(TREE_PAINT)) expect(used.has(p)).toBe(true);
+  it('має всі частини референсу: траву, скелю, валуни, плющ, квіти, ґрунт (небо — в оточенні, ADR-0224)', () => {
+    const used = new Set(Array.from(isle.island.paint));
+    for (const p of [TREE_PAINT.grass, TREE_PAINT.cliff, TREE_PAINT.boulder, TREE_PAINT.ivy, TREE_PAINT.flower, TREE_PAINT.soil]) expect(used.has(p)).toBe(true);
   });
 
   it('трикутники цілі, числа скінченні, атрибути на кожну вершину', () => {
-    for (const mesh of [isle.island, isle.debris, isle.sky]) {
+    for (const mesh of [isle.island, isle.debris]) {
       expect(mesh.positions.length % 9).toBe(0);
       for (const v of mesh.positions) expect(Number.isFinite(v)).toBe(true);
       expect(mesh.paint.length * 3).toBe(mesh.positions.length);
@@ -25,10 +25,8 @@ describe('острів дерева', () => {
     }
   });
 
-  it('на острові нічого не світиться саме: він денний; світяться лише хмари', () => {
+  it('на острові нічого не світиться саме: він денний', () => {
     for (const g of isle.island.glow) expect(g).toBe(0);
-    const { paint, glow } = isle.sky;
-    for (let v = 0; v < paint.length; v += 1) if (glow[v]! > 0) expect(paint[v]).toBe(TREE_PAINT.cloud);
   });
 
   it('у центрі, де росте дерево, лише трава (валуни, плющ і квіти — осторонь)', () => {
@@ -70,7 +68,6 @@ describe('острів дерева', () => {
   it('детерміновано: та сама дата — побітово той самий острів', () => {
     const again = buildTreeIsland('2022-12-26', R);
     expect(Array.from(again.island.positions)).toEqual(Array.from(isle.island.positions));
-    expect(Array.from(again.sky.positions)).toEqual(Array.from(isle.sky.positions));
     expect(Array.from(again.debris.positions)).toEqual(Array.from(isle.debris.positions));
   });
 });

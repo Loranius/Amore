@@ -5,7 +5,8 @@
 // по краю й на траві — рожево-сірі гранчасті валуни, дрібні рожеві квіти,
 // з краю звисає плющ, підошва — тепла коричнево-лілова скеля великими
 // гранями, довкола висять уламки того ж каменю, у небі — хмари й далекі
-// острівці. Дерево росте з центру.
+// острівці (вони — в оточенні на 360°, `diorama/surround.ts`, ADR-0224).
+// Дерево росте з центру.
 //
 // Ті самі «пензлі», що й острів кристала (ADR-0221): `Painter`, кавалки,
 // плющ. Фарби — ті самі індекси, прочитані по-своєму (`TREE_PAINT`).
@@ -38,8 +39,6 @@ export interface TreeIsland {
   island: IslandMesh;
   /** Уламки довкола: окремо, бо повільно гойдаються. */
   debris: IslandMesh;
-  /** Хмари й далекі острівці: окремо, бо дрейфують. */
-  sky: IslandMesh;
 }
 
 /** Дрібна рожева квітка: п'ять пелюсток зіркою й серединка. */
@@ -56,32 +55,6 @@ function flower(p: Painter, seed: string, key: string, c: V3, size: number) {
     p.tri(l, tip, r, TREE_PAINT.flower, 0.95 + 0.15 * unit(seed, `${key}:p${k}`));
     p.tri(l, r, mid, TREE_PAINT.flower, 1.1);
   }
-}
-
-/** Пухка низькополігональна хмара: кілька сплющених кавалків у ряд. */
-function cloud(p: Painter, seed: string, key: string, c: V3, size: number) {
-  const n = 3 + Math.floor(unit(seed, `${key}:n`) * 3);
-  for (let k = 0; k < n; k += 1) {
-    const t = n === 1 ? 0 : k / (n - 1) - 0.5;
-    const s = size * (0.55 + 0.45 * Math.cos(t * Math.PI) + 0.2 * unit(seed, `${key}:${k}:s`));
-    // Хмара світиться сама наполовину: у тіні діорами вона сіріла й читалась каменем.
-    chunk(p, seed, `${key}:${k}`, [c[0] + t * size * 2.6, c[1] + s * 0.15, c[2] + (unit(seed, `${key}:${k}:z`) - 0.5) * size * 0.6], s, TREE_PAINT.cloud, 0.55, 0.6);
-  }
-}
-
-/** Далекий острівець: трав'яна шапка й конус скелі під нею. */
-function islet(p: Painter, seed: string, key: string, c: V3, size: number) {
-  const n = 7;
-  const turn = unit(seed, `${key}:turn`) * Math.PI;
-  const top = Array.from({ length: n }, (_, i): V3 => {
-    const a = turn + (i / n) * Math.PI * 2;
-    const r = size * (0.85 + 0.3 * unit(seed, `${key}:r${i}`));
-    return [c[0] + Math.cos(a) * r, c[1], c[2] + Math.sin(a) * r];
-  });
-  const cap: V3 = [c[0], c[1] + size * 0.15, c[2]];
-  for (let i = 0; i < n; i += 1) p.tri(top[i]!, cap, top[(i + 1) % n]!, TREE_PAINT.grass, 0.9 + 0.15 * unit(seed, `${key}:g${i}`));
-  const tip: V3 = [c[0], c[1] - size * (0.8 + 0.4 * unit(seed, `${key}:tip`)), c[2]];
-  for (let i = 0; i < n; i += 1) p.tri(top[(i + 1) % n]!, top[i]!, tip, TREE_PAINT.far, 0.8 + 0.3 * unit(seed, `${key}:c${i}`));
 }
 
 export function buildTreeIsland(seed: string, radius: number): TreeIsland {
@@ -214,26 +187,5 @@ export function buildTreeIsland(seed: string, radius: number): TreeIsland {
     if (unit(seed, `${key}:grass`) < 0.5) chunk(debris, seed, `${key}:top`, polar(r, a, y + size * 0.7), size * 0.7, TREE_PAINT.grass, 0, 0.35);
   }
 
-  // ── Небо: хмари й далекі острівці ─────────────────────────
-  const sky = new Painter();
-  // Кадр телефона вузький: за островом видно лише кілька одиниць у боки, тож
-  // небо тісниться ближче до осі, а хмари — невеликі й далекі.
-  for (let k = 0; k < 7; k += 1) {
-    const key = `tree-sky:cloud${k}`;
-    const side = k % 2 === 0 ? -1 : 1;
-    const z = -5 - 9 * unit(seed, `${key}:z`);
-    const x = side * (1.4 + (1.2 - z * 0.12) * unit(seed, `${key}:x`));
-    const y = -0.6 + 3.2 * unit(seed, `${key}:y`);
-    cloud(sky, seed, key, [x, y, z], 0.22 + 0.22 * unit(seed, `${key}:s`));
-  }
-  for (let k = 0; k < 5; k += 1) {
-    const key = `tree-sky:islet${k}`;
-    const side = k % 2 === 0 ? 1 : -1;
-    const z = -7 - 9 * unit(seed, `${key}:z`);
-    const x = side * (1.6 + (1.0 - z * 0.1) * unit(seed, `${key}:x`));
-    const y = -1.4 + 3.4 * unit(seed, `${key}:y`);
-    islet(sky, seed, key, [x, y, z], 0.2 + 0.3 * unit(seed, `${key}:s`));
-  }
-
-  return { island: p.build(), debris: debris.build(), sky: sky.build() };
+  return { island: p.build(), debris: debris.build() };
 }

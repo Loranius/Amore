@@ -1,13 +1,16 @@
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
+import { Billboard } from '@react-three/drei';
 import type * as THREE from 'three';
 import { createIslandMaterial, createRayMaterial, meshGeometry } from '../../crystal3d/v2/CrystalIsland';
+import { buildReefSurround } from '@/features/home/diorama/surround';
 import { buildReefIsland } from './reefIsland';
 
 // ============================================================
 // Острів рифу за референсом власника (ADR-0223): барвінкова скеля клином,
 // арка, лагуна, водорості, дикі корали й зірки на схилах, уламки, далекі
-// скелі-стовпи й промені з поверхні. Геометрія — `reefIsland.ts`.
+// скелі-стовпи й промені з поверхні. Геометрія — `reefIsland.ts`; глибина
+// навколо — `diorama/surround.ts` (ADR-0224).
 // ============================================================
 
 /** Верхівка, скеля, валуни, водорості, лагуна, помаранчевий і рожевий корал, далечінь. */
@@ -17,6 +20,8 @@ const REEF_ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
 };
 
 const RAY: Record<'light' | 'dark', string> = { light: '#eafcff', dark: '#7fe8ff' };
+/** Товща води: далекі скелі й водорості тонуть у ній. */
+const WATER: Record<'light' | 'dark', string> = { light: '#4aa6cc', dark: '#0a2a5a' };
 
 interface ReefIslandProps {
   seed: string;
@@ -30,10 +35,13 @@ export function ReefIsland({ seed, theme, radius, groundY, reduceMotion }: ReefI
   const built = useMemo(() => buildReefIsland(seed, radius), [seed, radius]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
-  const far = useMemo(() => meshGeometry(built.far), [built]);
+  // Глибина навколо острова на всі 360° (ADR-0224): скелі з арками, ліс
+  // водоростей, дно внизу.
+  const far = useMemo(() => meshGeometry(buildReefSurround(seed)), [seed]);
   const materials = useMemo(() => ({
     island: createIslandMaterial(REEF_ISLAND_PAINTS[theme]),
     ray: createRayMaterial(RAY[theme]),
+    deep: createIslandMaterial(REEF_ISLAND_PAINTS[theme], { colour: WATER[theme], from: 20, to: 150, strength: 0.82 }),
   }), [theme]);
   const debrisRef = useRef<THREE.Group>(null);
 
@@ -53,19 +61,20 @@ export function ReefIsland({ seed, theme, radius, groundY, reduceMotion }: ReefI
   return (
     <>
       <group position={[0, groundY, 0]}>
-        <mesh geometry={far} material={materials.island} renderOrder={-5} frustumCulled={false} />
+        <mesh geometry={far} material={materials.deep} frustumCulled={false} />
       </group>
       {/* Промені з поверхні: падають згори навскоси крізь товщу води. */}
-      {[0, 1, 2, 3].map((k) => (
-        <mesh
+      {[0, 1, 2, 3, 4].map((k) => (
+        <Billboard
           key={k}
-          material={materials.ray}
-          position={[radius * (-1.2 + k * 0.9), groundY + radius * 2.4, -radius * (1.2 + 0.6 * k)]}
-          rotation={[0, 0, 0.35 - k * 0.06]}
-          renderOrder={-4}
+          lockX
+          lockZ
+          position={[Math.cos(k * 1.3 + 1.1) * radius * 2.2, groundY + radius * 2.4, Math.sin(k * 1.3 + 1.1) * radius * 2.2]}
         >
-          <planeGeometry args={[radius * (0.4 + 0.15 * (k % 2)), radius * 7]} />
-        </mesh>
+          <mesh material={materials.ray} rotation={[0, 0, 0.3 - k * 0.05]} renderOrder={-4}>
+            <planeGeometry args={[radius * (0.4 + 0.15 * (k % 2)), radius * 7]} />
+          </mesh>
+        </Billboard>
       ))}
       <group position={[0, groundY, 0]}>
         <mesh geometry={island} material={materials.island} />

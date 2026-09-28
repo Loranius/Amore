@@ -12,13 +12,13 @@ const R = 1.3;
 const isle = buildReefIsland('2022-12-26', R);
 
 describe('острів рифу', () => {
-  it('має всі частини референсу: верхівку, скелю, валуни, водорості, лагуну, корали, далекі скелі', () => {
-    const used = new Set([...Array.from(isle.island.paint), ...Array.from(isle.far.paint)]);
-    for (const p of Object.values(REEF_PAINT)) expect(used.has(p)).toBe(true);
+  it('має всі частини референсу: верхівку, скелю, валуни, водорості, лагуну, корали (глибина — в оточенні, ADR-0224)', () => {
+    const used = new Set(Array.from(isle.island.paint));
+    for (const p of Object.values(REEF_PAINT)) if (p !== REEF_PAINT.far) expect(used.has(p)).toBe(true);
   });
 
   it('трикутники цілі, числа скінченні, атрибути на кожну вершину', () => {
-    for (const mesh of [isle.island, isle.debris, isle.far]) {
+    for (const mesh of [isle.island, isle.debris]) {
       expect(mesh.positions.length % 9).toBe(0);
       for (const v of mesh.positions) expect(Number.isFinite(v)).toBe(true);
       expect(mesh.paint.length * 3).toBe(mesh.positions.length);
@@ -77,7 +77,6 @@ describe('острів рифу', () => {
   it('детерміновано: та сама дата — побітово той самий острів', () => {
     const again = buildReefIsland('2022-12-26', R);
     expect(Array.from(again.island.positions)).toEqual(Array.from(isle.island.positions));
-    expect(Array.from(again.far.positions)).toEqual(Array.from(isle.far.positions));
     expect(again.lagoon).toEqual(isle.lagoon);
   });
 });

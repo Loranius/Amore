@@ -4,7 +4,8 @@
 // Референс: підводний летючий острів — лілово-барвінкова гранчаста скеля
 // гострим клином донизу, на верхівці кам'яна арка, круглі валуни й
 // бірюзова лагуна, по краю й по скелі — зелені водорості пасмами, дикі
-// корали й морські зірки, у глибині — далекі скелі-стовпи.
+// корали й морські зірки, у глибині — далекі скелі-стовпи (вони — в
+// оточенні на 360°, `diorama/surround.ts`, ADR-0224).
 //
 // Ті самі «пензлі», що й острови кристала й дерева (ADR-0221, ADR-0222).
 // Корали ПАРИ стоять на верхівці й рахуються моделлю (ADR-0219); дикі
@@ -33,8 +34,6 @@ export interface ReefIsland {
   island: IslandMesh;
   /** Уламки довкола: окремо, бо повільно гойдаються. */
   debris: IslandMesh;
-  /** Далекі скелі-стовпи в глибині. */
-  far: IslandMesh;
   /** Центр і радіус лагуни — щоб бульбашки піднімались із неї. */
   lagoon: { x: number; z: number; r: number };
 }
@@ -253,22 +252,6 @@ export function buildReefIsland(seed: string, radius: number): ReefIsland {
     chunk(debris, seed, key, polar(R * (1.35 + 0.55 * unit(seed, `${key}:r`)), a, R * (-0.9 + 1.3 * unit(seed, `${key}:y`))), R * (0.06 + 0.07 * unit(seed, `${key}:s`)), REEF_PAINT.cliff);
   }
 
-  // ── Далекі скелі-стовпи в глибині ─────────────────────────
-  const far = new Painter();
-  // Далеко й небагато: у першому кадрі стовпи стояли близько й насичено
-  // синіми, і глибина читалась стіною, а не простором.
-  for (let k = 0; k < 6; k += 1) {
-    const key = `reef-far:pillar${k}`;
-    const side = k % 2 === 0 ? -1 : 1;
-    const z = -12 - 10 * unit(seed, `${key}:z`);
-    const x = side * (3 + (2 - z * 0.12) * unit(seed, `${key}:x`));
-    const h = 3 + 5 * unit(seed, `${key}:h`);
-    const w = 0.3 + 0.35 * unit(seed, `${key}:w`);
-    for (let s = 0; s * w * 1.2 < h; s += 1) {
-      chunk(far, seed, `${key}:${s}`, [x + (unit(seed, `${key}:${s}:dx`) - 0.5) * w * 0.4, -4 + s * w * 1.2, z], w * (0.9 - 0.3 * (s * w * 1.2) / h), REEF_PAINT.far);
-    }
-  }
-
-  return { island: p.build(), debris: debris.build(), far: far.build(), lagoon: { x: lc[0], z: lc[2], r: lagoonR } };
+  return { island: p.build(), debris: debris.build(), lagoon: { x: lc[0], z: lc[2], r: lagoonR } };
 }
 

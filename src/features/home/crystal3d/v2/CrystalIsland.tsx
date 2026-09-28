@@ -2,8 +2,8 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
-import { unit } from '@/engine/species/crystalV2/hash';
 import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
+import { buildCrystalSurround } from '@/features/home/diorama/surround';
 import { buildCrystalIsland, type IslandMesh } from './crystalIsland';
 
 // ============================================================
@@ -25,15 +25,35 @@ const ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
   dark: ['#a591b0', '#3c3163', '#ad9cba', '#4a9440', '#ff82d2', '#473c57', '#d8cff0', '#3a2c6c'],
 };
 
-/** Далекий грот: силуети, що тонуть у повітрі, і промені. */
-const CAVE: Record<'light' | 'dark', { far: string; air: string; ray: string }> = {
-  // Силуети грота ледь темніші за повітря: далина, а не стіна поруч.
-  light: { far: '#6a5bab', air: '#9c86cf', ray: '#fff0fb' },
-  dark: { far: '#2e2458', air: '#3a2c6c', ray: '#ffb8ec' },
+/**
+ * Фарби храму: ті самі слоти, але камінь — присмерково-ліловий, а не денна
+ * бруківка острова: храм у підземеллі, і світлий мармур читався б сонцем.
+ */
+const TEMPLE_PAINTS: Record<'light' | 'dark', readonly string[]> = {
+  light: ['#dcc3c6', '#5e4f8a', '#b9a8d2', '#5fae45', '#ff8fd0', '#7d6878', '#ffffff', '#5a4a9a'],
+  dark: ['#a591b0', '#2f2752', '#6f6398', '#3f8a3a', '#ff82d2', '#473c57', '#d8cff0', '#241c4c'],
 };
 
+/** Повітря підземного храму (серпанок оточення) і промені з розлому. */
+const CAVE: Record<'light' | 'dark', { air: string; ray: string }> = {
+  light: { air: '#9c86cf', ray: '#fff0fb' },
+  dark: { air: '#2a2058', ray: '#ffb8ec' },
+};
+
+/**
+ * Серпанок для далекого оточення (ADR-0224): що далі від осі острова, то
+ * ближче колір до повітря сцени. Рахується від осі, а не від камери, —
+ * інакше на далекому зумі тонув би й сам острів.
+ */
+export interface IslandHaze {
+  colour: string;
+  from: number;
+  to: number;
+  strength: number;
+}
+
 /** Матеріал острова: фарба з палітри (8 кольорів), м'яке світло діорами. */
-export function createIslandMaterial(paints: readonly string[]): THREE.ShaderMaterial {
+export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     // Обидва боки: віяла кришок плит і кавалків закручені як прийдеться, а
     // нормаль шейдер однаково повертає до камери. Перший кадр показав
@@ -44,6 +64,8 @@ export function createIslandMaterial(paints: readonly string[]): THREE.ShaderMat
       uKey: { value: KEY.clone() },
       uAmbient: { value: 0.52 },
       uTime: { value: 0 },
+      uHaze: { value: new THREE.Color(haze?.colour ?? '#000000') },
+      uHazeRange: { value: new THREE.Vector3(haze?.from ?? 1, haze?.to ?? 2, haze?.strength ?? 0) },
     },
     vertexShader: /* glsl */ `
       attribute float paint;
@@ -67,6 +89,8 @@ export function createIslandMaterial(paints: readonly string[]): THREE.ShaderMat
       uniform vec3 uKey;
       uniform float uAmbient;
       uniform float uTime;
+      uniform vec3 uHaze;
+      uniform vec3 uHazeRange;
       varying vec3 vWorld;
       varying float vPaint;
       varying float vTone;
@@ -82,6 +106,7 @@ export function createIslandMaterial(paints: readonly string[]): THREE.ShaderMat
         vec3 c = dioramaShade(base * vTone, n, view);
         // Самоцвіти в скелі світяться самі й повільно дихають.
         c = mix(c, base * (1.25 + 0.2 * sin(uTime * 1.3 + vWorld.x * 3.0)), vGlow * 0.85);
+        c = mix(c, uHaze, smoothstep(uHazeRange.x, uHazeRange.y, length(vWorld)) * uHazeRange.z);
         gl_FragColor = vec4(c, 1.0);
         ${END}
       }
@@ -123,50 +148,6 @@ function createGlowMaterial(tint: string, strength: number): THREE.ShaderMateria
         float r = length(vUv - 0.5) * 2.0;
         float a = pow(smoothstep(1.0, 0.0, r), 2.2) * uStrength * uPulse;
         gl_FragColor = vec4(uColour * a, a);
-      }
-    `,
-  });
-}
-
-/** Далекі силуети грота: колони й арки, що тонуть у повітрі. */
-function buildCave(seed: string): Float32Array {
-  const out: number[] = [];
-  const quad = (x0: number, x1: number, y0: number, y1: number, z: number) => {
-    out.push(x0, y0, z, x1, y0, z, x1, y1, z, x0, y0, z, x1, y1, z, x0, y1, z);
-  };
-  for (let k = 0; k < 9; k += 1) {
-    const side = k % 2 === 0 ? -1 : 1;
-    const x = side * (4 + 9 * unit(seed, `cave${k}:x`));
-    const z = -10 - 12 * unit(seed, `cave${k}:z`);
-    const w = 0.8 + 1.6 * unit(seed, `cave${k}:w`);
-    const top = 3 + 9 * unit(seed, `cave${k}:h`);
-    quad(x - w / 2, x + w / 2, -8, top, z);
-    // Кожна третя — арка: перекладина до сусідньої колони.
-    if (k % 3 === 0) quad(x - w / 2, x + w * 2.6, top - 1.2, top - 0.3, z);
-  }
-  return new Float32Array(out);
-}
-
-function createCaveMaterial(far: string, air: string): THREE.ShaderMaterial {
-  return new THREE.ShaderMaterial({
-    depthWrite: false,
-    uniforms: { uFar: { value: new THREE.Color(far) }, uAir: { value: new THREE.Color(air) } },
-    vertexShader: /* glsl */ `
-      varying float vY;
-      void main() {
-        vY = position.y;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: /* glsl */ `
-      uniform vec3 uFar;
-      uniform vec3 uAir;
-      varying float vY;
-      void main() {
-        // Низ тоне в повітрі грота: силует, а не стіна.
-        vec3 c = mix(uAir, uFar, smoothstep(-6.0, 4.0, vY));
-        gl_FragColor = vec4(c, 1.0);
-        ${END}
       }
     `,
   });
@@ -218,26 +199,24 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
   const built = useMemo(() => buildCrystalIsland(seed, radius), [seed, radius]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
-  const cave = useMemo(() => {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(buildCave(seed), 3));
-    return g;
-  }, [seed]);
+  // Давній храм у підземеллі навколо острова, на всі 360° (ADR-0224).
+  const temple = useMemo(() => meshGeometry(buildCrystalSurround(seed)), [seed]);
   const glowHex = `#${glowColour.getHexString()}`;
   const materials = useMemo(() => ({
     island: createIslandMaterial(ISLAND_PAINTS[theme]),
-    cave: createCaveMaterial(CAVE[theme].far, CAVE[theme].air),
+    temple: createIslandMaterial(TEMPLE_PAINTS[theme], { colour: CAVE[theme].air, from: 20, to: 170, strength: 0.8 }),
     ray: createRayMaterial(CAVE[theme].ray),
     core: createGlowMaterial(glowHex, theme === 'dark' ? 1.2 : 0.9),
   }), [theme, glowHex]);
   const debrisRef = useRef<THREE.Group>(null);
 
-  useEffect(() => () => { island.dispose(); debris.dispose(); cave.dispose(); }, [island, debris, cave]);
+  useEffect(() => () => { island.dispose(); debris.dispose(); temple.dispose(); }, [island, debris, temple]);
   useEffect(() => () => { for (const m of Object.values(materials)) m.dispose(); }, [materials]);
 
   useFrame(({ clock }) => {
     const t = reduceMotion ? 0 : clock.getElapsedTime();
     materials.island.uniforms.uTime!.value = t;
+    materials.temple.uniforms.uTime!.value = t;
     materials.ray.uniforms.uTime!.value = t;
     materials.core.uniforms.uPulse!.value = 0.85 + 0.15 * Math.sin(t * 0.9);
     // Уламки повільно пливуть довкола й гойдаються.
@@ -249,17 +228,20 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
 
   return (
     <>
-      <mesh geometry={cave} material={materials.cave} renderOrder={-5} frustumCulled={false} />
-      {[0, 1, 2].map((k) => (
-        <mesh
+      <mesh geometry={temple} material={materials.temple} frustumCulled={false} />
+      {/* Промені з розлому в склепінні: стоять кільцем і повертаються до
+          камери лише навколо вертикалі — збоку вони більше не дошки. */}
+      {[0, 1, 2, 3, 4].map((k) => (
+        <Billboard
           key={k}
-          material={materials.ray}
-          position={[radius * (0.6 + k * 0.9), groundY + radius * 2.2, -radius * (1.5 + k)]}
-          rotation={[0, 0, -0.45 - k * 0.08]}
-          renderOrder={-4}
+          lockX
+          lockZ
+          position={[Math.cos(k * 1.3 + 0.4) * radius * 2.2, groundY + radius * 2.4, Math.sin(k * 1.3 + 0.4) * radius * 2.2]}
         >
-          <planeGeometry args={[radius * (0.45 + 0.2 * k), radius * 7]} />
-        </mesh>
+          <mesh material={materials.ray} rotation={[0, 0, -0.35]} renderOrder={-4}>
+            <planeGeometry args={[radius * (0.45 + 0.15 * (k % 2)), radius * 7]} />
+          </mesh>
+        </Billboard>
       ))}
       <group position={[0, groundY, 0]}>
         <mesh geometry={island} material={materials.island} />
