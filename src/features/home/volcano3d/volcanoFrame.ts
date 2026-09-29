@@ -9,9 +9,12 @@ import { ARTIFACT_FIT_HEIGHT, ARTIFACT_FIT_WIDTH } from '@/engine/renderer/three
 import type { VolcanoGeometry } from '@/engine/species/volcano/geometry';
 import { dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
 
-/** Дорослий вулкан в одиницях моделі: висота з коралами й розмах підніжжя. */
-const ADULT_TOP = 2.7;
-const ADULT_REACH = 1.6;
+/**
+ * Сталий масштаб моделі в сцену. Широкий конус (підніжжя 0.72·висоти)
+ * мусить ставати на острів 1.3 до восьмого року, як кристал і дерево
+ * (`growthFit`), — звідси 0.7, а не «дорослий вулкан на всю висоту кадру».
+ */
+const MODEL_SCALE = 0.7;
 
 /**
  * Острів — та сама формула, що в кристала й дерева: спільний радіус 1.3,
@@ -28,7 +31,7 @@ export interface VolcanoFrame {
 }
 
 export function volcanoFrame(geometry: Pick<VolcanoGeometry, 'top' | 'reach'>): VolcanoFrame {
-  const reference = Math.min(ARTIFACT_FIT_HEIGHT / ADULT_TOP, ARTIFACT_FIT_WIDTH / (2 * ADULT_REACH));
+  const reference = MODEL_SCALE;
   const contain = Math.min(
     ARTIFACT_FIT_HEIGHT / Math.max(1e-3, geometry.top),
     ARTIFACT_FIT_WIDTH / Math.max(1e-3, geometry.reach * 2),

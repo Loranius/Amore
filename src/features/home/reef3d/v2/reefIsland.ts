@@ -176,8 +176,17 @@ function standingStone(p: Painter, seed: string, key: string, base: V3, height: 
  * @param options.arch арка позаду каменю; вулкан (ADR-0235) її не має —
  *   за конусом вона злипалась із ним в одну фіолетову пляму.
  */
-export function buildReefIsland(seed: string, radius: number, rock = radius * 0.65, options: { arch?: boolean } = {}): ReefIsland {
+export function buildReefIsland(
+  seed: string,
+  radius: number,
+  rock = radius * 0.65,
+  options: { arch?: boolean; lagoon?: boolean; stones?: boolean } = {},
+): ReefIsland {
   const withArch = options.arch ?? true;
+  // Вулкан (ADR-0235, референс власника): суцільне біле плато — без лагуни
+  // й без стоячих каменів по краю; на плато стоїть життя пари.
+  const withLagoon = options.lagoon ?? true;
+  const withStones = options.stones ?? true;
   const R = radius;
   const p = new Painter();
   const front = Math.PI / 2;
@@ -246,7 +255,8 @@ export function buildReefIsland(seed: string, radius: number, rock = radius * 0.
     inner,
     outer: Math.min(R * 0.9, inner + R * 0.17),
     angle: front + 0.55 + (unit(seed, 'reef-isle:water') - 0.5) * 0.3,
-    half: 1.05,
+    // Без лагуни вода має нульову дугу: `inReefWater` завжди «ні».
+    half: withLagoon ? 1.05 : 0,
   };
   const WSTEPS = 18;
   const waterY = RIM_Y + R * 0.006;
@@ -259,7 +269,7 @@ export function buildReefIsland(seed: string, radius: number, rock = radius * 0.
     const a = water.angle - water.half + 2 * water.half * t;
     return polar(midR + (side === 0 ? -halfW : halfW), a, waterY);
   };
-  for (let i = 0; i < WSTEPS; i += 1) {
+  for (let i = 0; i < (withLagoon ? WSTEPS : 0); i += 1) {
     const t0 = i / WSTEPS;
     const t1 = (i + 1) / WSTEPS;
     p.tri(edge(t0, 0), edge(t1, 1), edge(t0, 1), REEF_PAINT.lagoon, 1, 0.4);
@@ -303,7 +313,7 @@ export function buildReefIsland(seed: string, radius: number, rock = radius * 0.
   // ── Стоячі камені по краю ─────────────────────────────────
   const busy = (a: number, gap: number) =>
     nearAngle(a, archA, 0.55) || nearAngle(a, water.angle, water.half + gap) || nearAngle(a, front, 0.28);
-  for (let k = 0; k < 7; k += 1) {
+  for (let k = 0; k < (withStones ? 7 : 0); k += 1) {
     const key = `reef-isle:stone${k}`;
     const a = (k / 7) * Math.PI * 2 + (unit(seed, `${key}:a`) - 0.5) * 0.4;
     if (busy(a, 0.1)) continue;

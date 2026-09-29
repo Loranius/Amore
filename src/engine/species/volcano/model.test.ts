@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CrystalV2Snapshot } from '../crystalV2/model';
-import { CORAL_CEILING, buildVolcanoGeometry, volcanoPlacements } from './geometry';
+import { buildVolcanoGeometry, volcanoPlacements, volcanoUndergrowth } from './geometry';
 import { buildVolcanoModel, volcanoLayerThickness, volcanoSlopeRadius } from './model';
 
 // ============================================================
@@ -80,16 +80,24 @@ describe('вулкан: меш', () => {
   const model = buildVolcanoModel(read('fixtures/busy.json'));
   const geometry = buildVolcanoGeometry(model);
 
-  it('корали — літопис знизу вгору, але верхівка з кратером лишається голою', () => {
-    // Регресія першого кадру лабораторії: корали тонких молодих шарів
-    // тіснились під кратером і накривали вершину шапкою.
-    const firsts = volcanoPlacements(model).filter((p) => p.body === 0);
-    for (let i = 1; i < firsts.length; i += 1) {
-      expect(firsts[i]!.base[1]).toBeGreaterThanOrEqual(firsts[i - 1]!.base[1] - 1e-9);
+  it('конус чистий: усе життя — на плато кільцем довкола підніжжя (референс власника)', () => {
+    for (const place of [...volcanoPlacements(model), ...volcanoUndergrowth(model)]) {
+      expect(place.base[1]).toBe(0);
+      expect(Math.hypot(place.base[0], place.base[2])).toBeGreaterThanOrEqual(model.baseRadius * 0.97);
     }
-    for (const place of volcanoPlacements(model)) {
-      expect(place.base[1]).toBeLessThanOrEqual(model.height * CORAL_CEILING + place.colony.size);
-    }
+  });
+
+  it('колонії років — кільце, що росте назовні: старші ближче до підніжжя', () => {
+    const firsts = volcanoPlacements(model).filter((p) => p.body === 0).map((p) => Math.hypot(p.base[0], p.base[2]));
+    for (let i = 1; i < firsts.length; i += 1) expect(firsts[i]!).toBeGreaterThanOrEqual(firsts[i - 1]! - 1e-9);
+  });
+
+  it('ріки лави — від кратера до підніжжя: 3…5 рік', () => {
+    expect(model.veins).toBeGreaterThanOrEqual(3);
+    expect(model.veins).toBeLessThanOrEqual(5);
+    let low = Infinity;
+    for (let i = 1; i < geometry.lava.positions.length; i += 3) low = Math.min(low, geometry.lava.positions[i]!);
+    expect(low).toBeLessThan(model.height * 0.1);
   });
 
   it('жар — на кожній вершині каменю, 0…1; кратер розпечений, підніжжя холодне', () => {
@@ -98,7 +106,9 @@ describe('вулкан: меш', () => {
       expect(h).toBeGreaterThanOrEqual(0);
       expect(h).toBeLessThanOrEqual(1);
     }
-    expect(Math.max(...geometry.rockHeat)).toBeGreaterThanOrEqual(0.8);
+    // Корона й чаша — лава; найгарячіше в камені — вал під короною.
+    expect(Math.max(...geometry.rockHeat)).toBeGreaterThanOrEqual(0.45);
+    expect(Math.max(...geometry.lava.heat)).toBe(1);
     const footHeat = Array.from(geometry.rockHeat).filter((_, i) => geometry.rock.positions[i * 3 + 1]! < 0);
     expect(Math.max(...footHeat)).toBeLessThan(0.3);
   });

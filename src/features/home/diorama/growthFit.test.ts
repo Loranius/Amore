@@ -105,12 +105,15 @@ describe.each(cases)('%s, %i', (history, year) => {
     if (year <= 2030) expect(volcano).toBe(DIORAMA_ISLAND_RADIUS);
   });
 
-  it('вулкан: лагуна за підніжжям, жодна колонія основою не у воді', () => {
+  it('вулкан: острів без лагуни — колонії на плато, жодна не у воді й не за краєм', () => {
     const model = buildVolcanoModel(snap);
     const frame = volcanoFrame(buildVolcanoGeometry(model));
     const rock = model.baseRadius * frame.scale;
-    const { water } = buildReefIsland(model.startDate, volcanoIsland(frame), rock, { arch: false });
-    expect(water.inner).toBeGreaterThan(rock);
+    const island = volcanoIsland(frame);
+    const { water } = buildReefIsland(model.startDate, island, rock, { arch: false, lagoon: false, stones: false });
+    for (const place of volcanoPlacements(model)) {
+      expect(Math.hypot(place.base[0], place.base[2]) * frame.scale).toBeLessThan(island * 0.95);
+    }
     for (const place of volcanoPlacements(model)) {
       expect(inReefWater(water, place.base[0] * frame.scale, place.base[2] * frame.scale)).toBe(false);
     }

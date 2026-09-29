@@ -122,14 +122,15 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
     years: life.years,
     layers,
     height: r6(top),
-    // Підніжжя ширшає повільніше за висоту: вулкан росте вгору, а не вшир.
-    // 0.5 + 0.22·висоти — щоб молодий вулкан ставав на острів того самого
-    // розміру, що й кристал і дерево (1.3): з 0.75 + 0.3·висоти острів пари
-    // ~4 років виходив 1.76 і камера відступала, роблячи вулкан дрібним.
-    baseRadius: r6(0.5 + 0.22 * top),
+    // Пропорція — як у референсі власника: широкий конус, висота ≈ 0.7
+    // діаметра підніжжя, на кожному віці. Вузьке підніжжя (0.5 + 0.22·висоти)
+    // на 15–30 роках робило з вулкана вежу. На острів того ж розміру, що в
+    // кристала й дерева, його вміщує масштаб кадру (`volcanoFrame`).
+    baseRadius: r6(0.72 * top),
     craterRadius: r6(0.16 + 0.05 * top),
     glow: r6(glow),
-    veins: 2 + Math.min(4, Math.floor(Math.log2(1 + recent / 2))),
+    // 3…5 рік лави, як у референсі: більше — від активності останніх років.
+    veins: 3 + Math.min(2, Math.floor(Math.log2(1 + recent / 3))),
     vents: VOLCANO_VENT_YEARS.filter((year) => life.years >= year).map((year, i) => ({
       year,
       azimuth: r6(((unit(life.startDate, `vent${i}:a`) * 360) + i * 137.5) % 360),

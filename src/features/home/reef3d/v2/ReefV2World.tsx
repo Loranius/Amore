@@ -65,14 +65,18 @@ interface ReefV2WorldProps {
   rockRadius: number;
   /** Колір каменю замість рифового: базальт вулкана (ADR-0235). */
   rockColour?: string;
-  /** Арка позаду каменю острова; вулкан її вимикає (ADR-0235). */
+  /** Арка, лагуна й стоячі камені острова; вулкан їх вимикає (ADR-0235). */
   islandArch?: boolean;
+  islandLagoon?: boolean;
+  islandStones?: boolean;
   /**
    * Свій матеріал каменю й жар кожної його вершини (вулкан, ADR-0235).
    * Матеріалом володіє той, хто його передав: тут він не звільняється.
    */
   rockMaterial?: THREE.ShaderMaterial;
   rockHeat?: Float32Array;
+  /** Висота морської трави: на плато вулкана вона нижча, щоб не затуляти конус. */
+  seagrassScale?: number;
 }
 
 /**
@@ -80,7 +84,7 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, rockMaterial, rockHeat }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1 }: ReefV2WorldProps) {
   const palette = REEF_PALETTES[theme];
 
   const rock = useMemo(
@@ -122,7 +126,10 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
     return pointsGeometry(out, seed, 'snow');
   }, [seed]);
   // Бульбашки піднімаються з лагуни острова (ADR-0223) і з двох щілин біля неї.
-  const built = useMemo(() => buildReefIsland(seed, island, rockRadius), [seed, island, rockRadius]);
+  const built = useMemo(
+    () => buildReefIsland(seed, island, rockRadius, { arch: islandArch, lagoon: islandLagoon, stones: islandStones }),
+    [seed, island, rockRadius, islandArch, islandLagoon, islandStones],
+  );
   const lagoon = built.lagoon;
   const water = built.water;
   const bubbles = useMemo(() => {
@@ -168,13 +175,13 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
       dummy.rotation.set(0, unit(seed, `grass${i}:turn`) * Math.PI * 2, 0);
       // Трава не росте з води лагуни: там вона стирчала з бірюзи.
       const wet = inReefWater(water, p[0] * scale * k, p[2] * scale * k, 0.03);
-      dummy.scale.setScalar(wet ? 0 : 0.14 + 0.2 * unit(seed, `grass${i}:h`));
+      dummy.scale.setScalar(wet ? 0 : (0.14 + 0.2 * unit(seed, `grass${i}:h`)) * seagrassScale);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
     });
     mesh.instanceMatrix.needsUpdate = true;
     mesh.computeBoundingSphere();
-  }, [geometry, scale, seed, island, rockRadius, water]);
+  }, [geometry, scale, seed, island, rockRadius, water, seagrassScale]);
 
   useEffect(() => () => {
     for (const g of [rock, corals, critters, starfish, pearls, fish, tuft, snow, bubbles]) g?.dispose();
@@ -196,7 +203,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
   return (
     <>
       {!bare && <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />}
-      <ReefIsland bare={bare} arch={islandArch} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
+      <ReefIsland bare={bare} arch={islandArch} lagoon={islandLagoon} stones={islandStones} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         {geometry.seagrass.length > 0 && (
           <instancedMesh ref={grassRef} args={[tuft, materials.grass, geometry.seagrass.length]} frustumCulled={false} />

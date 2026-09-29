@@ -17,11 +17,11 @@ import { REEF_PALETTES, createGlowMaterial, createVolcanoRockMaterial } from '..
 
 /** Базальт: темніший і тепліший за камінь рифу. */
 /**
- * Базальт: сіро-сливовий, тепліший за барвінковий камінь острова. Перший
- * кадр лабораторії з фіолетовим `#3d3170` показав конус, що зливається з
- * островом у темній темі.
+ * Конус — насичений фіолетовий, як у референсі власника. Від скелі острова
+ * його відділяє біле плато й ріки лави, тож він не зливається (сіро-сливовий
+ * `#4f3f5e` був до референсу).
  */
-export const VOLCANO_ROCK: Record<'light' | 'dark', string> = { light: '#7d6a8e', dark: '#4f3f5e' };
+export const VOLCANO_ROCK: Record<'light' | 'dark', string> = { light: '#7a64d6', dark: '#5846b0' };
 
 /** Подвійний удар серця: два поштовхи й пауза, період 1.6 с. */
 export function heartbeat(t: number): number {
@@ -49,9 +49,11 @@ function createLavaMaterial(): THREE.ShaderMaterial {
       varying float vHeat;
       void main() {
         // Від застиглої темно-червоної кірки до жовто-рожевого серця.
-        vec3 crust = vec3(0.45, 0.08, 0.12);
-        vec3 hot = vec3(1.0, 0.36, 0.30);
-        vec3 core = vec3(1.0, 0.78, 0.55);
+        // Референс власника: ріки й корона — чистий червоно-помаранчевий,
+        // серце кратера — жовте.
+        vec3 crust = vec3(0.93, 0.2, 0.13);
+        vec3 hot = vec3(1.0, 0.38, 0.14);
+        vec3 core = vec3(1.0, 0.86, 0.3);
         float h = clamp(vHeat * (0.65 + 0.35 * uGlow) + 0.18 * uBeat * vHeat, 0.0, 1.0);
         vec3 c = h < 0.6 ? mix(crust, hot, h / 0.6) : mix(hot, core, (h - 0.6) / 0.4);
         gl_FragColor = vec4(c * (0.9 + 0.5 * uBeat * vHeat), 1.0);
@@ -131,6 +133,9 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         rockMaterial={materials.rock}
         rockHeat={geometry.rockHeat}
         islandArch={false}
+        islandLagoon={false}
+        islandStones={false}
+        seagrassScale={0.5}
         bare={bare}
       />
       <group position={[0, PORTAL_GROUND_Y, 0]}>

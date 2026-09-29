@@ -41,10 +41,13 @@ interface ReefIslandProps {
   bare?: boolean;
   /** Арка позаду каменю (вулкан — без неї, ADR-0235). */
   arch?: boolean;
+  /** Лагуна й стоячі камені по краю (вулкан — без них, ADR-0235). */
+  lagoon?: boolean;
+  stones?: boolean;
 }
 
-export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false, arch = true }: ReefIslandProps) {
-  const built = useMemo(() => buildReefIsland(seed, radius, rock, { arch }), [seed, radius, rock, arch]);
+export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false, arch = true, lagoon = true, stones = true }: ReefIslandProps) {
+  const built = useMemo(() => buildReefIsland(seed, radius, rock, { arch, lagoon, stones }), [seed, radius, rock, arch, lagoon, stones]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Глибина навколо острова на всі 360° (ADR-0224): скелі з арками, ліс
