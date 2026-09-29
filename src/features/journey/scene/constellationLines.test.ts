@@ -47,11 +47,14 @@ describe('прямі лінії сузір’я', () => {
     }
   });
 
-  it('лінія зупиняється ДО зірки, як на зоряній карті', () => {
+  it('лінія торкається зірки: кінець у сяйві, біля самого осердя (власник)', () => {
+    // «Зробити тонші лінії зв'язку і щоб вони торкались зірок»: кінець
+    // лінії не далі за 0.2 радіуса від центру, але й не в самому центрі.
     const mesh = buildConstellationLines(CHAIN, R);
     const all = vertices(mesh);
     for (const star of CHAIN) {
       const closest = Math.min(...all.map(({ p }) => Math.hypot(p[0] - star.x, p[1] - star.y, p[2] - star.z)));
+      expect(closest).toBeLessThanOrEqual(star.radius * 0.2 + R);
       expect(closest).toBeGreaterThan(star.radius * LINE_GAP_SHARE - R - 1e-6);
     }
   });

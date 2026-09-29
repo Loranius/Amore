@@ -6,14 +6,12 @@ import {
   InstancedMesh,
   Matrix4,
   PlaneGeometry,
-  ShapeGeometry,
   Vector3,
   type ShaderMaterial,
 } from 'three';
 import type { Star3D } from '../constellation3d';
 import { HALO_TINT_GAIN, starSeeds, starTints } from '../starPalette';
 import { auraGlows, birthProgress, starAura, starBreath } from './constellationLife';
-import { createStarShape } from './starSilhouette';
 
 // ============================================================
 // Зірки подій.
@@ -85,14 +83,17 @@ const HALO_FRAGMENT = /* glsl */ `
 `;
 
 /**
- * Силует зірки.
+ * Тіло зірки — світло, а не плоска фігура (власник: «сузір'я дуже
+ * виділяється на фоні, виглядає дешево»).
  *
- * Біле лише ОСЕРДЯ, і це виміряно: перша редакція підмішувала біле по всьому
- * силуету на 45 відсотків, і на живому екрані всі вісім зірок вийшли
- * однаково білими — рівні, які власник розрізняв кольором (бірюзова звичайна,
- * жовта важлива, неон ключова), зникли начисто. Додаткове змішування поверх
- * світлої туманності добиває залишок відтінку. Тому біле стискається в центр,
- * а промені лишаються кольором події.
+ * Раніше тут був залитий чотирикутний силует із твердим краєм: на гарній
+ * туманності він читався наклейкою. Тепер зірка — як на знімку неба: мале
+ * біле осердя, м'яке кольорове сяйво довкола й тонкі промені дифракції, що
+ * звужуються й гаснуть, а не обриваються. Жодного твердого краю: кожна
+ * складова — спад, тож зірка тоне в тлі, а не лежить на ньому.
+ *
+ * Біле лише ОСЕРДЯ (вимір ADR-0214: біле по всьому тілу знебарвило рівні),
+ * промені й сяйво несуть колір події.
  */
 const BODY_VERTEX = /* glsl */ `
   attribute vec3 instanceTint;
@@ -106,8 +107,7 @@ const BODY_VERTEX = /* glsl */ `
     vTint = instanceTint;
     vGlow = instanceGlow;
     vSeed = instanceSeed;
-    // Силует нормований так, що верхній промінь сягає одиниці, тож локальна
-    // відстань одразу читається як частка розміру зірки.
+    // Площина 2×2: локальна одиниця — розмір зірки (кінчик променя).
     vLocal = position.xy;
     gl_Position = projectionMatrix * modelViewMatrix * instanceMatrix * vec4(position, 1.0);
   }
@@ -119,20 +119,37 @@ const BODY_FRAGMENT = /* glsl */ `
   varying float vGlow;
   varying float vSeed;
   uniform float uTime;
-  void main() {
-    // Осердя ширше в події, яка світить сильніше: у ключової воно читається
-    // як розжарена серцевина, у звичайної — як іскра.
-    float core = 1.0 - smoothstep(0.0, 0.28 + vGlow * 0.09, length(vLocal));
 
-    // Мерехтіння: дві несумірні частоти, обидві з насіння зірки. Одна
-    // синусоїда дала б рівне блимання маячка; дві дають нерівний ритм, у
-    // якому око не вгадує періоду.
+  // Промінь уздовж осі: тонкий біля осердя, ще тонший до кінчика, гасне
+  // степенево — без обрізу.
+  float ray(float along, float across, float reach) {
+    float t = clamp(along / reach, 0.0, 1.0);
+    float width = 0.016 * (1.0 - t) + 0.003;
+    return exp(-pow(across / width, 2.0)) * pow(1.0 - t, 2.2);
+  }
+
+  void main() {
+    vec2 p = vLocal;
+    float r = length(p);
+    // Осердя ширше в події, що світить сильніше: у ключової — розжарена
+    // серцевина, у звичайної — іскра.
+    float core = exp(-(r * r) / (0.006 + 0.006 * vGlow));
+    float bloom = exp(-(r * r) / 0.05) * 0.5;
+    // Головні промені: вертикальний трохи довший (пропорції моделі власника).
+    float rays = ray(abs(p.y), abs(p.x), 1.0) + ray(abs(p.x), abs(p.y), 0.88);
+    // Діагональні — короткі й бліді: лише натяк на дифракцію.
+    vec2 d = vec2(p.x + p.y, p.x - p.y) * 0.7071;
+    float diag = (ray(abs(d.x), abs(d.y), 0.34) + ray(abs(d.y), abs(d.x), 0.34)) * 0.35;
+
+    // Мерехтіння: дві несумірні частоти з насіння зірки — нерівний ритм.
     float fast = sin(uTime * (2.1 + vSeed * 1.7) + vSeed * 37.0);
     float slow = sin(uTime * (0.7 + vSeed * 0.5) + vSeed * 11.0);
     float flicker = 1.0 + (fast * 0.5 + slow * 0.5) * 0.11;
 
-    vec3 colour = mix(vTint * 1.25, vec3(1.0), core * 0.9) * flicker;
-    gl_FragColor = vec4(colour, 1.0);
+    float light = (core * 1.3 + bloom + (rays + diag) * 0.85) * flicker;
+    if (light < 0.004) discard;
+    vec3 colour = mix(vTint * 1.25, vec3(1.0), clamp(core * 1.1, 0.0, 1.0));
+    gl_FragColor = vec4(colour * light, 1.0);
   }
 `;
 
@@ -160,7 +177,7 @@ export function JourneyConstellation({
   const bodyMaterialRef = useRef<ShaderMaterial>(null);
   const scratch = useRef({ matrix: new Matrix4(), position: new Vector3(), scale: new Vector3() });
 
-  const bodyGeometry = useMemo(() => new ShapeGeometry(createStarShape()), []);
+  const bodyGeometry = useMemo(() => new PlaneGeometry(2, 2), []);
   const haloGeometry = useMemo(() => new PlaneGeometry(1, 1), []);
 
   useEffect(() => () => {
@@ -246,7 +263,8 @@ export function JourneyConstellation({
         <shaderMaterial
           vertexShader={HALO_VERTEX}
           fragmentShader={HALO_FRAGMENT}
-          uniforms={{ uOpacity: { value: 0.85 } }}
+          // Тихіший ореол: зірка тоне в туманності, а не лежить на ній плямою.
+          uniforms={{ uOpacity: { value: 0.6 } }}
           transparent
           depthWrite={false}
           blending={AdditiveBlending}
