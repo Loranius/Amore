@@ -175,20 +175,44 @@ export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: 
       tone.push(t, t * 0.96);
     }
   }
-  // Губа кратера загортається всередину й униз, до лави.
-  const lip = rings[rings.length - 1]!.points;
+  // Жерло — об'ємне, а не пласке кільце (власник: «зроби жерло вулкана
+  // трошки об'ємнішим, не таким пласким»). Верх останнього шару — комір;
+  // над ним нерівна губа, що здіймається й трохи загортається всередину;
+  // усередині — чаша у два уступи до озера лави.
+  const collar = rings[rings.length - 1]!.points;
+  const R = model.craterRadius;
+  // Губа з округлим валом: спершу випирає назовні, потім загортається
+  // всередину. Одне кільце без валу з бокової камери читалось пласким.
+  const lift = collar.map((_, i) => R * (0.4 + 0.3 * unit(seed, `rim:${i}:y`)));
+  const bulge = collar.map(([x, y, z], i): V3 => [x * 1.1, y + lift[i]! * 0.45, z * 1.1]);
+  const rim = collar.map(([x, y, z], i): V3 => [x * 0.9, y + lift[i]!, z * 0.9]);
   const magma = volcanoMagmaY(model);
-  const inner = lip.map(([x, , z]): V3 => [x * 0.6, magma, z * 0.6]);
-  for (let i = 0; i < SIDES; i += 1) {
-    const j = (i + 1) % SIDES;
-    tris.push([lip[i]!, lip[j]!, inner[j]!], [lip[i]!, inner[j]!, inner[i]!]);
-    tone.push(0.55, 0.5);
+  const ledge = collar.map(([x, y, z], i): V3 => [x * 0.76, y - R * (0.08 + 0.08 * unit(seed, `ledge:${i}`)), z * 0.76]);
+  const inner = collar.map(([x, , z]): V3 => [x * 0.6, magma, z * 0.6]);
+  for (const [lo, hi, tag] of [[collar, bulge, 'bulge'], [bulge, rim, 'rim']] as const) {
+    for (let i = 0; i < SIDES; i += 1) {
+      const j = (i + 1) % SIDES;
+      const t = 0.78 + 0.24 * unit(seed, `${tag}:${i}:f`);
+      tris.push([lo[i]!, hi[j]!, lo[j]!], [lo[i]!, hi[i]!, hi[j]!]);
+      tone.push(t, t * 0.94);
+    }
   }
+  const outerCount = tris.length;
+  const stepDown = (a: V3[], b: V3[], dark: number) => {
+    for (let i = 0; i < SIDES; i += 1) {
+      const j = (i + 1) % SIDES;
+      tris.push([a[i]!, a[j]!, b[j]!], [a[i]!, b[j]!, b[i]!]);
+      tone.push(dark, dark * 0.9);
+    }
+  };
+  stepDown(rim, ledge, 0.62);
+  stepDown(ledge, inner, 0.5);
   // Жар — на кожну вершину, у тому ж порядку, що й трикутники.
   const heat: number[] = [];
   for (const tri of tris) for (const v of tri) heat.push(volcanoRockHeat(model, veins, v));
-  // Нутро кратера розпечене незалежно від відстані до жил.
-  for (let k = heat.length - SIDES * 6; k < heat.length; k += 1) heat[k] = Math.max(heat[k]!, 0.8);
+  // Нутро чаші розпечене незалежно від відстані до жил; губа — тепла.
+  for (let k = outerCount * 3; k < heat.length; k += 1) heat[k] = Math.max(heat[k]!, 0.8);
+  for (let k = (outerCount - SIDES * 4) * 3; k < outerCount * 3; k += 1) heat[k] = Math.max(heat[k]!, 0.45);
   for (const vent of model.vents) {
     const v = ventTriangles(model, vent);
     tris.push(...v.tris);
@@ -209,13 +233,14 @@ export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
   const p: number[] = [];
   const h: number[] = [];
   const push = (v: V3, heat: number) => { p.push(...v); h.push(heat); };
-  // Озеро: віяло трикутників на рівні лави.
+  // Озеро: віяло трикутників, що здувається посередині — лава випирає.
   const y = volcanoMagmaY(model) + 0.005;
   const r = volcanoSlopeRadius(model, model.height) * 0.64;
+  const dome = model.craterRadius * 0.28;
   for (let i = 0; i < SIDES; i += 1) {
     const a0 = (i / SIDES) * Math.PI * 2;
     const a1 = ((i + 1) / SIDES) * Math.PI * 2;
-    push([0, y, 0], 1);
+    push([0, y + dome, 0], 1);
     push([Math.cos(a1) * r, y, Math.sin(a1) * r], 0.85);
     push([Math.cos(a0) * r, y, Math.sin(a0) * r], 0.85);
   }
@@ -354,7 +379,8 @@ export interface VolcanoGeometry extends ReefV2Geometry {
 export function buildVolcanoGeometry(model: VolcanoModel): VolcanoGeometry {
   const cone = volcanoConeTriangles(model);
   const placements = [...volcanoPlacements(model), ...volcanoUndergrowth(model)];
-  const top = Math.max(model.height, ...placements.map((p) => p.base[1] + p.axis[1] * REEF_FORM_HEIGHT[p.colony.form] * p.size));
+  // Губа жерла здіймається над останнім шаром.
+  const top = Math.max(model.height + model.craterRadius * 0.7, ...placements.map((p) => p.base[1] + p.axis[1] * REEF_FORM_HEIGHT[p.colony.form] * p.size));
   const reach = Math.max(model.baseRadius * 1.1, ...placements.map((p) => Math.hypot(p.base[0], p.base[2]) + p.size * 0.6));
   const life = assembleReefLife(model.life, {
     rock: cone.tris,
