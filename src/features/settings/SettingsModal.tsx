@@ -24,6 +24,7 @@ import { useConfirm } from '@/providers/ConfirmProvider';
 import { MoonIcon, SunIcon } from '@/components/icons/UiIcon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { ProfileSection } from '@/features/profile/ProfileSection';
+import { PartnerInviteSection } from './PartnerInviteSection';
 
 interface SettingsModalProps {
   open: boolean;
@@ -91,6 +92,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         </section>
 
         <div className="settings-divider" />
+
+        {/* Лише для пари з однієї людини — див. сам розділ (ADR-0232). */}
+        <PartnerInviteSection />
 
         <ThemeSection />
 

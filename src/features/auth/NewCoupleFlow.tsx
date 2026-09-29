@@ -4,6 +4,8 @@
 // Порядок — дослівно за власником:
 //   1. хто створює акаунт — хлопець чи дівчина (і як звати: портал звертається
 //      до людини на ім'я, тож без нього головна не має що сказати);
+//      звідси ж — «Увійти за кодом» для другої людини пари (ADR-0232):
+//      код, і одразу головна, бо пара вже має і дату, і вид;
 //   2. з якого дня ви разом;
 //   3. минулі роки — «для росту об'єкта», можна пропустити й заповнити
 //      пізніше в налаштуваннях;
@@ -18,7 +20,7 @@
 // перемкнув би на головну посеред питань.
 // ============================================================
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useAuth } from '@/providers/AuthProvider';
+import { useAuth, type JoinCoupleResult } from '@/providers/AuthProvider';
 import { supabase } from '@/lib/supabase';
 import { coupleDay } from '@/features/world/portalSources';
 import { COUPLE_TIME_ZONE } from '@/features/world/coupleEngine';
@@ -28,6 +30,7 @@ import { SPECIES_SHAPE } from '@/features/onboarding/SweepSpecies';
 import { DECLARED_COUNTS_KEY, serializeDeclaredCounts } from '@/features/onboarding/declaredCounts';
 import type { AppUser } from '@/types';
 import { CHOICE_ORDER, type IslandsView } from './islandsView';
+import { INVITE_LENGTH, inviteCodeProblem, normalizeInviteCode, type InviteCodeProblem } from './inviteCode';
 import type { DemoSpecies } from './demoIslands';
 import {
   EMPTY_ANSWER,
@@ -49,6 +52,7 @@ type Gender = 'male' | 'female';
 
 type Step =
   | { kind: 'who' }
+  | { kind: 'code' }
   | { kind: 'since' }
   | { kind: 'past-ask' }
   | { kind: 'past'; index: number }
@@ -65,13 +69,29 @@ const START_TEXT = {
   too_early: 'Такої давньої дати портал не приймає.',
 } as const;
 
+const CODE_TEXT: Record<InviteCodeProblem, string> = {
+  empty: 'Введи код, який дав партнер.',
+  length: `У коді ${INVITE_LENGTH} знаків — перевір, чи все переписано.`,
+  alphabet: 'У коді немає нулів, одиниць і літер O, I, L — мабуть, там схожа літера чи цифра.',
+};
+
+const JOIN_TEXT: Record<Exclude<JoinCoupleResult, { ok: true }>['reason'], string> = {
+  invite_invalid: 'Такого коду немає, його вже використано або минув тиждень. Попроси партнера створити новий.',
+  locked: 'Забагато невдалих спроб. Спробуй за годину.',
+  couple_full: 'У цьому порталі вже двоє.',
+  email_taken: 'Ця пошта вже має місце в порталі — увійди у вкладці «Вхід».',
+  registration_closed: 'Реєстрацію зараз закрито.',
+  bad_request: 'Перевір імʼя й код.',
+  error: 'Не вдалося приєднатися. Спробуй ще раз.',
+};
+
 interface NewCoupleFlowProps {
   onView: (view: IslandsView) => void;
   onDone: (name: string) => void;
 }
 
 export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
-  const { createCouple, enterPortal } = useAuth();
+  const { createCouple, joinCouple, enterPortal } = useAuth();
   const saveArtifact = useSaveSharedArtifact();
   const today = useMemo(() => coupleDay(new Date(), COUPLE_TIME_ZONE), []);
 
@@ -82,6 +102,7 @@ export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [answers, setAnswers] = useState<Record<string, PastYearAnswer>>({});
   const [picked, setPicked] = useState<DemoSpecies>('crystal');
+  const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -123,13 +144,18 @@ export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
 
   // ── 1. хто ───────────────────────────────────────────────
   if (step.kind === 'who') {
-    const submit = (event: FormEvent) => {
-      event.preventDefault();
+    // Той самий крок веде у дві сторони: нова пара — або до пари, яку
+    // партнер уже створив. Стать та імʼя потрібні обом.
+    const go = (next: Step) => {
       const problem = nameProblem(name);
-      if (gender === null) { setError('Обери, хто створює акаунт.'); return; }
+      if (gender === null) { setError('Обери, хто ти.'); return; }
       if (problem !== null) { setError(NAME_TEXT[problem]); return; }
       setError(null);
-      setStep({ kind: 'since' });
+      setStep(next);
+    };
+    const submit = (event: FormEvent) => {
+      event.preventDefault();
+      go({ kind: 'since' });
     };
     return (
       <form className="auth-form" onSubmit={submit} noValidate>
@@ -162,6 +188,60 @@ export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
         </div>
         {error !== null && <p className="reg-problem" role="alert">{error}</p>}
         <button type="submit" className="btn reg-next">Далі</button>
+        <div className="auth-links">
+          <button type="button" className="auth-link" onClick={() => go({ kind: 'code' })}>
+            Партнер уже створив портал? Увійти за кодом
+          </button>
+        </div>
+      </form>
+    );
+  }
+
+  // ── 1б. код від партнера (ADR-0232) ─────────────────────
+  if (step.kind === 'code') {
+    const submit = async (event: FormEvent) => {
+      event.preventDefault();
+      const problem = inviteCodeProblem(code);
+      if (problem !== null) { setError(CODE_TEXT[problem]); return; }
+      if (gender === null) { setStep({ kind: 'who' }); return; }
+      setBusy(true);
+      setError(null);
+      const result = await joinCouple({ code: normalizeInviteCode(code), name, gender });
+      setBusy(false);
+      if (!result.ok) { setError(JOIN_TEXT[result.reason]); return; }
+      // Пара вже має і вид, і історію: питати нема про що — одразу головна.
+      onDone(result.user.name);
+    };
+    return (
+      <form className="auth-form" onSubmit={(e) => void submit(e)} noValidate>
+        <h1 className="auth-title">Код від партнера</h1>
+        <p className="reg-hint">
+          Партнер бачить його в налаштуваннях порталу, у розділі «Партнер». Код діє тиждень і підходить один раз.
+        </p>
+        <div className="reg-fields">
+          <label className="reg-field">
+            <span>Код запрошення</span>
+            <input
+              className="reg-input reg-input--code"
+              autoComplete="one-time-code"
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              inputMode="text"
+              maxLength={16}
+              placeholder="XXXX-XXXX"
+              value={code}
+              onChange={(e) => { setCode(e.target.value); setError(null); }}
+            />
+          </label>
+        </div>
+        {error !== null && <p className="reg-problem" role="alert">{error}</p>}
+        <button type="submit" className="btn reg-next" disabled={busy}>{busy ? 'Приєднуємо…' : 'Приєднатися'}</button>
+        <div className="auth-links">
+          <button type="button" className="auth-link" disabled={busy} onClick={() => { setError(null); setStep({ kind: 'who' }); }}>
+            Назад
+          </button>
+        </div>
       </form>
     );
   }

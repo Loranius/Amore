@@ -783,7 +783,9 @@ export type PortalAccountRequest =
   | { action: 'link' }
   | { action: 'claim'; user_id: number; pin: string }
   /** Нова пара (ADR-0230): людина, членство й дата початку — однією транзакцією. */
-  | { action: 'create'; name: string; gender: 'male' | 'female'; started_at: string };
+  | { action: 'create'; name: string; gender: 'male' | 'female'; started_at: string }
+  /** Друга людина пари — за кодом-запрошенням (ADR-0232). */
+  | { action: 'join'; code: string; name: string; gender: 'male' | 'female' };
 
 /**
  * Відповідь `portal-account`. `state` у `link` каже, куди вести людину:
@@ -799,7 +801,8 @@ export type PortalAccountResponse =
       ok?: false;
       error:
         | 'bad_request' | 'unauthenticated' | 'email_unconfirmed' | 'email_taken'
-        | 'seat_unavailable' | 'invalid' | 'locked' | 'server_error' | 'registration_closed';
+        | 'seat_unavailable' | 'invalid' | 'locked' | 'server_error' | 'registration_closed'
+        | 'invite_invalid' | 'couple_full';
       retryAfterSeconds?: number;
     };
 

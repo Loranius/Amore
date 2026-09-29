@@ -13,11 +13,14 @@
 //                                             | { ok, state: 'taken' }
 //   { action: 'claim', user_id, pin } + Bearer → { ok, user } | { error }
 //   { action: 'create', name, gender, started_at } + Bearer → { ok, user } | { error }
+//   { action: 'join', code, name, gender } + Bearer → { ok, user }
+//                                             | { error: 'invite_invalid' | 'locked' | 'couple_full' | … }
 //
 // НОВА ПОШТА — НОВА ПАРА (ADR-0230). Пошта, що не прив'язана до жодного
 // місця, створює власну пару: людину, членство й дату початку стосунків —
 // однією транзакцією `create_couple_for`. Партнер приєднується пізніше
-// кодом-запрошенням (етап 4 ADR-0229).
+// кодом-запрошенням (`join`, ADR-0232): код створює перша людина в
+// налаштуваннях, перевіряє й гасить його `join_couple_with_invite`.
 //
 // ЧОМУ МІСЦЕ, А НЕ НОВИЙ КОРИСТУВАЧ. Усі дані пари посилаються на
 // `users.id` (1 — Діма, 2 — Лєна). Новий рядок означав би чужу людину з
@@ -69,7 +72,9 @@ Deno.serve(async (req) => {
       // без його значення: так видно, де помилка, у назві чи у значенні.
       return json({ ok: true, registration: open ? "open" : "closed", configured: raw !== undefined }, 200);
     }
-    if (action !== "link" && action !== "claim" && action !== "create") return json({ error: "bad_request" }, 400);
+    if (action !== "link" && action !== "claim" && action !== "create" && action !== "join") {
+      return json({ error: "bad_request" }, 400);
+    }
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -154,6 +159,45 @@ Deno.serve(async (req) => {
       const userId = (created as { user_id?: number } | null)?.user_id;
       if (!userId) return json({ error: "server_error" }, 500);
       return json({ ok: true, user: { id: userId, name } }, 200);
+    }
+
+    // ── join: друга людина пари за кодом (ADR-0232) ──────────
+    if (action === "join") {
+      if (!open) return json({ error: "registration_closed" }, 403);
+      if (mine) return json({ error: "email_taken" }, 409);
+      const name = typeof body?.name === "string" ? body.name.trim() : "";
+      const gender = body?.gender;
+      const code = typeof body?.code === "string" ? body.code : "";
+      if (
+        name.length < 1 || name.length > 40 ||
+        (gender !== "male" && gender !== "female") ||
+        code.length < 1 || code.length > 32
+      ) {
+        return json({ error: "bad_request" }, 400);
+      }
+      const { data: joined, error: joinErr } = await admin
+        .rpc("join_couple_with_invite", {
+          p_email: email,
+          p_auth_user_id: caller.user.id,
+          p_code: code,
+          p_name: name,
+          p_gender: gender,
+        })
+        .maybeSingle();
+      if (joinErr) {
+        const message = joinErr.message ?? "";
+        if (message.includes("locked")) return json({ error: "locked" }, 429);
+        if (message.includes("couple_full")) return json({ error: "couple_full" }, 409);
+        if (message.includes("email_taken")) return json({ error: "email_taken" }, 409);
+        if (message.includes("bad_")) return json({ error: "bad_request" }, 400);
+        console.error("portal-account: join_couple_with_invite error:", joinErr);
+        return json({ error: "server_error" }, 500);
+      }
+      const row = joined as { user_id?: number | null; problem?: string | null } | null;
+      // Невірний код — відповідь, а не виняток: інакше спроба не лягла б у замок.
+      if (row?.problem === "invite_invalid") return json({ error: "invite_invalid" }, 404);
+      if (!row?.user_id) return json({ error: "server_error" }, 500);
+      return json({ ok: true, user: { id: row.user_id, name } }, 200);
     }
 
     // ── claim ────────────────────────────────────────────────

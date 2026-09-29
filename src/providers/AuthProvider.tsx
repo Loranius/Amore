@@ -59,6 +59,14 @@ export type CreateCoupleResult =
   | { ok: true; user: AppUser }
   | { ok: false; reason: 'email_taken' | 'registration_closed' | 'bad_request' | 'error' };
 
+/** Приєднання за кодом партнера (ADR-0232). Успіх одразу відчиняє портал. */
+export type JoinCoupleResult =
+  | { ok: true; user: AppUser }
+  | {
+      ok: false;
+      reason: 'invite_invalid' | 'locked' | 'couple_full' | 'email_taken' | 'registration_closed' | 'bad_request' | 'error';
+    };
+
 export type EmailLoginResult =
   | LinkResult
   | { ok: false; reason: 'invalid_credentials' | 'email_unconfirmed' | 'rate_limited' };
@@ -88,6 +96,11 @@ export interface AuthContextValue {
    * відкрито: це робить `enterPortal`, коли реєстрація дійде до кінця.
    */
   createCouple: (v: { name: string; gender: 'male' | 'female'; startedAt: string }) => Promise<CreateCoupleResult>;
+  /**
+   * Друга людина пари за кодом (ADR-0232). Пара вже має історію й вид,
+   * тож на успіх портал відчиняється одразу.
+   */
+  joinCouple: (v: { code: string; name: string; gender: 'male' | 'female' }) => Promise<JoinCoupleResult>;
   enterPortal: (user: AppUser) => void;
   logout: () => Promise<void>;
 }
@@ -237,6 +250,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     return { ok: false, reason: 'error' };
   }, []);
+
+  const joinCouple = useCallback(async (
+    v: { code: string; name: string; gender: 'male' | 'female' },
+  ): Promise<JoinCoupleResult> => {
+    let res;
+    try {
+      res = await invokeFn('portal-account', {
+        action: 'join', code: v.code, name: v.name.trim(), gender: v.gender,
+      });
+    } catch (e) {
+      console.error('portal-account join transport error:', e);
+      return { ok: false, reason: 'error' };
+    }
+    if (res.ok && 'user' in res && !('state' in res)) {
+      const appUser = toAppUser(res.user);
+      if (!appUser) return { ok: false, reason: 'error' };
+      // Як і після `create`: без свіжого токена хук тримав би роль аноніма.
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('refreshSession after join:', error);
+        return { ok: false, reason: 'error' };
+      }
+      enter(appUser);
+      return { ok: true, user: appUser };
+    }
+    if (!res.ok) {
+      switch (res.error) {
+        case 'invite_invalid':
+        case 'locked':
+        case 'couple_full':
+        case 'email_taken':
+        case 'registration_closed':
+        case 'bad_request':
+          return { ok: false, reason: res.error };
+      }
+    }
+    return { ok: false, reason: 'error' };
+  }, [enter]);
 
   const loginWithEmail = useCallback(async (email: string, password: string): Promise<EmailLoginResult> => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -389,9 +440,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user, status, login, logout,
       registrationOpen, loginWithEmail, sendCode, verifyCode, setPassword, linkAccount, claimSeat,
-      createCouple, enterPortal: enter,
+      createCouple, joinCouple, enterPortal: enter,
     }),
-    [user, status, login, logout, registrationOpen, loginWithEmail, sendCode, verifyCode, setPassword, linkAccount, claimSeat, createCouple, enter],
+    [user, status, login, logout, registrationOpen, loginWithEmail, sendCode, verifyCode, setPassword, linkAccount, claimSeat, createCouple, joinCouple, enter],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

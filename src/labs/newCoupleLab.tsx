@@ -8,7 +8,8 @@
 //   • `createCouple` відповідає успіхом через пів секунди;
 //   • записи в `settings` (минулі роки, вид) перехоплено до мережі й
 //     записано в `window.__labWrites` — жоден рядок бази не пишеться;
-//   • `enterPortal` лише ставить `data-lab-entered` на <html>.
+//   • `enterPortal` лише ставить `data-lab-entered` на <html>;
+//   • `joinCouple` (ADR-0232) приймає лише код `TEST2345`.
 //
 //   npm run live -- /new-couple-lab.html --no-login \
 //     --tap=.auth-choice-btn --fill=.reg-input=Олена --tap=.reg-next …
@@ -63,6 +64,15 @@ void (async () => {
       await new Promise((resolve) => setTimeout(resolve, 500));
       const user = toAppUser({ id: 9001, name: name.trim() });
       return user ? { ok: true, user } : { ok: false, reason: 'bad_request' };
+    },
+    // Код ADR-0232: `TEST2345` — успіх, будь-який інший — «такого коду немає».
+    joinCouple: async ({ code, name }) => {
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      if (code !== 'TEST2345') return { ok: false, reason: 'invite_invalid' };
+      const user = toAppUser({ id: 9002, name: name.trim() });
+      if (!user) return { ok: false, reason: 'bad_request' };
+      document.documentElement.dataset.labEntered = 'true';
+      return { ok: true, user };
     },
     enterPortal: () => { document.documentElement.dataset.labEntered = 'true'; },
     logout: async () => {},

@@ -3340,6 +3340,32 @@ textarea::placeholder {
 }
 .settings-section-desc { margin: -4px 0 0; color: var(--muted); font-size: 13px; }
 
+/* ── Партнер: код-запрошення (ADR-0232) ─────────────────────
+   Код — у тому ж жолобі зі скла, що й вибір теми: це річ, яку читають
+   і переписують, а не кнопка. Рівні знаки й просвіт — його диктують. */
+.partner-invite-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 12px;
+  border-radius: var(--radius-lg);
+  background: var(--glass-1);
+  box-shadow: var(--glass-edge);
+}
+.partner-invite-code {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  user-select: all;
+}
+.partner-invite-expiry { font-size: 12px; color: var(--muted); }
+.partner-invite-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.partner-invite-actions .btn { flex: 1 1 140px; }
+.partner-invite-problem { margin: 0; font-size: 13px; color: var(--danger); }
+
 /* Розміри звідси пішли разом із модулем «Заміри»
    (`features/sizes/sizes.css`). Лишати їх тут було б гірше, ніж мертвим
    кодом: класи називаються так само, і старий `.sizes-row` — рядок

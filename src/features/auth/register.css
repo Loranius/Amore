@@ -68,6 +68,21 @@
 }
 /* 16px вище — не смак: менший кегль змушує Safari на iOS збільшувати
    сторінку при фокусі в поле, і екран «стрибає». */
+/* Код-запрошення (ADR-0232): рівні знаки й просвіт — його переписують
+   з чужого екрана по літері. */
+.reg-input--code {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  text-align: center;
+  font-weight: 700;
+}
+
+.reg-input--code::placeholder {
+  letter-spacing: 0.18em;
+  color: var(--muted);
+}
+
 .reg-input:focus-visible {
   outline: none;
   border-color: var(--accent);

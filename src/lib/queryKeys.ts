@@ -10,6 +10,8 @@ import type { MediaType } from '@/types';
 
 export const qk = {
   users: () => ['users'] as const,
+  /** Активний код-запрошення пари, поки в ній одна людина (ADR-0232). */
+  coupleInvite: () => ['coupleInvite'] as const,
 
   events: () => ['events'] as const,
   plans: () => ['plans'] as const,
