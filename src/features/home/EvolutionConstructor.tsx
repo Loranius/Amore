@@ -14,7 +14,7 @@ import './evolutionConstructor.css';
 const ARTIFACT_LABEL: Record<EvolutionSandboxArtifact, string> = {
   crystal: 'Кристал',
   tree: 'Дерево',
-  reef: 'Риф',
+  reef: 'Вулкан',
 };
 
 const CONTROL_DEFINITIONS: readonly {

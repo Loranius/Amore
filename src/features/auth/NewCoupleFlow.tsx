@@ -441,7 +441,6 @@ export function NewCoupleFlow({ onView, onDone, invite = null }: NewCoupleFlowPr
         </div>
         <p className="reg-hint">
           {SPECIES_SHAPE[picked]}
-          {picked === 'reef' && ' Риф ще в розробці — його форма змінюватиметься.'}
           {' '}Обирайте разом: на головній житиме саме він.
         </p>
         {error !== null && <p className="reg-problem" role="alert">{error}</p>}

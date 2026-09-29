@@ -63,6 +63,10 @@ interface ReefV2WorldProps {
   bare?: boolean;
   /** Радіус кам'яної голови рифу в одиницях сцени. */
   rockRadius: number;
+  /** Колір каменю замість рифового: базальт вулкана (ADR-0235). */
+  rockColour?: string;
+  /** Арка позаду каменю острова; вулкан її вимикає (ADR-0235). */
+  islandArch?: boolean;
 }
 
 /**
@@ -70,7 +74,7 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true }: ReefV2WorldProps) {
   const palette = REEF_PALETTES[theme];
 
   const rock = useMemo(() => tonedGeometry(geometry.rock.positions, { tone: geometry.rock.tone }), [geometry]);
@@ -125,7 +129,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
   const materials = useMemo(() => {
     const ground = PORTAL_GROUND_Y;
     return {
-      rock: createSeabedMaterial(palette, palette.rock, ground),
+      rock: createSeabedMaterial(palette, rockColour ?? palette.rock, ground),
       star: createSeabedMaterial(palette, '#ff9a5a', ground),
       corals: createCoralMaterial(palette, ground),
       critters: createCritterMaterial(palette, ground),
@@ -135,7 +139,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
       snow: createGlowMaterial(palette.snow, palette.snowStrength, 0.05, 'snow'),
       bubbles: createGlowMaterial('#e6fbff', 0.6, 0.07, 'bubbles'),
     };
-  }, [palette]);
+  }, [palette, rockColour]);
 
   const grassRef = useRef<THREE.InstancedMesh>(null);
   useEffect(() => {
@@ -183,7 +187,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
   return (
     <>
       {!bare && <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />}
-      <ReefIsland bare={bare} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
+      <ReefIsland bare={bare} arch={islandArch} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         {geometry.seagrass.length > 0 && (
           <instancedMesh ref={grassRef} args={[tuft, materials.grass, geometry.seagrass.length]} frustumCulled={false} />

@@ -31,7 +31,7 @@ export function HomeArtifactWebglFallback({
   reason?: SceneFailureReason | 'webgl';
   onRetry?: () => void;
 }) {
-  const name = artifact === 'tree' ? 'Дерево' : artifact === 'reef' ? 'Риф' : 'Кристал';
+  const name = artifact === 'tree' ? 'Дерево' : artifact === 'reef' ? 'Вулкан' : 'Кристал';
 
   const copy = reason === 'asset'
     ? {

@@ -26,8 +26,8 @@ import { buildCrystalV2Model } from '@/engine/species/crystalV2/model';
 import { buildCrystalV2Geometry } from '@/engine/species/crystalV2/geometry';
 import { buildTreeV2Model } from '@/engine/species/treeV2/model';
 import { buildTreeV2Geometry } from '@/engine/species/treeV2/geometry';
-import { buildReefV2Model } from '@/engine/species/reefV2/model';
-import { buildReefV2Geometry } from '@/engine/species/reefV2/geometry';
+import { buildVolcanoModel } from '@/engine/species/volcano/model';
+import { buildVolcanoGeometry } from '@/engine/species/volcano/geometry';
 import { freshSeed } from '@/lib/entropy';
 import { dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
 import { PORTAL_GROUND_Y } from '@/features/home/crystal3d/scene/portalScene';
@@ -37,8 +37,8 @@ import { CrystalV2Object } from '@/features/home/crystal3d/v2/CrystalV2Object';
 import { linearColour } from '@/features/home/crystal3d/v2/crystalV2Material';
 import { treeV2Frame } from '@/features/home/crystal3d/treeV2/treeV2Frame';
 import { TreeV2World } from '@/features/home/crystal3d/treeV2/TreeV2World';
-import { reefV2Frame } from '@/features/home/reef3d/v2/reefV2Frame';
-import { ReefV2World } from '@/features/home/reef3d/v2/ReefV2World';
+import { volcanoFrame } from '@/features/home/volcano3d/volcanoFrame';
+import { VolcanoWorld } from '@/features/home/volcano3d/VolcanoWorld';
 import { demoIslands, type DemoIsland, type DemoSpecies } from './demoIslands';
 
 import { BACKDROP, CHOICE_ORDER, type IslandsView } from './islandsView';
@@ -64,13 +64,16 @@ function SpeciesIsland({ demo, theme, reduceMotion }: IslandProps) {
       const frame = treeV2Frame(geometry);
       return { kind: 'tree' as const, geometry, frame, island: dioramaIslandRadius(frame.reach * 0.9) };
     }
-    const model = buildReefV2Model(demo.snapshot);
-    const geometry = buildReefV2Geometry(model);
-    const frame = reefV2Frame(geometry);
-    const rock = model.radius * frame.scale;
+    // Місце рифу — підводний вулкан (ADR-0235).
+    const model = buildVolcanoModel(demo.snapshot);
+    const geometry = buildVolcanoGeometry(model);
+    const frame = volcanoFrame(geometry);
+    const rock = model.baseRadius * frame.scale;
     return {
-      kind: 'reef' as const, geometry, frame, rock,
-      island: dioramaIslandRadius(Math.max(frame.reach * 1.1, rock * 1.55)),
+      kind: 'reef' as const, geometry, frame, rock, glow: model.glow,
+      // Острівець щільніше облягає конус, ніж на головній: у ряду вибору
+      // вулкан мусить читатись героєм, а не купкою коралів на широкому плато.
+      island: dioramaIslandRadius(Math.max(frame.reach * 0.95, rock * 1.2)),
     };
   }, [demo]);
 
@@ -95,7 +98,7 @@ function SpeciesIsland({ demo, theme, reduceMotion }: IslandProps) {
         <TreeV2World bare seed={seed} geometry={built.geometry} scale={built.frame.scale} theme={theme} reduceMotion={reduceMotion} island={built.island} />
       )}
       {built.kind === 'reef' && (
-        <ReefV2World
+        <VolcanoWorld
           bare
           seed={seed}
           geometry={built.geometry}
@@ -104,6 +107,7 @@ function SpeciesIsland({ demo, theme, reduceMotion }: IslandProps) {
           reduceMotion={reduceMotion}
           island={built.island}
           rockRadius={built.rock}
+          glow={built.glow}
         />
       )}
     </group>

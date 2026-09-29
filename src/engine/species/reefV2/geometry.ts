@@ -214,7 +214,7 @@ function icosphere(): { verts: V3[]; faces: [number, number, number][] } {
 
 const ICO = icosphere();
 
-type Tri = [V3, V3, V3];
+export type Tri = [V3, V3, V3];
 
 function prism(start: V3, end: V3, r0: number, r1: number, sides = 5, caps = false): Tri[] {
   const d = norm([end[0] - start[0], end[1] - start[1], end[2] - start[2]]);
@@ -421,11 +421,37 @@ export interface ReefV2Geometry {
 }
 
 export function buildReefV2Geometry(model: ReefV2Model): ReefV2Geometry {
+  const summary = reefV2Summary(model);
+  return assembleReefLife(model, {
+    rock: reefV2RockTriangles(model),
+    placements: [...reefV2Placements(model), ...reefV2Undergrowth(model)],
+    ornaments: reefV2Ornaments(model),
+    top: summary.top,
+    reach: summary.reach,
+  });
+}
+
+/**
+ * Збирає меш із готових частин: камінь, місця коралів і прикраси.
+ *
+ * Винесено з `buildReefV2Geometry` для підводного вулкана (ADR-0235): він
+ * садить ті самі корали, актинії, мушлі й зірки, але на свої схили. Риф
+ * передає сюди рівно те, що рахував раніше, тож його меш не змінився.
+ */
+export function assembleReefLife(model: ReefV2Model, parts: {
+  rock: Tri[];
+  placements: ReefV2Placement[];
+  ornaments: ReefV2Ornaments;
+  top: number;
+  reach: number;
+  /** Тон кожної грані каменю; без нього — хеш, як у рифу. */
+  rockTone?: (face: number) => number;
+}): ReefV2Geometry {
   const seed = model.startDate;
   const rock: number[] = [];
   const rockTone: number[] = [];
-  reefV2RockTriangles(model).forEach((tri, k) => {
-    const tone = 0.85 + 0.3 * unit(seed, `rock:f${k}`);
+  parts.rock.forEach((tri, k) => {
+    const tone = parts.rockTone ? parts.rockTone(k) : 0.85 + 0.3 * unit(seed, `rock:f${k}`);
     for (const p of tri) { rock.push(...p); rockTone.push(tone); }
   });
 
@@ -434,7 +460,7 @@ export function buildReefV2Geometry(model: ReefV2Model): ReefV2Geometry {
   const coralForm: number[] = [];
   const coralHue: number[] = [];
   const coralRise: number[] = [];
-  for (const place of [...reefV2Placements(model), ...reefV2Undergrowth(model)]) {
+  for (const place of parts.placements) {
     const form = FORM_INDEX[place.colony.form];
     const height = REEF_FORM_HEIGHT[place.colony.form] * place.size;
     reefV2ColonyTriangles(model, place).forEach((tri, k) => {
@@ -451,7 +477,7 @@ export function buildReefV2Geometry(model: ReefV2Model): ReefV2Geometry {
     });
   }
 
-  const orn = reefV2Ornaments(model);
+  const orn = parts.ornaments;
   const critters: number[] = [];
   const critterChannel: number[] = [];
   const tentacle = 0.1 * Math.max(0.7, model.head);
@@ -495,7 +521,6 @@ export function buildReefV2Geometry(model: ReefV2Model): ReefV2Geometry {
     }
   }
 
-  const summary = reefV2Summary(model);
   return {
     rock: { positions: new Float32Array(rock), tone: new Float32Array(rockTone) },
     corals: {
@@ -510,7 +535,7 @@ export function buildReefV2Geometry(model: ReefV2Model): ReefV2Geometry {
     pearls: new Float32Array(pearls),
     fish: orn.fish,
     seagrass: orn.seagrass,
-    top: summary.top,
-    reach: summary.reach,
+    top: parts.top,
+    reach: parts.reach,
   };
 }

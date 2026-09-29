@@ -39,10 +39,12 @@ interface ReefIslandProps {
   reduceMotion: boolean;
   /** Лише острів, без глибини й променів — острівець на тлі входу (ADR-0228). */
   bare?: boolean;
+  /** Арка позаду каменю (вулкан — без неї, ADR-0235). */
+  arch?: boolean;
 }
 
-export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false }: ReefIslandProps) {
-  const built = useMemo(() => buildReefIsland(seed, radius, rock), [seed, radius, rock]);
+export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false, arch = true }: ReefIslandProps) {
+  const built = useMemo(() => buildReefIsland(seed, radius, rock, { arch }), [seed, radius, rock, arch]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Глибина навколо острова на всі 360° (ADR-0224): скелі з арками, ліс

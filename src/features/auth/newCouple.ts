@@ -202,5 +202,5 @@ export function grownSnapshot(startedAt: string, today: string, counts: Declared
 export const SPECIES_POSSESSIVE = {
   crystal: { your: 'ваш кристал', it: 'він' },
   tree: { your: 'ваше дерево', it: 'воно' },
-  reef: { your: 'ваш риф', it: 'він' },
+  reef: { your: 'ваш вулкан', it: 'він' },
 } as const;

@@ -173,8 +173,11 @@ function standingStone(p: Painter, seed: string, key: string, base: V3, height: 
  * @param rock радіус каменю рифу в сцені — там ростуть колонії пари; типово
  *   0.65 радіуса острова, як у молодого рифу (`ReefV2Scene`: острів ≥ 1.55
  *   каменю).
+ * @param options.arch арка позаду каменю; вулкан (ADR-0235) її не має —
+ *   за конусом вона злипалась із ним в одну фіолетову пляму.
  */
-export function buildReefIsland(seed: string, radius: number, rock = radius * 0.65): ReefIsland {
+export function buildReefIsland(seed: string, radius: number, rock = radius * 0.65, options: { arch?: boolean } = {}): ReefIsland {
+  const withArch = options.arch ?? true;
   const R = radius;
   const p = new Painter();
   const front = Math.PI / 2;
@@ -274,7 +277,7 @@ export function buildReefIsland(seed: string, radius: number, rock = radius * 0.
   // Великі камені, що налягають один на одного: з дрібних арка читалась
   // намистом, а в референсі це масивна дуга з кількох широких граней.
   const archStone = R * 0.16;
-  for (const sgn of [-1, 1]) {
+  for (const sgn of withArch ? [-1, 1] : []) {
     for (let k = 0; k < 3; k += 1) {
       const foot: V3 = [archC[0] + tangent[0] * sgn * half, legTop * (k / 2.4), archC[2] + tangent[2] * sgn * half];
       chunk(p, seed, `reef-isle:leg${sgn}:${k}`, foot, archStone * (1.1 - 0.06 * k), REEF_PAINT.boulder);
@@ -286,14 +289,16 @@ export function buildReefIsland(seed: string, radius: number, rock = radius * 0.
     legTop + Math.sin(t) * half * 0.9,
     archC[2] - tangent[2] * Math.cos(t) * half,
   ];
-  for (let s = 0; s < ARC; s += 1) {
+  for (let s = 0; s < (withArch ? ARC : 0); s += 1) {
     const t = ((s + 0.5) / ARC) * Math.PI;
     chunk(p, seed, `reef-isle:arc${s}`, archTopAt(t), archStone * (0.95 + 0.1 * unit(seed, `reef-isle:arc${s}:s`)), REEF_PAINT.boulder);
   }
   // На верхівці арки — дика живність, як у референсі.
-  seaweed(p, seed, 'reef-isle:archweed0', along(archTopAt(Math.PI * 0.3), [0, 1, 0], archStone * 0.7), R * 0.12);
-  branchCoral(p, seed, 'reef-isle:archcoral', along(archTopAt(Math.PI * 0.55), [0, 1, 0], archStone * 0.75), [0, 1, 0], R * 0.16, REEF_PAINT.pink);
-  seaweed(p, seed, 'reef-isle:archweed1', along(archTopAt(Math.PI * 0.8), [0, 1, 0], archStone * 0.7), R * 0.1);
+  if (withArch) {
+    seaweed(p, seed, 'reef-isle:archweed0', along(archTopAt(Math.PI * 0.3), [0, 1, 0], archStone * 0.7), R * 0.12);
+    branchCoral(p, seed, 'reef-isle:archcoral', along(archTopAt(Math.PI * 0.55), [0, 1, 0], archStone * 0.75), [0, 1, 0], R * 0.16, REEF_PAINT.pink);
+    seaweed(p, seed, 'reef-isle:archweed1', along(archTopAt(Math.PI * 0.8), [0, 1, 0], archStone * 0.7), R * 0.1);
+  }
 
   // ── Стоячі камені по краю ─────────────────────────────────
   const busy = (a: number, gap: number) =>

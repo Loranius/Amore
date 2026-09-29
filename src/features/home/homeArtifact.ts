@@ -8,7 +8,8 @@ const HOME_ARTIFACTS = new Set<HomeArtifact>(['crystal', 'tree', 'reef']);
 export const HOME_ARTIFACT_LABELS: Readonly<Record<HomeArtifact, string>> = {
   crystal: 'Кристал',
   tree: 'Дерево',
-  reef: 'Риф',
+  // Ключ 'reef' лишився (дані пар, адреси), вид — підводний вулкан (ADR-0235).
+  reef: 'Вулкан',
 };
 
 /**
@@ -26,7 +27,7 @@ export const HOME_ARTIFACT_LABELS: Readonly<Record<HomeArtifact, string>> = {
 export const HOME_ARTIFACT_LOCATIVE: Readonly<Record<HomeArtifact, string>> = {
   crystal: 'кристалі',
   tree: 'дереві',
-  reef: 'рифі',
+  reef: 'вулкані',
 };
 
 export function parseHomeArtifact(value: string | null | undefined): HomeArtifact | null {

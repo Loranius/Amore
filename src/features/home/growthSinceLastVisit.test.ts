@@ -93,7 +93,7 @@ describe('підпис приросту', () => {
     const summary = summariseGrowth([ev('a'), ev('b')], new Set());
     expect(growthCaption(summary, null, 'crystal')).toBe('У кристалі 2 нові миті');
     expect(growthCaption(summary, null, 'tree')).toBe('У дереві 2 нові миті');
-    expect(growthCaption(summary, null, 'reef')).toBe('У рифі 2 нові миті');
+    expect(growthCaption(summary, null, 'reef')).toBe('У вулкані 2 нові миті');
   });
 
   it('місцевий відмінок узятий таблицею, а не правилом', () => {

@@ -34,7 +34,7 @@ import { plural } from '@/lib/plural';
 export const SPECIES_SHAPE: Readonly<Record<HomeArtifact, string>> = {
   crystal: 'Роки стають окремими кристалами й сідають кільцями навколо головного.',
   tree: 'Роки стають гілками одного стовбура — знизу вгору, від першого до цьогорічного.',
-  reef: 'Роки стають колоніями коралів навколо спільної голови рифу.',
+  reef: 'Кожен рік — новий шар вулкана, і на ньому оселяються корали того року.',
 };
 
 interface SweepSpeciesProps {
@@ -82,7 +82,6 @@ export function SweepSpecies({ yearCount }: SweepSpeciesProps) {
 
       <p className="sweep-said">
         <strong>{HOME_ARTIFACT_LABELS[artifact]}.</strong> {SPECIES_SHAPE[artifact]}
-        {artifact === 'reef' && ' Риф ще в розробці — його форма змінюватиметься.'}
       </p>
 
       <p className="sweep-hint">

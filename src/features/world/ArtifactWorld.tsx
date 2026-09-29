@@ -46,7 +46,8 @@ import './artifactWorld.css';
 
 const CrystalScene = lazy(() => import('../home/crystal3d/CrystalSceneEntry'));
 // Риф v2 (ADR-0219). Старий риф — його шлях відкату, вантажить його сама v2.
-const ReefScene = lazy(() => import('../home/reef3d/v2/ReefV2Scene'));
+// Місце рифу займає підводний вулкан (ADR-0235); риф v2 — його відкат.
+const ReefScene = lazy(() => import('../home/volcano3d/VolcanoScene'));
 
 /*
  * ТУТ ЖИЛИ `storedArtifact` І `persistArtifact` — читання й запис у
