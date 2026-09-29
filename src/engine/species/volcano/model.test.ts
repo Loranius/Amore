@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CrystalV2Snapshot } from '../crystalV2/model';
-import { buildVolcanoGeometry, volcanoPlacements, volcanoUndergrowth } from './geometry';
+import { buildVolcanoGeometry, volcanoCrater, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinPaths } from './geometry';
 import { buildVolcanoModel, volcanoLayerThickness, volcanoSlopeRadius } from './model';
 
 // ============================================================
@@ -90,6 +90,21 @@ describe('вулкан: меш', () => {
   it('колонії років — кільце, що росте назовні: старші ближче до підніжжя', () => {
     const firsts = volcanoPlacements(model).filter((p) => p.body === 0).map((p) => Math.hypot(p.base[0], p.base[2]));
     for (let i = 1; i < firsts.length; i += 1) expect(firsts[i]!).toBeGreaterThanOrEqual(firsts[i - 1]! - 1e-9);
+  });
+
+  it('ріка витікає з жерла й лежить над гранями конуса, а не під ними (регресія)', () => {
+    // Власник: «лава … витікає десь під текстурами вулкана». Ріка на гладкому
+    // конусі пірнала під грані, що випинаються від шуму кілець.
+    const crater = volcanoCrater(model);
+    const profile = [crater.rim, crater.bulge, ...volcanoRings(model).map((r) => r.points).reverse()];
+    for (const path of volcanoVeinPaths(model)) {
+      const a = Math.atan2(path[1]!.at[2], path[1]!.at[0]);
+      const source = path[0]!;
+      expect(Math.hypot(source.at[0], source.at[2])).toBeLessThan(volcanoRingHit(crater.rim, a).r);
+      path.slice(1).forEach((point, k) => {
+        expect(Math.hypot(point.at[0], point.at[2])).toBeGreaterThanOrEqual(volcanoRingHit(profile[k]!, a).r);
+      });
+    }
   });
 
   it('ріки лави — від кратера до підніжжя: 3…5 рік', () => {

@@ -180,13 +180,16 @@ export function buildReefIsland(
   seed: string,
   radius: number,
   rock = radius * 0.65,
-  options: { arch?: boolean; lagoon?: boolean; stones?: boolean } = {},
+  options: { arch?: boolean; lagoon?: boolean; stones?: boolean; wildlife?: number } = {},
 ): ReefIsland {
   const withArch = options.arch ?? true;
   // Вулкан (ADR-0235, референс власника): суцільне біле плато — без лагуни
   // й без стоячих каменів по краю; на плато стоїть життя пари.
   const withLagoon = options.lagoon ?? true;
   const withStones = options.stones ?? true;
+  // Частка дикої живності плато й водоростей на краю: вулкан бере третину
+  // (власник: «прибери рослинність … в дві третини, вони дуже нагромаджені»).
+  const wildlife = options.wildlife ?? 1;
   const R = radius;
   const p = new Painter();
   const front = Math.PI / 2;
@@ -331,9 +334,10 @@ export function buildReefIsland(
 
   // ── Дика живність плато: між каменем рифу й краєм ────────
   const lifeFrom = Math.max(rock + R * 0.04, R * 0.5);
-  for (let k = 0; k < 16; k += 1) {
+  const lifeCount = Math.round(16 * wildlife);
+  for (let k = 0; k < lifeCount; k += 1) {
     const key = `reef-isle:life${k}`;
-    const a = (k / 16) * Math.PI * 2 + (unit(seed, `${key}:a`) - 0.5) * 0.3;
+    const a = (k / lifeCount) * Math.PI * 2 + (unit(seed, `${key}:a`) - 0.5) * 0.3;
     const kind = Math.floor(unit(seed, `${key}:kind`) * 6);
     const size = R * (0.09 + 0.06 * unit(seed, `${key}:s`));
     // Гілки тягнуться на свій розмір у всі боки — тож і відступ від каменю
@@ -374,9 +378,10 @@ export function buildReefIsland(
     tubes(p, seed, key, along(at, n, -R * 0.015), R * 0.1, n);
   }
   // Кілька клаптів водоростей звисають з краю.
-  for (let k = 0; k < 6; k += 1) {
+  const edgeCount = Math.round(6 * wildlife);
+  for (let k = 0; k < edgeCount; k += 1) {
     const key = `reef-isle:edge${k}`;
-    const a = (k / 6) * Math.PI * 2 + unit(seed, `${key}:a`) * 0.5;
+    const a = (k / edgeCount) * Math.PI * 2 + unit(seed, `${key}:a`) * 0.5;
     if (nearAngle(a, water.angle, water.half)) continue;
     seaweed(p, seed, key, polar(R * 0.95, a, RIM_Y), R * 0.07);
   }

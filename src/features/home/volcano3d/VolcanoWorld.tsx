@@ -136,6 +136,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         islandLagoon={false}
         islandStones={false}
         seagrassScale={0.5}
+        islandWildlife={1 / 3}
         bare={bare}
       />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
