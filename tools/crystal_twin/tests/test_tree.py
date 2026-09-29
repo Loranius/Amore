@@ -39,7 +39,7 @@ class TimeIsTheCurrency(unittest.TestCase):
         for year in range(2023, 2066):
             model = build_tree_model(dict(BASE, asOf=f"{year}-12-27"))
             sk = skeleton(model)
-            now = (model["height"], model["trunkRadius"], model["orders"], len(sk["branches"]))
+            now = (model["height"], model["trunkRadius"], model["tiers"], len(sk["branches"]))
             if previous:
                 # Основа росту (ADR-0090) доростає за 40 років і далі тримає
                 # розмір: строго росте до сорокового року, потім не меншає.
@@ -60,7 +60,9 @@ class TimeIsTheCurrency(unittest.TestCase):
 class OneModuleOneEffect(unittest.TestCase):
     """Кожен модуль міняє рівно своє поле моделі і нічого більше."""
 
-    FIELDS = ("height", "trunkRadius", "orders", "limbs", "leafiness", "blossoms", "fruits",
+    # `yearBranches` — не слід модуля, а активність року (ADR-0237): її
+    # змінюють усі модулі разом, і саме так має бути.
+    FIELDS = ("height", "trunkRadius", "crownLimbs", "tiers", "leafiness", "blossoms", "fruits",
               "roots", "rootReach", "fireflies", "flowers")
 
     def changed(self, **rows) -> set[str]:
@@ -68,13 +70,20 @@ class OneModuleOneEffect(unittest.TestCase):
         return {f for f in self.FIELDS if a[f] != b[f]}
 
     def test_each_module(self):
-        self.assertEqual(self.changed(plans=dated(7)), {"limbs"})
+        self.assertEqual(self.changed(plans=dated(7)), {"crownLimbs"})
         self.assertEqual(self.changed(memories=dated(40)), {"leafiness"})
         self.assertEqual(self.changed(wishes=dated(3)), {"blossoms"})
         self.assertEqual(self.changed(events=[{"id": 1, "date": "2024-01-01", "isMilestone": True}]), {"fruits"})
         self.assertEqual(self.changed(places=dated(12)), {"roots", "rootReach"})
         self.assertEqual(self.changed(media=dated(30)), {"fireflies"})
         self.assertEqual(self.changed(daysOff=["2024-05-01", "2024-05-02"]), {"flowers"})
+
+    def test_plain_events_feed_only_the_year_branch(self):
+        # Звичайна подія «Нашого шляху» — лише активність свого року (ADR-0237 §3).
+        a = with_()
+        b = with_(events=[{"id": 1, "date": "2024-01-01"}] * 1)
+        self.assertEqual({f for f in self.FIELDS if a[f] != b[f]}, set())
+        self.assertNotEqual(a["yearBranches"], b["yearBranches"])
 
     def test_blossom_colour_is_who_granted_the_wish(self):
         wishes = [
@@ -90,10 +99,14 @@ class OneModuleOneEffect(unittest.TestCase):
 
 
 class Geometry(unittest.TestCase):
-    def test_crown_top_is_the_model_height(self):
+    def test_crown_top_follows_the_model_height(self):
+        # Скелет в одиницях сцени (ADR-0237): верхівка — провідник на 0.86·H
+        # плюс гілки планів; крона не нижча за висоту моделі й не вища за 1.6·H.
         for name in ("empty", "busy", "leap_day"):
             model = build_tree_model(fixture(name))
-            self.assertAlmostEqual(summary(model)["top"], round(model["height"], 4), places=3)
+            top = summary(model)["top"]
+            self.assertGreaterEqual(top, model["height"])
+            self.assertLessEqual(top, 1.6 * model["height"])
 
     def test_every_number_is_finite(self):
         model = build_tree_model(fixture("busy"))

@@ -1,5 +1,5 @@
 // ============================================================
-// Дерево v2 — модель росту (ADR-0218).
+// Дерево v3 — модель росту (ADR-0218, граматика ADR-0237).
 // ------------------------------------------------------------
 // Той самий запис правила, що в Python-двійнику
 // (`tools/crystal_twin/crystal_twin/tree_model.py`); звірку тримає
@@ -7,10 +7,14 @@
 //
 // Основа росту — закон віку ADR-0090 без змін: дерево дорослішає за 40
 // років, швидко в молодості, і росте щороку навіть на порожній історії.
-// Решта — по одному ефекту на модуль:
+// Граматика ADR-0237: кожен рік разом — одна ГІЛКА РОКУ; гілки стоять
+// ярусами по 3 або 4, і коли ярус повний, стовбур витягується й відкриває
+// новий. Решта — по одному ефекту на модуль:
 //
-//   час разом           → висота, товщина стовбура, порядки гілок
-//   виконані плани      → скелетні гілки
+//   час разом           → висота й товщина стовбура
+//   рік разом           → гілка року (ярус, місце в ньому, вік)
+//   активність року     → гілка року довша (≤ ×1.35) і горизонтальніша
+//   виконані плани      → гілки верхівки
 //   спогади             → пишність крони
 //   виконані бажання    → квіти; колір кожної — хто виконав бажання
 //   віхи «Нашого шляху» → золоті плоди
@@ -31,8 +35,9 @@ import {
   type CrystalV2Snapshot,
   type GiftChannel,
 } from '../crystalV2/model';
+import { tierSlot, yearElements } from '../grammar/grammar';
 
-export const TREE_V2_VERSION = 'tree-v2/2026-09-28';
+export const TREE_V2_VERSION = 'tree-v3/2026-09-29';
 
 const FULL_TERM_YEARS = 40;
 const GROWTH_SATURATION = 3.8;
@@ -41,6 +46,11 @@ const GROWTH_SATURATION = 3.8;
 export function treeAgeProgressV2(years: number): number {
   const term = Math.min(1, Math.max(0, years) / FULL_TERM_YEARS);
   return (1 - Math.exp(-GROWTH_SATURATION * term)) / (1 - Math.exp(-GROWTH_SATURATION));
+}
+
+/** Висота дерева на віці `years` (закон ADR-0090): тут же міряється висота ярусу. */
+export function treeHeightAt(years: number): number {
+  return 0.35 + 4.65 * treeAgeProgressV2(years);
 }
 
 /** Частка осіннього листя за місяцем; узимку дерево вічнозелене, не голе. */
@@ -56,6 +66,19 @@ export interface TreeV2Blossom {
   year: number;
 }
 
+/** Гілка року (ADR-0237): елемент року дерева. */
+export interface TreeV2YearBranch {
+  year: number;
+  /** Вік гілки в роках: від початку її року до знімка. */
+  age: number;
+  activity: number;
+  /** Насиченість року 0…1: довжина (≤ ×1.35) і наскільки гілка горизонтальна. */
+  fertility: number;
+  tier: number;
+  slot: number;
+  size: number;
+}
+
 export interface TreeV2Model {
   version: string;
   startDate: string;
@@ -66,8 +89,11 @@ export interface TreeV2Model {
   counts: ActivityCounts;
   height: number;
   trunkRadius: number;
-  orders: number;
-  limbs: number;
+  /** Гілки верхівки — виконані плани. */
+  crownLimbs: number;
+  /** Скільки ярусів відкрито. */
+  tiers: number;
+  yearBranches: TreeV2YearBranch[];
   leafiness: number;
   blossoms: TreeV2Blossom[];
   fruits: number;
@@ -93,7 +119,11 @@ export function buildTreeV2Model(snapshot: TreeV2Snapshot): TreeV2Model {
   for (const item of datedItems(snapshot, start, asOf)) counts[item.kind] += 1;
 
   const p = treeAgeProgressV2(years);
-  const height = 0.35 + 4.65 * p;
+  const height = treeHeightAt(years);
+  const yearBranches: TreeV2YearBranch[] = yearElements(snapshot).map((e) => {
+    const place = tierSlot(seed, e.year);
+    return { year: e.year, age: e.age, activity: e.activity, fertility: e.fertility, tier: place.tier, slot: place.slot, size: place.size };
+  });
 
   // Квіти: по одній на виконане бажання, найновіші — якщо їх забагато.
   // Порядок — дата, тоді id, тоді канал: той самий, що в Python (кортежі).
@@ -126,8 +156,9 @@ export function buildTreeV2Model(snapshot: TreeV2Snapshot): TreeV2Model {
     counts,
     height: r6(height),
     trunkRadius: r6(height * (0.03 + 0.025 * p)),
-    orders: 2 + Math.min(3, Math.floor(years / 3)),
-    limbs: 3 + Math.min(4, Math.floor(Math.log2(1 + counts.plans))),
+    crownLimbs: 2 + Math.min(3, Math.floor(Math.log2(1 + counts.plans))),
+    tiers: yearBranches.length === 0 ? 0 : yearBranches.at(-1)!.tier + 1,
+    yearBranches,
     leafiness: r6(0.7 + 0.1 * Math.log1p(counts.memories)),
     blossoms,
     fruits: Math.min(12, counts.milestones),

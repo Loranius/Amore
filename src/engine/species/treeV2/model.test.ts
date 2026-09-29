@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ICO_INRADIUS, buildTreeV2Geometry, treeV2Knuckles, treeV2Skeleton, treeV2Summary } from './geometry';
+import { ICO_INRADIUS, buildTreeV2Geometry, treeV2Knuckles, treeV2Skeleton, treeV2Summary, treeV2TierHeight } from './geometry';
 import { buildTreeV2Model, treeAgeProgressV2, type TreeV2Snapshot } from './model';
 
 // ============================================================
@@ -142,3 +142,56 @@ describe('дерево v2: меш', () => {
     expect(Array.from(again.leaves.positions)).toEqual(Array.from(geometry.leaves.positions));
   });
 });
+
+describe('дерево v3: гілка року ярусами (ADR-0237, власник)', () => {
+  const branchOf = (model: ReturnType<typeof buildTreeV2Model>, year: number) =>
+    treeV2Skeleton(model).branches.find((b) => b.key === `y${year}`)!;
+  const shape = (b: { start: number[]; end: number[] }) => {
+    const d = [b.end[0]! - b.start[0]!, b.end[1]! - b.start[1]!, b.end[2]! - b.start[2]!];
+    const length = Math.hypot(d[0]!, d[1]!, d[2]!);
+    return { length, rise: d[1]! / length };
+  };
+
+  it('кожен рік разом — одна гілка; на ярусі 3 або 4, новий ярус — вище, коли нижній повний', () => {
+    const model = buildTreeV2Model({ ...BASE, asOf: '2040-01-01' });
+    expect(model.yearBranches.map((b) => b.year)).toEqual(Array.from({ length: model.yearBranches.length }, (_, i) => i));
+    const perTier = new Map<number, number>();
+    for (const b of model.yearBranches) perTier.set(b.tier, (perTier.get(b.tier) ?? 0) + 1);
+    for (const [tier, count] of perTier) {
+      if (tier < model.tiers - 1) expect([3, 4]).toContain(count);
+    }
+    const heights = Array.from({ length: model.tiers }, (_, t) => treeV2TierHeight(model, t));
+    for (let t = 1; t < heights.length; t += 1) expect(heights[t]!).toBeGreaterThan(heights[t - 1]!);
+  });
+
+  it('ярус, що вже відкрився, не повзе вгору з роками: гілка лишається де виросла', () => {
+    const young = buildTreeV2Model({ ...BASE, asOf: '2031-01-01' });
+    const old = buildTreeV2Model({ ...BASE, asOf: '2050-01-01' });
+    expect(treeV2TierHeight(old, 0)).toBeCloseTo(treeV2TierHeight(young, 0), 9);
+    expect(treeV2TierHeight(old, 1)).toBeCloseTo(treeV2TierHeight(young, 1), 9);
+  });
+
+  it('активність року — гілка довша (не більше ×1.35) і горизонтальніша (власник: «довша гілка, горизонтальною стає»)', () => {
+    const quiet = buildTreeV2Model({ ...BASE, asOf: '2026-09-27' });
+    const busyYear = Array.from({ length: 40 }, (_, i) => ({ id: 1000 + i, date: '2024-03-01' }));
+    const rich = buildTreeV2Model({ ...BASE, asOf: '2026-09-27', memories: busyYear, plans: busyYear.map((m) => ({ ...m, id: m.id + 100 })) });
+    const q = shape(branchOf(quiet, 1));
+    const r = shape(branchOf(rich, 1));
+    expect(r.length).toBeGreaterThan(q.length * 1.2);
+    expect(r.length).toBeLessThanOrEqual(q.length * 1.35 + 1e-9);
+    expect(r.rise).toBeLessThan(q.rise);
+    // Інші роки не зачеплені: події 2024-го не змінюють гілку 2023-го.
+    expect(shape(branchOf(rich, 0)).length).toBeCloseTo(shape(branchOf(quiet, 0)).length, 9);
+  });
+
+  it('квітка бажання — на гілці свого року', () => {
+    const model = buildTreeV2Model({ ...BASE, asOf: '2030-01-01', wishes: [{ id: 7, date: '2024-06-01', isShared: true }] });
+    const { clusters } = treeV2Skeleton(model);
+    const own = clusters.filter((c) => c.key === 'y1' || c.key.startsWith('y1.'));
+    const blossom = buildTreeV2Geometry(model).blossoms.positions;
+    const at = [blossom[0]!, blossom[1]!, blossom[2]!];
+    const near = Math.min(...own.map((c) => Math.hypot(at[0]! - c.centre[0], at[1]! - c.centre[1], at[2]! - c.centre[2]) - c.radius));
+    expect(near).toBeLessThan(0.1);
+  });
+});
+

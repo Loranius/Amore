@@ -3,6 +3,8 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from '../crystalV2/model';
 import { buildVolcanoModel } from '../volcano/model';
+import { treeV2Skeleton } from '../treeV2/geometry';
+import { buildTreeV2Model } from '../treeV2/model';
 import { YEAR_BOOST_CAP, tierSize, tierSlot, yearBoost, yearElements, yearFertility } from './grammar';
 
 // ============================================================
@@ -27,6 +29,15 @@ const SPECIES: Record<string, (snapshot: CrystalV2Snapshot) => SpeciesView> = {
   кристал: (s) => {
     const m = buildCrystalV2Model(s);
     return { size: m.monarch.height, elements: new Map(m.children.map((c) => [c.year, c.height])) };
+  },
+  дерево: (s) => {
+    const m = buildTreeV2Model(s);
+    const { branches } = treeV2Skeleton(m);
+    const length = (key: string) => {
+      const b = branches.find((x) => x.key === key)!;
+      return Math.hypot(b.end[0] - b.start[0], b.end[1] - b.start[1], b.end[2] - b.start[2]);
+    };
+    return { size: m.height, elements: new Map(m.yearBranches.map((b) => [b.year, length(`y${b.year}`)])) };
   },
   вулкан: (s) => {
     const m = buildVolcanoModel(s);

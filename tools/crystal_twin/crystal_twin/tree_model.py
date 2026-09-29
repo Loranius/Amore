@@ -1,12 +1,14 @@
-"""Модель росту дерева v2 (ADR-0218) — по одному ефекту на модуль.
+"""Модель росту дерева v3 (ADR-0218, граматика ADR-0237) — по одному ефекту на модуль.
 
 Власник: «перебери сцену з деревом, створи її з нуля… використовуючи лише
 основу росту». Основа росту — закон віку (`species/tree/growthLaw.ts`,
 ADR-0090): дерево дорослішає за 40 років, швидко в молодості й повільно
 потім, і росте щороку навіть на порожній історії. Усе інше — нове:
 
-    час разом (дні)        → висота, товщина стовбура, порядки гілок
-    виконані плани         → скелетні гілки (скільки «опор» у крони)
+    час разом (дні)        → висота й товщина стовбура
+    рік разом              → гілка року; яруси по 3 або 4 (ADR-0237)
+    активність року        → гілка року довша (≤ ×1.35) і горизонтальніша
+    виконані плани         → гілки верхівки
     спогади                → пишність крони
     виконані бажання       → квіти; колір кожної — хто виконав бажання
                               (Лєна — червоний, Діма — блакитний, спільне —
@@ -27,9 +29,10 @@ from typing import Any
 
 from .calendar import DAYS_PER_YEAR, days_between, parse_day, year_index
 from .hashing import unit
+from .grammar import tier_slot, year_elements
 from .model import _dated_items, _gift_channel, r6
 
-TREE_MODEL_VERSION = "tree-v2/2026-09-28"
+TREE_MODEL_VERSION = "tree-v3/2026-09-29"
 
 # ── Основа росту (не змінена, ADR-0090) ──────────────────────
 FULL_TERM_YEARS = 40.0
@@ -40,6 +43,11 @@ def age_progress(years: float) -> float:
     """0 у день знайомства, 1 на сороковому році; швидко в молодості."""
     term = min(1.0, max(0.0, years) / FULL_TERM_YEARS)
     return (1.0 - math.exp(-GROWTH_SATURATION * term)) / (1.0 - math.exp(-GROWTH_SATURATION))
+
+
+def height_at(years: float) -> float:
+    """Висота дерева на віці `years` (закон ADR-0090)."""
+    return 0.35 + 4.65 * age_progress(years)
 
 
 # Осіннє листя за місяцем (січень…грудень). Узимку дерево не голе: воно
@@ -65,10 +73,14 @@ def build_tree_model(snapshot: dict[str, Any]) -> dict[str, Any]:
         counts[item.kind] += 1
 
     p = age_progress(years)
-    height = 0.35 + 4.65 * p
+    height = height_at(years)
     trunk_radius = height * (0.03 + 0.025 * p)
-    orders = 2 + min(3, int(years // 3))
-    limbs = 3 + min(4, int(math.floor(math.log2(1 + counts["plans"]))))
+    year_branches = []
+    for e in year_elements(snapshot):
+        place = tier_slot(seed, e["year"])
+        year_branches.append({"year": e["year"], "age": e["age"], "activity": e["activity"],
+                              "fertility": e["fertility"], "tier": place["tier"], "slot": place["slot"],
+                              "size": place["size"]})
     leafiness = 0.7 + 0.1 * math.log1p(counts["memories"])
 
     # Квіти: по одній на виконане бажання, найновіші — якщо їх забагато.
@@ -96,8 +108,9 @@ def build_tree_model(snapshot: dict[str, Any]) -> dict[str, Any]:
         "counts": counts,
         "height": r6(height),
         "trunkRadius": r6(trunk_radius),
-        "orders": orders,
-        "limbs": limbs,
+        "crownLimbs": 2 + min(3, int(math.floor(math.log2(1 + counts["plans"])))),
+        "tiers": year_branches[-1]["tier"] + 1 if year_branches else 0,
+        "yearBranches": year_branches,
         "leafiness": r6(leafiness),
         "blossoms": blossoms,
         "fruits": min(12, counts["milestones"]),

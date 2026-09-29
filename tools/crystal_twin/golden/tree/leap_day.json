@@ -13,6 +13,7 @@
    "plans": 0,
    "wishes": 0
   },
+  "crownLimbs": 2,
   "days": 1827,
   "fireflies": 0,
   "flowers": 0,
@@ -21,23 +22,78 @@
   "leafiness": 0.838629,
   "lean": 2.040988,
   "leanAzimuth": 259.397992,
-  "limbs": 3,
-  "orders": 3,
   "progress": 0.386898,
   "rootReach": 0.193417,
   "roots": 3,
   "startDate": "2020-02-29",
+  "tiers": 2,
   "trunkRadius": 0.085259,
-  "version": "tree-v2/2026-09-28",
+  "version": "tree-v3/2026-09-29",
+  "yearBranches": [
+   {
+    "activity": 0.0,
+    "age": 5.002156,
+    "fertility": 0.0,
+    "size": 3,
+    "slot": 0,
+    "tier": 0,
+    "year": 0
+   },
+   {
+    "activity": 2.0,
+    "age": 4.00282,
+    "fertility": 0.295837,
+    "size": 3,
+    "slot": 1,
+    "tier": 0,
+    "year": 1
+   },
+   {
+    "activity": 0.0,
+    "age": 3.003484,
+    "fertility": 0.0,
+    "size": 3,
+    "slot": 2,
+    "tier": 0,
+    "year": 2
+   },
+   {
+    "activity": 0.0,
+    "age": 2.004148,
+    "fertility": 0.0,
+    "size": 3,
+    "slot": 0,
+    "tier": 1,
+    "year": 3
+   },
+   {
+    "activity": 1.0,
+    "age": 1.002074,
+    "fertility": 0.186652,
+    "size": 3,
+    "slot": 1,
+    "tier": 1,
+    "year": 4
+   },
+   {
+    "activity": 0.0,
+    "age": 0.002738,
+    "fertility": 0.0,
+    "size": 3,
+    "slot": 2,
+    "tier": 1,
+    "year": 5
+   }
+  ],
   "years": 5.002156
  },
  "summary": {
-  "branches": 29,
-  "clusters": 24,
-  "crownRadius": 1.145,
+  "branches": 31,
+  "clusters": 26,
+  "crownRadius": 1.8419,
   "firstBlossom": null,
-  "meadowRadius": 3.066,
-  "reach": 0.9187,
-  "top": 2.1491
+  "meadowRadius": 3.6235,
+  "reach": 1.5205,
+  "top": 3.1234
  }
 }

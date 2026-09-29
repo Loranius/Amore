@@ -12,7 +12,9 @@ from __future__ import annotations
 import math
 from typing import Any
 
+from .grammar import year_boost
 from .hashing import unit
+from .tree_model import height_at
 
 UP = (0.0, 1.0, 0.0)
 # Товщина деревини відносно моделі (ADR-0222) — дзеркало TREE_GIRTH у TS.
@@ -54,11 +56,20 @@ def _deviate(d, angle_deg, turn_deg):
     return _norm(_add(out, (0.0, 0.15, 0.0)))
 
 
+def tier_height(model: dict[str, Any], tier: int) -> float:
+    """Висота, на якій ярус `tier` виходить зі стовбура (ADR-0237)."""
+    opened = next((b["year"] for b in model["yearBranches"] if b["tier"] == tier), 0)
+    return 0.62 * min(height_at(opened + 1), model["height"])
+
+
+def _trunk_at(d, y):
+    return _mul(d, y / d[1])
+
+
 def skeleton(model: dict[str, Any]) -> dict[str, Any]:
-    """Гілки, кінчики й кластери крони — у ОДИНИЦЯХ СЦЕНИ (висота = model.height)."""
+    """Стовбур сегментами до ярусів, гілки років, гілки верхівки — в одиницях сцени."""
     seed = model["startDate"]
-    orders = model["orders"]
-    limbs = model["limbs"]
+    H = model["height"]
     leafiness = model["leafiness"]
     lean = math.radians(model["lean"])
     lean_az = math.radians(model["leanAzimuth"])
@@ -67,53 +78,63 @@ def skeleton(model: dict[str, Any]) -> dict[str, Any]:
     branches: list[dict[str, Any]] = []
     clusters: list[dict[str, Any]] = []
 
-    def grow(start, direction, length, order, key, radius, thinning):
+    def trunk_rel(y):
+        return 1.0 - 0.55 * min(1.0, y / H)
+
+    def grow(start, direction, length, order, last, key, radius, thinning):
         end = _add(start, _mul(direction, length))
         r1 = max(radius * thinning, 0.004)
         branches.append({"start": start, "end": end, "r0": radius, "r1": r1, "order": order, "key": key})
-        if order >= orders - 1 and order > 0:
-            # Кінчик і передостанній порядок несуть листя: так крона
-            # повна й на молодому дереві з двома порядками.
-            size = (0.2 + 0.9 * length) * leafiness * (0.55 if order == orders else 0.42)
+        if order >= last - 1 and order > 0:
+            size = (0.08 + 0.34 * length) * leafiness * (0.9 if order == last else 0.7)
             clusters.append({"centre": end, "radius": size, "key": key})
-        if order == orders:
-            return
-        if order == 0:
-            n = limbs
-            for i in range(n):
-                t = 0.62 + 0.38 * ((i + 0.5) / n)
-                phi = i * 360.0 / n + (unit(seed, f"{key}:limb{i}:az") - 0.5) * 30.0
-                theta = 32.0 + 20.0 * unit(seed, f"{key}:limb{i}:th")
-                d = (math.sin(math.radians(theta)) * math.cos(math.radians(phi)),
-                     math.cos(math.radians(theta)),
-                     math.sin(math.radians(theta)) * math.sin(math.radians(phi)))
-                at = _add(start, _mul(direction, length * t))
-                grow(at, d, 0.85 * (0.85 + 0.3 * unit(seed, f"{key}:limb{i}:len")),
-                     1, f"{key}.l{i}", radius * (0.62 - 0.12 * t), 0.7)
-            leader = _deviate(_norm(_add(direction, (0.0, 0.5, 0.0))), 8.0, 360.0 * unit(seed, f"{key}:lead"))
-            grow(end, leader, 0.72, 1, f"{key}.c", r1 * 0.85, 0.7)
+        if order == last:
             return
         turn = 137.5 * order + 360.0 * unit(seed, f"{key}:turn")
         cont = _deviate(direction, 18.0 + 16.0 * unit(seed, f"{key}:ca") - 8.0, turn)
         side = _deviate(direction, 42.0 + 24.0 * unit(seed, f"{key}:sa") - 12.0, turn + 180.0)
-        grow(end, cont, length * 0.74, order + 1, f"{key}.c", r1 * 0.85, 0.7 if order + 1 < orders else 0.5)
-        grow(end, side, length * 0.62, order + 1, f"{key}.s", r1 * 0.65, 0.7 if order + 1 < orders else 0.5)
+        thin = 0.7 if order + 1 < last else 0.5
+        grow(end, cont, length * 0.74, order + 1, last, f"{key}.c", r1 * 0.85, thin)
+        grow(end, side, length * 0.62, order + 1, last, f"{key}.s", r1 * 0.65, thin)
 
-    grow((0.0, 0.0, 0.0), trunk_dir, 1.3, 0, "t", 1.0, 0.72)
+    stops = [tier_height(model, t) for t in range(model["tiers"])]
+    top_y = 0.86 * H
+    heights = [y for y in stops if y < top_y - 1e-9] + [top_y]
+    start = (0.0, 0.0, 0.0)
+    start_y = 0.0
+    for i, y in enumerate(heights):
+        to = _trunk_at(trunk_dir, y)
+        branches.append({"start": start, "end": to, "r0": trunk_rel(start_y), "r1": trunk_rel(y), "order": 0, "key": f"t{i}"})
+        start, start_y = to, y
 
-    # Масштаб: верх крони — рівно висота моделі.
-    top = max([b["end"][1] for b in branches] + [c["centre"][1] + c["radius"] for c in clusters])
-    s = model["height"] / top
-    radius_scale = model["trunkRadius"] * TREE_GIRTH  # радіуси рахувались від 1.0 у стовбура
+    for yb in model["yearBranches"]:
+        key = f"y{yb['year']}"
+        y = stops[yb["tier"]]
+        az = yb["slot"] * 360.0 / yb["size"] + yb["tier"] * 137.5 + (unit(seed, f"{key}:az") - 0.5) * 24.0
+        el = 50.0 - 30.0 * yb["fertility"] + (unit(seed, f"{key}:el") - 0.5) * 8.0
+        d = (math.cos(math.radians(el)) * math.cos(math.radians(az)), math.sin(math.radians(el)),
+             math.cos(math.radians(el)) * math.sin(math.radians(az)))
+        grown = 1.0 - math.exp(-(yb["age"] + 0.25) / 2.0)
+        reach = 0.5 * H / (1.0 + 0.18 * yb["tier"])
+        length = reach * (0.35 + 0.65 * grown) * year_boost(yb["activity"]) * (0.9 + 0.2 * unit(seed, f"{key}:len"))
+        last = 1 + min(2, int(yb["age"] // 2))
+        grow(_trunk_at(trunk_dir, y), d, length, 1, last, key, trunk_rel(y) * 0.55 * (0.6 + 0.4 * grown), 0.6)
+
+    top = _trunk_at(trunk_dir, top_y)
+    n = model["crownLimbs"]
+    for i in range(n):
+        key = f"c{i}"
+        az = i * 360.0 / n + (unit(seed, f"{key}:az") - 0.5) * 40.0
+        el = 55.0 + 15.0 * unit(seed, f"{key}:el")
+        d = (math.cos(math.radians(el)) * math.cos(math.radians(az)), math.sin(math.radians(el)),
+             math.cos(math.radians(el)) * math.sin(math.radians(az)))
+        grow(top, d, 0.28 * H * (0.85 + 0.3 * unit(seed, f"{key}:len")), 1, 2, key, trunk_rel(top_y) * 0.6, 0.6)
+
+    girth = model["trunkRadius"] * TREE_GIRTH
     for b in branches:
-        b["start"] = _mul(b["start"], s)
-        b["end"] = _mul(b["end"], s)
-        b["r0"] *= radius_scale
-        b["r1"] *= radius_scale
-    for c in clusters:
-        c["centre"] = _mul(c["centre"], s)
-        c["radius"] *= s
-    return {"branches": branches, "clusters": clusters, "scale": s}
+        b["r0"] *= girth
+        b["r1"] *= girth
+    return {"branches": branches, "clusters": clusters}
 
 
 def roots(model: dict[str, Any]) -> list[dict[str, Any]]:
@@ -139,8 +160,9 @@ def ornaments(model: dict[str, Any], clusters: list[dict[str, Any]]) -> dict[str
     seed = model["startDate"]
     n = len(clusters)
 
-    def on_cluster(tag: str, upward: bool, depth: float):
-        c = clusters[min(n - 1, int(unit(seed, f"{tag}:c") * n))]
+    def on_cluster(tag: str, upward: bool, depth: float, pool=None):
+        pool = pool if pool else clusters
+        c = pool[min(len(pool) - 1, int(unit(seed, f"{tag}:c") * len(pool)))]
         y = 0.2 + 0.8 * unit(seed, f"{tag}:y")
         if not upward:
             y = -(0.3 + 0.5 * unit(seed, f"{tag}:y"))
@@ -149,8 +171,11 @@ def ornaments(model: dict[str, Any], clusters: list[dict[str, Any]]) -> dict[str
         d = (ring * math.cos(phi), y, ring * math.sin(phi))
         return _add(c["centre"], _mul(d, c["radius"] * depth))
 
-    blossoms = [{"position": on_cluster(f"blossom{b['id']}", True, 0.98), "channel": b["channel"]}
-                for b in model["blossoms"]]
+    # Квітка бажання сідає на гілку свого року (ADR-0237).
+    blossoms = []
+    for b in model["blossoms"]:
+        own = [c for c in clusters if c["key"] == f"y{b['year']}" or c["key"].startswith(f"y{b['year']}.")]
+        blossoms.append({"position": on_cluster(f"blossom{b['id']}", True, 0.98, own), "channel": b["channel"]})
     fruits = [on_cluster(f"fruit{k}", False, 0.92) for k in range(model["fruits"])]
 
     crown_mid = sum(c["centre"][1] for c in clusters) / n

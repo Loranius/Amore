@@ -5,16 +5,17 @@
 // (`tools/crystal_twin/crystal_twin/tree_geometry.py`); `summary` звіряється
 // з `golden/tree/*.json`.
 //
-// Скелет росте рекурсивно: стовбур → скелетні гілки (плани) і провідник
-// угору → на кожному порядку продовження й бічна гілка. Кут, азимут і
-// довжина кожної гілки — з хешу її шляху. Крона — гранчасті кластери на
+// Скелет (ADR-0237): стовбур сегментами до кожного ярусу; з ярусу виходять
+// гілки років (3 або 4), кожна розгалужується з віком; на верхівці — гілки
+// планів. Кут, азимут і довжина кожної гілки — з хешу її шляху. Крона — гранчасті кластери на
 // кінцях гілок: пласкі грані, жодного шуму.
 //
 // Модуль чистий: лише масиви, без three, без React.
 // ============================================================
 import { unit } from '../crystalV2/hash';
 import type { GiftChannel } from '../crystalV2/model';
-import type { TreeV2Model } from './model';
+import { yearBoost } from '../grammar/grammar';
+import { treeHeightAt, type TreeV2Model } from './model';
 
 type V3 = [number, number, number];
 
@@ -52,65 +53,94 @@ export const TREE_GIRTH = 1.5;
 
 export interface TreeV2Cluster { centre: V3; radius: number; key: string }
 
+/** Висота, на якій ярус `tier` виходить зі стовбура (ADR-0237). */
+export function treeV2TierHeight(model: TreeV2Model, tier: number): number {
+  const first = model.yearBranches.find((b) => b.tier === tier);
+  const opened = first ? first.year : 0;
+  // Ярус стоїть на висоті, яку дерево мало, коли його рік прожито; далі
+  // стовбур росте вище, а ярус лишається де був — як справжня гілка.
+  return 0.62 * Math.min(treeHeightAt(opened + 1), model.height);
+}
+
+/** Вузол на осі стовбура на висоті `y` (стовбур трохи похилений). */
+function trunkAt(dir: V3, y: number): V3 {
+  return mul(dir, y / dir[1]);
+}
+
 export function treeV2Skeleton(model: TreeV2Model): { branches: TreeV2Branch[]; clusters: TreeV2Cluster[] } {
   const seed = model.startDate;
-  const { orders, limbs, leafiness } = model;
+  const H = model.height;
+  const { leafiness } = model;
   const lean = rad(model.lean);
   const leanAz = rad(model.leanAzimuth);
   const trunkDir: V3 = [Math.sin(lean) * Math.cos(leanAz), Math.cos(lean), Math.sin(lean) * Math.sin(leanAz)];
   const branches: TreeV2Branch[] = [];
   const clusters: TreeV2Cluster[] = [];
+  // Радіуси — у частках стовбура біля землі; у кінці множаться на товщину.
+  const trunkRel = (y: number) => 1 - 0.55 * Math.min(1, y / H);
 
-  const grow = (start: V3, direction: V3, length: number, order: number, key: string, radius: number, thinning: number): void => {
+  const grow = (start: V3, direction: V3, length: number, order: number, last: number, key: string, radius: number, thinning: number): void => {
     const end = add(start, mul(direction, length));
     const r1 = Math.max(radius * thinning, 0.004);
     branches.push({ start, end, r0: radius, r1, order, key });
-    if (order >= orders - 1 && order > 0) {
-      // Кінчик і передостанній порядок несуть листя: так крона повна й на
-      // молодому дереві з двома порядками.
-      const size = (0.2 + 0.9 * length) * leafiness * (order === orders ? 0.55 : 0.42);
+    if (order >= last - 1 && order > 0) {
+      // Кінчик і передостанній порядок несуть листя.
+      const size = (0.08 + 0.34 * length) * leafiness * (order === last ? 0.9 : 0.7);
       clusters.push({ centre: end, radius: size, key });
     }
-    if (order === orders) return;
-    if (order === 0) {
-      for (let i = 0; i < limbs; i += 1) {
-        const t = 0.62 + 0.38 * ((i + 0.5) / limbs);
-        const phi = (i * 360) / limbs + (unit(seed, `${key}:limb${i}:az`) - 0.5) * 30;
-        const theta = 32 + 20 * unit(seed, `${key}:limb${i}:th`);
-        const d: V3 = [
-          Math.sin(rad(theta)) * Math.cos(rad(phi)),
-          Math.cos(rad(theta)),
-          Math.sin(rad(theta)) * Math.sin(rad(phi)),
-        ];
-        const at = add(start, mul(direction, length * t));
-        grow(at, d, 0.85 * (0.85 + 0.3 * unit(seed, `${key}:limb${i}:len`)), 1, `${key}.l${i}`, radius * (0.62 - 0.12 * t), 0.7);
-      }
-      const leader = deviate(norm(add(direction, [0, 0.5, 0])), 8, 360 * unit(seed, `${key}:lead`));
-      grow(end, leader, 0.72, 1, `${key}.c`, r1 * 0.85, 0.7);
-      return;
-    }
+    if (order === last) return;
     const turn = 137.5 * order + 360 * unit(seed, `${key}:turn`);
     const cont = deviate(direction, 18 + 16 * unit(seed, `${key}:ca`) - 8, turn);
     const side = deviate(direction, 42 + 24 * unit(seed, `${key}:sa`) - 12, turn + 180);
-    const last = order + 1 < orders ? 0.7 : 0.5;
-    grow(end, cont, length * 0.74, order + 1, `${key}.c`, r1 * 0.85, last);
-    grow(end, side, length * 0.62, order + 1, `${key}.s`, r1 * 0.65, last);
+    const thin = order + 1 < last ? 0.7 : 0.5;
+    grow(end, cont, length * 0.74, order + 1, last, `${key}.c`, r1 * 0.85, thin);
+    grow(end, side, length * 0.62, order + 1, last, `${key}.s`, r1 * 0.65, thin);
   };
 
-  grow([0, 0, 0], trunkDir, 1.3, 0, 't', 1, 0.72);
+  // Стовбур: сегмент до кожного ярусу, далі провідник до верхівки. Кожен
+  // сегмент починається там, де скінчився попередній: вузли закривають стик.
+  const stops = Array.from({ length: model.tiers }, (_, t) => treeV2TierHeight(model, t));
+  const topY = 0.86 * H;
+  const heights = [...stops.filter((y) => y < topY - 1e-9), topY];
+  let from: V3 = [0, 0, 0];
+  let fromY = 0;
+  heights.forEach((y, i) => {
+    const to = trunkAt(trunkDir, y);
+    branches.push({ start: from, end: to, r0: trunkRel(fromY), r1: trunkRel(y), order: 0, key: `t${i}` });
+    from = to;
+    fromY = y;
+  });
 
-  // Масштаб: верх крони — рівно висота моделі.
-  const top = Math.max(...branches.map((b) => b.end[1]), ...clusters.map((c) => c.centre[1] + c.radius));
-  const s = model.height / top;
-  for (const b of branches) {
-    b.start = mul(b.start, s);
-    b.end = mul(b.end, s);
-    b.r0 *= model.trunkRadius * TREE_GIRTH;
-    b.r1 *= model.trunkRadius * TREE_GIRTH;
+  // Гілки років: ярусами по 3 або 4 довкола стовбура.
+  for (const yb of model.yearBranches) {
+    const key = `y${yb.year}`;
+    const y = stops[yb.tier]!;
+    const az = (yb.slot * 360) / yb.size + yb.tier * 137.5 + (unit(seed, `${key}:az`) - 0.5) * 24;
+    // Тиха гілка дивиться вгору (~50°), насичена майже горизонтальна (~20°).
+    const el = 50 - 30 * yb.fertility + (unit(seed, `${key}:el`) - 0.5) * 8;
+    const d: V3 = [Math.cos(rad(el)) * Math.cos(rad(az)), Math.sin(rad(el)), Math.cos(rad(el)) * Math.sin(rad(az))];
+    const grown = 1 - Math.exp(-(yb.age + 0.25) / 2);
+    const reach = (0.5 * H) / (1 + 0.18 * yb.tier);
+    const length = reach * (0.35 + 0.65 * grown) * yearBoost(yb.activity) * (0.9 + 0.2 * unit(seed, `${key}:len`));
+    // Молода гілка — один пагін; з роками розгалужується, до трьох порядків.
+    const last = 1 + Math.min(2, Math.floor(yb.age / 2));
+    grow(trunkAt(trunkDir, y), d, length, 1, last, key, trunkRel(y) * 0.55 * (0.6 + 0.4 * grown), 0.6);
   }
-  for (const c of clusters) {
-    c.centre = mul(c.centre, s);
-    c.radius *= s;
+
+  // Верхівка: гілки планів розходяться від провідника вгору й убік.
+  const top = trunkAt(trunkDir, topY);
+  for (let i = 0; i < model.crownLimbs; i += 1) {
+    const key = `c${i}`;
+    const az = (i * 360) / model.crownLimbs + (unit(seed, `${key}:az`) - 0.5) * 40;
+    const el = 55 + 15 * unit(seed, `${key}:el`);
+    const d: V3 = [Math.cos(rad(el)) * Math.cos(rad(az)), Math.sin(rad(el)), Math.cos(rad(el)) * Math.sin(rad(az))];
+    grow(top, d, 0.28 * H * (0.85 + 0.3 * unit(seed, `${key}:len`)), 1, 2, key, trunkRel(topY) * 0.6, 0.6);
+  }
+
+  const girth = model.trunkRadius * TREE_GIRTH;
+  for (const b of branches) {
+    b.r0 *= girth;
+    b.r1 *= girth;
   }
   return { branches, clusters };
 }
@@ -146,14 +176,18 @@ export interface TreeV2Ornaments {
 export function treeV2Ornaments(model: TreeV2Model, clusters: readonly TreeV2Cluster[]): TreeV2Ornaments {
   const seed = model.startDate;
   const n = clusters.length;
-  const onCluster = (tag: string, upward: boolean, depth: number): V3 => {
-    const c = clusters[Math.min(n - 1, Math.floor(unit(seed, `${tag}:c`) * n))]!;
+  const onCluster = (tag: string, upward: boolean, depth: number, pool: readonly TreeV2Cluster[] = clusters): V3 => {
+    const c = pool[Math.min(pool.length - 1, Math.floor(unit(seed, `${tag}:c`) * pool.length))]!;
     const y = upward ? 0.2 + 0.8 * unit(seed, `${tag}:y`) : -(0.3 + 0.5 * unit(seed, `${tag}:y`));
     const ring = Math.sqrt(Math.max(0, 1 - y * y));
     const phi = 2 * Math.PI * unit(seed, `${tag}:phi`);
     return add(c.centre, mul([ring * Math.cos(phi), y, ring * Math.sin(phi)], c.radius * depth));
   };
-  const blossoms = model.blossoms.map((b) => ({ position: onCluster(`blossom${b.id}`, true, 0.98), channel: b.channel }));
+  // Квітка бажання сідає на гілку СВОГО року (ADR-0237), якщо та вже має листя.
+  const blossoms = model.blossoms.map((b) => {
+    const own = clusters.filter((c) => c.key === `y${b.year}` || c.key.startsWith(`y${b.year}.`));
+    return { position: onCluster(`blossom${b.id}`, true, 0.98, own.length > 0 ? own : clusters), channel: b.channel };
+  });
   const fruits = Array.from({ length: model.fruits }, (_, k) => onCluster(`fruit${k}`, false, 0.92));
 
   const crownMid = clusters.reduce((sum, c) => sum + c.centre[1], 0) / n;

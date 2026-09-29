@@ -13,6 +13,7 @@
    "plans": 0,
    "wishes": 0
   },
+  "crownLimbs": 2,
   "days": 1371,
   "fireflies": 0,
   "flowers": 0,
@@ -21,23 +22,60 @@
   "leafiness": 0.7,
   "lean": 4.145291,
   "leanAzimuth": 115.983109,
-  "limbs": 3,
-  "orders": 3,
   "progress": 0.30681,
   "rootReach": 0.1599,
   "roots": 3,
   "startDate": "2022-12-26",
+  "tiers": 2,
   "trunkRadius": 0.066928,
-  "version": "tree-v2/2026-09-28",
+  "version": "tree-v3/2026-09-29",
+  "yearBranches": [
+   {
+    "activity": 0.0,
+    "age": 3.753671,
+    "fertility": 0.0,
+    "size": 3,
+    "slot": 0,
+    "tier": 0,
+    "year": 0
+   },
+   {
+    "activity": 0.0,
+    "age": 2.754334,
+    "fertility": 0.0,
+    "size": 3,
+    "slot": 1,
+    "tier": 0,
+    "year": 1
+   },
+   {
+    "activity": 0.0,
+    "age": 1.75226,
+    "fertility": 0.0,
+    "size": 3,
+    "slot": 2,
+    "tier": 0,
+    "year": 2
+   },
+   {
+    "activity": 0.0,
+    "age": 0.752924,
+    "fertility": 0.0,
+    "size": 4,
+    "slot": 0,
+    "tier": 1,
+    "year": 3
+   }
+  ],
   "years": 3.753671
  },
  "summary": {
-  "branches": 29,
-  "clusters": 24,
-  "crownRadius": 0.9602,
+  "branches": 17,
+  "clusters": 14,
+  "crownRadius": 1.1462,
   "firstBlossom": null,
-  "meadowRadius": 2.9181,
-  "reach": 0.6897,
-  "top": 1.7767
+  "meadowRadius": 3.067,
+  "reach": 0.8476,
+  "top": 2.4069
  }
 }
