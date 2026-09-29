@@ -40,6 +40,8 @@ import {
   useSaveSharedArtifact,
   useSharedArtifact,
 } from './sharedArtifact';
+import { canSwitchArtifact } from '../home/artifactChoice';
+import { useAuth } from '@/providers/AuthProvider';
 import './artifactWorld.css';
 
 const CrystalScene = lazy(() => import('../home/crystal3d/CrystalSceneEntry'));
@@ -76,15 +78,19 @@ export function ArtifactWorldProvider({ children }: { children: ReactNode }) {
    * спільного виду — рівно та пастка, за яку `scripts/live/README.md`
    * тримає пункт №9.
    */
+  // Адреса може назвати вид лише власнику (ADR-0234): решта бачить тільки
+  // вид, обраний парою, хоч би що стояло в `?artifact=`.
+  const explorer = canSwitchArtifact(useAuth().user?.id);
+
   useEffect(() => {
     const value = shared.data;
     if (value === undefined || value === null) return;
-    if (typeof window !== 'undefined') {
+    if (explorer && typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       if (params.get(HOME_ARTIFACT_QUERY_KEY) !== null || params.get('engine') !== null) return;
     }
     setArtifact((current) => (current === value ? current : value));
-  }, [shared.data]);
+  }, [shared.data, explorer]);
 
   const selectArtifact = useCallback((next: HomeArtifact) => {
     /*

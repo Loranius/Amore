@@ -20,6 +20,8 @@
 import { HomeArtifactSwitcher } from '@/features/home/HomeArtifactSwitcher';
 import { HOME_ARTIFACT_LABELS, type HomeArtifact } from '@/features/home/homeArtifact';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
+import { canSwitchArtifact } from '@/features/home/artifactChoice';
+import { useAuth } from '@/providers/AuthProvider';
 import { plural } from '@/lib/plural';
 
 /**
@@ -42,6 +44,20 @@ interface SweepSpeciesProps {
 
 export function SweepSpecies({ yearCount }: SweepSpeciesProps) {
   const { artifact, selectArtifact } = useArtifactWorld();
+  // Вид пара обрала при реєстрації; перемикати його може лише власник
+  // (ADR-0234). Решта бачить, У ЧОМУ росте їхня історія, без вибору.
+  const explorer = canSwitchArtifact(useAuth().user?.id);
+
+  if (!explorer) {
+    return (
+      <section className="sweep-step">
+        <h2 className="sweep-question">У чому росте ваша історія</h2>
+        <p className="sweep-said">
+          <strong>{HOME_ARTIFACT_LABELS[artifact]}.</strong> {SPECIES_SHAPE[artifact]}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="sweep-step">

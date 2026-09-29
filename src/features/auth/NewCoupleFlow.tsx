@@ -442,7 +442,7 @@ export function NewCoupleFlow({ onView, onDone, invite = null }: NewCoupleFlowPr
         <p className="reg-hint">
           {SPECIES_SHAPE[picked]}
           {picked === 'reef' && ' Риф ще в розробці — його форма змінюватиметься.'}
-          {' '}Змінити вид можна будь-коли на головній.
+          {' '}Обирайте разом: на головній житиме саме він.
         </p>
         {error !== null && <p className="reg-problem" role="alert">{error}</p>}
         <button type="button" className="btn reg-next" disabled={busy} onClick={() => void confirm()}>

@@ -17,11 +17,15 @@
 import { Hero } from './Hero';
 import { HomeArtifactSwitcher } from './HomeArtifactSwitcher';
 import { HOME_ARTIFACT_LABELS } from './homeArtifact';
+import { canSwitchArtifact } from './artifactChoice';
+import { useAuth } from '@/providers/AuthProvider';
 import { useArtifactWorld } from '../world/artifactWorldContext';
 import { useWorldVisibleRoute } from '../world/useWorldVisibleRoute';
 
 export function HomePage() {
   const { artifact, selectArtifact } = useArtifactWorld();
+  // Перемикач видів — лише власнику; пара бачить свій обраний вид (ADR-0234).
+  const explorer = canSwitchArtifact(useAuth().user?.id);
   // Home is the one route the world shows through today, so it is the one
   // route whose chrome follows it. Phase 2 adds the rest.
   // Головна віддає дотики артефакту: кристал тут і є сторінка.
@@ -30,7 +34,7 @@ export function HomePage() {
   return (
     <section className="home home--world" data-home-artifact={artifact}>
       <Hero />
-      <HomeArtifactSwitcher value={artifact} onChange={selectArtifact} />
+      {explorer && <HomeArtifactSwitcher value={artifact} onChange={selectArtifact} />}
       <h1 className="home-title">{HOME_ARTIFACT_LABELS[artifact]} Amore</h1>
     </section>
   );
