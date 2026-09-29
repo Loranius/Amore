@@ -134,7 +134,7 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
       year,
       azimuth: r6(((unit(life.startDate, `vent${i}:a`) * 360) + i * 137.5) % 360),
       at: r6(0.16 + 0.14 * unit(life.startDate, `vent${i}:at`)),
-      size: r6((0.26 + 0.08 * unit(life.startDate, `vent${i}:s`)) * (0.55 + 0.45 * Math.min(1, (life.years - year) / 8))),
+      size: r6((0.34 + 0.1 * unit(life.startDate, `vent${i}:s`)) * (0.55 + 0.45 * Math.min(1, (life.years - year) / 8))),
     })),
     life,
   };

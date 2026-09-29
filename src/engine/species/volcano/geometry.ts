@@ -267,12 +267,14 @@ export function volcanoPlacements(model: VolcanoModel): ReefV2Placement[] {
       const key = `colony${c.year}:body${j}`;
       let a = a0;
       let y = Math.min(ceiling, yMid);
-      let scale = 0.85;
+      // Корали дрібніші за рифові (власник: «зменш корали»): вулкан — герой,
+      // корали на ньому — його мешканці, а не шуба.
+      let scale = 0.6;
       if (j > 0) {
         const r = Math.max(0.2, volcanoSlopeRadius(model, y));
         a = a0 + ((j % 2 ? 1 : -1) * Math.ceil(j / 2) * c.size * (0.55 + 0.25 * unit(seed, `${key}:d`))) / r;
         y = Math.min(ceiling, Math.max(0.02, y + (unit(seed, `${key}:y`) - 0.5) * c.size * 0.6));
-        scale = 0.5 + 0.3 * unit(seed, `${key}:s`);
+        scale = 0.36 + 0.2 * unit(seed, `${key}:s`);
       }
       const size = c.size * scale;
       out.push({ colony: c, body: j, key, size, base: onSlope(model, a, y, 0.96), axis: slopeAxis(a) });
@@ -293,7 +295,7 @@ export function volcanoUndergrowth(model: VolcanoModel): ReefV2Placement[] {
     const a = 2 * Math.PI * unit(seed, `${key}:a`);
     const foot = k % 3 === 2;
     const y = foot ? 0 : ceiling * Math.pow(unit(seed, `${key}:y`), 1.4);
-    const size = 0.08 + 0.12 * unit(seed, `${key}:s`);
+    const size = 0.055 + 0.075 * unit(seed, `${key}:s`);
     const form = UNDERGROWTH_FORMS[Math.min(5, Math.floor(unit(seed, `${key}:f`) * 6))]!;
     const colony: ReefV2Colony = { year: -1, age: 0, activity: 0, form, size, bodies: 1, azimuth: 0, reach: 0, hue: unit(seed, `${key}:h`) };
     const base: V3 = foot
