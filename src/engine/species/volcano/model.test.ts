@@ -64,17 +64,43 @@ describe('вулкан: ріст', () => {
   });
 });
 
+describe('вулкан: бічні конуси — віхи часу', () => {
+  it('з\'являються на 6-му, 12-му й 20-му роках і далі підростають', () => {
+    const count = (y: number) => buildVolcanoModel(at(`${2012 + y}-10-15`)).vents.length;
+    expect([count(5), count(6), count(11), count(12), count(19), count(20), count(40)]).toEqual([0, 1, 1, 2, 2, 3, 3]);
+    const young = buildVolcanoModel(at('2019-10-15')).vents[0]!.size;
+    const old = buildVolcanoModel(at('2030-10-15')).vents[0]!.size;
+    expect(old).toBeGreaterThan(young);
+    // Той самий конус на тому самому місці: азимут не стрибає з віком.
+    expect(buildVolcanoModel(at('2030-10-15')).vents[0]!.azimuth).toBe(buildVolcanoModel(at('2019-10-15')).vents[0]!.azimuth);
+  });
+});
+
 describe('вулкан: меш', () => {
   const model = buildVolcanoModel(read('fixtures/busy.json'));
   const geometry = buildVolcanoGeometry(model);
 
-  it('корал року — на шарі свого року (або під стелею жару)', () => {
-    for (const place of volcanoPlacements(model).filter((p) => p.body === 0)) {
-      const layer = model.layers.find((l) => l.year === place.colony.year);
-      if (!layer) continue;
-      const mid = Math.min(model.height * CORAL_CEILING, (layer.from + layer.to) / 2);
-      expect(place.base[1]).toBeCloseTo(mid, 5);
+  it('корали — літопис знизу вгору, але верхівка з кратером лишається голою', () => {
+    // Регресія першого кадру лабораторії: корали тонких молодих шарів
+    // тіснились під кратером і накривали вершину шапкою.
+    const firsts = volcanoPlacements(model).filter((p) => p.body === 0);
+    for (let i = 1; i < firsts.length; i += 1) {
+      expect(firsts[i]!.base[1]).toBeGreaterThanOrEqual(firsts[i - 1]!.base[1] - 1e-9);
     }
+    for (const place of volcanoPlacements(model)) {
+      expect(place.base[1]).toBeLessThanOrEqual(model.height * CORAL_CEILING + place.colony.size);
+    }
+  });
+
+  it('жар — на кожній вершині каменю, 0…1; кратер розпечений, підніжжя холодне', () => {
+    expect(geometry.rockHeat.length * 3).toBe(geometry.rock.positions.length);
+    for (const h of geometry.rockHeat) {
+      expect(h).toBeGreaterThanOrEqual(0);
+      expect(h).toBeLessThanOrEqual(1);
+    }
+    expect(Math.max(...geometry.rockHeat)).toBeGreaterThanOrEqual(0.8);
+    const footHeat = Array.from(geometry.rockHeat).filter((_, i) => geometry.rock.positions[i * 3 + 1]! < 0);
+    expect(Math.max(...footHeat)).toBeLessThan(0.3);
   });
 
   it('усі числа скінченні, трикутники цілі', () => {

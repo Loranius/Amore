@@ -24,6 +24,7 @@
 // Модуль чистий: лише числа, без three і React.
 // ============================================================
 import { anniversary, dayNumber, parseDay, yearIndex, yearsSince } from '../crystalV2/calendar';
+import { unit } from '../crystalV2/hash';
 import { ACTIVITY_WEIGHTS, datedItems, r6, type CrystalV2Snapshot } from '../crystalV2/model';
 import { buildReefV2Model, type ReefV2Model } from '../reefV2/model';
 
@@ -51,6 +52,19 @@ export interface VolcanoLayer {
   to: number;
 }
 
+/** Роки, на яких прорізається бічний конус: віха росту, не подія. */
+export const VOLCANO_VENT_YEARS: readonly number[] = [6, 12, 20];
+
+export interface VolcanoVent {
+  /** Рік разом, коли конус з'явився. */
+  year: number;
+  azimuth: number;
+  /** Де на схилі стоїть: частка висоти головного конуса. */
+  at: number;
+  /** Висота бічного конуса: росте ще вісім років після появи. */
+  size: number;
+}
+
 export interface VolcanoModel {
   version: string;
   startDate: string;
@@ -63,6 +77,8 @@ export interface VolcanoModel {
   /** Жар кратера 0.35…1: свіжа лава останніх двох років. */
   glow: number;
   veins: number;
+  /** Бічні конуси: з'являються на 6-му, 12-му й 20-му роках разом. */
+  vents: VolcanoVent[];
   /** Модель рифу тієї ж пари: колонії, актинії, мушлі, риби, трава, зірки. */
   life: ReefV2Model;
 }
@@ -111,6 +127,12 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
     craterRadius: r6(0.16 + 0.05 * top),
     glow: r6(glow),
     veins: 2 + Math.min(4, Math.floor(Math.log2(1 + recent / 2))),
+    vents: VOLCANO_VENT_YEARS.filter((year) => life.years >= year).map((year, i) => ({
+      year,
+      azimuth: r6(((unit(life.startDate, `vent${i}:a`) * 360) + i * 137.5) % 360),
+      at: r6(0.16 + 0.14 * unit(life.startDate, `vent${i}:at`)),
+      size: r6((0.26 + 0.08 * unit(life.startDate, `vent${i}:s`)) * (0.55 + 0.45 * Math.min(1, (life.years - year) / 8))),
+    })),
     life,
   };
 }

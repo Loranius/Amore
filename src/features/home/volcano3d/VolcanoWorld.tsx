@@ -13,10 +13,15 @@ import { unit } from '@/engine/species/crystalV2/hash';
 import type { VolcanoGeometry } from '@/engine/species/volcano/geometry';
 import { PORTAL_GROUND_Y } from '../crystal3d/scene/portalScene';
 import { ReefV2World } from '../reef3d/v2/ReefV2World';
-import { createGlowMaterial } from '../reef3d/v2/reefV2Materials';
+import { REEF_PALETTES, createGlowMaterial, createVolcanoRockMaterial } from '../reef3d/v2/reefV2Materials';
 
 /** Базальт: темніший і тепліший за камінь рифу. */
-export const VOLCANO_ROCK: Record<'light' | 'dark', string> = { light: '#6f5ca6', dark: '#3d3170' };
+/**
+ * Базальт: сіро-сливовий, тепліший за барвінковий камінь острова. Перший
+ * кадр лабораторії з фіолетовим `#3d3170` показав конус, що зливається з
+ * островом у темній темі.
+ */
+export const VOLCANO_ROCK: Record<'light' | 'dark', string> = { light: '#7d6a8e', dark: '#4f3f5e' };
 
 /** Подвійний удар серця: два поштовхи й пауза, період 1.6 с. */
 export function heartbeat(t: number): number {
@@ -92,16 +97,21 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
     return g;
   }, [geometry, seed]);
   const materials = useMemo(() => ({
+    rock: createVolcanoRockMaterial(REEF_PALETTES[theme], VOLCANO_ROCK[theme], PORTAL_GROUND_Y),
     lava: createLavaMaterial(),
     embers: createGlowMaterial('#ffb487', 0.9 + 0.6 * glow, 0.09, 'bubbles'),
-  }), [glow]);
+  }), [glow, theme]);
 
   useEffect(() => () => { lava.dispose(); embers.dispose(); }, [lava, embers]);
-  useEffect(() => () => { materials.lava.dispose(); materials.embers.dispose(); }, [materials]);
+  useEffect(() => () => { materials.rock.dispose(); materials.lava.dispose(); materials.embers.dispose(); }, [materials]);
 
   useFrame(({ clock, size }) => {
     const t = reduceMotion ? 0 : clock.getElapsedTime();
-    materials.lava.uniforms.uBeat!.value = reduceMotion ? 0.3 : heartbeat(t);
+    const beat = reduceMotion ? 0.3 : heartbeat(t);
+    materials.lava.uniforms.uBeat!.value = beat;
+    materials.rock.uniforms.uBeat!.value = beat;
+    materials.rock.uniforms.uGlow!.value = glow;
+    materials.rock.uniforms.uTime!.value = t;
     materials.lava.uniforms.uGlow!.value = glow;
     materials.embers.uniforms.uTime!.value = t;
     materials.embers.uniforms.uScale!.value = size.height;
@@ -118,6 +128,8 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         island={island}
         rockRadius={rockRadius}
         rockColour={VOLCANO_ROCK[theme]}
+        rockMaterial={materials.rock}
+        rockHeat={geometry.rockHeat}
         islandArch={false}
         bare={bare}
       />

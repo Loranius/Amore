@@ -67,6 +67,12 @@ interface ReefV2WorldProps {
   rockColour?: string;
   /** Арка позаду каменю острова; вулкан її вимикає (ADR-0235). */
   islandArch?: boolean;
+  /**
+   * Свій матеріал каменю й жар кожної його вершини (вулкан, ADR-0235).
+   * Матеріалом володіє той, хто його передав: тут він не звільняється.
+   */
+  rockMaterial?: THREE.ShaderMaterial;
+  rockHeat?: Float32Array;
 }
 
 /**
@@ -74,10 +80,13 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, rockMaterial, rockHeat }: ReefV2WorldProps) {
   const palette = REEF_PALETTES[theme];
 
-  const rock = useMemo(() => tonedGeometry(geometry.rock.positions, { tone: geometry.rock.tone }), [geometry]);
+  const rock = useMemo(
+    () => tonedGeometry(geometry.rock.positions, rockHeat ? { tone: geometry.rock.tone, heat: rockHeat } : { tone: geometry.rock.tone }),
+    [geometry, rockHeat],
+  );
   const corals = useMemo(() => tonedGeometry(geometry.corals.positions, {
     tone: geometry.corals.tone, form: geometry.corals.form, hue: geometry.corals.hue, rise: geometry.corals.rise,
   }), [geometry]);
@@ -195,7 +204,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
         <points geometry={snow} material={materials.snow} frustumCulled={false} />
         <points geometry={bubbles} material={materials.bubbles} frustumCulled={false} />
         <group scale={scale}>
-          <mesh geometry={rock} material={materials.rock} />
+          <mesh geometry={rock} material={rockMaterial ?? materials.rock} />
           <mesh geometry={corals} material={materials.corals} />
           {critters && <mesh geometry={critters} material={materials.critters} />}
           {starfish && <mesh geometry={starfish} material={materials.star} />}

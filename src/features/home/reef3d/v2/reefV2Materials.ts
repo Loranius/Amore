@@ -133,6 +133,49 @@ export function createSeabedMaterial(p: ReefPalette, base: string, ground: numbe
 }
 
 /**
+ * Базальт вулкана (ADR-0235): той самий підводний камінь, але з жаром на
+ * вершину — біля кратера й жил він тепліє до кольору жару й пульсує разом
+ * із лавою (`uBeat`). Сам камінь не світить: жар лише підмішується.
+ */
+export function createVolcanoRockMaterial(p: ReefPalette, base: string, ground: number): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    side: THREE.DoubleSide,
+    uniforms: { ...waterUniforms(p, ground), uBase: { value: colour(base) }, uBeat: { value: 0 }, uGlow: { value: 1 } },
+    vertexShader: /* glsl */ `
+      attribute float tone;
+      attribute float heat;
+      varying vec3 vWorld;
+      varying float vTone;
+      varying float vHeat;
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        vWorld = w.xyz;
+        vTone = tone;
+        vHeat = heat;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uBase;
+      uniform float uBeat;
+      uniform float uGlow;
+      varying vec3 vWorld;
+      varying float vTone;
+      varying float vHeat;
+      ${WATER}
+      void main() {
+        vec3 c = underwater(uBase * vTone, flatNormal(vWorld), vWorld);
+        float h = vHeat * (0.6 + 0.4 * uGlow);
+        vec3 ember = vec3(1.0, 0.33, 0.28);
+        c = mix(c, c * 0.55 + ember * 0.75, h * 0.6) + ember * h * uBeat * 0.28;
+        gl_FragColor = vec4(c, 1.0);
+        ${END}
+      }
+    `,
+  });
+}
+
+/**
  * Корали: колір форми, власний зсув відтінку колонії, темніше біля основи,
  * світліші кінчики; уночі кінчики й ребра світяться (біолюмінесценція).
  */
