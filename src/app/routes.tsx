@@ -22,6 +22,7 @@ import { lazyRoute } from './lazyRoute';
 import { Layout } from '@/components/layout/Layout';
 import { RouteErrorBoundary } from '@/components/layout/RouteErrorBoundary';
 import { RequireAuth, RedirectIfAuthed } from '@/components/guards/RequireAuth';
+import { GameGate } from '@/features/game/GameGate';
 import { LoginPage } from '@/features/auth/LoginPage';
 import { RegisterPage } from '@/features/auth/RegisterPage';
 import { HomePage } from '@/features/home/HomePage';
@@ -176,7 +177,7 @@ export const router = createHashRouter([
           // бо на /map ведуть закладки й старі посилання в планах.
           { path: 'map', element: <Navigate to="/memories" replace /> },
           { path: 'culinary', element: page(<CulinaryPage />) },
-          { path: 'game', element: page(<GamePage />) },
+          { path: 'game', element: <GameGate>{page(<GamePage />)}</GameGate> },
           /*
            * «Заміри» стоять поруч із грою в «Ще» — і поруч у цьому файлі
            * теж, щоб порядок роутів не розходився з порядком у меню.

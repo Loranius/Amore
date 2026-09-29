@@ -10,6 +10,8 @@
 import { useEffect } from 'react';
 import { NavLink } from 'react-router-dom';
 import { MORE_GROUPS, SETTINGS_ICON } from '@/app/nav';
+import { useCoupleId } from '@/features/_shared/useCoupleId';
+import { visibleNavItems } from '@/features/game/gameAccess';
 import { cn } from '@/lib/utils';
 
 interface MoreMenuProps {
@@ -19,6 +21,8 @@ interface MoreMenuProps {
 }
 
 export function MoreMenu({ open, onClose, onOpenSettings }: MoreMenuProps) {
+  // «Гра» — лише для пари, для якої її зроблено (ADR-0236).
+  const { coupleId } = useCoupleId();
   // Escape закриває. Блокування скролу фону — в Layout (там же .content).
   useEffect(() => {
     if (!open) return;
@@ -41,7 +45,7 @@ export function MoreMenu({ open, onClose, onOpenSettings }: MoreMenuProps) {
       <div className="more-menu-sheet" role="dialog" aria-modal="true" aria-label="Інші розділи">
         <p className="more-menu-title">Інші розділи</p>
 
-        {MORE_GROUPS.map((group) => (
+        {MORE_GROUPS.map((group) => ({ ...group, items: visibleNavItems(group.items, coupleId) })).filter((group) => group.items.length > 0).map((group) => (
           <div key={group.label} className="more-menu-group">
             <p className="more-menu-group-label">{group.label}</p>
             <div className="more-menu-grid">

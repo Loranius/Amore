@@ -10,6 +10,8 @@ import type { MediaType } from '@/types';
 
 export const qk = {
   users: () => ['users'] as const,
+  /** Пара того, хто увійшов (`portal_me`) — очищається разом із сесією (ADR-0236). */
+  myCouple: () => ['myCouple'] as const,
   /** Активний код-запрошення пари, поки в ній одна людина (ADR-0232). */
   coupleInvite: () => ['coupleInvite'] as const,
 

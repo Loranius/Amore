@@ -7,17 +7,20 @@
 import { NavLink } from 'react-router-dom';
 import { BOTTOM_LEFT, BOTTOM_RIGHT, HOME_ITEM, MORE_ITEMS, SETTINGS_ICON } from '@/app/nav';
 import type { NavItem } from '@/app/nav';
+import { useVisibleNavItems } from '@/features/game/gameAccess';
 import { cn } from '@/lib/utils';
 
 const ALL_ITEMS: NavItem[] = [HOME_ITEM, ...BOTTOM_LEFT, ...BOTTOM_RIGHT, ...MORE_ITEMS];
 
 export function Sidebar({ onOpenSettings }: { onOpenSettings: () => void }) {
+  // «Гра» — лише для пари, для якої її зроблено (ADR-0236).
+  const visibleItems = useVisibleNavItems(ALL_ITEMS);
   return (
     <aside className="sidebar" aria-label="Бічна навігація">
       <div className="sidebar-brand">Amore</div>
 
       <nav className="sidebar-nav">
-        {ALL_ITEMS.map((i) => (
+        {visibleItems.map((i) => (
           <NavLink
             key={i.to}
             to={i.to}

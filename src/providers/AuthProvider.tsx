@@ -32,9 +32,26 @@ import {
 } from 'react';
 import { supabase, invokeFn } from '@/lib/supabase';
 import { toAppUser } from '@/lib/guards';
+import { resetPortalSession } from '@/lib/sessionReset';
 import type { AppUser, PortalSeat } from '@/types';
 
 const SESSION_KEY = 'portal_session_user_id';
+
+/**
+ * Запам'ятати, хто в порталі. Якщо це ІНША людина, ніж була на пристрої, —
+ * спершу стерти все, що портал пам'ятав про попередню (ADR-0236): інакше
+ * нова пара до оновлення сторінки бачила б чужі дні, дату й плани з кешу.
+ */
+function rememberUser(userId: number): void {
+  let previous: string | null = null;
+  try {
+    previous = localStorage.getItem(SESSION_KEY);
+  } catch {
+    previous = null;
+  }
+  if (previous !== String(userId)) resetPortalSession();
+  localStorage.setItem(SESSION_KEY, String(userId));
+}
 
 export type AuthStatus = 'loading' | 'authenticated' | 'unauthenticated';
 
@@ -119,6 +136,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const bootstrapped = useRef(false);
 
   const clearLocalSession = useCallback(() => {
+    // Вихід — кінець чужих даних на цьому пристрої (ADR-0236).
+    resetPortalSession();
     localStorage.removeItem(SESSION_KEY);
     setUser(null);
     setStatus('unauthenticated');
@@ -164,7 +183,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return { ok: false, reason: 'error' };
         }
 
-        localStorage.setItem(SESSION_KEY, String(userId));
+        rememberUser(userId);
         setUser(appUser);
         setStatus('authenticated');
         return { ok: true };
@@ -183,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // ── Пошта й пароль (ADR-0228) ──────────────────────────────
   const enter = useCallback((appUser: AppUser) => {
-    localStorage.setItem(SESSION_KEY, String(appUser.id));
+    rememberUser(appUser.id);
     setUser(appUser);
     setStatus('authenticated');
   }, []);
@@ -396,7 +415,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const { data: me } = await supabase.rpc('portal_me');
           const appUser = Array.isArray(me) ? toAppUser(me[0]) : null;
           if (appUser) {
-            localStorage.setItem(SESSION_KEY, String(appUser.id));
+            rememberUser(appUser.id);
             setUser(appUser);
             setStatus('authenticated');
             return;
