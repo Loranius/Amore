@@ -6,13 +6,18 @@
 // світиться: озеро лави в кратері, жили на схилах і жар, що здіймається з
 // кратера. Лава б'ється подвійним поштовхом і паузою — «серце вулкана».
 // ============================================================
-import { useEffect, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useEffect, useMemo, useRef } from 'react';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { unit } from '@/engine/species/crystalV2/hash';
 import type { VolcanoGeometry } from '@/engine/species/volcano/geometry';
 import { PORTAL_GROUND_Y } from '../crystal3d/scene/portalScene';
 import { ReefV2World } from '../reef3d/v2/ReefV2World';
+import { isCrystalTap, type CrystalPointerSample } from '../crystal3d/evolution/tapGesture';
+import { eruptionAt } from './eruption';
+
+const VOLCANO_ROCK_NAME = 'volcano-rock';
+const VOLCANO_LAVA_NAME = 'volcano-lava';
 import { REEF_PALETTES, createGlowMaterial, createVolcanoRockMaterial } from '../reef3d/v2/reefV2Materials';
 
 /** Базальт: темніший і тепліший за камінь рифу. */
@@ -34,27 +39,48 @@ function createLavaMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
     toneMapped: false,
-    uniforms: { uBeat: { value: 0 }, uGlow: { value: 1 } },
+    uniforms: { uBeat: { value: 0 }, uGlow: { value: 1 }, uFront: { value: 0 }, uCool: { value: 0 } },
     vertexShader: /* glsl */ `
       attribute float heat;
+      attribute float flow;
       varying float vHeat;
+      varying float vFlow;
+      varying vec3 vLocal;
       void main() {
         vHeat = heat;
+        vFlow = flow;
+        vLocal = position;
         gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
       }
     `,
     fragmentShader: /* glsl */ `
       uniform float uBeat;
       uniform float uGlow;
+      uniform float uFront;
+      uniform float uCool;
       varying float vHeat;
+      varying float vFlow;
+      varying vec3 vLocal;
       void main() {
+        // Ріки (flow ≥ 0) видно лише до фронту дотику; фронт нерівний —
+        // язики лави біжать трохи вперед і відстають. Чаша (flow < 0) — завжди.
+        float head = 0.0;
+        if (vFlow >= 0.0) {
+          float lick = 0.02 * sin(vLocal.x * 57.0 + vLocal.z * 43.0) + 0.012 * sin(vLocal.y * 91.0);
+          if (vFlow > uFront + lick) discard;
+          // Застигання — розсип: гасне крапка за крапкою, без прозорості.
+          float grain = fract(sin(dot(floor(gl_FragCoord.xy * 0.5), vec2(12.9898, 78.233))) * 43758.5453);
+          if (grain < uCool) discard;
+          // Голова потоку — найгарячіша.
+          head = smoothstep(0.08, 0.0, uFront - vFlow) * step(uFront, 0.999);
+        }
         // Від застиглої темно-червоної кірки до жовто-рожевого серця.
         // Референс власника: ріки й корона — чистий червоно-помаранчевий,
         // серце кратера — жовте.
         vec3 crust = vec3(0.93, 0.2, 0.13);
         vec3 hot = vec3(1.0, 0.38, 0.14);
         vec3 core = vec3(1.0, 0.86, 0.3);
-        float h = clamp(vHeat * (0.65 + 0.35 * uGlow) + 0.18 * uBeat * vHeat, 0.0, 1.0);
+        float h = clamp(vHeat * (0.65 + 0.35 * uGlow) + 0.18 * uBeat * vHeat + 0.35 * head, 0.0, 1.0);
         vec3 c = h < 0.6 ? mix(crust, hot, h / 0.6) : mix(hot, core, (h - 0.6) / 0.4);
         gl_FragColor = vec4(c * (0.9 + 0.5 * uBeat * vHeat), 1.0);
       }
@@ -72,6 +98,10 @@ interface VolcanoWorldProps {
   rockRadius: number;
   /** Жар кратера з моделі: 0.35…1. */
   glow: number;
+  /**
+   * Без діорами (екран входу, лабораторія): там нікому торкнутися, тож ріки
+   * течуть завжди — інакше вулкан у ряду вибору був би без лави.
+   */
   bare?: boolean;
 }
 
@@ -80,9 +110,16 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(geometry.lava.positions, 3));
     g.setAttribute('heat', new THREE.BufferAttribute(geometry.lava.heat, 1));
+    g.setAttribute('flow', new THREE.BufferAttribute(geometry.lava.flow, 1));
     g.computeBoundingSphere();
     return g;
   }, [geometry]);
+  // Виверження на дотик (власник: «нехай лава починає текти лише при дотику
+  // по вулкану»). Час дотику — з годинника сцени; тап відділено від
+  // перетягування орбіти тим самим правилом, що в кристала.
+  const tappedAt = useRef<number | null>(null);
+  const pointerDown = useRef<CrystalPointerSample | null>(null);
+  const clockRef = useRef(0);
   // Жар: іскри, що здіймаються з кратера (рух — шейдер «бульбашок» рифу).
   const embers = useMemo(() => {
     const out: number[] = [];
@@ -110,17 +147,41 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
   useFrame(({ clock, size }) => {
     const t = reduceMotion ? 0 : clock.getElapsedTime();
     const beat = reduceMotion ? 0.3 : heartbeat(t);
+    clockRef.current = clock.getElapsedTime();
+    const eruption = bare
+      ? { front: 1, cool: 0 }
+      : eruptionAt(tappedAt.current === null ? null : clockRef.current - tappedAt.current, reduceMotion);
+    materials.lava.uniforms.uFront!.value = eruption.front;
+    materials.lava.uniforms.uCool!.value = eruption.cool;
+    // Камінь тепліє з рікою: у спокої — лише біля жерла.
+    const flowing = eruption.front * (1 - eruption.cool);
     materials.lava.uniforms.uBeat!.value = beat;
     materials.rock.uniforms.uBeat!.value = beat;
-    materials.rock.uniforms.uGlow!.value = glow;
+    materials.rock.uniforms.uGlow!.value = glow * (0.35 + 0.65 * flowing);
     materials.rock.uniforms.uTime!.value = t;
     materials.lava.uniforms.uGlow!.value = glow;
     materials.embers.uniforms.uTime!.value = t;
     materials.embers.uniforms.uScale!.value = size.height;
   });
 
+  const isVolcano = (event: ThreeEvent<PointerEvent | MouseEvent>) =>
+    event.object.name === VOLCANO_ROCK_NAME || event.object.name === VOLCANO_LAVA_NAME;
+
   return (
-    <>
+    <group
+      onPointerDown={(event: ThreeEvent<PointerEvent>) => {
+        if (!isVolcano(event)) return;
+        pointerDown.current = { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY, at: performance.now() };
+      }}
+      onClick={(event: ThreeEvent<MouseEvent>) => {
+        if (!isVolcano(event)) return;
+        const start = pointerDown.current;
+        pointerDown.current = null;
+        if (!isCrystalTap(start, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY, at: performance.now() })) return;
+        event.stopPropagation();
+        tappedAt.current = clockRef.current;
+      }}
+    >
       <ReefV2World
         seed={seed}
         geometry={geometry}
@@ -131,6 +192,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         rockRadius={rockRadius}
         rockColour={VOLCANO_ROCK[theme]}
         rockMaterial={materials.rock}
+        rockName={VOLCANO_ROCK_NAME}
         rockHeat={geometry.rockHeat}
         islandArch={false}
         islandLagoon={false}
@@ -141,10 +203,10 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
       />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         <group scale={scale}>
-          <mesh geometry={lava} material={materials.lava} />
+          <mesh name={VOLCANO_LAVA_NAME} geometry={lava} material={materials.lava} />
           <points geometry={embers} material={materials.embers} frustumCulled={false} />
         </group>
       </group>
-    </>
+    </group>
   );
 }

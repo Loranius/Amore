@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CrystalV2Snapshot } from '../crystalV2/model';
-import { buildVolcanoGeometry, volcanoCrater, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinPaths } from './geometry';
+import { buildVolcanoGeometry, volcanoCrater, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinIndices, volcanoVeinPaths } from './geometry';
 import { buildVolcanoModel, volcanoLayerThickness, volcanoSlopeRadius } from './model';
 
 // ============================================================
@@ -92,18 +92,42 @@ describe('вулкан: меш', () => {
     for (let i = 1; i < firsts.length; i += 1) expect(firsts[i]!).toBeGreaterThanOrEqual(firsts[i - 1]! - 1e-9);
   });
 
-  it('ріка витікає з жерла й лежить над гранями конуса, а не під ними (регресія)', () => {
+  it('ріка витікає з виїмки жерла й лежить над гранями конуса, а не під ними (регресія)', () => {
     // Власник: «лава … витікає десь під текстурами вулкана». Ріка на гладкому
     // конусі пірнала під грані, що випинаються від шуму кілець.
     const crater = volcanoCrater(model);
     const profile = [crater.rim, crater.bulge, ...volcanoRings(model).map((r) => r.points).reverse()];
-    for (const path of volcanoVeinPaths(model)) {
-      const a = Math.atan2(path[1]!.at[2], path[1]!.at[0]);
-      const source = path[0]!;
-      expect(Math.hypot(source.at[0], source.at[2])).toBeLessThan(volcanoRingHit(crater.rim, a).r);
+    const notchIndices = volcanoVeinIndices(model);
+    volcanoVeinPaths(model).forEach((path, v) => {
+      const notch = crater.rim[notchIndices[v]!]!;
+      // Виїмка нижча за сусідні зубці губи.
+      const i = notchIndices[v]!;
+      const neighbours = [crater.rim[(i + 1) % crater.rim.length]!, crater.rim[(i + crater.rim.length - 1) % crater.rim.length]!];
+      for (const n of neighbours) if (!notchIndices.includes(crater.rim.indexOf(n))) expect(notch[1]).toBeLessThan(n[1]);
+      // Джерело — у чаші, під виїмкою.
+      expect(Math.hypot(path[0]!.at[0], path[0]!.at[2])).toBeLessThan(Math.hypot(notch[0], notch[2]));
+      const sub = (path.length - 2) / (profile.length - 1);
       path.slice(1).forEach((point, k) => {
-        expect(Math.hypot(point.at[0], point.at[2])).toBeGreaterThanOrEqual(volcanoRingHit(profile[k]!, a).r);
+        const a = Math.atan2(point.at[2], point.at[0]);
+        const ring = Math.min(profile.length - 1, Math.floor(k / sub));
+        const s = ring === profile.length - 1 ? 0 : (k % sub) / sub;
+        const lo = volcanoRingHit(profile[ring]!, a).r;
+        const hi = s > 0 ? volcanoRingHit(profile[ring + 1]!, a).r : lo;
+        expect(Math.hypot(point.at[0], point.at[2])).toBeGreaterThanOrEqual(lo + (hi - lo) * s);
       });
+      // Фронт дотику: від жерла (0) монотонно до язика (1).
+      for (let k = 1; k < path.length; k += 1) expect(path[k]!.flow).toBeGreaterThanOrEqual(path[k - 1]!.flow);
+      expect(path.at(-1)!.flow).toBe(1);
+    });
+  });
+
+  it('лава не рівна: береги хвилясті й різні ліворуч і праворуч', () => {
+    for (const path of volcanoVeinPaths(model)) {
+      const body = path.slice(2, -4);
+      const left = body.map((p) => p.wl);
+      const right = body.map((p) => p.wr);
+      expect(left.some((w, k) => k > 0 && w < left[k - 1]!)).toBe(true);
+      expect(left.some((w, k) => Math.abs(w - right[k]!) > 1e-3)).toBe(true);
     }
   });
 

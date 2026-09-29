@@ -77,6 +77,8 @@ interface ReefV2WorldProps {
   rockHeat?: Float32Array;
   /** Частка дикої живності острова (вулкан — третина, ADR-0235). */
   islandWildlife?: number;
+  /** Ім'я меша каменю: вулкан за ним відрізняє дотик до конуса. */
+  rockName?: string;
   /** Висота морської трави: на плато вулкана вона нижча, щоб не затуляти конус. */
   seagrassScale?: number;
 }
@@ -86,7 +88,7 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1 }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '' }: ReefV2WorldProps) {
   const palette = REEF_PALETTES[theme];
 
   const rock = useMemo(
@@ -213,7 +215,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
         <points geometry={snow} material={materials.snow} frustumCulled={false} />
         <points geometry={bubbles} material={materials.bubbles} frustumCulled={false} />
         <group scale={scale}>
-          <mesh geometry={rock} material={rockMaterial ?? materials.rock} />
+          <mesh name={rockName} geometry={rock} material={rockMaterial ?? materials.rock} />
           <mesh geometry={corals} material={materials.corals} />
           {critters && <mesh geometry={critters} material={materials.critters} />}
           {starfish && <mesh geometry={starfish} material={materials.star} />}

@@ -69,7 +69,12 @@ export function volcanoMagmaY(model: VolcanoModel): number {
   return model.height - 0.1 - 0.05 * model.height;
 }
 
-interface VeinPoint { at: V3; side: V3; w: number; heat: number }
+/**
+ * Точка ріки: вісь, напрям упоперек, ширина окремо лівого й правого берега
+ * (природна лава не симетрична), жар і `flow` — частка довжини ріки від
+ * жерла (0) до язика (1): фронт анімації дотику (ADR-0235).
+ */
+interface VeinPoint { at: V3; side: V3; wl: number; wr: number; heat: number; flow: number }
 
 /**
  * Де грань конуса перетинає промінь з осі під азимутом `a`: радіус і
@@ -107,25 +112,51 @@ export function volcanoVeinPaths(model: VolcanoModel): VeinPoint[][] {
   const cone = volcanoRings(model).map((ring) => ring.points).reverse();
   // Згори донизу: губа, вал, комір (= верх останнього шару), кільця шарів.
   const profile: V3[][] = [crater.rim, crater.bulge, ...cone];
+  // Між кільцями — по кілька проміжних точок: ріка звивається й хвилює
+  // берегами не лише на межах шарів.
+  const SUB = 4;
   const paths: VeinPoint[][] = [];
-  for (let v = 0; v < model.veins; v += 1) {
-    // Рівномірно довкола, з легким зсувом: ріки не злипаються в один бік.
-    const a = ((v + 0.35 * (unit(seed, `vein${v}:a`) - 0.5)) / model.veins) * Math.PI * 2 + unit(seed, 'veins:turn') * Math.PI * 2;
-    const side: V3 = [-Math.sin(a), 0, Math.cos(a)];
+  for (const [v, index] of volcanoVeinIndices(model).entries()) {
+    const notch = crater.rim[index]!;
+    const a0 = Math.atan2(notch[2], notch[0]);
+    const tag = `vein${v}`;
+    const phase = unit(seed, `${tag}:p`) * Math.PI * 2;
+    const drift = (unit(seed, `${tag}:d`) - 0.5) * 0.18;
+    const samples: { ring: number; s: number }[] = [];
+    for (let k = 0; k < profile.length - 1; k += 1) {
+      for (let q = 0; q < SUB; q += 1) samples.push({ ring: k, s: q / SUB });
+    }
+    samples.push({ ring: profile.length - 1, s: 0 });
+    const n = samples.length - 1;
     const path: VeinPoint[] = [];
-    // Джерело — у чаші, під губою: лава переливається через край.
-    const lip = volcanoRingHit(crater.rim, a);
-    path.push({ at: [Math.cos(a) * lip.r * 0.8, lip.y - R * 0.05, Math.sin(a) * lip.r * 0.8], side, w: R * 0.26, heat: 1 });
-    profile.forEach((ring, k) => {
-      const hit = volcanoRingHit(ring, a);
-      const t = k / (profile.length - 1);
+    // Джерело — у чаші під виїмкою: лава переливається через край жерла.
+    path.push({
+      at: [notch[0] * 0.8, notch[1] - R * 0.05, notch[2] * 0.8],
+      side: [-Math.sin(a0), 0, Math.cos(a0)],
+      wl: R * 0.22, wr: R * 0.22, heat: 1, flow: 0,
+    });
+    samples.forEach((sample, k) => {
+      const t = k / n;
+      // Меандр: ріка повільно відхиляється й хитається, а не падає по лінійці.
+      const a = a0 + drift * t + 0.07 * Math.sin(phase + t * 7.5) * Math.min(1, t * 4);
+      const lo = volcanoRingHit(profile[sample.ring]!, a);
+      const hi = sample.s > 0 ? volcanoRingHit(profile[sample.ring + 1]!, a) : lo;
+      const r = lo.r + (hi.r - lo.r) * sample.s;
+      const y = lo.y + (hi.y - lo.y) * sample.s;
       const lift = 1.03 + 0.01 * t;
+      // Малі хвилі берегів — кожен берег свої — і ширшання донизу.
+      const base = R * (0.26 + 0.24 * t);
+      const waveL = 1 + 0.18 * Math.sin(phase + t * 23) + 0.1 * Math.sin(phase * 2 + t * 41);
+      const waveR = 1 + 0.18 * Math.sin(phase + 1.7 + t * 19) + 0.1 * Math.sin(phase * 3 + t * 37);
+      // Язик заокруглюється: береги сходяться в останні 6% довжини.
+      const toe = t > 0.94 ? Math.sqrt(Math.max(0, (1 - t) / 0.06)) : 1;
       path.push({
-        at: [Math.cos(a) * hit.r * lift, hit.y + 0.006, Math.sin(a) * hit.r * lift],
-        side,
-        // Ширина росте донизу: ріка розтікається схилом.
-        w: R * (0.3 + 0.22 * t),
+        at: [Math.cos(a) * r * lift, y + 0.006, Math.sin(a) * r * lift],
+        side: [-Math.sin(a), 0, Math.cos(a)],
+        wl: base * waveL * toe + 0.002,
+        wr: base * waveR * toe + 0.002,
         heat: 0.95 - 0.4 * t,
+        flow: Math.max(0.02, t),
       });
     });
     paths.push(path);
@@ -186,14 +217,24 @@ function ventTriangles(model: VolcanoModel, vent: VolcanoModel['vents'][number])
  * Кільця жерла. Корона — зубці через один: високі й низькі, як у
  * референсі власника; вал під нею випирає назовні.
  */
+/** Вершини губи, з яких витікають ріки: рівномірно довкола, з хешу пари. */
+export function volcanoVeinIndices(model: VolcanoModel): number[] {
+  const offset = Math.floor(unit(model.startDate, 'veins:turn') * SIDES);
+  return Array.from({ length: model.veins }, (_, v) => (offset + Math.round((v * SIDES) / model.veins)) % SIDES);
+}
+
 export function volcanoCrater(model: VolcanoModel) {
   const seed = model.startDate;
   const rings = volcanoRings(model);
   const collar = rings[rings.length - 1]!.points;
   const R = model.craterRadius;
-  // Губа — кам'яна й рівна, без зубців корони (власник: «прибери цю лавову
-  // корону»): легкий шум, щоб край не був циркулем.
-  const lift = collar.map((_, i) => R * (0.4 + 0.1 * unit(seed, `rim:${i}:y`)));
+  const notches = new Set(volcanoVeinIndices(model));
+  // Губа кам'яна, трошки зубчаста (власник: «зроби жерло трошки зубчастим,
+  // з виямки якої витікає лава»): зубці через один, а над кожною рікою —
+  // виїмка майже до коміра, звідки лава й переливається.
+  const lift = collar.map((_, i) => (notches.has(i)
+    ? R * 0.05
+    : R * ((i % 2 === 0 ? 0.46 : 0.3) + 0.1 * unit(seed, `rim:${i}:y`))));
   const bulge = collar.map(([x, y, z], i): V3 => [x * 1.1, y + lift[i]! * 0.4, z * 1.1]);
   const rim = collar.map(([x, y, z], i): V3 => [x * 0.95, y + lift[i]!, z * 0.95]);
   const magma = volcanoMagmaY(model);
@@ -256,12 +297,18 @@ export interface VolcanoLava {
   positions: Float32Array;
   /** Жар вершини 0…1: 1 у кратері, згасає вниз по жилі. */
   heat: Float32Array;
+  /**
+   * Де вершина на ріці: 0 у жерлі … 1 на язику; −1 — чаша й кратери
+   * бічних конусів, що світяться завжди. Фронт дотику порівнюється з цим.
+   */
+  flow: Float32Array;
 }
 
 export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
   const p: number[] = [];
   const h: number[] = [];
-  const push = (v: V3, heat: number) => { p.push(...v); h.push(heat); };
+  const f: number[] = [];
+  const push = (v: V3, heat: number, flow = -1) => { p.push(...v); h.push(heat); f.push(flow); };
   // Озеро: віяло трикутників, що здувається посередині — лава випирає.
   const y = volcanoMagmaY(model) + 0.005;
   const r = volcanoSlopeRadius(model, model.height) * 0.64;
@@ -287,14 +334,14 @@ export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
   for (const path of volcanoVeinPaths(model)) {
     let prev: VeinPoint | null = null;
     for (const point of path) {
-      const { at, side, w, heat } = point;
+      const { at, side, wl, wr, heat, flow } = point;
       if (prev) {
-        const pa: V3 = [prev.at[0] + prev.side[0] * prev.w, prev.at[1], prev.at[2] + prev.side[2] * prev.w];
-        const pb: V3 = [prev.at[0] - prev.side[0] * prev.w, prev.at[1], prev.at[2] - prev.side[2] * prev.w];
-        const qa: V3 = [at[0] + side[0] * w, at[1], at[2] + side[2] * w];
-        const qb: V3 = [at[0] - side[0] * w, at[1], at[2] - side[2] * w];
-        push(pa, prev.heat); push(qa, heat); push(pb, prev.heat);
-        push(pb, prev.heat); push(qa, heat); push(qb, heat);
+        const pa: V3 = [prev.at[0] + prev.side[0] * prev.wl, prev.at[1], prev.at[2] + prev.side[2] * prev.wl];
+        const pb: V3 = [prev.at[0] - prev.side[0] * prev.wr, prev.at[1], prev.at[2] - prev.side[2] * prev.wr];
+        const qa: V3 = [at[0] + side[0] * wl, at[1], at[2] + side[2] * wl];
+        const qb: V3 = [at[0] - side[0] * wr, at[1], at[2] - side[2] * wr];
+        push(pa, prev.heat, prev.flow); push(qa, heat, flow); push(pb, prev.heat, prev.flow);
+        push(pb, prev.heat, prev.flow); push(qa, heat, flow); push(qb, heat, flow);
       }
       prev = point;
     }
@@ -314,7 +361,7 @@ export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
       push([c[0] + Math.cos(t0) * r, c[1], c[2] + Math.sin(t0) * r], 0.7);
     }
   }
-  return { positions: new Float32Array(p), heat: new Float32Array(h) };
+  return { positions: new Float32Array(p), heat: new Float32Array(h), flow: new Float32Array(f) };
 }
 
 /**
