@@ -51,15 +51,72 @@ export interface TreeV2Branch { start: V3; end: V3; r0: number; r1: number; orde
  */
 export const TREE_GIRTH = 1.5;
 
-export interface TreeV2Cluster { centre: V3; radius: number; key: string }
+export interface TreeV2Cluster {
+  centre: V3;
+  radius: number;
+  key: string;
+  /** Сплющення крони по висоті: дуб 0.82, ялина пласка лапа, сакура хмаринка. */
+  squash?: number;
+}
+
+/**
+ * Форма дерева (ADR-0237 §4.3): ТОЙ САМИЙ ріст — яруси, гілки років,
+ * плани, спогади — інший малюнок. Модель і таблиця модулів однакові.
+ */
+export type TreeForm = 'oak' | 'spruce' | 'sakura';
+export const TREE_FORMS: readonly TreeForm[] = ['oak', 'spruce', 'sakura'];
+
+interface FormRules {
+  /** Верх провідника — частка висоти моделі. */
+  top: number;
+  /** Кут гілки року над горизонтом: тихий рік, і на скільки нижче — повний. */
+  rise: number;
+  fall: number;
+  /** Досяжність гілки ярусу `tier` на висоті `y` (у частках H). */
+  reach: (H: number, tier: number, y: number, topY: number) => number;
+  /** Скільки порядків розгалуження на вік гілки. */
+  depth: (age: number) => number;
+  squash: number;
+  leaf: number;
+  lean: number;
+  /** Де ярус виходить зі стовбура: частка висоти дерева наприкінці року відкриття. */
+  tierAt: number;
+}
+
+const FORMS: Record<TreeForm, FormRules> = {
+  oak: {
+    top: 0.86, rise: 50, fall: 30,
+    reach: (H, tier) => (0.5 * H) / (1 + 0.18 * tier),
+    depth: (age) => 1 + Math.min(2, Math.floor(age / 2)),
+    squash: 0.82, leaf: 1, lean: 1, tierAt: 0.62,
+  },
+  // Ялина: стовбур до самої верхівки, гілки майже горизонтальні й коротшають
+  // догори — крона конусом; лапи пласкі.
+  spruce: {
+    top: 0.98, rise: 14, fall: 16,
+    reach: (H, _tier, y, topY) => 0.46 * H * Math.max(0.12, 1 - y / topY),
+    depth: (age) => 1 + Math.min(1, Math.floor(age / 3)),
+    squash: 0.42, leaf: 1.15, lean: 0.3,
+    // Кільце гілок ялини — там, де того року була верхівка.
+    tierAt: 0.9,
+  },
+  // Сакура: низький нахилений стовбур, довгі розлогі гілки, плоска
+  // хмаринка крони.
+  sakura: {
+    top: 0.58, rise: 32, fall: 26,
+    reach: (H, tier) => (0.64 * H) / (1 + 0.12 * tier),
+    depth: (age) => 1 + Math.min(2, Math.floor(age / 2)),
+    squash: 0.6, leaf: 1.12, lean: 2.2, tierAt: 0.62,
+  },
+};
 
 /** Висота, на якій ярус `tier` виходить зі стовбура (ADR-0237). */
-export function treeV2TierHeight(model: TreeV2Model, tier: number): number {
+export function treeV2TierHeight(model: TreeV2Model, tier: number, form: TreeForm = 'oak'): number {
   const first = model.yearBranches.find((b) => b.tier === tier);
   const opened = first ? first.year : 0;
   // Ярус стоїть на висоті, яку дерево мало, коли його рік прожито; далі
   // стовбур росте вище, а ярус лишається де був — як справжня гілка.
-  return 0.62 * Math.min(treeHeightAt(opened + 1), model.height);
+  return FORMS[form].tierAt * Math.min(treeHeightAt(opened + 1), model.height);
 }
 
 /** Вузол на осі стовбура на висоті `y` (стовбур трохи похилений). */
@@ -67,11 +124,12 @@ function trunkAt(dir: V3, y: number): V3 {
   return mul(dir, y / dir[1]);
 }
 
-export function treeV2Skeleton(model: TreeV2Model): { branches: TreeV2Branch[]; clusters: TreeV2Cluster[] } {
+export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { branches: TreeV2Branch[]; clusters: TreeV2Cluster[] } {
+  const rules = FORMS[form];
   const seed = model.startDate;
   const H = model.height;
   const { leafiness } = model;
-  const lean = rad(model.lean);
+  const lean = rad(model.lean * rules.lean);
   const leanAz = rad(model.leanAzimuth);
   const trunkDir: V3 = [Math.sin(lean) * Math.cos(leanAz), Math.cos(lean), Math.sin(lean) * Math.sin(leanAz)];
   const branches: TreeV2Branch[] = [];
@@ -85,8 +143,8 @@ export function treeV2Skeleton(model: TreeV2Model): { branches: TreeV2Branch[]; 
     branches.push({ start, end, r0: radius, r1, order, key });
     if (order >= last - 1 && order > 0) {
       // Кінчик і передостанній порядок несуть листя.
-      const size = (0.08 + 0.34 * length) * leafiness * (order === last ? 0.9 : 0.7);
-      clusters.push({ centre: end, radius: size, key });
+      const size = (0.08 + 0.34 * length) * leafiness * (order === last ? 0.9 : 0.7) * rules.leaf;
+      clusters.push({ centre: end, radius: size, key, squash: rules.squash });
     }
     if (order === last) return;
     const turn = 137.5 * order + 360 * unit(seed, `${key}:turn`);
@@ -99,8 +157,8 @@ export function treeV2Skeleton(model: TreeV2Model): { branches: TreeV2Branch[]; 
 
   // Стовбур: сегмент до кожного ярусу, далі провідник до верхівки. Кожен
   // сегмент починається там, де скінчився попередній: вузли закривають стик.
-  const stops = Array.from({ length: model.tiers }, (_, t) => treeV2TierHeight(model, t));
-  const topY = 0.86 * H;
+  const stops = Array.from({ length: model.tiers }, (_, t) => treeV2TierHeight(model, t, form));
+  const topY = rules.top * H;
   const heights = [...stops.filter((y) => y < topY - 1e-9), topY];
   let from: V3 = [0, 0, 0];
   let fromY = 0;
@@ -117,24 +175,51 @@ export function treeV2Skeleton(model: TreeV2Model): { branches: TreeV2Branch[]; 
     const y = stops[yb.tier]!;
     const az = (yb.slot * 360) / yb.size + yb.tier * 137.5 + (unit(seed, `${key}:az`) - 0.5) * 24;
     // Тиха гілка дивиться вгору (~50°), насичена майже горизонтальна (~20°).
-    const el = 50 - 30 * yb.fertility + (unit(seed, `${key}:el`) - 0.5) * 8;
+    const el = rules.rise - rules.fall * yb.fertility + (unit(seed, `${key}:el`) - 0.5) * 8;
     const d: V3 = [Math.cos(rad(el)) * Math.cos(rad(az)), Math.sin(rad(el)), Math.cos(rad(el)) * Math.sin(rad(az))];
     const grown = 1 - Math.exp(-(yb.age + 0.25) / 2);
-    const reach = (0.5 * H) / (1 + 0.18 * yb.tier);
+    const reach = rules.reach(H, yb.tier, y, topY);
     const length = reach * (0.35 + 0.65 * grown) * yearBoost(yb.activity) * (0.9 + 0.2 * unit(seed, `${key}:len`));
     // Молода гілка — один пагін; з роками розгалужується, до трьох порядків.
-    const last = 1 + Math.min(2, Math.floor(yb.age / 2));
-    grow(trunkAt(trunkDir, y), d, length, 1, last, key, trunkRel(y) * 0.55 * (0.6 + 0.4 * grown), 0.6);
+    const last = rules.depth(yb.age);
+    const start = trunkAt(trunkDir, y);
+    grow(start, d, length, 1, last, key, trunkRel(y) * 0.55 * (0.6 + 0.4 * grown), 0.6);
+    // Ялина: лапа хвої вздовж усієї гілки, а не лише на кінчику.
+    if (form === 'spruce') clusters.push({ centre: add(start, mul(d, length * 0.55)), radius: length * 0.42 * leafiness, key: `${key}:paw`, squash: rules.squash });
+  }
+
+  // Ялина: між кільцями — короткі проміжні лапи, як у справжньої ялини між
+  // мутовками. Це малюнок форми, а не елемент року: число й довжина — лише
+  // від висоти, тож таблиця модулів не змінюється.
+  if (form === 'spruce') {
+    const marks = [0, ...heights];
+    for (let i = 1; i < marks.length; i += 1) {
+      for (const f of [1 / 3, 2 / 3]) {
+        const y = marks[i - 1]! + (marks[i]! - marks[i - 1]!) * f;
+        if (y < H * 0.18) continue;
+        const key = `m${i}:${f < 0.5 ? 'a' : 'b'}`;
+        const az = 360 * unit(seed, `${key}:az`);
+        const el = 10 + 8 * unit(seed, `${key}:el`);
+        const d: V3 = [Math.cos(rad(el)) * Math.cos(rad(az)), Math.sin(rad(el)), Math.cos(rad(el)) * Math.sin(rad(az))];
+        const length = rules.reach(H, 0, y, topY) * 0.6;
+        const start = trunkAt(trunkDir, y);
+        branches.push({ start, end: add(start, mul(d, length)), r0: trunkRel(y) * 0.25, r1: trunkRel(y) * 0.1, order: 2, key });
+        clusters.push({ centre: add(start, mul(d, length * 0.6)), radius: length * 0.45 * leafiness, key: `${key}:paw`, squash: rules.squash });
+      }
+    }
   }
 
   // Верхівка: гілки планів розходяться від провідника вгору й убік.
   const top = trunkAt(trunkDir, topY);
+  // Ялина закінчується шпилем: гостра верхівка над гілками планів.
+  if (form === 'spruce') clusters.push({ centre: top, radius: 0.1 * H * leafiness, key: 'spire', squash: 1.7 });
   for (let i = 0; i < model.crownLimbs; i += 1) {
     const key = `c${i}`;
     const az = (i * 360) / model.crownLimbs + (unit(seed, `${key}:az`) - 0.5) * 40;
     const el = 55 + 15 * unit(seed, `${key}:el`);
     const d: V3 = [Math.cos(rad(el)) * Math.cos(rad(az)), Math.sin(rad(el)), Math.cos(rad(el)) * Math.sin(rad(az))];
-    grow(top, d, 0.28 * H * (0.85 + 0.3 * unit(seed, `${key}:len`)), 1, 2, key, trunkRel(topY) * 0.6, 0.6);
+    const limb = form === 'spruce' ? 0.1 : form === 'sakura' ? 0.34 : 0.28;
+    grow(top, d, limb * H * (0.85 + 0.3 * unit(seed, `${key}:len`)), 1, 2, key, trunkRel(topY) * 0.6, 0.6);
   }
 
   const girth = model.trunkRadius * TREE_GIRTH;
@@ -335,9 +420,9 @@ export interface TreeV2Geometry {
   meadowRadius: number;
 }
 
-export function buildTreeV2Geometry(model: TreeV2Model): TreeV2Geometry {
+export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'): TreeV2Geometry {
   const seed = model.startDate;
-  const { branches, clusters } = treeV2Skeleton(model);
+  const { branches, clusters } = treeV2Skeleton(model, form);
   const orn = treeV2Ornaments(model, clusters);
 
   const wood: number[] = [];
@@ -376,9 +461,10 @@ export function buildTreeV2Geometry(model: TreeV2Model): TreeV2Geometry {
   for (const c of clusters) {
     const pts = ICO.verts.map((v, i): V3 => {
       const k = c.radius * 1.14 * (0.82 + 0.3 * unit(seed, `${c.key}:v${i}`));
-      return [c.centre[0] + v[0] * k, c.centre[1] + v[1] * k * 0.82, c.centre[2] + v[2] * k];
+      return [c.centre[0] + v[0] * k, c.centre[1] + v[1] * k * (c.squash ?? 0.82), c.centre[2] + v[2] * k];
     });
-    const autumn = unit(seed, `${c.key}:autumn`) < model.autumn ? 1 : 0;
+    // Ялина вічнозелена: осені в неї немає.
+    const autumn = form !== 'spruce' && unit(seed, `${c.key}:autumn`) < model.autumn ? 1 : 0;
     ICO.faces.forEach(([a, b, cc], k) => {
       const tone = 0.85 + 0.3 * unit(seed, `${c.key}:f${k}`);
       for (const p of [pts[a]!, pts[b]!, pts[cc]!]) {

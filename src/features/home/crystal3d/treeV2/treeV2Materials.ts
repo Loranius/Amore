@@ -25,6 +25,15 @@ export interface TreePalette {
   fireflyStrength: number;
 }
 
+/**
+ * Колір крони за формою дерева (ADR-0237): ялина — темна хвоя, сакура —
+ * рожеве цвітіння, восени — теплий помаранч. Решта палітри спільна.
+ */
+export const TREE_FORM_LEAVES: Record<'spruce' | 'sakura', Record<'light' | 'dark', Pick<TreePalette, 'leaf' | 'leafAutumn'>>> = {
+  spruce: { light: { leaf: '#2f8f55', leafAutumn: '#2f8f55' }, dark: { leaf: '#2b7d4b', leafAutumn: '#2b7d4b' } },
+  sakura: { light: { leaf: '#ffb7d2', leafAutumn: '#ff8a5c' }, dark: { leaf: '#f39cc2', leafAutumn: '#f07f52' } },
+};
+
 export const TREE_PALETTES: Record<'light' | 'dark', TreePalette> = {
   light: {
     bark: '#8a5236',

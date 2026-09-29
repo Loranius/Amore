@@ -8,13 +8,14 @@
 //   /tree-growth-lab.html                         — 1, 4, 5, 8, 15, 30 років
 //   /tree-growth-lab.html?years=4,8&hot=2         — рік 2 насичений: його гілка довша й горизонтальніша
 //   /tree-growth-lab.html?fill=0&theme=light      — порожня історія: росте лише час
+//   /tree-growth-lab.html?form=spruce             — ялина (oak | spruce | sakura, ADR-0237)
 //
 // Сторінка не входить у збірку продукту: лише dev-сервер.
 // ============================================================
 import { useMemo } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Canvas } from '@react-three/fiber';
-import { buildTreeV2Geometry } from '@/engine/species/treeV2/geometry';
+import { TREE_FORMS, buildTreeV2Geometry, type TreeForm } from '@/engine/species/treeV2/geometry';
 import { buildTreeV2Model } from '@/engine/species/treeV2/model';
 import { PORTAL_GROUND_Y } from '@/features/home/crystal3d/scene/portalScene';
 import { TreeV2World } from '@/features/home/crystal3d/treeV2/TreeV2World';
@@ -24,7 +25,7 @@ import { yearsWord } from '@/features/auth/newCouple';
 import { labSnapshot } from './labSnapshot';
 import '@/index.css';
 
-function Island({ years, fill, hot, theme, x }: { years: number; fill: number; hot: number[]; theme: 'light' | 'dark'; x: number }) {
+function Island({ years, fill, hot, theme, x, form }: { years: number; fill: number; hot: number[]; theme: 'light' | 'dark'; x: number; form: TreeForm }) {
   const built = useMemo(() => {
     const base = labSnapshot(years, fill);
     const startYear = Number(base.startDate.slice(0, 4));
@@ -32,15 +33,15 @@ function Island({ years, fill, hot, theme, x }: { years: number; fill: number; h
     const extra = hot.filter((y) => y < years).flatMap((y) =>
       Array.from({ length: 40 }, (_, k) => ({ id: 500_000 + y * 100 + k, date: `${startYear + y}-05-${String(1 + (k % 28)).padStart(2, '0')}` })));
     const model = buildTreeV2Model({ ...base, memories: [...(base.memories ?? []), ...extra] });
-    const geometry = buildTreeV2Geometry(model);
+    const geometry = buildTreeV2Geometry(model, form);
     const frame = treeV2Frame(geometry);
     return { model, geometry, frame, island: dioramaIslandRadius(frame.reach * 0.9) };
-  }, [years, fill, hot]);
+  }, [years, fill, hot, form]);
   const k = 1 / 2.6;
   return (
     <group position={[x, 0, 0]} scale={k}>
       <group position={[0, -PORTAL_GROUND_Y, 0]}>
-        <TreeV2World bare seed={built.model.startDate} geometry={built.geometry} scale={built.frame.scale} theme={theme} reduceMotion island={built.island} />
+        <TreeV2World bare seed={built.model.startDate} geometry={built.geometry} scale={built.frame.scale} theme={theme} reduceMotion island={built.island} form={form} />
       </group>
     </group>
   );
@@ -52,6 +53,8 @@ function Lab() {
   const fill = Number(params.get('fill') ?? 4);
   const hot = (params.get('hot') ?? '').split(',').filter(Boolean).map(Number);
   const theme = params.get('theme') === 'dark' ? 'dark' : 'light';
+  const asked = params.get('form');
+  const form: TreeForm = TREE_FORMS.includes(asked as TreeForm) ? (asked as TreeForm) : 'oak';
   const gap = 2.1;
   const sky = theme === 'light' ? '#bfe3f2' : '#1b2a4a';
   return (
@@ -65,7 +68,7 @@ function Lab() {
       >
         <color attach="background" args={[sky]} />
         {ages.map((years, i) => (
-          <Island key={years} years={years} fill={fill} hot={hot} theme={theme} x={(i - (ages.length - 1) / 2) * gap} />
+          <Island key={years} years={years} fill={fill} hot={hot} theme={theme} form={form} x={(i - (ages.length - 1) / 2) * gap} />
         ))}
       </Canvas>
       <div style={{ position: 'fixed', left: 0, right: 0, bottom: 24, display: 'flex', justifyContent: 'space-around', pointerEvents: 'none' }}>

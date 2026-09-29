@@ -196,6 +196,60 @@ function body(
   return tris;
 }
 
+/**
+ * Форма кристала (ADR-0237 §4.3): ТОЙ САМИЙ ріст — монарх, кристал на рік,
+ * колір, нахил — інший малюнок. `druse` — теперішня друза кварцу,
+ * `stalagmite` — натічний сталагміт.
+ */
+export type CrystalForm = 'druse' | 'stalagmite';
+export const CRYSTAL_FORMS: readonly CrystalForm[] = ['druse', 'stalagmite'];
+
+const STALAGMITE_SIDES = 9;
+
+/**
+ * Сталагміт: округлий конус, найширший біля основи, з натічними кільцями.
+ * Кант — лише на горизонтальних ребрах кілець, не на вертикальних: так
+ * читаються шари натеку, а не грані кварцу. Кожна грань — пласка трапеція
+ * між двома кільцями, кінчик — заокруглений маленьким кільцем і точкою.
+ */
+function stalagmite(seed: string, tag: string, radius: number, height: number, rings: number, bury: number): Tri[] {
+  const n = STALAGMITE_SIDES;
+  const turn = unit(seed, `${tag}:turn`) * 360;
+  const angles = Array.from({ length: n }, (_, i) => ((i + 0.3 * (unit(seed, `${tag}:a${i}`) - 0.5)) / n) * 360 + turn);
+  const tipShift: [number, number] = [(unit(seed, `${tag}:tx`) - 0.5) * 0.3 * radius, (unit(seed, `${tag}:tz`) - 0.5) * 0.3 * radius];
+  const level = (k: number): V3[] => {
+    // t 0 → основа, 1 → під кінчиком; натічні кільця — легкі потовщення.
+    const t = k / rings;
+    const y = -bury + (height * 0.94 + bury) * t;
+    const bulge = k > 0 && k < rings ? 1 + 0.07 * (unit(seed, `${tag}:ring${k}`) - 0.2) : 1;
+    const r = radius * 1.25 * Math.pow(1 - 0.86 * t, 0.8) * bulge;
+    return angles.map((deg) => {
+      const a = (deg * Math.PI) / 180;
+      return [Math.cos(a) * r + tipShift[0] * t * t, y, Math.sin(a) * r + tipShift[1] * t * t];
+    });
+  };
+  const levels = Array.from({ length: rings + 1 }, (_, k) => level(k));
+  const tris: Tri[] = [];
+  let face = 0;
+  for (let k = 0; k < rings; k += 1) {
+    const lo = levels[k]!;
+    const hi = levels[k + 1]!;
+    for (let i = 0; i < n; i += 1) {
+      const j = (i + 1) % n;
+      tris.push(outward(lo[i]!, lo[j]!, hi[j]!, face, [false, false, true]));
+      tris.push(outward(lo[i]!, hi[j]!, hi[i]!, face, [true, false, false]));
+      face += 1;
+    }
+  }
+  const last = levels[rings]!;
+  const apex: V3 = [tipShift[0], height, tipShift[1]];
+  for (let i = 0; i < n; i += 1) {
+    tris.push(outward(last[i]!, last[(i + 1) % n]!, apex, face, [false, false, true]));
+    face += 1;
+  }
+  return tris;
+}
+
 /** Нахил НАЗОВНІ від осі колонії: поворот навколо дотичної осі (Родрігес). */
 function leanOutward(p: V3, leanDeg: number, azimuthDeg: number): V3 {
   const az = (azimuthDeg * Math.PI) / 180;
@@ -213,7 +267,7 @@ function leanOutward(p: V3, leanDeg: number, azimuthDeg: number): V3 {
   ];
 }
 
-export function buildCrystalV2Geometry(model: CrystalV2Model): CrystalV2Geometry {
+export function buildCrystalV2Geometry(model: CrystalV2Model, form: CrystalForm = 'druse'): CrystalV2Geometry {
   const seed = model.startDate;
   const m = model.monarch;
   const bodies: { key: string; tris: Tri[]; height: number }[] = [{
@@ -221,8 +275,11 @@ export function buildCrystalV2Geometry(model: CrystalV2Model): CrystalV2Geometry
     // Вершина зміщена вчетверо далі, ніж у моделі: ±0.08 радіуса на екрані
     // не читались зовсім, кінчик стояв по центру. Точок кінчика — стільки,
     // скільки ярусів дали плани (ADR-0217).
-    tris: body(seed, 'monarch', m.sides, m.height, m.tierHeights.reduce((sum, h) => sum + h, 0),
-      [m.apex[0] * 4, m.apex[1] * 4], m.tiers, 0.12 * m.height),
+    // Плани — у друзи точки кінчика, у сталагміта кільця натеку (ADR-0237).
+    tris: form === 'stalagmite'
+      ? stalagmite(seed, 'monarch', m.radius, m.height, 3 + m.tiers, 0.12 * m.height)
+      : body(seed, 'monarch', m.sides, m.height, m.tierHeights.reduce((sum, h) => sum + h, 0),
+        [m.apex[0] * 4, m.apex[1] * 4], m.tiers, 0.12 * m.height),
     height: m.height,
   }];
   const sparks: number[] = [];
@@ -236,12 +293,17 @@ export function buildCrystalV2Geometry(model: CrystalV2Model): CrystalV2Geometry
       (unit(seed, `${key}:apex:x`) - 0.5) * 0.5 * child.radius,
       (unit(seed, `${key}:apex:z`) - 0.5) * 0.5 * child.radius,
     ];
-    const tris = body(seed, key, child.sides, child.height, tip, apexShift,
-      1 + Math.floor(unit(seed, `${key}:ridge`) * 2), 0.12 * child.height);
+    const tris = form === 'stalagmite'
+      ? stalagmite(seed, key, child.radius * 1.6, child.height * 0.8, 3, 0.12 * child.height)
+      : body(seed, key, child.sides, child.height, tip, apexShift,
+        1 + Math.floor(unit(seed, `${key}:ridge`) * 2), 0.12 * child.height);
     const az = (child.azimuth * Math.PI) / 180;
     const offset: V3 = [Math.cos(az) * child.distance, 0, Math.sin(az) * child.distance];
+    // Сталагміт росте прямо вгору — краплі падають згори; нахил місць лишається
+    // натяком (третина), а не віялом, як у друзи.
+    const lean = form === 'stalagmite' ? child.lean * 0.3 : child.lean;
     const place = (p: V3): V3 => {
-      const q = leanOutward(p, child.lean, child.azimuth);
+      const q = leanOutward(p, lean, child.azimuth);
       return [q[0] + offset[0], q[1], q[2] + offset[2]];
     };
     bodies.push({
@@ -253,7 +315,7 @@ export function buildCrystalV2Geometry(model: CrystalV2Model): CrystalV2Geometry
       const h = child.height * (0.25 + 0.5 * unit(seed, `child${child.year}:spark${s}`));
       sparks.push(...place([0, h, 0]));
     }
-    reach = Math.max(reach, child.distance + Math.sin((child.lean * Math.PI) / 180) * child.height + child.radius);
+    reach = Math.max(reach, child.distance + Math.sin((lean * Math.PI) / 180) * child.height + child.radius * (form === 'stalagmite' ? 2 : 1));
   }
 
   const total = bodies.reduce((sum, b) => sum + b.tris.length, 0);

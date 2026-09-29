@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { unit } from '@/engine/species/crystalV2/hash';
-import type { TreeV2Geometry } from '@/engine/species/treeV2/geometry';
+import type { TreeForm, TreeV2Geometry } from '@/engine/species/treeV2/geometry';
 import { PORTAL_GROUND_Y } from '../scene/portalScene';
 import { Diorama } from '@/features/home/diorama/Diorama';
 import { buildGrassTuft, grassInstances } from './meadow';
@@ -10,6 +10,7 @@ import { TreeIsland } from './TreeIsland';
 import { treeIslandBase, treeIslandGround } from './treeIsland';
 import {
   FLOWER_COLOURS,
+  TREE_FORM_LEAVES,
   TREE_PALETTES,
   createBlossomMaterial,
   createGlowPointsMaterial,
@@ -77,6 +78,8 @@ interface TreeV2WorldProps {
   island: number;
   /** Без діорами й оточення — острівець на тлі входу (ADR-0228). */
   bare?: boolean;
+  /** Форма дерева: колір крони (ADR-0237). Геометрію форми вже несе `geometry`. */
+  form?: TreeForm;
 }
 
 /**
@@ -87,8 +90,11 @@ interface TreeV2WorldProps {
  * (`PORTAL_GROUND_Y`), тож камера порталу кадрує дерево тими самими
  * правилами, що й кристал, і жест повороту той самий.
  */
-export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island, bare = false }: TreeV2WorldProps) {
-  const palette = TREE_PALETTES[theme];
+export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island, bare = false, form = 'oak' }: TreeV2WorldProps) {
+  const palette = useMemo(
+    () => (form === 'oak' ? TREE_PALETTES[theme] : { ...TREE_PALETTES[theme], ...TREE_FORM_LEAVES[form][theme] }),
+    [form, theme],
+  );
 
   // ── Світ (не залежить від дерева) ────────────────────────
   const clear = Math.max(0.25, geometry.height * scale * 0.06);
