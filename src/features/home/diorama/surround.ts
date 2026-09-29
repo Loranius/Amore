@@ -267,8 +267,15 @@ function kelp(p: Painter, seed: string, key: string, base: V3, height: number, w
   }
 }
 
-export function buildReefSurround(seed: string): IslandMesh {
+/**
+ * @param calm спокійне тло для вулкана (ADR-0235): стовпи нижчі за лінію
+ *   острова, водорості коротші. Стовп із квіткою за конусом тягнув увагу з
+ *   героя — у референсі власника тло порожнє.
+ */
+export function buildReefSurround(seed: string, calm = false): IslandMesh {
   const p = new Painter();
+  const lower = calm ? 26 : 0;
+  const kelpScale = calm ? 0.45 : 1;
   // Скелі-стовпи кільцем. Арки між ними в стандартному кадрі лягали
   // якраз під шапку головної — тож стовпи стоять самі й нижчі за неї.
   const N = 26;
@@ -278,14 +285,14 @@ export function buildReefSurround(seed: string): IslandMesh {
     const a = turn + (k / N) * TAU + (unit(seed, `${key}:a`) - 0.5) * 0.15;
     const r = 88 + 45 * unit(seed, `${key}:r`);
     const w = 1.6 + 1.6 * unit(seed, `${key}:w`);
-    rockPillar(p, seed, key, polar(r, a, -52), -14 + 26 * unit(seed, `${key}:h`), w);
+    rockPillar(p, seed, key, polar(r, a, -52), -14 - lower + 26 * unit(seed, `${key}:h`), w);
   }
   // Ліс водоростей між стовпами.
   for (let k = 0; k < 20; k += 1) {
     const key = `deep:kelp${k}`;
     const a = unit(seed, `${key}:a`) * TAU;
     const r = 72 + 40 * unit(seed, `${key}:r`);
-    kelp(p, seed, key, polar(r, a, -55), 35 + 40 * unit(seed, `${key}:h`), 0.5 + 0.5 * unit(seed, `${key}:w`));
+    kelp(p, seed, key, polar(r, a, -55), (35 + 40 * unit(seed, `${key}:h`)) * kelpScale, 0.5 + 0.5 * unit(seed, `${key}:w`));
   }
   // Піщане дно далеко внизу (власник: «пісчане дно, яке видніється
   // далеко»): диск із пологими дюнами під усім рифом, край тоне в товщі.

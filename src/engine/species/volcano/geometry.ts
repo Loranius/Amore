@@ -42,12 +42,25 @@ function onSlope(model: VolcanoModel, azimuth: number, y: number, inset = 0.97):
 interface Ring { y: number; key: string; points: V3[] }
 
 /** Кільця конуса: підніжжя, верх пагорба, межі шарів і губа кратера. */
+const MAX_RING_LAYERS = 5;
+
+function ringLayers<T>(layers: readonly T[]): T[] {
+  if (layers.length <= MAX_RING_LAYERS + 1) return [...layers];
+  const picked: T[] = [];
+  for (let k = 1; k <= MAX_RING_LAYERS; k += 1) picked.push(layers[Math.round((k * (layers.length - 1)) / (MAX_RING_LAYERS + 1))]!);
+  picked.push(layers[layers.length - 1]!);
+  return picked;
+}
+
 export function volcanoRings(model: VolcanoModel): Ring[] {
   const seed = model.startDate;
   const heights: { y: number; key: string }[] = [
     { y: -0.08, key: 'foot' },
     { y: Math.min(model.height, 0.35), key: 'hill' },
-    ...model.layers.map((l) => ({ y: l.to, key: `year${l.year}` })),
+    // Не більше п'яти кілець шарів (плюс верхнє): великі грані, як у
+    // референсі власника. Кільце на кожен рік робило конус дрібно
+    // посмугованим і м'яким; роки й далі в шарах моделі — тут лише меш.
+    ...ringLayers(model.layers).map((l) => ({ y: l.to, key: `year${l.year}` })),
   ];
   return heights.map(({ y, key }, index) => {
     const last = index === heights.length - 1;
@@ -252,11 +265,11 @@ export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: 
   for (let k = 0; k < rings.length - 1; k += 1) {
     const lo = rings[k]!;
     const hi = rings[k + 1]!;
-    // Смуги років: сусідні шари трохи різняться тоном — видно, скільки їх.
-    const band = k % 2 === 0 ? 0.05 : -0.04;
     for (let i = 0; i < SIDES; i += 1) {
       const j = (i + 1) % SIDES;
-      const t = 0.82 + 0.26 * unit(seed, `${hi.key}:f${i}`) + band;
+      // Сильніша різниця між гранями, без горизонтальних смуг: low-poly
+      // референсу читається гранями, а не поясами.
+      const t = 0.72 + 0.4 * unit(seed, `${hi.key}:f${i}`);
       tris.push([lo.points[i]!, hi.points[j]!, lo.points[j]!], [lo.points[i]!, hi.points[i]!, hi.points[j]!]);
       tone.push(t, t * 0.96);
     }

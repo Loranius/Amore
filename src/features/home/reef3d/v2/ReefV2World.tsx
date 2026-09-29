@@ -77,6 +77,8 @@ interface ReefV2WorldProps {
   rockHeat?: Float32Array;
   /** Частка дикої живності острова (вулкан — третина, ADR-0235). */
   islandWildlife?: number;
+  /** Спокійне далеке тло (вулкан, ADR-0235). */
+  calmSurround?: boolean;
   /** Ім'я меша каменю: вулкан за ним відрізняє дотик до конуса. */
   rockName?: string;
   /** Висота морської трави: на плато вулкана вона нижча, щоб не затуляти конус. */
@@ -88,7 +90,7 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '' }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false }: ReefV2WorldProps) {
   const palette = REEF_PALETTES[theme];
 
   const rock = useMemo(
@@ -207,7 +209,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
   return (
     <>
       {!bare && <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />}
-      <ReefIsland bare={bare} arch={islandArch} lagoon={islandLagoon} stones={islandStones} wildlife={islandWildlife} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
+      <ReefIsland bare={bare} arch={islandArch} lagoon={islandLagoon} stones={islandStones} wildlife={islandWildlife} calmSurround={calmSurround} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         {geometry.seagrass.length > 0 && (
           <instancedMesh ref={grassRef} args={[tuft, materials.grass, geometry.seagrass.length]} frustumCulled={false} />

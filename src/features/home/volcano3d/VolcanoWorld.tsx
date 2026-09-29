@@ -157,7 +157,8 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
     const flowing = eruption.front * (1 - eruption.cool);
     materials.lava.uniforms.uBeat!.value = beat;
     materials.rock.uniforms.uBeat!.value = beat;
-    materials.rock.uniforms.uGlow!.value = glow * (0.35 + 0.65 * flowing);
+    // Жерло тліє й у спокої — як у референсі; ріка лише додає.
+    materials.rock.uniforms.uGlow!.value = glow * (0.65 + 0.35 * flowing);
     materials.rock.uniforms.uTime!.value = t;
     materials.lava.uniforms.uGlow!.value = glow;
     materials.embers.uniforms.uTime!.value = t;
@@ -199,6 +200,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         islandStones={false}
         seagrassScale={0.5}
         islandWildlife={1 / 3}
+        calmSurround
         bare={bare}
       />
       <group position={[0, PORTAL_GROUND_Y, 0]}>

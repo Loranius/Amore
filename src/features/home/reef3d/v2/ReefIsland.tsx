@@ -46,9 +46,11 @@ interface ReefIslandProps {
   stones?: boolean;
   /** Частка дикої живності плато (вулкан — третина, ADR-0235). */
   wildlife?: number;
+  /** Спокійне далеке тло: стовпи нижчі, водорості коротші (вулкан). */
+  calmSurround?: boolean;
 }
 
-export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false, arch = true, lagoon = true, stones = true, wildlife = 1 }: ReefIslandProps) {
+export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false, arch = true, lagoon = true, stones = true, wildlife = 1, calmSurround = false }: ReefIslandProps) {
   const built = useMemo(
     () => buildReefIsland(seed, radius, rock, { arch, lagoon, stones, wildlife }),
     [seed, radius, rock, arch, lagoon, stones, wildlife],
@@ -57,7 +59,7 @@ export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, b
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Глибина навколо острова на всі 360° (ADR-0224): скелі з арками, ліс
   // водоростей, дно внизу.
-  const far = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildReefSurround(seed)), [seed, bare]);
+  const far = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildReefSurround(seed, calmSurround)), [seed, bare, calmSurround]);
   const materials = useMemo(() => ({
     island: createIslandMaterial(REEF_ISLAND_PAINTS[theme]),
     ray: createRayMaterial(RAY[theme]),
