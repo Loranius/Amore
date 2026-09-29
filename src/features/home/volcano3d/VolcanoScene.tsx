@@ -15,9 +15,9 @@ import { PortalStage } from '../crystal3d/scene/PortalStage';
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from '../crystal3d/evolution/EvolutionRuntimeProbe';
 import { readQuality } from '../crystal3d/evolution/useEvolutionCrystalPipeline';
 import { crystalV2GrowthEvents } from '../crystal3d/v2/crystalV2Frame';
-import { dioramaFrameHeight, dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
+import { dioramaFrameHeight } from '@/features/home/diorama/dioramaStyle';
 import { VolcanoWorld } from './VolcanoWorld';
-import { volcanoFrame } from './volcanoFrame';
+import { volcanoFrame, volcanoIsland } from './volcanoFrame';
 import { useVolcano } from './useVolcano';
 import '../crystal3d/evolution/evolutionPreview.css';
 
@@ -57,7 +57,7 @@ export default function VolcanoScene() {
   const frame = useMemo(() => (geometry ? volcanoFrame(geometry) : null), [geometry]);
   const noBearings = useMemo<readonly number[]>(() => [], []);
   // Острівець ширший за підніжжя: на ньому ще трава, мушлі й зірки.
-  const island = frame && state ? dioramaIslandRadius(Math.max(frame.reach * 1.1, state.model.baseRadius * frame.scale * 1.5)) : 0;
+  const island = frame ? volcanoIsland(frame) : 0;
 
   if (error) {
     console.error('[Volcano] rollback to reef v2:', error);

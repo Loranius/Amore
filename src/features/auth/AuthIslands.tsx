@@ -37,7 +37,7 @@ import { CrystalV2Object } from '@/features/home/crystal3d/v2/CrystalV2Object';
 import { linearColour } from '@/features/home/crystal3d/v2/crystalV2Material';
 import { treeV2Frame } from '@/features/home/crystal3d/treeV2/treeV2Frame';
 import { TreeV2World } from '@/features/home/crystal3d/treeV2/TreeV2World';
-import { volcanoFrame } from '@/features/home/volcano3d/volcanoFrame';
+import { volcanoFrame, volcanoIsland } from '@/features/home/volcano3d/volcanoFrame';
 import { VolcanoWorld } from '@/features/home/volcano3d/VolcanoWorld';
 import { demoIslands, type DemoIsland, type DemoSpecies } from './demoIslands';
 
@@ -71,9 +71,7 @@ function SpeciesIsland({ demo, theme, reduceMotion }: IslandProps) {
     const rock = model.baseRadius * frame.scale;
     return {
       kind: 'reef' as const, geometry, frame, rock, glow: model.glow,
-      // Острівець щільніше облягає конус, ніж на головній: у ряду вибору
-      // вулкан мусить читатись героєм, а не купкою коралів на широкому плато.
-      island: dioramaIslandRadius(Math.max(frame.reach * 0.95, rock * 1.2)),
+      island: volcanoIsland(frame),
     };
   }, [demo]);
 

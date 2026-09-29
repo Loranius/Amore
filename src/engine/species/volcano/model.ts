@@ -123,7 +123,10 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
     layers,
     height: r6(top),
     // Підніжжя ширшає повільніше за висоту: вулкан росте вгору, а не вшир.
-    baseRadius: r6(0.75 + 0.3 * top),
+    // 0.5 + 0.22·висоти — щоб молодий вулкан ставав на острів того самого
+    // розміру, що й кристал і дерево (1.3): з 0.75 + 0.3·висоти острів пари
+    // ~4 років виходив 1.76 і камера відступала, роблячи вулкан дрібним.
+    baseRadius: r6(0.5 + 0.22 * top),
     craterRadius: r6(0.16 + 0.05 * top),
     glow: r6(glow),
     veins: 2 + Math.min(4, Math.floor(Math.log2(1 + recent / 2))),

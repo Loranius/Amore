@@ -18,9 +18,8 @@ import type { CrystalV2Snapshot } from '@/engine/species/crystalV2/model';
 import { buildVolcanoGeometry } from '@/engine/species/volcano/geometry';
 import { buildVolcanoModel } from '@/engine/species/volcano/model';
 import { PORTAL_GROUND_Y } from '@/features/home/crystal3d/scene/portalScene';
-import { dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
 import { VolcanoWorld } from '@/features/home/volcano3d/VolcanoWorld';
-import { volcanoFrame } from '@/features/home/volcano3d/volcanoFrame';
+import { volcanoFrame, volcanoIsland } from '@/features/home/volcano3d/volcanoFrame';
 import { yearsWord } from '@/features/auth/newCouple';
 import '@/index.css';
 
@@ -59,7 +58,7 @@ function Island({ years, fill, theme, x }: { years: number; fill: number; theme:
     const geometry = buildVolcanoGeometry(model);
     const frame = volcanoFrame(geometry);
     const rock = model.baseRadius * frame.scale;
-    return { model, geometry, frame, rock, island: dioramaIslandRadius(Math.max(frame.reach * 1.05, rock * 1.35)) };
+    return { model, geometry, frame, rock, island: volcanoIsland(frame) };
   }, [years, fill]);
   // Спільний масштаб на всі віки: розмір вулкана видно, а не нормовано.
   const k = 1 / 2.6;

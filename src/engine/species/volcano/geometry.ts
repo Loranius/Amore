@@ -298,7 +298,7 @@ export function volcanoUndergrowth(model: VolcanoModel): ReefV2Placement[] {
     const colony: ReefV2Colony = { year: -1, age: 0, activity: 0, form, size, bodies: 1, azimuth: 0, reach: 0, hue: unit(seed, `${key}:h`) };
     const base: V3 = foot
       ? (() => {
-          const r = model.baseRadius * (1 + 0.15 * unit(seed, `${key}:r`));
+          const r = model.baseRadius * (0.98 + 0.08 * unit(seed, `${key}:r`));
           return [Math.cos(a) * r, 0, Math.sin(a) * r];
         })()
       : onSlope(model, a, y, 0.96);

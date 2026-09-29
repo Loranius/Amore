@@ -7,10 +7,19 @@
 // ============================================================
 import { ARTIFACT_FIT_HEIGHT, ARTIFACT_FIT_WIDTH } from '@/engine/renderer/three';
 import type { VolcanoGeometry } from '@/engine/species/volcano/geometry';
+import { dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
 
 /** Дорослий вулкан в одиницях моделі: висота з коралами й розмах підніжжя. */
 const ADULT_TOP = 2.7;
-const ADULT_REACH = 2.1;
+const ADULT_REACH = 1.6;
+
+/**
+ * Острів — та сама формула, що в кристала й дерева: спільний радіус 1.3,
+ * більший лише коли самому вулканові (з коралами підніжжя) забракло місця.
+ */
+export function volcanoIsland(frame: VolcanoFrame): number {
+  return dioramaIslandRadius(frame.reach * 1.1);
+}
 
 export interface VolcanoFrame {
   scale: number;

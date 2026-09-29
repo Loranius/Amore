@@ -12,7 +12,10 @@ import { treeV2Frame } from '../crystal3d/treeV2/treeV2Frame';
 import { treeIslandBase, treeIslandGround } from '../crystal3d/treeV2/treeIsland';
 import { reefV2Frame } from '../reef3d/v2/reefV2Frame';
 import { buildReefIsland, inReefWater, reefIslandGround } from '../reef3d/v2/reefIsland';
-import { dioramaIslandRadius } from './dioramaStyle';
+import { DIORAMA_ISLAND_RADIUS, dioramaIslandRadius } from './dioramaStyle';
+import { buildVolcanoModel } from '@/engine/species/volcano/model';
+import { buildVolcanoGeometry, volcanoPlacements } from '@/engine/species/volcano/geometry';
+import { volcanoFrame, volcanoIsland } from '../volcano3d/volcanoFrame';
 
 // ============================================================
 // Ріст пари × острови (ADR-0222, ADR-0223, ADR-0224).
@@ -90,6 +93,27 @@ describe.each(cases)('%s, %i', (history, year) => {
     const frame = reefV2Frame(buildReefV2Geometry(model));
     const island = dioramaIslandRadius(Math.max(frame.reach * 1.1, model.radius * frame.scale * 1.55));
     for (const t of [0, 0.3, 0.6, 0.9, 1]) expect(reefIslandGround(island, island * t)).toBeLessThan(0);
+  });
+
+  it('вулкан: скелет сцени той самий — острів не більший, ніж у кристала й дерева того ж віку (ADR-0235)', () => {
+    // Власник: «скелет сцени має збігатись з деревом і кристалом (розмір
+    // острова)». Було 1.76 проти 1.30 у пари ~4 років: камера відступала.
+    const crystal = dioramaIslandRadius(crystalV2Frame(buildCrystalV2Geometry(buildCrystalV2Model(snap))).reach * 1.3);
+    const tree = dioramaIslandRadius(treeV2Frame(buildTreeV2Geometry(buildTreeV2Model(snap as never))).reach * 0.9);
+    const volcano = volcanoIsland(volcanoFrame(buildVolcanoGeometry(buildVolcanoModel(snap))));
+    expect(volcano).toBeLessThanOrEqual(Math.max(crystal, tree) + 1e-9);
+    if (year <= 2030) expect(volcano).toBe(DIORAMA_ISLAND_RADIUS);
+  });
+
+  it('вулкан: лагуна за підніжжям, жодна колонія основою не у воді', () => {
+    const model = buildVolcanoModel(snap);
+    const frame = volcanoFrame(buildVolcanoGeometry(model));
+    const rock = model.baseRadius * frame.scale;
+    const { water } = buildReefIsland(model.startDate, volcanoIsland(frame), rock, { arch: false });
+    expect(water.inner).toBeGreaterThan(rock);
+    for (const place of volcanoPlacements(model)) {
+      expect(inReefWater(water, place.base[0] * frame.scale, place.base[2] * frame.scale)).toBe(false);
+    }
   });
 
   it('кристал: колонія не дотягується до руїн по краю острова', () => {
