@@ -30,7 +30,7 @@ import { SPECIES_SHAPE } from '@/features/onboarding/SweepSpecies';
 import { DECLARED_COUNTS_KEY, serializeDeclaredCounts } from '@/features/onboarding/declaredCounts';
 import type { AppUser } from '@/types';
 import { CHOICE_ORDER, type IslandsView } from './islandsView';
-import { INVITE_LENGTH, inviteCodeProblem, normalizeInviteCode, type InviteCodeProblem } from './inviteCode';
+import { INVITE_PROBLEM_TEXT, inviteCodeProblem, normalizeInviteCode } from './inviteCode';
 import type { DemoSpecies } from './demoIslands';
 import {
   EMPTY_ANSWER,
@@ -69,11 +69,7 @@ const START_TEXT = {
   too_early: 'Такої давньої дати портал не приймає.',
 } as const;
 
-const CODE_TEXT: Record<InviteCodeProblem, string> = {
-  empty: 'Введи код, який дав партнер.',
-  length: `У коді ${INVITE_LENGTH} знаків — перевір, чи все переписано.`,
-  alphabet: 'У коді немає нулів, одиниць і літер O, I, L — мабуть, там схожа літера чи цифра.',
-};
+const CODE_TEXT = INVITE_PROBLEM_TEXT;
 
 const JOIN_TEXT: Record<Exclude<JoinCoupleResult, { ok: true }>['reason'], string> = {
   invite_invalid: 'Такого коду немає, його вже використано або минув тиждень. Попроси партнера створити новий.',
@@ -88,9 +84,14 @@ const JOIN_TEXT: Record<Exclude<JoinCoupleResult, { ok: true }>['reason'], strin
 interface NewCoupleFlowProps {
   onView: (view: IslandsView) => void;
   onDone: (name: string) => void;
+  /**
+   * Код запрошення, введений ще на екрані коду з листа (ADR-0232). Тоді
+   * людина не створює пару, а приєднується: питаємо лише стать та імʼя.
+   */
+  invite?: string | null;
 }
 
-export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
+export function NewCoupleFlow({ onView, onDone, invite = null }: NewCoupleFlowProps) {
   const { createCouple, joinCouple, enterPortal } = useAuth();
   const saveArtifact = useSaveSharedArtifact();
   const today = useMemo(() => coupleDay(new Date(), COUPLE_TIME_ZONE), []);
@@ -102,7 +103,7 @@ export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
   const [user, setUser] = useState<AppUser | null>(null);
   const [answers, setAnswers] = useState<Record<string, PastYearAnswer>>({});
   const [picked, setPicked] = useState<DemoSpecies>('crystal');
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(invite ?? '');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -142,25 +143,49 @@ export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
     onDone(user.name);
   };
 
+  /** Приєднання за кодом. Невдача з кодом веде на крок коду, щоб його виправити. */
+  const join = async (raw: string, who: Gender) => {
+    const problem = inviteCodeProblem(raw);
+    if (problem !== null) { setCode(raw); setError(CODE_TEXT[problem]); setStep({ kind: 'code' }); return; }
+    setBusy(true);
+    setError(null);
+    const result = await joinCouple({ code: normalizeInviteCode(raw), name, gender: who });
+    setBusy(false);
+    if (!result.ok) {
+      setError(JOIN_TEXT[result.reason]);
+      if (result.reason === 'invite_invalid') { setCode(raw); setStep({ kind: 'code' }); }
+      return;
+    }
+    // Пара вже має і вид, і історію: питати нема про що — одразу головна.
+    onDone(result.user.name);
+  };
+
   // ── 1. хто ───────────────────────────────────────────────
   if (step.kind === 'who') {
     // Той самий крок веде у дві сторони: нова пара — або до пари, яку
     // партнер уже створив. Стать та імʼя потрібні обом.
-    const go = (next: Step) => {
+    const ready = (): Gender | null => {
       const problem = nameProblem(name);
-      if (gender === null) { setError('Обери, хто ти.'); return; }
-      if (problem !== null) { setError(NAME_TEXT[problem]); return; }
+      if (gender === null) { setError('Обери, хто ти.'); return null; }
+      if (problem !== null) { setError(NAME_TEXT[problem]); return null; }
       setError(null);
-      setStep(next);
+      return gender;
     };
+    const go = (next: Step) => { if (ready() !== null) setStep(next); };
     const submit = (event: FormEvent) => {
       event.preventDefault();
-      go({ kind: 'since' });
+      if (invite === null) { go({ kind: 'since' }); return; }
+      const who = ready();
+      if (who !== null) void join(invite, who);
     };
     return (
       <form className="auth-form" onSubmit={submit} noValidate>
-        <h1 className="auth-title">Хто створює акаунт?</h1>
-        <p className="reg-hint">Портал — на двох. Партнера запросите пізніше, коли все буде готово.</p>
+        <h1 className="auth-title">{invite === null ? 'Хто створює акаунт?' : 'Хто ти?'}</h1>
+        <p className="reg-hint">
+          {invite === null
+            ? 'Портал — на двох. Партнера запросите пізніше, коли все буде готово.'
+            : 'Ти приєднуєшся до пари за кодом від партнера. Лишилось сказати, хто ти.'}
+        </p>
         <div className="auth-choice" role="group" aria-label="Хто створює акаунт">
           {(['male', 'female'] as const).map((value) => (
             <button
@@ -187,12 +212,18 @@ export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
           </label>
         </div>
         {error !== null && <p className="reg-problem" role="alert">{error}</p>}
-        <button type="submit" className="btn reg-next">Далі</button>
-        <div className="auth-links">
-          <button type="button" className="auth-link" onClick={() => go({ kind: 'code' })}>
-            Партнер уже створив портал? Увійти за кодом
-          </button>
-        </div>
+        {invite === null ? (
+          <>
+            <button type="submit" className="btn reg-next">Далі</button>
+            <div className="auth-links">
+              <button type="button" className="auth-link" onClick={() => go({ kind: 'code' })}>
+                Партнер уже створив портал? Увійти за кодом
+              </button>
+            </div>
+          </>
+        ) : (
+          <button type="submit" className="btn reg-next" disabled={busy}>{busy ? 'Приєднуємо…' : 'Увійти в портал'}</button>
+        )}
       </form>
     );
   }
@@ -204,13 +235,7 @@ export function NewCoupleFlow({ onView, onDone }: NewCoupleFlowProps) {
       const problem = inviteCodeProblem(code);
       if (problem !== null) { setError(CODE_TEXT[problem]); return; }
       if (gender === null) { setStep({ kind: 'who' }); return; }
-      setBusy(true);
-      setError(null);
-      const result = await joinCouple({ code: normalizeInviteCode(code), name, gender });
-      setBusy(false);
-      if (!result.ok) { setError(JOIN_TEXT[result.reason]); return; }
-      // Пара вже має і вид, і історію: питати нема про що — одразу головна.
-      onDone(result.user.name);
+      await join(code, gender);
     };
     return (
       <form className="auth-form" onSubmit={(e) => void submit(e)} noValidate>

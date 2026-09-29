@@ -227,6 +227,43 @@ function icosphere(): { verts: V3[]; faces: [number, number, number][] } {
 
 const ICO = icosphere();
 
+/**
+ * Найменша відстань від центру до площини грані — наскільки кругла сфера
+ * з ICO насправді. Вузол має накрити кільце радіуса r, тож його радіус
+ * рахується від цієї величини, а не від радіуса вершин.
+ */
+export const ICO_INRADIUS = Math.min(...ICO.faces.map(([a, b, c]) => {
+  const pa = ICO.verts[a]!;
+  const n = norm(cross(
+    [ICO.verts[b]![0] - pa[0], ICO.verts[b]![1] - pa[1], ICO.verts[b]![2] - pa[2]],
+    [ICO.verts[c]![0] - pa[0], ICO.verts[c]![1] - pa[1], ICO.verts[c]![2] - pa[2]],
+  ));
+  return Math.abs(n[0] * pa[0] + n[1] * pa[1] + n[2] * pa[2]);
+}));
+
+/**
+ * Вузли деревини — там, де з кінця гілки виходять дочірні.
+ *
+ * Кожна гілка — окрема відкрита призма. Дочірня тонша (0.85 чи 0.65 від
+ * кінця батьківської), дивиться деінде й має власний поворот граней, тож на
+ * розвилці лишалась щілина й видно було нутро стовбура: «розходяться шви»
+ * (скрін власника, тестова пара 13 років, 2026-09-29). Вузол — гранчаста
+ * куля трохи ширша за кінець гілки — закриває стик, як потовщення на справжній
+ * розвилці. Модель і скелет не змінюються: лише те, як стик намальовано.
+ */
+export const KNUCKLE_MARGIN = 1.06;
+
+export function treeV2Knuckles(branches: readonly TreeV2Branch[]): { centre: V3; radius: number; key: string }[] {
+  const out: { centre: V3; radius: number; key: string }[] = [];
+  for (const b of branches) {
+    const children = branches.filter((c) => c !== b && c.start[0] === b.end[0] && c.start[1] === b.end[1] && c.start[2] === b.end[2]);
+    if (children.length === 0) continue;
+    const widest = Math.max(b.r1, ...children.map((c) => c.r0));
+    out.push({ centre: b.end, radius: (widest * KNUCKLE_MARGIN) / ICO_INRADIUS, key: `${b.key}:knot` });
+  }
+  return out;
+}
+
 /** Пласкі трикутники призми, закручені НАЗОВНІ (перевіряє тест). */
 function prism(start: V3, end: V3, r0: number, r1: number, sides: number): V3[][] {
   const d = norm([end[0] - start[0], end[1] - start[1], end[2] - start[2]]);
@@ -284,6 +321,16 @@ export function buildTreeV2Geometry(model: TreeV2Model): TreeV2Geometry {
     // Тонкі гілки — п'ять граней, стовбур і скелетні — шість: той самий вигляд, менше трикутників.
     pushTris(prism(b.start, b.end, b.r0, b.r1, b.order < 2 ? 6 : 5), wood, woodTone,
       (face) => 0.82 + 0.36 * unit(seed, `${b.key}:w${face}`));
+  }
+  for (const k of treeV2Knuckles(branches)) {
+    const tris = ICO.faces.map(([a, b, c]) => [a, b, c].map((i) => add(k.centre, mul(ICO.verts[i]!, k.radius))));
+    tris.forEach((tri, f) => {
+      const value = 0.82 + 0.36 * unit(seed, `${k.key}:w${f}`);
+      for (const p of tri) {
+        wood.push(p[0], p[1], p[2]);
+        woodTone.push(value);
+      }
+    });
   }
   for (const r of treeV2Roots(model)) {
     pushTris(prism(r.start, r.end, r.r0, r.r1, 5), wood, woodTone, (face) => 0.75 + 0.3 * unit(seed, `${r.key}:w${face}`));

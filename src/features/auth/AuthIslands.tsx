@@ -141,8 +141,11 @@ function slots(width: number, height: number): { x: number; y: number; size: num
 function choiceSlots(width: number, height: number): { x: number; y: number; size: number }[] {
   const wide = width >= height * 0.9;
   const size = wide ? Math.min(width * 0.105, height * 0.19) : Math.min(width * 0.17, height * 0.12);
-  const y = wide ? height * 0.16 : height * 0.2;
-  const step = wide ? width * 0.27 : width * 0.31;
+  // Посередині вільного неба над компактною карткою (≈ верхні 2/3 екрана).
+  const y = height * 0.16;
+  // Телефон: 0.28, а не 0.31 — обраний острів (×1.22) крайнього ряду
+  // інакше зрізав край екрана (живий кадр 2026-09-29).
+  const step = wide ? width * 0.27 : width * 0.28;
   return CHOICE_ORDER.map((_, k) => ({ x: (k - 1) * step, y, size }));
 }
 

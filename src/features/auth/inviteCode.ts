@@ -31,6 +31,13 @@ export function inviteCodeProblem(raw: string): InviteCodeProblem | null {
   return null;
 }
 
+/** Що сказати людині про кожну проблему — спільне для обох екранів, де вводять код. */
+export const INVITE_PROBLEM_TEXT: Readonly<Record<InviteCodeProblem, string>> = {
+  empty: 'Введи код, який дав партнер.',
+  length: `У коді ${INVITE_LENGTH} знаків — перевір, чи все переписано.`,
+  alphabet: 'У коді немає нулів, одиниць і літер O, I, L — мабуть, там схожа літера чи цифра.',
+};
+
 /** Для показу: дві четвірки, як читають уголос. */
 export function formatInviteCode(code: string): string {
   const clean = normalizeInviteCode(code);

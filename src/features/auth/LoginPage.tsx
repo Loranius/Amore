@@ -24,6 +24,7 @@ import type { PortalSeat } from '@/types';
 import { PortalConfetti } from './PortalConfetti';
 import { NewCoupleFlow } from './NewCoupleFlow';
 import { BACKDROP, type IslandsView } from './islandsView';
+import { INVITE_PROBLEM_TEXT as INVITE_TEXT, inviteCodeProblem, normalizeInviteCode } from './inviteCode';
 import {
   CODE_RE,
   GENDER_TEXT,
@@ -73,7 +74,7 @@ export function LoginPage({ initialStep = { kind: 'form' } }: { initialStep?: St
   const docked = step.kind === 'new' && view.mode !== 'backdrop';
 
   return (
-    <div className={`auth-screen${docked ? ' auth-screen--docked' : ''}`}>
+    <div className={`auth-screen auth-screen--account${docked ? ' auth-screen--docked' : ''}`}>
       <Suspense fallback={null}>
         <AuthIslands theme={theme === 'light' ? 'light' : 'dark'} view={step.kind === 'new' ? view : BACKDROP} />
       </Suspense>
@@ -106,6 +107,9 @@ interface FlowProps {
 
 function Flow({ tab, step, setStep, switchTab, onView }: FlowProps) {
   const { linkAccount, logout } = useAuth();
+  // Код запрошення, введений на екрані коду з листа (ADR-0232): живе тут,
+  // бо між ним і приєднанням ще стоїть крок пароля.
+  const [invite, setInvite] = useState<string | null>(null);
 
   /** Куди вести після входу чи пароля — один вузол для обох вкладок. */
   const follow = (result: LinkResult, name?: string) => {
@@ -122,7 +126,13 @@ function Flow({ tab, step, setStep, switchTab, onView }: FlowProps) {
         ? <LoginForm follow={follow} onForgot={() => switchTab('register')} />
         : <EmailForm onSent={(email) => setStep({ kind: 'code', email })} />;
     case 'code':
-      return <CodeForm email={step.email} onVerified={() => setStep({ kind: 'password' })} onBack={() => setStep({ kind: 'form' })} />;
+      return (
+        <CodeForm
+          email={step.email}
+          onVerified={(code) => { setInvite(code); setStep({ kind: 'password' }); }}
+          onBack={() => setStep({ kind: 'form' })}
+        />
+      );
     case 'password':
       return <PasswordForm onSaved={async () => follow(await linkAccount())} />;
     case 'claim':
@@ -145,7 +155,7 @@ function Flow({ tab, step, setStep, switchTab, onView }: FlowProps) {
         />
       );
     case 'new':
-      return <NewCoupleFlow onView={onView} onDone={(name) => setStep({ kind: 'portal', name })} />;
+      return <NewCoupleFlow onView={onView} invite={invite} onDone={(name) => setStep({ kind: 'portal', name })} />;
     case 'empty':
       return (
         <>
@@ -269,12 +279,25 @@ function EmailForm({ onSent }: { onSent: (email: string) => void }) {
 }
 
 // ── Реєстрація: код ──────────────────────────────────────────
-function CodeForm({ email, onVerified, onBack }: { email: string; onVerified: () => void; onBack: () => void }) {
+/**
+ * `onVerified(invite)` — `invite` не порожній, коли людина прийшла за кодом
+ * від партнера (ADR-0232): тоді далі не створення пари, а приєднання.
+ */
+function CodeForm({ email, onVerified, onBack }: {
+  email: string;
+  onVerified: (invite: string | null) => void;
+  onBack: () => void;
+}) {
   const { verifyCode, sendCode, registrationOpen } = useAuth();
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [wait, setWait] = useState(RESEND_SECONDS);
+  // Режим «увійти за кодом запрошення»: код із листа все одно потрібен —
+  // ним доводиться, що пошта твоя, — але вже без автопереходу на шостій
+  // цифрі, бо поле запрошення може бути ще не заповнене.
+  const [joining, setJoining] = useState(false);
+  const [invite, setInvite] = useState('');
 
   useEffect(() => {
     if (wait <= 0) return;
@@ -285,9 +308,13 @@ function CodeForm({ email, onVerified, onBack }: { email: string; onVerified: ()
   const verify = async (value: string) => {
     setBusy(true);
     setError(null);
+    if (joining) {
+      const problem = inviteCodeProblem(invite);
+      if (problem !== null) { setBusy(false); setError(INVITE_TEXT[problem]); return; }
+    }
     const result = await verifyCode(email, value);
     setBusy(false);
-    if (result.ok) onVerified();
+    if (result.ok) onVerified(joining ? normalizeInviteCode(invite) : null);
     else if (result.reason === 'invalid_code') setError('Код не підходить або вже прострочений.');
     else if (result.reason === 'rate_limited') setError('Забагато спроб. Зачекай хвилину.');
     else setError('Не вдалося перевірити код. Спробуй ще раз.');
@@ -297,7 +324,7 @@ function CodeForm({ email, onVerified, onBack }: { email: string; onVerified: ()
     const digits = raw.replace(/\D/g, '').slice(0, 6);
     setCode(digits);
     setError(null);
-    if (CODE_RE.test(digits)) void verify(digits);
+    if (!joining && CODE_RE.test(digits)) void verify(digits);
   };
 
   const resend = async () => {
@@ -308,10 +335,25 @@ function CodeForm({ email, onVerified, onBack }: { email: string; onVerified: ()
 
   return (
     <form className="auth-form" onSubmit={(e) => { e.preventDefault(); if (CODE_RE.test(code)) void verify(code); }} noValidate>
-      <h1 className="auth-title">Код із листа</h1>
+      <h1 className="auth-title">{joining ? 'Вхід за кодом запрошення' : 'Код із листа'}</h1>
       <p className="reg-hint">Надіслали на <b className="auth-email">{email}</b>. Лист може йти хвилину; зазирни й у «Спам».</p>
+      {joining && (
+        <label className="reg-field">
+          <span>Код запрошення від партнера</span>
+          <input
+            className="reg-input reg-input--code"
+            autoCapitalize="characters"
+            autoCorrect="off"
+            spellCheck={false}
+            maxLength={16}
+            placeholder="XXXX-XXXX"
+            value={invite}
+            onChange={(e) => { setInvite(e.target.value); setError(null); }}
+          />
+        </label>
+      )}
       <label className="reg-field auth-code-field">
-        <span>Шість цифр</span>
+        <span>{joining ? 'Шість цифр із листа' : 'Шість цифр'}</span>
         <input
           className="reg-input auth-code"
           inputMode="numeric"
@@ -324,8 +366,20 @@ function CodeForm({ email, onVerified, onBack }: { email: string; onVerified: ()
         />
       </label>
       {error !== null && <p className="reg-problem" role="alert">{error}</p>}
-      <button type="submit" className="btn reg-next" disabled={busy || !CODE_RE.test(code)}>{busy ? 'Перевіряємо…' : 'Підтвердити'}</button>
+      <button type="submit" className="btn reg-next" disabled={busy || !CODE_RE.test(code)}>
+        {busy ? 'Перевіряємо…' : joining ? 'Увійти в портал' : 'Підтвердити'}
+      </button>
+      {!joining && (
+        <button type="button" className="btn btn-ghost reg-back" onClick={() => { setJoining(true); setError(null); }}>
+          Маю код запрошення від партнера
+        </button>
+      )}
       <div className="auth-links">
+        {joining && (
+          <button type="button" className="auth-link" onClick={() => { setJoining(false); setError(null); }}>
+            Без коду — створити свій портал
+          </button>
+        )}
         <button type="button" className="auth-link" disabled={wait > 0} onClick={() => void resend()}>
           {wait > 0 ? `Надіслати ще раз за ${wait} с` : 'Надіслати ще раз'}
         </button>

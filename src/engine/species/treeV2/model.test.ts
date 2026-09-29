@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildTreeV2Geometry, treeV2Skeleton, treeV2Summary } from './geometry';
+import { ICO_INRADIUS, buildTreeV2Geometry, treeV2Knuckles, treeV2Skeleton, treeV2Summary } from './geometry';
 import { buildTreeV2Model, treeAgeProgressV2, type TreeV2Snapshot } from './model';
 
 // ============================================================
@@ -113,6 +113,27 @@ describe('дерево v2: меш', () => {
       const n = [e1[1]! * e2[2]! - e1[2]! * e2[1]!, e1[2]! * e2[0]! - e1[0]! * e2[2]!, e1[0]! * e2[1]! - e1[1]! * e2[0]!];
       const centre = [(a[0]! + b[0]! + c[0]!) / 3, (a[2]! + b[2]! + c[2]!) / 3];
       expect(n[0]! * centre[0]! + n[2]! * centre[1]!).toBeGreaterThan(0);
+    }
+  });
+
+  it('розвилки закриті вузлами: кінець батьківської гілки й початки дочірніх — усередині вузла (регресія «розходяться шви»)', () => {
+    // Скрін власника 2026-09-29: на тестовій парі 13 років крізь розвилку
+    // видно нутро стовбура — відкриті призми сходились без стику.
+    const { branches } = treeV2Skeleton(model);
+    const knots = treeV2Knuckles(branches);
+    const startsAt = (c: (typeof branches)[number], p: readonly number[]) =>
+      c.start[0] === p[0] && c.start[1] === p[1] && c.start[2] === p[2];
+    const withChildren = branches.filter((b) => branches.some((c) => c !== b && startsAt(c, b.end)));
+    expect(knots.length).toBe(withChildren.length);
+    expect(knots.length).toBeGreaterThan(0);
+    for (const b of withChildren) {
+      const knot = knots.find((k) => k.centre === b.end)!;
+      // Куля гранчаста: гарантію дає відстань до площини грані, а не до вершини.
+      const covered = knot.radius * ICO_INRADIUS;
+      expect(covered).toBeGreaterThan(b.r1);
+      for (const c of branches.filter((x) => x !== b && startsAt(x, b.end))) {
+        expect(covered).toBeGreaterThan(c.r0);
+      }
     }
   });
 

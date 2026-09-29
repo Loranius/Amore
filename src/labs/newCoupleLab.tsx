@@ -49,6 +49,9 @@ void (async () => {
     import('@/lib/guards'),
   ]);
   const refuse = async () => { throw new Error('лабораторія: не для цього екрана'); };
+  // `?step=code` — почати з екрана коду з листа (вхід за кодом запрошення,
+  // ADR-0232): будь-які шість цифр і будь-який пароль приймаються.
+  const fromCode = new URLSearchParams(window.location.search).get('step') === 'code';
   const value: import('@/providers/AuthProvider').AuthContextValue = {
     user: null,
     status: 'unauthenticated',
@@ -56,8 +59,8 @@ void (async () => {
     registrationOpen: async () => true,
     loginWithEmail: refuse,
     sendCode: refuse,
-    verifyCode: refuse,
-    setPassword: refuse,
+    verifyCode: fromCode ? async () => ({ ok: true }) : refuse,
+    setPassword: fromCode ? async () => ({ ok: true }) : refuse,
     linkAccount: async () => ({ ok: true, state: 'new' }),
     claimSeat: refuse,
     createCouple: async ({ name }) => {
@@ -84,7 +87,7 @@ void (async () => {
       <ThemeProvider>
         <auth.AuthContext.Provider value={value}>
           <MemoryRouter>
-            <LoginPage initialStep={{ kind: 'new' }} />
+            <LoginPage initialStep={fromCode ? { kind: 'code', email: 'olena@example.com' } : { kind: 'new' }} />
           </MemoryRouter>
         </auth.AuthContext.Provider>
       </ThemeProvider>

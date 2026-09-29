@@ -167,11 +167,32 @@
 }
 
 /* Вибір виду й ріст: картка сходить униз, острівці — над нею. */
-.auth-screen--docked {
-  align-items: flex-end;
+/* Екран входу — рівно вікно, а не `100dvh`. Вбудований браузер Telegram
+   віддає `dvh` висотою напіврозгорнутої шторки й не оновлює його, коли
+   шторку розгорнули: екран лишався коротшим за вікно, картка «вибору виду»
+   висіла посередині й накривала острівці (скрін власника, 2026-09-29).
+   `fixed` + `inset: 0` міряється від самого вікна в будь-якому браузері. */
+.auth-screen--account {
+  position: fixed;
+  inset: 0;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
+
+/* Вибір виду й ріст дивляться на острівці: картка — внизу й компактна.
+   `margin-block-start: auto`, а не `align-items: flex-end`: вищу за вікно
+   картку flex-end обрізав би згори без прокрутки, а auto-відступ — ні. */
 .auth-screen--docked .auth-card {
-  padding: 24px 24px 28px;
+  margin-block-start: auto;
+  padding: 18px 20px 20px;
+  gap: 12px;
+}
+.auth-screen--docked .auth-kicker {
+  display: none;
+}
+.auth-screen--docked .auth-title {
+  font-size: 22px;
 }
 
 .auth-choice {
