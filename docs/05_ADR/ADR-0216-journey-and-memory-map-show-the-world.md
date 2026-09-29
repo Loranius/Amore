@@ -1,6 +1,6 @@
 # ADR-0216 — «Наш шлях» і мапа спогадів теж просвічуються світом
 
-- **Статус:** Accepted
+- **Статус:** Superseded by ADR-0231 (2026-09-29): власник скасував вуаль — мапа й «Наш шлях» непрозорі
 - **Дата:** 2026-09-27
 - **Зачіпає:** `journey/JourneyPage.tsx`, `journey/journeyScene.css`,
   `journey/scene/JourneyScene.tsx`, `journey/scene/JourneyEnvironment.tsx`,

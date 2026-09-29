@@ -80,11 +80,6 @@ export interface JourneySceneProps {
   addClosedSignal?: number;
   /** Вимкнути сяйво примусово — для порівняльних знімків. */
   bloom?: boolean;
-  /**
-   * Світ порталу видно крізь небо (ADR-0216). Полотно стає прозорим, а
-   * туманність — вуаллю: зірки й сузір'я лишаються, світ проступає між ними.
-   */
-  world?: boolean;
 }
 
 /** Секунди від початку сцени, у рефі. */
@@ -162,7 +157,6 @@ export function JourneyScene({
   dismissSignal = 0,
   addClosedSignal = 0,
   bloom = true,
-  world = false,
 }: JourneySceneProps) {
   const constellation = useMemo(() => buildConstellation3D(events), [events]);
   const palette = useMemo(() => journeyPalette(seed), [seed]);
@@ -375,14 +369,11 @@ export function JourneyScene({
           far: JOURNEY_SKY_RADIUS * 2.2,
         }}
         /*
-         * Прозоре полотно, коли позаду світ (ADR-0216). `alpha` —
-         * властивість контексту, тож зміна режиму перестворює полотно;
-         * режим не перемикається посеред перегляду, тож це разова ціна.
+         * Полотно НЕПРОЗОРЕ (ADR-0231): власник скасував вуаль ADR-0216 —
+         * крізь небо було видно кристал світу.
          */
-        key={world ? 'world' : 'solid'}
-        gl={{ antialias: true, alpha: world, powerPreference: 'high-performance' }}
+        gl={{ antialias: true, alpha: false, powerPreference: 'high-performance' }}
         onCreated={({ gl }) => {
-          if (world) gl.setClearColor(0x000000, 0);
           gl.outputColorSpace = SRGBColorSpace;
           gl.toneMapping = ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.1;
@@ -404,7 +395,7 @@ export function JourneyScene({
           як запобіжник — сузір'я не мусить чекати ні на що з неба.
         */}
         <Suspense fallback={null}>
-          <JourneyEnvironment reducedMotion={reducedMotion} veil={world} />
+          <JourneyEnvironment reducedMotion={reducedMotion} />
           <SkyLoaded onLoaded={markSkyLoaded} />
         </Suspense>
 

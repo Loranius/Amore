@@ -28,10 +28,29 @@ export interface WishlistWorldNavProps {
   secretAvailable: boolean;
 }
 
+// «Бульбашки», а не «Кристали»: власник (2026-09-29) назвав вигляд так, як
+// пара його бачить — бажання плавають кулями, кристалів у ньому немає.
 const VIEWS: readonly { value: WishlistViewMode; label: string }[] = [
-  { value: 'bubbles', label: 'Кристали' },
+  { value: 'bubbles', label: 'Бульбашки' },
   { value: 'grid', label: 'Список' },
 ];
+
+function ViewIcon({ view }: { view: WishlistViewMode }) {
+  return view === 'bubbles' ? (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <circle cx="8.5" cy="14.5" r="4.5" />
+      <circle cx="16.5" cy="8.5" r="3.5" />
+      <circle cx="17" cy="17" r="2" />
+    </svg>
+  ) : (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M9 6h11M9 12h11M9 18h11" />
+      <circle cx="4.5" cy="6" r="1.2" />
+      <circle cx="4.5" cy="12" r="1.2" />
+      <circle cx="4.5" cy="18" r="1.2" />
+    </svg>
+  );
+}
 
 function FilterViewIcon() {
   return (
@@ -148,19 +167,29 @@ export function WishlistWorldNav({
             </button>
           </div>
 
+          {/*
+            * Вигляд — ОДИН віджет, а не дві плитки: доріжка на всю ширину й
+            * повзунок, що переїжджає під обраний вигляд. Раніше дві кнопки
+            * стояли в сітці на три колонки й не займали ширини (власник:
+            * «віджетруй кнопки»).
+            */}
           <div
-            className="wl-top-filter-group wl-top-filter-group--views"
-            role="group"
+            className="wl-view-switch"
+            role="radiogroup"
             aria-label="Вигляд бажань"
+            data-view={view}
           >
+            <span className="wl-view-thumb" aria-hidden="true" />
             {VIEWS.map((item) => (
               <button
                 key={item.value}
                 type="button"
-                className="wl-top-filter-chip"
-                aria-pressed={item.value === view}
+                role="radio"
+                className="wl-view-option"
+                aria-checked={item.value === view}
                 onClick={() => onViewChange(item.value)}
               >
+                <ViewIcon view={item.value} />
                 {item.label}
               </button>
             ))}

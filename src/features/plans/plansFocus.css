@@ -229,37 +229,60 @@
 
 /* ── Тихі лічильники ─────────────────────────────────────── */
 .pf-quiet {
+  /* Рядок розділу — тіло тієї самої мови, що й картка плану:
+     скло, кант, тінь, радіус картки. Власник: сірі напівпрозорі смуги
+     «виглядають пережитком минулого дизайну» поруч із картками. */
   inline-size: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 28px;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 8px;
-  padding: 13px 15px;
-  min-block-size: 48px;
-  border-radius: var(--radius-md);
-  /* Те саме й тут: білі 3% на світлому ґрунті — це ніщо, і рядок
-     тримався б самим кантом. Світла тема це й показала. */
-  background: color-mix(in srgb, var(--text) 4%, transparent);
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px 12px 12px 17px;
+  min-block-size: 56px;
   border: 1px solid var(--border);
-  color: var(--muted);
+  border-radius: var(--radius-card);
+  background: var(--glass-read);
+  box-shadow: var(--glass-edge), var(--shadow-md);
+  color: var(--text);
   font: inherit;
-  font-size: 13.5px;
-  font-weight: 700;
   text-align: start;
   cursor: pointer;
-  transition: background var(--dur-press, 120ms) ease-out;
+  transition: translate var(--dur-press, 120ms) ease-out, box-shadow var(--dur-press, 120ms) ease-out;
 }
-.pf-quiet:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
-.pf-quiet[aria-expanded='true'] { background: color-mix(in srgb, var(--text) 8%, transparent); }
-.pf-quiet b { color: var(--text); font-weight: 800; }
-.pf-quiet-mark {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
+.pf-quiet:active { translate: 0 2px; box-shadow: var(--glass-edge), var(--shadow-sm); }
+.pf-quiet-label {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.005em;
 }
-.pf-quiet svg { transition: rotate 180ms ease-out; }
-.pf-quiet[aria-expanded='true'] svg { rotate: 90deg; }
+/* Число — чип, як лічильники вкладок: читається одним поглядом. */
+.pf-quiet-count {
+  min-inline-size: 28px;
+  padding: 3px 9px;
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.pf-quiet-go {
+  grid-column: 3;
+  inline-size: 24px;
+  block-size: 24px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.05);
+  background-image: var(--control-sheen);
+  color: var(--muted);
+  box-shadow: var(--control-top), var(--control-lip-press);
+}
+.pf-quiet-go svg { transition: rotate 180ms ease-out; }
+.pf-quiet[aria-expanded='true'] .pf-quiet-go svg { rotate: 90deg; }
 
 .pf-quiet-body { margin-top: 8px; }
 
@@ -272,5 +295,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pf-quiet svg { transition: none; }
+  .pf-quiet-go svg, .pf-quiet { transition: none; }
 }

@@ -123,7 +123,7 @@ test.describe('Amore mobile visual preview', () => {
     const chooseView = async (label: string) => {
       await openFilters();
       const sheet = page.locator('.wl-top-filter-sheet');
-      await sheet.getByRole('button', { name: label, exact: true }).click();
+      await sheet.getByRole('radio', { name: label, exact: true }).click();
       await page.locator('.wl-top-filter-toggle').click();
       await expect(sheet).toBeHidden();
     };
@@ -140,7 +140,7 @@ test.describe('Amore mobile visual preview', () => {
       await grid.screenshot({ path: testInfo.outputPath('06-wishlist-grid.png') });
     }
 
-    await chooseView('Кристали');
+    await chooseView('Бульбашки');
     await expect(sphereField).toBeVisible();
   });
 });

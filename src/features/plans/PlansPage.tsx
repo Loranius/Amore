@@ -350,11 +350,11 @@ function QuietSection({ label, count, open, onToggle, children }: {
         aria-expanded={open}
         onClick={onToggle}
       >
-        <span className="pf-quiet-mark">
-          <ChevronRightIcon size={15} />
-          {label}
-        </span>
-        {count !== undefined && <b>{count}</b>}
+        <span className="pf-quiet-label">{label}</span>
+        {count !== undefined && <b className="pf-quiet-count">{count}</b>}
+        {/* Той самий кружок зі стрілкою, що й на картці плану: рядок — такий
+            самий предмет модуля, як картка, а не службова смуга. */}
+        <span className="pf-quiet-go" aria-hidden="true"><ChevronRightIcon size={15} /></span>
       </button>
       {open && <div className="pf-quiet-body">{children}</div>}
     </>

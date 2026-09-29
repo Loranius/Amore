@@ -24,7 +24,6 @@ import { useCrystalSeed } from '@/features/home/useHome';
 import { useCalendarMutations } from '@/features/calendar/useCalendar';
 import { AddEventModal } from '@/features/calendar/AddEventModal';
 import { useImmersiveRoute } from '@/features/world/useImmersiveRoute';
-import { useWorldModule } from '@/features/world/useWorldModule';
 import type { EventRow } from '@/types';
 import type { ConstellationEvent } from './constellationRules';
 import { EventDetails } from './EventDetails';
@@ -47,8 +46,7 @@ function toConstellationEvent(event: EventRow): ConstellationEvent {
 }
 
 export function JourneyPage() {
-  // Світ позаду, як у решти модулів (ADR-0216).
-  const worldVisible = useWorldModule();
+  // Світу позаду немає (ADR-0231): небо шляху — власний непрозорий космос.
   useImmersiveRoute();
   const navigate = useNavigate();
   /**
@@ -100,7 +98,6 @@ export function JourneyPage() {
     <div
       className="journey-page"
       data-journey-layout={split ? 'split' : 'full'}
-      data-world={worldVisible ? 'true' : undefined}
     >
       {moments.length === 0 ? (
         <section className="jn-empty">
@@ -117,7 +114,6 @@ export function JourneyPage() {
           dismissSignal={dismissSignal}
           addClosedSignal={addClosedSignal}
           bloom={search.get('bloom') !== 'off'}
-          world={worldVisible}
         />
       )}
 

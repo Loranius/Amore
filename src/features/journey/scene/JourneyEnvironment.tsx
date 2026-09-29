@@ -10,12 +10,16 @@ import {
   RGBAFormat,
   SRGBColorSpace,
   Color,
-  Vector3,
   type Group,
   type ShaderMaterial,
 } from 'three';
-import { JOURNEY_BAND_NORMAL, JOURNEY_SKY_COLOURS, journeyStarField } from '../journeySky';
-import { useTheme } from '@/providers/ThemeProvider';
+import {
+  JOURNEY_NEBULA_HEIGHT,
+  JOURNEY_NEBULA_WIDTH,
+  JOURNEY_SKY_COLOURS,
+  journeyHeroStars,
+  journeyStarField,
+} from '../journeySky';
 
 // ============================================================
 // Космос навколо пари — намальований, а не завантажений (ADR-0214).
@@ -34,6 +38,10 @@ import { useTheme } from '@/providers/ThemeProvider';
 //
 // Обидва шари в одній групі, що повільно обертається: космос живий, але
 // не тягне уваги на себе.
+//
+// ADR-0231: небо НЕПРОЗОРЕ й перемальоване з нуля — вуаль над світом
+// (ADR-0216) і шар «зоряного пилу» в шейдері прибрано; додано третій шар —
+// кілька десятків яскравих зірок із променями.
 // ============================================================
 
 /**
@@ -86,89 +94,66 @@ const STAR_FRAGMENT = /* glsl */ `
 `;
 
 /*
- * СФЕРА НЕБА: ТУМАННІСТЬ + ЗОРЯНИЙ ПИЛ ОДНИМ ПРОХОДОМ.
- *
- * Пил — це безліч дрібних синіх і червоних іскор між зірками, те зерно, яке
- * власник пам'ятає зі старої панорами. Точками його не дати: на кадрі його
- * потрібно в десятки разів більше, ніж зірок, тобто сотні тисяч вершин.
- * Тут пил рахує сам фрагмент: напрям ділиться на тривимірні клітинки, у
- * кожній клітинці хеш вирішує, чи є іскра і де. Густота будь-яка, ціна —
- * кілька множень на піксель, і іскра завжди завбільшки з піксель ЕКРАНА
- * (через `fwidth`), тобто гостра на будь-якому телефоні.
- *
- * `highp` обов'язковий: координати клітинок сягають сотень, і на `mediump`
- * дробова частина розсипалась би на сходинки.
+ * СФЕРА НЕБА — лише туманність із воркера. Поки вона малюється, видно колір
+ * порожнечі, і туманність проявляється плавно. Жодного процедурного пилу
+ * тут більше немає: на телефоні він читався як телевізійний шум (ADR-0231).
  */
 const SKY_VERTEX = /* glsl */ `
-  varying vec3 vDir;
   varying vec2 vUv;
   void main() {
-    vDir = normalize(position);
     vUv = uv;
     gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
   }
 `;
 
 const SKY_FRAGMENT = /* glsl */ `
-  precision highp float;
-  varying vec3 vDir;
   varying vec2 vUv;
   uniform sampler2D uNebula;
   uniform float uNebulaMix;
   uniform vec3 uVoid;
-  uniform vec3 uBand;
-  uniform float uVeil;
-
-  float hash13(vec3 p3) {
-    p3 = fract(p3 * 0.1031);
-    p3 += dot(p3, p3.zyx + 31.32);
-    return fract((p3.x + p3.y) * p3.z);
-  }
-  vec3 hash33(vec3 p3) {
-    p3 = fract(p3 * vec3(0.1031, 0.1030, 0.0973));
-    p3 += dot(p3, p3.yxz + 33.33);
-    return fract((p3.xxy + p3.yxx) * p3.zyx);
-  }
-
-  // Один шар пилу: клітинки масштабу scale, частка зайнятих — chance.
-  vec3 dustLayer(vec3 dir, float scale, float chance, float level) {
-    vec3 p = dir * scale;
-    vec3 cell = floor(p);
-    float h = hash13(cell);
-    if (h > chance) return vec3(0.0);
-    vec3 at = 0.2 + 0.6 * hash33(cell + 17.0);
-    float footprint = max(length(fwidth(p)), 1e-4);
-    float d = length(fract(p) - at);
-    // Іскра — близько півтора пікселя екрана, згасає до нуля на краю.
-    float spark = smoothstep(footprint * 1.1, footprint * 0.25, d);
-    float hue = hash13(cell + 5.0);
-    vec3 tint = hue < 0.46 ? vec3(0.5, 0.58, 1.0)
-      : hue < 0.74 ? vec3(1.0, 0.42, 0.52)
-      : vec3(0.86, 0.84, 0.96);
-    float bright = level * (0.35 + 0.65 * hash13(cell + 9.0));
-    return tint * spark * bright;
-  }
-
   void main() {
-    vec3 dir = normalize(vDir);
     vec3 nebula = mix(uVoid, texture2D(uNebula, vUv).rgb, uNebulaMix);
-    float off = dot(dir, uBand);
-    float band = exp(-(off / 0.34) * (off / 0.34));
-    // Пил густішає вздовж смуги — так і виглядає Чумацький Шлях.
-    vec3 dust = dustLayer(dir, 330.0, 0.10 + 0.22 * band, 0.55)
-      + dustLayer(dir, 610.0, 0.06 + 0.2 * band, 0.38);
-    /*
-     * ВУАЛЬ (ADR-0216). Коли позаду світ порталу, туманність — лише
-     * напівпрозорий серпанок, а іскри пилу лишаються повної сили. Альфа —
-     * найбільше з двох, а колір ділиться на неї: при звичайному змішуванні
-     * іскра на прозорому тлі виходить рівно своєї яскравості.
-     */
-    float nebulaAlpha = uVeil < 0.0 ? 1.0 : uVeil * uNebulaMix;
-    float sparkAlpha = clamp(max(dust.r, max(dust.g, dust.b)), 0.0, 1.0);
-    float alpha = max(nebulaAlpha, sparkAlpha);
-    vec3 colour = (nebula * nebulaAlpha + dust) / max(alpha, 1e-3);
-    gl_FragColor = vec4(colour, alpha);
+    gl_FragColor = vec4(nebula, 1.0);
     #include <colorspace_fragment>
+  }
+`;
+
+/*
+ * ЯСКРАВІ ЗІРКИ — спрайт із ядром, ореолом і чотирма тонкими променями.
+ * Промені тонші й довші горизонтально-вертикально, як дифракція в
+ * телескопі: саме вони кажуть оку «це зірка», а не «це крапка».
+ */
+const HERO_VERTEX = /* glsl */ `
+  attribute float aSize;
+  attribute vec3 aColour;
+  attribute float aPhase;
+  uniform float uPixelRatio;
+  uniform float uTime;
+  varying vec3 vColour;
+  varying float vTwinkle;
+  void main() {
+    vColour = aColour;
+    vTwinkle = 0.88 + 0.12 * sin(uTime * 1.3 + aPhase);
+    vec4 mv = modelViewMatrix * vec4(position, 1.0);
+    gl_Position = projectionMatrix * mv;
+    gl_PointSize = aSize * uPixelRatio;
+  }
+`;
+
+const HERO_FRAGMENT = /* glsl */ `
+  varying vec3 vColour;
+  varying float vTwinkle;
+  void main() {
+    vec2 p = (gl_PointCoord - 0.5) * 2.0;
+    float r = length(p);
+    if (r > 1.0) discard;
+    float core = exp(-r * r * 90.0);
+    float halo = exp(-r * r * 9.0) * 0.28;
+    float spikeX = exp(-abs(p.y) * 70.0) * (1.0 - smoothstep(0.0, 1.0, abs(p.x)));
+    float spikeY = exp(-abs(p.x) * 70.0) * (1.0 - smoothstep(0.0, 1.0, abs(p.y)));
+    float light = (core * 1.6 + halo + (spikeX + spikeY) * 0.55) * vTwinkle;
+    vec3 colour = mix(vColour, vec3(1.0), core * 0.7) * light;
+    gl_FragColor = vec4(colour, 1.0);
   }
 `;
 
@@ -213,28 +198,13 @@ function paintNebula(): Promise<Uint8Array | null> {
 export interface JourneyEnvironmentProps {
   /** Пара просила спокою: небо стоїть, зірки не мерехтять. */
   reducedMotion?: boolean;
-  /**
-   * Позаду світ порталу (ADR-0216): туманність стає вуаллю, тла немає, і
-   * світ проступає між зірками.
-   */
-  veil?: boolean;
 }
 
-/**
- * Щільність туманності-вуалі. Досить, щоб небо лишилось небом, і мало, щоб
- * світ було видно.
- *
- * Для світлої теми — щільніша. Виміряно знімком: 0.34 над світлим світом дала
- * сіру мряку, у якій зірки губились; нічне небо над світлим днем мусить бути
- * сутінками, а не туманом.
- */
-const VEIL_OPACITY = { dark: 0.34, light: 0.6 } as const;
-
-export function JourneyEnvironment({ reducedMotion = false, veil = false }: JourneyEnvironmentProps) {
-  const { theme } = useTheme();
+export function JourneyEnvironment({ reducedMotion = false }: JourneyEnvironmentProps) {
   const groupRef = useRef<Group>(null);
   const skyMaterial = useRef<ShaderMaterial>(null);
   const starMaterial = useRef<ShaderMaterial>(null);
+  const heroMaterial = useRef<ShaderMaterial>(null);
   const pixelRatio = useThree((state) => state.viewport.dpr);
   const [pixels, setPixels] = useState<Uint8Array | null>(nebulaCache.pixels);
   const shown = useRef(nebulaCache.pixels !== null ? 1 : 0);
@@ -248,7 +218,7 @@ export function JourneyEnvironment({ reducedMotion = false, veil = false }: Jour
 
   const texture = useMemo(() => {
     if (pixels === null) return null;
-    const next = new DataTexture(pixels, 1024, 512, RGBAFormat);
+    const next = new DataTexture(pixels, JOURNEY_NEBULA_WIDTH, JOURNEY_NEBULA_HEIGHT, RGBAFormat);
     next.colorSpace = SRGBColorSpace;
     next.magFilter = LinearFilter;
     next.minFilter = LinearFilter;
@@ -271,10 +241,8 @@ export function JourneyEnvironment({ reducedMotion = false, veil = false }: Jour
       uNebula: { value: placeholder as DataTexture },
       uNebulaMix: { value: 0 },
       uVoid: { value: new Color(JOURNEY_SKY_COLOURS.void) },
-      uBand: { value: new Vector3(...JOURNEY_BAND_NORMAL) },
-      uVeil: { value: veil ? 0 : -1 },
     };
-  }, [veil]);
+  }, []);
   useEffect(() => () => skyUniforms.uNebula.value.dispose(), [skyUniforms]);
 
 
@@ -294,6 +262,21 @@ export function JourneyEnvironment({ reducedMotion = false, veil = false }: Jour
   }, []);
   useEffect(() => () => stars.dispose(), [stars]);
 
+  const heroes = useMemo(() => {
+    const field = journeyHeroStars();
+    const geometry = new BufferGeometry();
+    const positions = new Float32Array(field.positions.length);
+    for (let index = 0; index < positions.length; index += 1) {
+      positions[index] = field.positions[index]! * JOURNEY_SKY_RADIUS * 0.95;
+    }
+    geometry.setAttribute('position', new BufferAttribute(positions, 3));
+    geometry.setAttribute('aSize', new BufferAttribute(field.sizes, 1));
+    geometry.setAttribute('aColour', new BufferAttribute(field.colours, 3));
+    geometry.setAttribute('aPhase', new BufferAttribute(field.phases, 1));
+    return geometry;
+  }, []);
+  useEffect(() => () => heroes.dispose(), [heroes]);
+
   useFrame((state, delta) => {
     const step = Math.min(delta, 0.05);
     const sky = skyMaterial.current;
@@ -301,12 +284,16 @@ export function JourneyEnvironment({ reducedMotion = false, veil = false }: Jour
       shown.current = reducedMotion ? 1 : Math.min(1, shown.current + step / NEBULA_FADE_SECONDS);
       sky.uniforms.uNebula!.value = texture;
       sky.uniforms.uNebulaMix!.value = shown.current;
-      sky.uniforms.uVeil!.value = veil ? VEIL_OPACITY[theme] : -1;
     }
     const starShader = starMaterial.current;
     if (starShader) {
       starShader.uniforms.uTime!.value = reducedMotion ? 0 : state.clock.elapsedTime;
       starShader.uniforms.uPixelRatio!.value = pixelRatio;
+    }
+    const heroShader = heroMaterial.current;
+    if (heroShader) {
+      heroShader.uniforms.uTime!.value = reducedMotion ? 0 : state.clock.elapsedTime;
+      heroShader.uniforms.uPixelRatio!.value = pixelRatio;
     }
     const group = groupRef.current;
     if (group && !reducedMotion) group.rotation.y += ((2 * Math.PI) / SKY_TURN_SECONDS) * step;
@@ -316,7 +303,7 @@ export function JourneyEnvironment({ reducedMotion = false, veil = false }: Jour
     <>
     {/* Тло — найтемніший колір туманності, тож її поява не блимає. Поза
         групою: `attach` чіпляє до БАТЬКА, і всередині групи тло сіло б на неї. */}
-    {!veil && <color attach="background" args={[JOURNEY_SKY_COLOURS.void]} />}
+    <color attach="background" args={[JOURNEY_SKY_COLOURS.void]} />
     <group ref={groupRef}>
       <mesh scale={JOURNEY_SKY_RADIUS} renderOrder={-2} frustumCulled={false}>
         <sphereGeometry args={[1, 48, 24]} />
@@ -326,7 +313,6 @@ export function JourneyEnvironment({ reducedMotion = false, veil = false }: Jour
           fragmentShader={SKY_FRAGMENT}
           uniforms={skyUniforms}
           side={BackSide}
-          transparent={veil}
           depthWrite={false}
           toneMapped={false}
         />
@@ -338,6 +324,18 @@ export function JourneyEnvironment({ reducedMotion = false, veil = false }: Jour
           fragmentShader={STAR_FRAGMENT}
           uniforms={{ uPixelRatio: { value: pixelRatio }, uTime: { value: 0 } }}
           premultipliedAlpha
+          transparent
+          depthWrite={false}
+          blending={AdditiveBlending}
+          toneMapped={false}
+        />
+      </points>
+      <points geometry={heroes} renderOrder={-1} frustumCulled={false}>
+        <shaderMaterial
+          ref={heroMaterial}
+          vertexShader={HERO_VERTEX}
+          fragmentShader={HERO_FRAGMENT}
+          uniforms={{ uPixelRatio: { value: pixelRatio }, uTime: { value: 0 } }}
           transparent
           depthWrite={false}
           blending={AdditiveBlending}

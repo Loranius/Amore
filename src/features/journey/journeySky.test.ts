@@ -6,14 +6,16 @@ import {
   JOURNEY_SKY_COLOURS,
   JOURNEY_STAR_COUNT,
   bandCloseness,
+  coreCloseness,
   hexToRgb,
+  journeyHeroStars,
   journeyStarField,
   nebulaDirection,
   paintJourneyNebula,
 } from './journeySky';
 
 // ============================================================
-// Небо «Нашого шляху» (ADR-0214).
+// Небо «Нашого шляху» (ADR-0214; перемальоване з нуля — ADR-0231).
 // ------------------------------------------------------------
 // ВИМОГА ВЛАСНИКА: «при відкритті довго вантажиться фон і в поганій
 // якості». Небо тепер малюється, а не вантажиться. Тут стережеться те, що
@@ -44,29 +46,50 @@ describe('туманність', () => {
     expect(W).toBe(H * 2);
   });
 
-  it('без шва: перший і останній стовпчики — сусіди на сфері', () => {
-    let worst = 0;
-    for (let row = 0; row < SMALL_H; row += 1) {
-      const left = (row * SMALL_W) * 4;
-      const right = (row * SMALL_W + SMALL_W - 1) * 4;
-      for (let c = 0; c < 3; c += 1) worst = Math.max(worst, Math.abs(nebula[left + c]! - nebula[right + c]!));
-    }
-    expect(worst).toBeLessThan(10);
+  it('без шва: стик країв розгортки не гірший за звичайних сусідів', () => {
+    // Перший і останній стовпчики — сусіди на сфері. Шов — це коли на
+    // стику різниця БІЛЬША, ніж між будь-якими іншими сусідами. Сама
+    // різниця не нульова: у небі ADR-0231 є дрібна структура.
+    const diffAt = (a: number, b: number) => {
+      let worst = 0;
+      for (let row = 0; row < SMALL_H; row += 1) {
+        for (let c = 0; c < 3; c += 1) {
+          worst = Math.max(worst, Math.abs(nebula[(row * SMALL_W + a) * 4 + c]! - nebula[(row * SMALL_W + b) * 4 + c]!));
+        }
+      }
+      return worst;
+    };
+    let typical = 0;
+    for (let column = 0; column < SMALL_W - 1; column += 1) typical = Math.max(typical, diffAt(column, column + 1));
+    expect(diffAt(SMALL_W - 1, 0)).toBeLessThanOrEqual(typical);
   });
 
-  it('темна, як на скриншоті власника: жоден піксель не світліший за найсвітліший колір палітри', () => {
-    const ceiling = Math.max(...hexToRgb(JOURNEY_SKY_COLOURS.glow));
-    let brightest = 0;
-    let sum = 0;
-    for (let i = 0; i < nebula.length; i += 4) {
-      brightest = Math.max(brightest, nebula[i]!, nebula[i + 1]!, nebula[i + 2]!);
-      sum += nebula[i]! + nebula[i + 1]! + nebula[i + 2]!;
+  it('глибокий космос: більшість неба темна, а смуга світиться', () => {
+    // ADR-0231: не бузкова мряка (вуаль над світом), а ніч. Половина неба —
+    // темніша за підсвіт порожнечі з малим запасом; найсвітліше — ядро.
+    const lum: number[] = [];
+    for (let i = 0; i < nebula.length; i += 4) lum.push((nebula[i]! + nebula[i + 1]! + nebula[i + 2]!) / 3);
+    lum.sort((a, b) => a - b);
+    const median = lum[Math.floor(lum.length / 2)]!;
+    const deep = Math.max(...hexToRgb(JOURNEY_SKY_COLOURS.deep));
+    expect(median).toBeLessThan(deep + 20);
+    expect(lum[lum.length - 1]!).toBeGreaterThan(median * 3);
+  });
+
+  it('ядро галактики тепле: у ньому червоного більше, ніж синього', () => {
+    let warm = 0;
+    let n = 0;
+    for (let v = 0.02; v < 1; v += 0.01) {
+      for (let u = 0; u < 1; u += 0.01) {
+        const d = nebulaDirection(u, v);
+        if (coreCloseness(d) < 0.8 || bandCloseness(d) < 0.8) continue;
+        const [r, , b] = at(u, v);
+        warm += r - b;
+        n += 1;
+      }
     }
-    expect(brightest).toBeLessThanOrEqual(ceiling + 1);
-    // Середнє — у межах тіла туманності (#271528 на скриншоті), а не чорнота.
-    const mean = sum / (nebula.length / 4) / 3;
-    expect(mean).toBeGreaterThan(18);
-    expect(mean).toBeLessThan(60);
+    expect(n).toBeGreaterThan(3);
+    expect(warm / n).toBeGreaterThan(0);
   });
 
   it('смуга Чумацького Шляху світліша за полюси смуги', () => {
@@ -141,5 +164,23 @@ describe('зірки', () => {
     // Частка сфери з близькістю > 0.5 — близько 0.28; зірок там помітно більше.
     expect(near / field.sizes.length).toBeGreaterThan(0.36);
     expect(Math.hypot(...JOURNEY_BAND_NORMAL)).toBeCloseTo(1, 9);
+  });
+});
+
+describe('яскраві зірки з променями (ADR-0231)', () => {
+  const heroes = journeyHeroStars();
+  it('кілька десятків, детерміновані, на одиничній сфері', () => {
+    expect(heroes.sizes.length).toBeGreaterThan(30);
+    expect(heroes.sizes.length).toBeLessThan(100);
+    expect(Array.from(journeyHeroStars().positions.slice(0, 12))).toEqual(Array.from(heroes.positions.slice(0, 12)));
+    for (let i = 0; i < heroes.sizes.length; i += 1) {
+      const p = [heroes.positions[i * 3]!, heroes.positions[i * 3 + 1]!, heroes.positions[i * 3 + 2]!];
+      expect(Math.hypot(...p)).toBeCloseTo(1, 4);
+    }
+  });
+  it('помітно більші за звичайні зірки — інакше променів не видно', () => {
+    const smallest = Math.min(...heroes.sizes);
+    const field = journeyStarField();
+    expect(smallest).toBeGreaterThan(Math.max(...field.sizes) * 2);
   });
 });

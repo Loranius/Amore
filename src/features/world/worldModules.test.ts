@@ -53,25 +53,26 @@ describe('усі модулі просвічуються світом (ADR-0215)
     expect(read(path)).toMatch(/useWorldVisibleRoute\(\)|useWorldModule\(\)/);
   });
 
-  it('«Наш шлях» — теж (ADR-0216): полотно прозоре, небо стає вуаллю над світом', () => {
+  it('«Наш шлях» — НЕПРОЗОРИЙ космос (ADR-0231 скасовує вуаль ADR-0216)', () => {
+    // Власник: «прибери прозорий фон щоб не було видно кристала».
     const page = read('features/journey/JourneyPage.tsx');
-    expect(page).toContain('useWorldModule()');
-    expect(page).toContain('world={worldVisible}');
+    expect(page).not.toContain('useWorldModule()');
     const scene = read('features/journey/scene/JourneyScene.tsx');
-    expect(scene).toContain('alpha: world');
-    expect(scene).toContain('veil={world}');
-    expect(read('features/journey/journeyScene.css')).toMatch(/\.journey-page\[data-world='true'\]\s*\{[^}]*background:\s*transparent/);
+    expect(scene).toContain('alpha: false');
+    expect(scene).not.toContain('veil=');
+    expect(read('features/journey/journeyScene.css')).not.toMatch(/\.journey-page\[data-world='true'\]/);
+    expect(read('features/journey/scene/JourneyEnvironment.tsx')).toContain('<color attach="background"');
   });
 
-  it('мапа спогадів — теж (ADR-0216): карта-вуаль, а під нею лише світ, не галерея', () => {
+  it('мапа спогадів — НЕПРОЗОРА (ADR-0231 скасовує вуаль ADR-0216)', () => {
+    // Власник: «прибери прозорість фону на карті в спогадах» — крізь
+    // напівпрозорі заливки світ перетворював мапу на бузкову мряку.
     const map = read('features/memories/MemoriesMap.tsx');
-    expect(map).toContain('mapVeilChanges(');
-    expect(map).toContain("root.setAttribute('data-map-open', 'true')");
-    // Світ під картою вмикає сторінка «Спогадів»; другий виклик хука в
-    // діалозі зняв би позначку при закритті карти.
-    expect(map).not.toContain('useWorldModule()');
+    expect(map).not.toContain('mapVeilChanges(');
+    expect(map).not.toContain('data-world');
     const css = read('features/memories/memories.css');
-    expect(css).toMatch(/\[data-map-open='true'\] \.app-shell > \.content \{ visibility: hidden; \}/);
+    expect(css).not.toMatch(/\.mm-map\[data-world='true'\]/);
+    expect(css).toMatch(/\.mm-map \{[^}]*background: var\(--bg\)/);
   });
 
   it('гра — виняток за словом власника: світу в ній немає', () => {
