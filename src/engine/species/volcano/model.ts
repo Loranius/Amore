@@ -27,6 +27,7 @@ import { anniversary, dayNumber, parseDay, yearIndex, yearsSince } from '../crys
 import { unit } from '../crystalV2/hash';
 import { ACTIVITY_WEIGHTS, datedItems, r6, type CrystalV2Snapshot } from '../crystalV2/model';
 import { buildReefV2Model, type ReefV2Model } from '../reefV2/model';
+import { yearFertility } from '../grammar/grammar';
 
 export const VOLCANO_VERSION = 'volcano/2026-09-29';
 
@@ -38,8 +39,6 @@ export const VOLCANO_LAYER = 0.26;
 export const VOLCANO_LAYER_DECAY_YEARS = 9;
 /** Скільки найбільше додає насичений рік до товщини шару. */
 export const VOLCANO_FERTILE_BONUS = 0.25;
-/** Активність року, на якій бонус насиченості повний. */
-const FERTILE_FULL = 40;
 
 export interface VolcanoLayer {
   year: number;
@@ -84,8 +83,8 @@ export interface VolcanoModel {
 }
 
 export function volcanoLayerThickness(year: number, lived: number, activity: number): number {
-  const fertile = Math.min(1, Math.log1p(Math.max(0, activity)) / Math.log1p(FERTILE_FULL));
-  return VOLCANO_LAYER * Math.exp(-year / VOLCANO_LAYER_DECAY_YEARS) * lived * (1 + VOLCANO_FERTILE_BONUS * fertile);
+  // Насиченість року — спільна для всіх видів (ADR-0237).
+  return VOLCANO_LAYER * Math.exp(-year / VOLCANO_LAYER_DECAY_YEARS) * lived * (1 + VOLCANO_FERTILE_BONUS * yearFertility(activity));
 }
 
 export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
