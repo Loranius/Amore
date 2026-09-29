@@ -86,7 +86,8 @@ interface FormRules {
 const FORMS: Record<TreeForm, FormRules> = {
   oak: {
     top: 0.86, rise: 50, fall: 30,
-    reach: (H, tier) => (0.5 * H) / (1 + 0.18 * tier),
+    // 0.5 → 0.4 (власник, 2026-09-29: «гілки дерев занадто довгі»).
+    reach: (H, tier) => (0.4 * H) / (1 + 0.18 * tier),
     depth: (age) => 1 + Math.min(2, Math.floor(age / 2)),
     squash: 0.82, leaf: 1, lean: 1, tierAt: 0.62,
   },
@@ -94,7 +95,7 @@ const FORMS: Record<TreeForm, FormRules> = {
   // догори — крона конусом; лапи пласкі.
   spruce: {
     top: 0.98, rise: 14, fall: 16,
-    reach: (H, _tier, y, topY) => 0.46 * H * Math.max(0.12, 1 - y / topY),
+    reach: (H, _tier, y, topY) => 0.37 * H * Math.max(0.12, 1 - y / topY),
     depth: (age) => 1 + Math.min(1, Math.floor(age / 3)),
     squash: 0.42, leaf: 1.15, lean: 0.3,
     // Кільце гілок ялини — там, де того року була верхівка.
@@ -104,7 +105,7 @@ const FORMS: Record<TreeForm, FormRules> = {
   // хмаринка крони.
   sakura: {
     top: 0.58, rise: 32, fall: 26,
-    reach: (H, tier) => (0.64 * H) / (1 + 0.12 * tier),
+    reach: (H, tier) => (0.51 * H) / (1 + 0.12 * tier),
     depth: (age) => 1 + Math.min(2, Math.floor(age / 2)),
     squash: 0.6, leaf: 1.12, lean: 2.2, tierAt: 0.62,
   },

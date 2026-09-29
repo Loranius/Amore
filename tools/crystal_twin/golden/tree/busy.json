@@ -133,14 +133,14 @@
  "summary": {
   "branches": 26,
   "clusters": 23,
-  "crownRadius": 1.9818,
+  "crownRadius": 1.5974,
   "firstBlossom": [
-   1.3063,
-   1.0446,
-   0.0257
+   1.0527,
+   0.9371,
+   0.026
   ],
-  "meadowRadius": 3.7354,
-  "reach": 1.6374,
+  "meadowRadius": 3.4279,
+  "reach": 1.3069,
   "top": 2.5826
  }
 }

@@ -115,7 +115,8 @@ def skeleton(model: dict[str, Any]) -> dict[str, Any]:
         d = (math.cos(math.radians(el)) * math.cos(math.radians(az)), math.sin(math.radians(el)),
              math.cos(math.radians(el)) * math.sin(math.radians(az)))
         grown = 1.0 - math.exp(-(yb["age"] + 0.25) / 2.0)
-        reach = 0.5 * H / (1.0 + 0.18 * yb["tier"])
+        # 0.5 → 0.4 (власник, 2026-09-29: «гілки дерев занадто довгі»).
+        reach = 0.4 * H / (1.0 + 0.18 * yb["tier"])
         length = reach * (0.35 + 0.65 * grown) * year_boost(yb["activity"]) * (0.9 + 0.2 * unit(seed, f"{key}:len"))
         last = 1 + min(2, int(yb["age"] // 2))
         grow(_trunk_at(trunk_dir, y), d, length, 1, last, key, trunk_rel(y) * 0.55 * (0.6 + 0.4 * grown), 0.6)
