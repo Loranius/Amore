@@ -142,6 +142,7 @@ export default function CrystalV2Scene() {
             glowColour={linearColour(model.colour.rgb)}
             crystalHeight={frame.height}
             reduceMotion={reduceMotion}
+            druses={model.druses}
           />
           <CrystalV2Object
             model={model}

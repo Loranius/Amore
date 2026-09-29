@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CrystalV2Snapshot } from '../crystalV2/model';
-import { buildVolcanoGeometry, volcanoCrater, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinIndices, volcanoVeinPaths } from './geometry';
+import { buildVolcanoGeometry, volcanoCrater, volcanoLedges, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinIndices, volcanoVeinPaths } from './geometry';
 import { buildVolcanoModel, volcanoLayerThickness, volcanoSlopeRadius } from './model';
 
 // ============================================================
@@ -64,15 +64,45 @@ describe('вулкан: ріст', () => {
   });
 });
 
-describe('вулкан: бічні конуси — віхи часу', () => {
-  it('з\'являються на 6-му, 12-му й 20-му роках і далі підростають', () => {
-    const count = (y: number) => buildVolcanoModel(at(`${2012 + y}-10-15`)).vents.length;
-    expect([count(5), count(6), count(11), count(12), count(19), count(20), count(40)]).toEqual([0, 1, 1, 2, 2, 3, 3]);
-    const young = buildVolcanoModel(at('2019-10-15')).vents[0]!.size;
-    const old = buildVolcanoModel(at('2030-10-15')).vents[0]!.size;
-    expect(old).toBeGreaterThan(young);
-    // Той самий конус на тому самому місці: азимут не стрибає з віком.
-    expect(buildVolcanoModel(at('2030-10-15')).vents[0]!.azimuth).toBe(buildVolcanoModel(at('2019-10-15')).vents[0]!.azimuth);
+describe('вулкан: сліди модулів (ADR-0237)', () => {
+  const plans = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i, date: '2016-05-05' }));
+
+  it('бічні конуси — виконані плани: 3 → 1, 9 → 2, 21 → 3, не більше трьох', () => {
+    const count = (n: number) => buildVolcanoModel(at('2030-10-15', { plans: plans(n) })).vents.length;
+    expect([0, 2, 3, 8, 9, 20, 21, 500].map(count)).toEqual([0, 0, 1, 1, 2, 2, 3, 3]);
+    const young = buildVolcanoModel(at('2016-10-15', { plans: plans(3) })).vents[0]!;
+    const old = buildVolcanoModel(at('2030-10-15', { plans: plans(3) })).vents[0]!;
+    // Той самий конус на тому самому місці; з віком вулкана підростає.
+    expect(old.azimuth).toBe(young.azimuth);
+    expect(old.size).toBeGreaterThan(young.size);
+  });
+
+  it('новий вид риб на 5-му, 10-му й 20-му роках разом (власник)', () => {
+    const kinds = (y: number) => buildVolcanoModel(at(`${2012 + y}-10-15`)).fishKinds;
+    expect([1, 4, 5, 9, 10, 19, 20, 40].map(kinds)).toEqual([1, 1, 2, 2, 3, 3, 4, 4]);
+  });
+
+  it('спогади — скільки коралів у колонії свого року: 1 на тихий рік, до чотирьох', () => {
+    const quiet = buildVolcanoModel(at('2020-10-15'));
+    const rich = buildVolcanoModel(at('2020-10-15', { memories: Array.from({ length: 30 }, (_, i) => ({ id: i, date: '2015-05-05' })) }));
+    const bodies = (m: typeof quiet, year: number) => volcanoPlacements(m).filter((p) => p.colony.year === year).length;
+    expect(bodies(quiet, 2)).toBe(1);
+    expect(bodies(rich, 2)).toBe(4);
+    expect(bodies(rich, 3)).toBe(1);
+  });
+
+  it('насичений рік лишає уступ на схилі; тихий — ні', () => {
+    const quiet = buildVolcanoModel(at('2020-10-15'));
+    expect(volcanoLedges(quiet).tris.length).toBe(0);
+    const rich = buildVolcanoModel(at('2020-10-15', { memories: Array.from({ length: 40 }, (_, i) => ({ id: i, date: '2014-05-05' })) }));
+    expect(rich.layers.find((l) => l.year === 1)!.fertility).toBeGreaterThanOrEqual(0.4);
+    expect(volcanoLedges(rich).tris.length).toBeGreaterThan(0);
+    // Уступ року лишається й пізніше, на тій самій висоті (переривається
+    // лише там, де з роками проляже нова ріка лави).
+    const later = buildVolcanoModel(at('2026-10-15', { memories: Array.from({ length: 40 }, (_, i) => ({ id: i, date: '2014-05-05' })) }));
+    const shelf = (m: typeof rich) => m.layers.find((l) => l.year === 1)!.to;
+    expect(shelf(later)).toBe(shelf(rich));
+    expect(volcanoLedges(later).tris.some((tri) => Math.abs(tri[0][1] - shelf(later)) < 1e-9)).toBe(true);
   });
 });
 

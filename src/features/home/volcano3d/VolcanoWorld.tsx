@@ -103,9 +103,11 @@ interface VolcanoWorldProps {
    * течуть завжди — інакше вулкан у ряду вибору був би без лави.
    */
   bare?: boolean;
+  /** Видів риб у зграї: новий на 5 / 10 / 20 роках разом (ADR-0237). */
+  fishKinds?: number;
 }
 
-export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, glow, bare = false }: VolcanoWorldProps) {
+export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, glow, bare = false, fishKinds = 1 }: VolcanoWorldProps) {
   const lava = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(geometry.lava.positions, 3));
@@ -201,6 +203,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         seagrassScale={0.5}
         islandWildlife={1 / 3}
         calmSurround
+        fishKinds={fishKinds}
         bare={bare}
       />
       <group position={[0, PORTAL_GROUND_Y, 0]}>

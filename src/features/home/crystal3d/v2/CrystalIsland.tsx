@@ -224,10 +224,12 @@ interface CrystalIslandProps {
   reduceMotion: boolean;
   /** Лише острів, без храму й променів — острівець на тлі входу (ADR-0228). */
   bare?: boolean;
+  /** Друзи-самоцвіти на плитах — спільні вихідні пари (ADR-0237). */
+  druses?: number;
 }
 
-export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crystalHeight, reduceMotion, bare = false }: CrystalIslandProps) {
-  const built = useMemo(() => buildCrystalIsland(seed, radius), [seed, radius]);
+export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crystalHeight, reduceMotion, bare = false, druses = 0 }: CrystalIslandProps) {
+  const built = useMemo(() => buildCrystalIsland(seed, radius, druses), [seed, radius, druses]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Давній храм у підземеллі навколо острова, на всі 360° (ADR-0224).

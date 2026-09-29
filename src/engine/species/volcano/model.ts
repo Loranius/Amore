@@ -17,6 +17,8 @@
 //   останні два роки    → жар кратера й кількість жил лави
 //   роки разом          → колонія корала на шарі СВОГО року: вулкан —
 //                         літопис знизу вгору
+//   виконані плани      → бічні конуси (ADR-0237)
+//   5 / 10 / 20 років   → новий вид риб у зграї (ADR-0237)
 //   решта (актинії-бажання, мушлі-віхи, риби-медіа, трава-вихідні,
 //   зірки-місця, підріст) — ті самі правила, що в рифі v2 (ADR-0219):
 //   модель рифу рахується й перевикористовується, а не переписується.
@@ -45,22 +47,31 @@ export interface VolcanoLayer {
   /** Частка року, що вже прожита (1 для всіх, крім поточного). */
   lived: number;
   activity: number;
+  /** Насиченість року 0…1 (ADR-0237): насичений рік лишає уступ на схилі. */
+  fertility: number;
+  /** Спогади року: скільки коралів у колонії цього року (ADR-0237). */
+  memories: number;
   thickness: number;
   /** Висота низу й верху шару. */
   from: number;
   to: number;
 }
 
-/** Роки, на яких прорізається бічний конус: віха росту, не подія. */
-export const VOLCANO_VENT_YEARS: readonly number[] = [6, 12, 20];
+/** Скільки бічних конусів дають виконані плани: 3 → 1, 9 → 2, 21 → 3 (ADR-0237). */
+export function volcanoVentCount(plans: number): number {
+  return Math.min(3, Math.floor(Math.log2(1 + Math.max(0, plans) / 3)));
+}
+
+/** Роки разом, на яких у зграї з'являється новий вид риб (ADR-0237, власник). */
+export const VOLCANO_FISH_YEARS: readonly number[] = [5, 10, 20];
 
 export interface VolcanoVent {
-  /** Рік разом, коли конус з'явився. */
-  year: number;
+  /** Порядковий номер конуса: його азимут і місце не змінюються з роками. */
+  index: number;
   azimuth: number;
   /** Де на схилі стоїть: частка висоти головного конуса. */
   at: number;
-  /** Висота бічного конуса: росте ще вісім років після появи. */
+  /** Висота бічного конуса: росте з віком вулкана. */
   size: number;
 }
 
@@ -76,8 +87,10 @@ export interface VolcanoModel {
   /** Жар кратера 0.35…1: свіжа лава останніх двох років. */
   glow: number;
   veins: number;
-  /** Бічні конуси: з'являються на 6-му, 12-му й 20-му роках разом. */
+  /** Бічні конуси — виконані плани (ADR-0237). */
   vents: VolcanoVent[];
+  /** Скільки видів риб у зграї: 1 + віхи 5 / 10 / 20 років разом. */
+  fishKinds: number;
   /** Модель рифу тієї ж пари: колонії, актинії, мушлі, риби, трава, зірки. */
   life: ReefV2Model;
 }
@@ -93,6 +106,11 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
   const asOf = parseDay(snapshot.asOf);
   const items = datedItems(snapshot, start, asOf);
   const activityByYear = new Map<number, number>();
+  const plans = items.filter((item) => item.kind === 'plans').length;
+  const memoriesByYear = new Map<number, number>();
+  for (const item of items) {
+    if (item.kind === 'memories') memoriesByYear.set(yearIndex(start, item.day), (memoriesByYear.get(yearIndex(start, item.day)) ?? 0) + 1);
+  }
   for (const item of items) {
     const k = yearIndex(start, item.day);
     activityByYear.set(k, (activityByYear.get(k) ?? 0) + ACTIVITY_WEIGHTS[item.kind]);
@@ -107,7 +125,7 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
     if (lived <= 0) continue;
     const activity = activityByYear.get(k) ?? 0;
     const thickness = volcanoLayerThickness(k, lived, activity);
-    layers.push({ year: k, lived: r6(lived), activity: r6(activity), thickness: r6(thickness), from: r6(top), to: r6(top + thickness) });
+    layers.push({ year: k, lived: r6(lived), activity: r6(activity), fertility: r6(yearFertility(activity)), memories: memoriesByYear.get(k) ?? 0, thickness: r6(thickness), from: r6(top), to: r6(top + thickness) });
     top += thickness;
   }
 
@@ -130,12 +148,13 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
     glow: r6(glow),
     // 3…5 рік лави, як у референсі: більше — від активності останніх років.
     veins: 3 + Math.min(2, Math.floor(Math.log2(1 + recent / 3))),
-    vents: VOLCANO_VENT_YEARS.filter((year) => life.years >= year).map((year, i) => ({
-      year,
+    vents: Array.from({ length: volcanoVentCount(plans) }, (_, i) => ({
+      index: i,
       azimuth: r6(((unit(life.startDate, `vent${i}:a`) * 360) + i * 137.5) % 360),
       at: r6(0.16 + 0.14 * unit(life.startDate, `vent${i}:at`)),
-      size: r6((0.34 + 0.1 * unit(life.startDate, `vent${i}:s`)) * (0.55 + 0.45 * Math.min(1, (life.years - year) / 8))),
+      size: r6((0.34 + 0.1 * unit(life.startDate, `vent${i}:s`)) * (0.55 + 0.45 * Math.min(1, life.years / 8))),
     })),
+    fishKinds: 1 + VOLCANO_FISH_YEARS.filter((year) => life.years >= year).length,
     life,
   };
 }

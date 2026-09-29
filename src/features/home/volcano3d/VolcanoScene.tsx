@@ -121,6 +121,7 @@ export default function VolcanoScene() {
             island={island}
             rockRadius={model.baseRadius * frame.scale}
             glow={model.glow}
+            fishKinds={model.fishKinds}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

@@ -70,7 +70,7 @@ function SpeciesIsland({ demo, theme, reduceMotion }: IslandProps) {
     const frame = volcanoFrame(geometry);
     const rock = model.baseRadius * frame.scale;
     return {
-      kind: 'reef' as const, geometry, frame, rock, glow: model.glow,
+      kind: 'reef' as const, geometry, frame, rock, glow: model.glow, fishKinds: model.fishKinds,
       island: volcanoIsland(frame),
     };
   }, [demo]);
@@ -88,6 +88,7 @@ function SpeciesIsland({ demo, theme, reduceMotion }: IslandProps) {
             glowColour={linearColour(built.model.colour.rgb)}
             crystalHeight={built.frame.height}
             reduceMotion={reduceMotion}
+            druses={built.model.druses}
           />
           <CrystalV2Object model={built.model} geometry={built.geometry} scale={built.frame.scale} theme={theme} reduceMotion={reduceMotion} />
         </>
@@ -106,6 +107,7 @@ function SpeciesIsland({ demo, theme, reduceMotion }: IslandProps) {
           island={built.island}
           rockRadius={built.rock}
           glow={built.glow}
+          fishKinds={built.fishKinds}
         />
       )}
     </group>

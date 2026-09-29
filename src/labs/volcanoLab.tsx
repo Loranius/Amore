@@ -46,6 +46,7 @@ function Island({ years, fill, theme, x }: { years: number; fill: number; theme:
           island={built.island}
           rockRadius={built.rock}
           glow={built.model.glow}
+          fishKinds={built.model.fishKinds}
         />
       </group>
     </group>

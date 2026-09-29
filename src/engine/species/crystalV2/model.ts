@@ -11,7 +11,7 @@
 //   події «Нашого шляху»  → добриво року; віхи — іскри в кристалі свого року
 //   місця на мапі         → нахил кристала свого року назовні
 //   переглянуте (медіа)   → внутрішнє сяйво колонії (і нічого більше)
-//   спільні вихідні       → добриво року
+//   спільні вихідні       → друзи-самоцвіти на острові (ADR-0237)
 //   активність року       → розмір кристала свого року
 //
 // Той самий запис живе в Python (`tools/crystal_twin/crystal_twin/model.py`);
@@ -137,6 +137,8 @@ export interface CrystalV2Model {
     rgb: [number, number, number];
   };
   children: CrystalV2Child[];
+  /** Друзи-самоцвіти на острові — спільні вихідні (ADR-0237). */
+  druses: number;
 }
 
 /** Округлення, однакове з Python: floor(x·10⁶ + ½) / 10⁶. */
@@ -348,5 +350,8 @@ export function buildCrystalV2Model(snapshot: CrystalV2Snapshot): CrystalV2Model
     },
     colour: colonyColour(startText, snapshot.wishes ?? [], partners, asOf),
     children,
+    // Спільні вихідні — дрібні друзи на острові (ADR-0237 §3): по одній на
+    // день, до двадцяти чотирьох, щоб острів не став розсипом.
+    druses: Math.min(24, counts.daysOff),
   };
 }

@@ -18,7 +18,7 @@ import {
 } from './reefV2Materials';
 
 /** Риба: ромб тіла й трикутник хвоста; голова вздовж +x. */
-function buildFishGeometry(fish: ReefV2Geometry['fish'], seed: string) {
+function buildFishGeometry(fish: ReefV2Geometry['fish'], seed: string, kinds: number) {
   const body = new Float32Array([
     1, 0, 0, -0.3, 0.45, 0, -0.3, -0.45, 0,
     -0.3, 0.45, 0, -0.3, -0.45, 0, -0.35, 0, 0.12,
@@ -31,7 +31,7 @@ function buildFishGeometry(fish: ReefV2Geometry['fish'], seed: string) {
   attr('aHeight', fish.map((f) => f.height));
   attr('aPhase', fish.map((f) => f.phase));
   attr('aSpeed', fish.map((f) => f.speed));
-  attr('aKind', fish.map((_, k) => Math.floor(unit(seed, `fish${k}:kind`) * 3)));
+  attr('aKind', fish.map((_, k) => Math.floor(unit(seed, `fish${k}:kind`) * kinds)));
   g.instanceCount = fish.length;
   return g;
 }
@@ -83,6 +83,8 @@ interface ReefV2WorldProps {
   rockName?: string;
   /** Висота морської трави: на плато вулкана вона нижча, щоб не затуляти конус. */
   seagrassScale?: number;
+  /** Скільки видів риб у зграї (1…4). Риф — три; вулкан — від віку пари (ADR-0237). */
+  fishKinds?: number;
 }
 
 /**
@@ -90,7 +92,7 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false, fishKinds = 3 }: ReefV2WorldProps) {
   const palette = REEF_PALETTES[theme];
 
   const rock = useMemo(
@@ -112,7 +114,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
     () => (geometry.pearls.length ? pointsGeometry(Array.from(geometry.pearls), seed, 'pearl') : null),
     [geometry, seed],
   );
-  const fish = useMemo(() => (geometry.fish.length ? buildFishGeometry(geometry.fish, seed) : null), [geometry, seed]);
+  const fish = useMemo(() => (geometry.fish.length ? buildFishGeometry(geometry.fish, seed, fishKinds) : null), [geometry, seed, fishKinds]);
   const tuft = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([

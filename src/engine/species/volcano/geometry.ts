@@ -210,15 +210,15 @@ function ventTriangles(model: VolcanoModel, vent: VolcanoModel['vents'][number])
     const t = ((i + 0.3 * (unit(seed, `${tag}:${i}`) - 0.5)) / n) * Math.PI * 2;
     return [centre[0] + Math.cos(t) * r, centre[1] - (tag.endsWith('lo') ? 0.03 : 0), centre[2] + Math.sin(t) * r];
   });
-  const lo = ring([base[0], base[1] - vent.size * 0.15, base[2]], r0, `vent${vent.year}:lo`);
-  const hi = ring(tip, r1, `vent${vent.year}:hi`);
+  const lo = ring([base[0], base[1] - vent.size * 0.15, base[2]], r0, `vent${vent.index}:lo`);
+  const hi = ring(tip, r1, `vent${vent.index}:hi`);
   const pit: V3 = [tip[0], tip[1] - vent.size * 0.2, tip[2]];
   const tris: Tri[] = [];
   const tone: number[] = [];
   const heat: number[] = [];
   for (let i = 0; i < n; i += 1) {
     const j = (i + 1) % n;
-    const t = 0.8 + 0.25 * unit(seed, `vent${vent.year}:f${i}`);
+    const t = 0.8 + 0.25 * unit(seed, `vent${vent.index}:f${i}`);
     tris.push([lo[i]!, hi[j]!, lo[j]!], [lo[i]!, hi[i]!, hi[j]!], [hi[i]!, pit, hi[j]!]);
     tone.push(t, t * 0.95, 0.5);
     heat.push(0, 0.35, 0.35, 0, 0.35, 0.35, 0.35, 0.9, 0.35);
@@ -302,7 +302,75 @@ export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: 
     tone.push(...v.tone);
     heat.push(...v.heat);
   }
+  const ledges = volcanoLedges(model);
+  for (const tri of ledges.tris) for (const v of tri) heat.push(volcanoRockHeat(model, veins, v));
+  tris.push(...ledges.tris);
+  tone.push(...ledges.tone);
   return { tris, tone, heat };
+}
+
+/** Радіус справжнього гранчастого конуса на висоті `y` під азимутом `a`. */
+export function volcanoConeRadiusAt(rings: readonly Ring[], a: number, y: number): number {
+  for (let k = 0; k + 1 < rings.length; k += 1) {
+    const lo = volcanoRingHit(rings[k]!.points, a);
+    const hi = volcanoRingHit(rings[k + 1]!.points, a);
+    if (y >= lo.y && y <= hi.y) return lo.r + ((hi.r - lo.r) * (y - lo.y)) / Math.max(1e-9, hi.y - lo.y);
+  }
+  return volcanoRingHit(rings[rings.length - 1]!.points, a).r;
+}
+
+/** Мінімальна насиченість року, з якої він лишає уступ. */
+export const VOLCANO_LEDGE_FERTILITY = 0.4;
+
+/**
+ * Уступи насичених років (ADR-0237 §5): на верху шару року, що був
+ * насиченим, лава застигла терасою. Тераса — ДУГА на одному боці конуса
+ * (азимут — золотий кут року), а не кільце: кільце на кожному насиченому
+ * році робило з конуса посмугований стос (живий кадр, 2026-09-29), а смуги
+ * власник уже відкидав. Чим насиченіший рік, тим ширша дуга й далі виступ.
+ * Над ріками лави тераси немає: вона перекрила б ріку.
+ */
+export function volcanoLedges(model: VolcanoModel): { tris: Tri[]; tone: number[] } {
+  const seed = model.startDate;
+  const rings = volcanoRings(model);
+  const crater = volcanoCrater(model);
+  const notches = volcanoVeinIndices(model).map((i) => Math.atan2(crater.rim[i]![2], crater.rim[i]![0]));
+  const tris: Tri[] = [];
+  const tone: number[] = [];
+  const N = 24;
+  for (const layer of model.layers) {
+    if (layer.fertility < VOLCANO_LEDGE_FERTILITY || layer.to > model.height * 0.85) continue;
+    const y = layer.to;
+    const drop = 0.035 + 0.03 * layer.fertility;
+    const out = 0.04 + 0.08 * layer.fertility;
+    const t = 0.78 + 0.3 * unit(seed, `ledge${layer.year}`);
+    const centre = layer.year * 2.399963 + unit(seed, `ledge${layer.year}:a`) * 0.6;
+    const span = (0.7 + 1.0 * layer.fertility) * (Math.PI / 3);
+    const segments = Math.max(3, Math.round((span / (Math.PI * 2)) * N));
+    for (let i = 0; i < segments; i += 1) {
+      const a0 = centre - span / 2 + (i / segments) * span;
+      const a1 = centre - span / 2 + ((i + 1) / segments) * span;
+      const mid = (a0 + a1) / 2;
+      const nearRiver = notches.some((n) => Math.abs(Math.atan2(Math.sin(mid - n), Math.cos(mid - n))) < 0.42);
+      if (nearRiver) continue;
+      const at = (a: number, dy: number, grow: number): V3 => {
+        const r = volcanoConeRadiusAt(rings, a, y + dy) * (1 + grow) - (grow === 0 ? 0.004 : 0);
+        return [Math.cos(a) * r, y + dy, Math.sin(a) * r];
+      };
+      const in0 = at(a0, 0, 0);
+      const in1 = at(a1, 0, 0);
+      // Тераса звужується до кінців дуги — як застиглий язик, а не полиця.
+      const taper = (k: number) => Math.sin((Math.PI * k) / segments) ** 0.6;
+      const o0 = at(a0, 0, out * taper(i));
+      const o1 = at(a1, 0, out * taper(i + 1));
+      const b0 = at(a0, -drop, 0);
+      const b1 = at(a1, -drop, 0);
+      // Полиця зверху й лице вниз до схилу — закручено назовні.
+      tris.push([in0, in1, o1], [in0, o1, o0], [o0, o1, b1], [o0, b1, b0]);
+      tone.push(t * 1.05, t * 1.05, t * 0.86, t * 0.86);
+    }
+  }
+  return { tris, tone };
 }
 
 export interface VolcanoLava {
@@ -390,8 +458,11 @@ export function volcanoPlacements(model: VolcanoModel): ReefV2Placement[] {
   for (const [index, c] of model.life.colonies.entries()) {
     const a0 = (c.azimuth * Math.PI) / 180;
     const r0 = model.baseRadius * (1.04 + 0.1 * (index / years));
-    // Третина тіл колонії (власник: «прибери … коралів в дві третини»).
-    const bodies = Math.max(1, Math.round(c.bodies / 3));
+    // Скільки коралів у колонії — спогади цього року (ADR-0237): 1 на тихий
+    // рік, до чотирьох на рік, повний спогадів. Небагато — власник: «прибери
+    // … коралів в дві третини».
+    const memories = model.layers.find((l) => l.year === c.year)?.memories ?? 0;
+    const bodies = 1 + Math.min(3, Math.floor(Math.log2(1 + memories / 2)));
     for (let j = 0; j < bodies; j += 1) {
       const key = `colony${c.year}:body${j}`;
       let a = a0;

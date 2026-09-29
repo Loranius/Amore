@@ -335,7 +335,9 @@ export function createFishMaterial(p: ReefPalette, ground: number): THREE.Shader
     side: THREE.DoubleSide,
     uniforms: {
       ...waterUniforms(p, ground),
-      uColours: { value: ['#ffd24a', '#6ec6ff', '#ff8a5c'].map(colour) },
+      // Четвертий — скат вулкана на 20-му році разом (ADR-0237): бузковий і
+      // більший за решту зграї.
+      uColours: { value: ['#ffd24a', '#6ec6ff', '#ff8a5c', '#c58cff'].map(colour) },
       uGlow: { value: p.glow },
       uScale: { value: 1 },
     },
@@ -358,20 +360,20 @@ export function createFishMaterial(p: ReefPalette, ground: number): THREE.Shader
         // Хвіст (x < 0) б'є вбік; тіло нерухоме.
         p.z += step(p.x, -0.3) * sin(uTime * 8.0 + aPhase) * 0.18;
         vec3 local = forward * p.x + vec3(0.0, p.y, 0.0) + side * p.z;
-        vec4 w = modelMatrix * vec4(centre + local * 0.09 * uScale, 1.0);
+        vec4 w = modelMatrix * vec4(centre + local * 0.09 * uScale * (aKind > 2.5 ? 1.7 : 1.0), 1.0);
         vWorld = w.xyz;
         vKind = aKind;
         gl_Position = projectionMatrix * viewMatrix * w;
       }
     `,
     fragmentShader: /* glsl */ `
-      uniform vec3 uColours[3];
+      uniform vec3 uColours[4];
       uniform float uGlow;
       varying vec3 vWorld;
       varying float vKind;
       ${WATER}
       void main() {
-        vec3 base = vKind < 0.5 ? uColours[0] : (vKind < 1.5 ? uColours[1] : uColours[2]);
+        vec3 base = vKind < 0.5 ? uColours[0] : (vKind < 1.5 ? uColours[1] : (vKind < 2.5 ? uColours[2] : uColours[3]));
         vec3 c = underwater(base, flatNormal(vWorld), vWorld) + base * uGlow * 0.3;
         gl_FragColor = vec4(c, 1.0);
         ${END}

@@ -178,7 +178,34 @@ export interface CrystalIsland {
   ruinTop: number;
 }
 
-export function buildCrystalIsland(seed: string, radius: number): CrystalIsland {
+/**
+ * Друза: два-три шестигранні шпилі кольору самоцвітів, що виходять із
+ * щілини між плитами (ADR-0237: спільні вихідні). Вершина гостра, як у
+ * кварцу; невеликий нахил — кожен шпиль у свій бік.
+ */
+function druse(p: Painter, seed: string, key: string, c: V3, size: number) {
+  const spikes = 2 + Math.floor(unit(seed, `${key}:n`) * 2);
+  for (let s = 0; s < spikes; s += 1) {
+    const k = `${key}:s${s}`;
+    const h = size * (s === 0 ? 1 : 0.55 + 0.3 * unit(seed, `${k}:h`));
+    const w = h * 0.22;
+    const lean = s === 0 ? 0.12 : 0.35 + 0.25 * unit(seed, `${k}:l`);
+    const dir = unit(seed, `${k}:d`) * Math.PI * 2;
+    const base: V3 = s === 0 ? c : [c[0] + Math.cos(dir) * w * 1.4, c[1], c[2] + Math.sin(dir) * w * 1.4];
+    const axis: V3 = [Math.cos(dir) * lean, 1, Math.sin(dir) * lean];
+    const ring = (t: number, r: number) => Array.from({ length: 6 }, (_, i): V3 => {
+      const a = (i / 6) * Math.PI * 2 + dir;
+      return [base[0] + axis[0] * h * t + Math.cos(a) * r, base[1] + axis[1] * h * t, base[2] + axis[2] * h * t + Math.sin(a) * r];
+    });
+    const low = ring(0, w);
+    const high = ring(0.7, w);
+    const tip: V3 = [base[0] + axis[0] * h, base[1] + axis[1] * h, base[2] + axis[2] * h];
+    p.band(low, high, PAINT.gem, (i) => 0.85 + 0.3 * unit(seed, `${k}:f${i}`), false, false, 0.35);
+    for (let i = 0; i < 6; i += 1) p.tri(high[i]!, high[(i + 1) % 6]!, tip, PAINT.gem, 1.05 + 0.2 * unit(seed, `${k}:t${i}`), 0.5);
+  }
+}
+
+export function buildCrystalIsland(seed: string, radius: number, druses = 0): CrystalIsland {
   const R = radius;
   const p = new Painter();
   // Гранчастий low-poly за референсом власника (ADR-0227): світлі плити,
@@ -363,6 +390,16 @@ export function buildCrystalIsland(seed: string, radius: number): CrystalIsland 
       const ad = a + (unit(seed, `${key}:${d}:a`) - 0.5) * 0.08;
       ivy(p, seed, `${key}:${d}`, polar(surfaceAt(ad, y) + R * 0.015, ad, y), R * (0.065 - d * 0.005));
     }
+  }
+
+  // ── Друзи — спільні вихідні (ADR-0237) ─────────────────────
+  // Між колонією в центрі й колонами по краю, золотим кутом — рівно
+  // розсипані, і кожна нова лягає на своє місце, не зсуваючи старих.
+  for (let k = 0; k < druses; k += 1) {
+    const key = `isle:druse${k}`;
+    const a = turn + k * 2.399963 + (unit(seed, `${key}:a`) - 0.5) * 0.3;
+    const r = R * (0.5 + 0.32 * unit(seed, `${key}:r`));
+    druse(p, seed, key, polar(r, a, R * 0.01), R * (0.07 + 0.05 * unit(seed, `${key}:s`)));
   }
 
   // ── Фіолетові кавалки довкола ─────────────────────────────

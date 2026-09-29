@@ -265,4 +265,6 @@ def build_model(snapshot: dict[str, Any]) -> dict[str, Any]:
         },
         "colour": colony_colour(start_text, snapshot.get("wishes", []), partners, as_of),
         "children": children,
+        # Спільні вихідні — друзи-самоцвіти на острові (ADR-0237 §3).
+        "druses": min(24, counts["daysOff"]),
     }
