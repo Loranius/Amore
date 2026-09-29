@@ -57,7 +57,7 @@ type EventModal = {
 } | null;
 
 /** Які тихі лічильники відкриті. Календар приходить із рядка запиту. */
-type OpenSection = 'scheduled' | 'ideas' | 'closed' | 'calendar';
+type OpenSection = 'scheduled' | 'closed' | 'calendar';
 
 export function PlansPage() {
   const navigate = useNavigate();
@@ -234,18 +234,8 @@ export function PlansPage() {
             </div>
           </QuietSection>
 
-          <QuietSection
-            label="Задуми без дати"
-            count={ideas.length}
-            open={open.has('ideas')}
-            onToggle={() => toggle('ideas')}
-          >
-            <div className="pm-tiles">
-              {ideas.map((plan) => (
-                <PlanTile key={plan.id} plan={plan} onConfirm={(id) => confirmPlan.mutate(id)} />
-              ))}
-            </div>
-          </QuietSection>
+          {/* Акордеону «Задуми без дати» немає: колода «Що наступне?» вище
+              показує ті самі задуми й веде до кожного (власник: дублює). */}
 
           <QuietSection
             label="Прожито разом"
