@@ -4,6 +4,7 @@
 // Той самий знімок, що в кристала v2 (`crystalV2SnapshotFrom`): один
 // запит на всі види, та сама пісочниця й ті самі кольорові партнери.
 // ============================================================
+import { useArtifactForms } from '@/features/world/artifactForms';
 import { useMemo, useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useUsers } from '@/features/_shared/useUsers';
@@ -30,6 +31,8 @@ export function useTreeV2(): { state: TreeV2State | null; isPending: boolean; er
   const sources = usePortalSources('tree', me.id, asOf);
   const { enabled: sandboxEnabled, values: sandboxValues } = useEvolutionSandbox();
   const partners = useMemo(() => resolveCrystalColorPartners(users.data ?? []), [users.data]);
+  // Форма — вибір пари в налаштуваннях (ADR-0237): лише малюнок, модель та сама.
+  const form = useArtifactForms().tree;
   const isPending = sources.isPending || users.isPending;
   const queryError = sources.error ?? users.error;
 
@@ -56,9 +59,9 @@ export function useTreeV2(): { state: TreeV2State | null; isPending: boolean; er
         partners,
       });
       const model = buildTreeV2Model(snapshot);
-      return { state: { snapshot, model, geometry: buildTreeV2Geometry(model) }, isPending: false, error: null };
+      return { state: { snapshot, model, geometry: buildTreeV2Geometry(model, form) }, isPending: false, error: null };
     } catch (error) {
       return { state: null, isPending: false, error: error instanceof Error ? error : new Error(String(error)) };
     }
-  }, [asOf, day, isPending, partners, queryError, sandboxEnabled, sandboxValues, sources.data]);
+  }, [asOf, day, form, isPending, partners, queryError, sandboxEnabled, sandboxValues, sources.data]);
 }

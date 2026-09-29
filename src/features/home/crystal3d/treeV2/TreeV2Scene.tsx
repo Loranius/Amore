@@ -1,3 +1,4 @@
+import { useArtifactForms } from '@/features/world/artifactForms';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalRenderScale } from '@/engine/renderer';
@@ -37,6 +38,7 @@ export default function TreeV2Scene() {
   );
   const [quality] = useState(readQuality);
   const { state, isPending, error } = useTreeV2();
+  const form = useArtifactForms().tree;
   const { pose, region } = useWorldPose();
   const motionMode = useWorldMotionMode();
   // Гаки — до ранніх виходів (див. той самий коментар у сцені кристала).
@@ -115,6 +117,7 @@ export default function TreeV2Scene() {
             theme={theme}
             reduceMotion={reduceMotion}
             island={island}
+            form={form}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

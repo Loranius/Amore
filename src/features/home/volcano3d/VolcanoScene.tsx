@@ -1,3 +1,4 @@
+import { seasonOf } from '@/engine/species/grammar/season';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalRenderScale } from '@/engine/renderer';
@@ -122,6 +123,7 @@ export default function VolcanoScene() {
             rockRadius={model.baseRadius * frame.scale}
             glow={model.glow}
             fishKinds={model.fishKinds}
+            season={seasonOf(model.asOf)}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

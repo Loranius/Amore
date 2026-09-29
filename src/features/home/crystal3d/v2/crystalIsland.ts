@@ -12,6 +12,7 @@
 //
 // Модуль чистий: лише масиви, без three. Одиниці — сцени, земля на y = 0.
 // ============================================================
+import type { Season } from '@/engine/species/grammar/season';
 import { unit } from '@/engine/species/crystalV2/hash';
 
 export type V3 = [number, number, number];
@@ -205,7 +206,7 @@ function druse(p: Painter, seed: string, key: string, c: V3, size: number) {
   }
 }
 
-export function buildCrystalIsland(seed: string, radius: number, druses = 0): CrystalIsland {
+export function buildCrystalIsland(seed: string, radius: number, druses = 0, season: Season = 'summer'): CrystalIsland {
   const R = radius;
   const p = new Painter();
   // Гранчастий low-poly за референсом власника (ADR-0227): світлі плити,
@@ -400,6 +401,31 @@ export function buildCrystalIsland(seed: string, radius: number, druses = 0): Cr
     const a = turn + k * 2.399963 + (unit(seed, `${key}:a`) - 0.5) * 0.3;
     const r = R * (0.5 + 0.32 * unit(seed, `${key}:r`));
     druse(p, seed, key, polar(r, a, R * 0.01), R * (0.07 + 0.05 * unit(seed, `${key}:s`)));
+  }
+
+  // ── Пора року (ADR-0237): іній узимку, квіти навесні ──────
+  // Погода, а не ріст: ні кількість, ні місце нічого не кажуть про пару.
+  if (season === 'winter') {
+    // Сніжні шапки на плитах — пласкі білі кавалки, що лежать на камені.
+    for (let k = 0; k < 16; k += 1) {
+      const key = `isle:snow${k}`;
+      const a = unit(seed, `${key}:a`) * Math.PI * 2;
+      const r = R * (0.3 + 0.62 * Math.sqrt(unit(seed, `${key}:r`)));
+      chunk(p, seed, key, polar(r, a, R * 0.022), R * (0.05 + 0.05 * unit(seed, `${key}:s`)), PAINT.cloud, 0.25, 0.22);
+    }
+  } else if (season === 'spring') {
+    // Дрібні квіти в щілинах плит: три пелюстки й серцевина.
+    for (let k = 0; k < 22; k += 1) {
+      const key = `isle:bloom${k}`;
+      const a = unit(seed, `${key}:a`) * Math.PI * 2;
+      const r = R * (0.32 + 0.6 * Math.sqrt(unit(seed, `${key}:r`)));
+      const c = polar(r, a, R * 0.03);
+      for (let q = 0; q < 3; q += 1) {
+        const pa = a + (q / 3) * Math.PI * 2;
+        chunk(p, seed, `${key}:p${q}`, [c[0] + Math.cos(pa) * R * 0.014, c[1], c[2] + Math.sin(pa) * R * 0.014], R * 0.013, k % 2 === 0 ? PAINT.gem : PAINT.cloud, 0.35, 0.35);
+      }
+      chunk(p, seed, `${key}:heart`, [c[0], c[1] + R * 0.004, c[2]], R * 0.007, PAINT.ivy, 0.2, 0.6);
+    }
   }
 
   // ── Фіолетові кавалки довкола ─────────────────────────────

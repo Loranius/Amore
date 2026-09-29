@@ -3339,6 +3339,8 @@ textarea::placeholder {
   .settings-switch-btn { transition: none; }
 }
 .settings-section-desc { margin: -4px 0 0; color: var(--muted); font-size: 13px; }
+/* Три форми дерева — той самий жолоб, три рівні комірки (ADR-0237). */
+.settings-switch--3 { grid-template-columns: repeat(3, 1fr); }
 
 /* ── Партнер: код-запрошення (ADR-0232) ─────────────────────
    Код — у тому ж жолобі зі скла, що й вибір теми: це річ, яку читають

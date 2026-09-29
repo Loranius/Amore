@@ -4,6 +4,7 @@ import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 import { buildCrystalSurround } from '@/features/home/diorama/surround';
+import type { Season } from '@/engine/species/grammar/season';
 import { EMPTY_MESH, buildCrystalIsland, type IslandMesh } from './crystalIsland';
 
 // ============================================================
@@ -226,10 +227,12 @@ interface CrystalIslandProps {
   bare?: boolean;
   /** Друзи-самоцвіти на плитах — спільні вихідні пари (ADR-0237). */
   druses?: number;
+  /** Пора року (ADR-0237): іній узимку, квіти навесні. */
+  season?: Season;
 }
 
-export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crystalHeight, reduceMotion, bare = false, druses = 0 }: CrystalIslandProps) {
-  const built = useMemo(() => buildCrystalIsland(seed, radius, druses), [seed, radius, druses]);
+export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crystalHeight, reduceMotion, bare = false, druses = 0, season = 'summer' }: CrystalIslandProps) {
+  const built = useMemo(() => buildCrystalIsland(seed, radius, druses, season), [seed, radius, druses, season]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
   // Давній храм у підземеллі навколо острова, на всі 360° (ADR-0224).

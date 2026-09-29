@@ -11,6 +11,7 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { unit } from '@/engine/species/crystalV2/hash';
 import type { VolcanoGeometry } from '@/engine/species/volcano/geometry';
+import type { Season } from '@/engine/species/grammar/season';
 import { PORTAL_GROUND_Y } from '../crystal3d/scene/portalScene';
 import { ReefV2World } from '../reef3d/v2/ReefV2World';
 import { isCrystalTap, type CrystalPointerSample } from '../crystal3d/evolution/tapGesture';
@@ -105,9 +106,11 @@ interface VolcanoWorldProps {
   bare?: boolean;
   /** Видів риб у зграї: новий на 5 / 10 / 20 роках разом (ADR-0237). */
   fishKinds?: number;
+  /** Пора року: світло й морський сніг у воді (ADR-0237). */
+  season?: Season;
 }
 
-export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, glow, bare = false, fishKinds = 1 }: VolcanoWorldProps) {
+export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, glow, bare = false, fishKinds = 1, season }: VolcanoWorldProps) {
   const lava = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(geometry.lava.positions, 3));
@@ -204,6 +207,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         islandWildlife={1 / 3}
         calmSurround
         fishKinds={fishKinds}
+        {...(season ? { season } : {})}
         bare={bare}
       />
       <group position={[0, PORTAL_GROUND_Y, 0]}>

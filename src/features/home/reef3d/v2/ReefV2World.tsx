@@ -3,12 +3,14 @@ import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import { unit } from '@/engine/species/crystalV2/hash';
 import type { ReefV2Geometry } from '@/engine/species/reefV2/geometry';
+import type { Season } from '@/engine/species/grammar/season';
 import { Diorama } from '@/features/home/diorama/Diorama';
 import { PORTAL_GROUND_Y } from '../../crystal3d/scene/portalScene';
 import { ReefIsland } from './ReefIsland';
 import { buildReefIsland, inReefWater, reefIslandGround } from './reefIsland';
 import {
   REEF_PALETTES,
+  seasonalReefPalette,
   createCoralMaterial,
   createCritterMaterial,
   createFishMaterial,
@@ -85,6 +87,8 @@ interface ReefV2WorldProps {
   seagrassScale?: number;
   /** Скільки видів риб у зграї (1…4). Риф — три; вулкан — від віку пари (ADR-0237). */
   fishKinds?: number;
+  /** Пора року: світло й морський сніг у воді (ADR-0237). Без неї — палітра як є. */
+  season?: Season;
 }
 
 /**
@@ -92,8 +96,8 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false, fishKinds = 3 }: ReefV2WorldProps) {
-  const palette = REEF_PALETTES[theme];
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false, fishKinds = 3, season }: ReefV2WorldProps) {
+  const palette = useMemo(() => (season ? seasonalReefPalette(REEF_PALETTES[theme], season, theme) : REEF_PALETTES[theme]), [season, theme]);
 
   const rock = useMemo(
     () => tonedGeometry(geometry.rock.positions, rockHeat ? { tone: geometry.rock.tone, heat: rockHeat } : { tone: geometry.rock.tone }),

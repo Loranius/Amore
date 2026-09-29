@@ -24,6 +24,7 @@ import { useConfirm } from '@/providers/ConfirmProvider';
 import { MoonIcon, SunIcon } from '@/components/icons/UiIcon';
 import { useTheme } from '@/providers/ThemeProvider';
 import { ProfileSection } from '@/features/profile/ProfileSection';
+import { ArtifactFormSection } from './ArtifactFormSection';
 import { PartnerInviteSection } from './PartnerInviteSection';
 
 interface SettingsModalProps {
@@ -92,6 +93,9 @@ export function SettingsModal({ open, onClose }: SettingsModalProps) {
         </section>
 
         <div className="settings-divider" />
+
+        {/* Вигляд об'єкта пари: форми обраного виду (ADR-0237). */}
+        <ArtifactFormSection />
 
         {/* Лише для пари з однієї людини — див. сам розділ (ADR-0232). */}
         <PartnerInviteSection />

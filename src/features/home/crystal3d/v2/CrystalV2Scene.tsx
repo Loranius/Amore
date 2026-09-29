@@ -1,3 +1,4 @@
+import { seasonOf } from '@/engine/species/grammar/season';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalRenderScale } from '@/engine/renderer';
@@ -143,6 +144,7 @@ export default function CrystalV2Scene() {
             crystalHeight={frame.height}
             reduceMotion={reduceMotion}
             druses={model.druses}
+            season={seasonOf(model.asOf)}
           />
           <CrystalV2Object
             model={model}

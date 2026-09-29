@@ -12,6 +12,7 @@
 // планктон світяться самі (біолюмінесценція).
 // ============================================================
 import * as THREE from 'three';
+import type { Season } from '@/engine/species/grammar/season';
 import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 
 export interface ReefPalette {
@@ -48,6 +49,26 @@ export const REEF_PALETTES: Record<'light' | 'dark', ReefPalette> = {
     snowStrength: 0.9,
   },
 };
+
+/**
+ * Пора року у воді (ADR-0237 §7, п. 4): світло з поверхні й морський сніг.
+ * Зима — холодне тьмяніше світло й густий сніг; весна — свіже зеленкувате;
+ * літо — тепле яскраве; осінь — бурштинове. Колір каменю й живності не
+ * змінюється: це погода, а не ріст.
+ */
+export function seasonalReefPalette(p: ReefPalette, season: Season, theme: 'light' | 'dark'): ReefPalette {
+  const light = theme === 'light';
+  switch (season) {
+    case 'winter':
+      return { ...p, key: light ? '#dfe9ff' : '#8aa6ff', keyStrength: p.keyStrength * 0.85, snowStrength: p.snowStrength * 1.6 };
+    case 'spring':
+      return { ...p, key: light ? '#f2ffe8' : '#a8e6c8', keyStrength: p.keyStrength * 1.0 };
+    case 'summer':
+      return { ...p, key: light ? '#fff1cc' : '#b8c6ff', keyStrength: p.keyStrength * 1.12, snowStrength: p.snowStrength * 0.8 };
+    case 'autumn':
+      return { ...p, key: light ? '#ffe0bd' : '#c9a8ff', keyStrength: p.keyStrength * 0.95 };
+  }
+}
 
 /**
  * Кольори шести форм — чисті й насичені, як у референсі (ADR-0225):

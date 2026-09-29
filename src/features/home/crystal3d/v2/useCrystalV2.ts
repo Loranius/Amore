@@ -6,6 +6,7 @@
 // конвеєрі. Нового тут лише одне: замість шести томів рушія — одна модель,
 // кожен модуль якої дає рівно один ефект, і вона звірена з Python-двійником.
 // ============================================================
+import { useArtifactForms } from '@/features/world/artifactForms';
 import { useMemo, useState } from 'react';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { useUsers } from '@/features/_shared/useUsers';
@@ -43,6 +44,8 @@ export function useCrystalV2(): UseCrystalV2Result {
   const sources = usePortalSources('crystal', me.id, asOf);
   const { enabled: sandboxEnabled, values: sandboxValues } = useEvolutionSandbox();
   const partners = useMemo(() => resolveCrystalColorPartners(users.data ?? []), [users.data]);
+  // Форма — вибір пари в налаштуваннях (ADR-0237): лише малюнок, модель та сама.
+  const form = useArtifactForms().crystal;
 
   const isPending = sources.isPending || users.isPending;
   const queryError = sources.error ?? users.error;
@@ -72,9 +75,9 @@ export function useCrystalV2(): UseCrystalV2Result {
         partners,
       });
       const model = buildCrystalV2Model(snapshot);
-      return { state: { snapshot, model, geometry: buildCrystalV2Geometry(model) }, isPending: false, error: null };
+      return { state: { snapshot, model, geometry: buildCrystalV2Geometry(model, form) }, isPending: false, error: null };
     } catch (error) {
       return { state: null, isPending: false, error: error instanceof Error ? error : new Error(String(error)) };
     }
-  }, [asOf, day, isPending, partners, queryError, sandboxEnabled, sandboxValues, sources.data]);
+  }, [asOf, day, form, isPending, partners, queryError, sandboxEnabled, sandboxValues, sources.data]);
 }
