@@ -37,6 +37,7 @@ import {
   serializeDeclaredCounts,
   withDeclared,
   type DeclaredCounts,
+  NO_GAPS,
   type DeclaredKind,
 } from './declaredCounts';
 import {
@@ -529,7 +530,7 @@ export function useHistorySweep(): HistorySweep {
   const declaredGaps = sources.data?.declaredGaps ?? {};
   const declaredGapFor = useCallback(
     (year: RelationshipYearFill): Record<DeclaredKind, number> => (
-      declaredGaps[year.startsAt] ?? { photos: 0, movies: 0, series: 0, places: 0 }
+      declaredGaps[year.startsAt] ?? { ...NO_GAPS }
     ),
     [declaredGaps],
   );

@@ -23,6 +23,7 @@ import {
   readToneMapping,
   tapPoint,
   tapSelector,
+  fillSelector,
   wheelOverScene,
   swipeOverScene,
   dragSelector,
@@ -53,6 +54,8 @@ const USAGE = `
   --ink=<css>                        колір елемента числом: чорнило, тло, контраст, відтінок
   --tap=<css>                        тапнути перший збіг і зняти кадр; можна кілька,
                                      вони йдуть послідовно (модалка → її вміст)
+  --fill=<css>=<значення>            заповнити поле в тій самій черзі, що й тапи,
+                                     без кадру: пройти форму (імʼя, дата)
   --again=<мс>                       другий кадр того самого екрана через N мс:
                                      що рухається, коли пара нічого не робить
   --swipe=<px>[:<мс>]                провести пальцем по сцені й зняти кадр, коли
@@ -370,6 +373,12 @@ async function main() {
           // першого. Один тап не діставав до вмісту, який відкривається
           // всередині модалки — акордеон значення події перевірити було нічим.
           for (const [index, selector] of options.taps.entries()) {
+            if (typeof selector === 'object') {
+              const filled = await fillSelector(portal.page, selector.fill, selector.value);
+              console.log(`  поле    ${selector.fill} ← «${selector.value}»${filled ? '' : ' — не знайдено'}`);
+              if (!filled) break;
+              continue;
+            }
             const hit = await tapSelector(portal.page, selector);
             if (!hit) {
               console.log(`  тап     ${selector} — не знайдено`);

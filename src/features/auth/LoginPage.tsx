@@ -16,12 +16,14 @@
 // На тлі — три летючі острівці з кристалом, деревом і рифом, щоразу інші
 // (`AuthIslands.tsx`), вантажаться ліниво: вхід від них не чекає.
 // ============================================================
-import { Suspense, lazy, useEffect, useState, type FormEvent } from 'react';
+import { Suspense, lazy, useCallback, useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth, type LinkResult } from '@/providers/AuthProvider';
 import { useTheme } from '@/providers/ThemeProvider';
 import type { PortalSeat } from '@/types';
 import { PortalConfetti } from './PortalConfetti';
+import { NewCoupleFlow } from './NewCoupleFlow';
+import { BACKDROP, type IslandsView } from './islandsView';
 import {
   CODE_RE,
   GENDER_TEXT,
@@ -39,7 +41,7 @@ import './login.css';
 const AuthIslands = lazy(() => import('./AuthIslands'));
 
 type Tab = 'login' | 'register';
-type Step =
+export type Step =
   | { kind: 'form' }
   | { kind: 'code'; email: string }
   | { kind: 'password' }
@@ -47,25 +49,33 @@ type Step =
   | { kind: 'claim-pin'; seat: PortalSeat; seats: PortalSeat[] }
   | { kind: 'empty' }
   | { kind: 'taken' }
+  /** Нова пошта — нова пара (ADR-0230). */
+  | { kind: 'new' }
   | { kind: 'portal'; name: string };
 
 /** Скільки чекати перед повторним листом — межа Supabase на відправку. */
 const RESEND_SECONDS = 60;
 
-export function LoginPage() {
+/** `initialStep` — лише для лабораторії (`new-couple-lab.html`); портал його не передає. */
+export function LoginPage({ initialStep = { kind: 'form' } }: { initialStep?: Step } = {}) {
   const { theme } = useTheme();
-  const [tab, setTab] = useState<Tab>('login');
-  const [step, setStep] = useState<Step>({ kind: 'form' });
+  const [tab, setTab] = useState<Tab>(initialStep.kind === 'form' ? 'login' : 'register');
+  const [step, setStep] = useState<Step>(initialStep);
+  const [view, setView] = useState<IslandsView>(BACKDROP);
+  const onView = useCallback((next: IslandsView) => setView(next), []);
 
   const switchTab = (next: Tab) => {
     setTab(next);
     setStep({ kind: 'form' });
   };
 
+  // Вибір виду й ріст дивляться на острівці — картка сходить униз екрана.
+  const docked = step.kind === 'new' && view.mode !== 'backdrop';
+
   return (
-    <div className="auth-screen">
+    <div className={`auth-screen${docked ? ' auth-screen--docked' : ''}`}>
       <Suspense fallback={null}>
-        <AuthIslands theme={theme === 'light' ? 'light' : 'dark'} />
+        <AuthIslands theme={theme === 'light' ? 'light' : 'dark'} view={step.kind === 'new' ? view : BACKDROP} />
       </Suspense>
       {step.kind === 'portal' && <PortalConfetti />}
       <div className="auth-card auth-card--account">
@@ -80,7 +90,7 @@ export function LoginPage() {
             </button>
           </div>
         )}
-        <Flow tab={tab} step={step} setStep={setStep} switchTab={switchTab} />
+        <Flow tab={tab} step={step} setStep={setStep} switchTab={switchTab} onView={onView} />
       </div>
     </div>
   );
@@ -91,9 +101,10 @@ interface FlowProps {
   step: Step;
   setStep: (step: Step) => void;
   switchTab: (tab: Tab) => void;
+  onView: (view: IslandsView) => void;
 }
 
-function Flow({ tab, step, setStep, switchTab }: FlowProps) {
+function Flow({ tab, step, setStep, switchTab, onView }: FlowProps) {
   const { linkAccount, logout } = useAuth();
 
   /** Куди вести після входу чи пароля — один вузол для обох вкладок. */
@@ -133,6 +144,8 @@ function Flow({ tab, step, setStep, switchTab }: FlowProps) {
           onNoPin={() => setStep({ kind: 'taken' })}
         />
       );
+    case 'new':
+      return <NewCoupleFlow onView={onView} onDone={(name) => setStep({ kind: 'portal', name })} />;
     case 'empty':
       return (
         <>
@@ -235,7 +248,7 @@ function EmailForm({ onSent }: { onSent: (email: string) => void }) {
     setBusy(false);
     if (result.ok) onSent(clean);
     else if (result.reason === 'rate_limited') setError('Листи йдуть не частіше ніж раз на хвилину. Зачекай трохи.');
-    else if (result.reason === 'not_found') setError('Реєстрація нових акаунтів ще не відкрита. Поки що входь старим PIN-кодом.');
+    else if (result.reason === 'not_found') setError('Реєстрацію нових акаунтів зараз закрито.');
     else setError('Не вдалося надіслати лист. Спробуй ще раз.');
   };
 

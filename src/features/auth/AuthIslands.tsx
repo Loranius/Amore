@@ -8,6 +8,16 @@
 //
 // Полотно прозоре й лежить під карткою; якщо WebGL немає, лишається
 // градієнт екрана — вхід від тла не залежить.
+//
+// РЕЖИМИ (ADR-0230, реєстрація нової пари):
+//   • `backdrop` — тло входу; під час питань реєстрації ще й розфокусоване
+//     (`defocus`), бо попереду картка й дивитись треба на неї;
+//   • `choose` — вибір виду: острівці підпливають ближче, стають у ряд
+//     (кристал, дерево, риф), виходять із розфокусу й обертаються з
+//     легкою левітацією; обраний трохи більший;
+//   • `grow` — обраний вид один посередині, вирощений зі знімка САМОЇ
+//     пари (її минулих років), і росте з маленького до повного.
+// Переходи — не стрибки: кожен острівець тягнеться до цілі щокадру.
 // ============================================================
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
@@ -29,7 +39,9 @@ import { treeV2Frame } from '@/features/home/crystal3d/treeV2/treeV2Frame';
 import { TreeV2World } from '@/features/home/crystal3d/treeV2/TreeV2World';
 import { reefV2Frame } from '@/features/home/reef3d/v2/reefV2Frame';
 import { ReefV2World } from '@/features/home/reef3d/v2/ReefV2World';
-import { demoIslands, type DemoIsland } from './demoIslands';
+import { demoIslands, type DemoIsland, type DemoSpecies } from './demoIslands';
+
+import { BACKDROP, CHOICE_ORDER, type IslandsView } from './islandsView';
 
 interface IslandProps {
   demo: DemoIsland;
@@ -122,32 +134,106 @@ function slots(width: number, height: number): { x: number; y: number; size: num
   ];
 }
 
-function Floating({ islands, theme, reduceMotion }: { islands: DemoIsland[]; theme: 'light' | 'dark'; reduceMotion: boolean }) {
+/**
+ * Ряд вибору: острівці ближче й більші, ніж на тлі, над карткою, що
+ * опускається вниз екрана. Обраний — трохи більший за сусідів.
+ */
+function choiceSlots(width: number, height: number): { x: number; y: number; size: number }[] {
+  const wide = width >= height * 0.9;
+  const size = wide ? Math.min(width * 0.105, height * 0.19) : Math.min(width * 0.17, height * 0.12);
+  const y = wide ? height * 0.16 : height * 0.2;
+  const step = wide ? width * 0.27 : width * 0.31;
+  return CHOICE_ORDER.map((_, k) => ({ x: (k - 1) * step, y, size }));
+}
+
+/** Один острів посередині — той, що росте з історії пари. */
+function growSlot(width: number, height: number): { x: number; y: number; size: number } {
+  const wide = width >= height * 0.9;
+  return { x: 0, y: wide ? height * 0.08 : height * 0.14, size: wide ? Math.min(width * 0.2, height * 0.3) : Math.min(width * 0.33, height * 0.17) };
+}
+
+/** Ціль острівця в поточному режимі; `hidden` — сховати (масштаб у нуль). */
+function targetOf(
+  view: IslandsView,
+  species: DemoSpecies,
+  index: number,
+  width: number,
+  height: number,
+): { x: number; y: number; size: number } {
+  if (view.mode === 'choose') {
+    const slot = choiceSlots(width, height)[CHOICE_ORDER.indexOf(species)]!;
+    const scale = view.picked === null ? 1 : view.picked === species ? 1.22 : 0.82;
+    return { ...slot, size: slot.size * scale };
+  }
+  if (view.mode === 'grow') {
+    // Демо-острівці відпливають убік і зникають — сцена лише для пари.
+    const slot = choiceSlots(width, height)[CHOICE_ORDER.indexOf(species)]!;
+    return { x: slot.x * 1.6, y: slot.y, size: 0 };
+  }
+  return slots(width, height)[index]!;
+}
+
+/** Згасання до цілі щокадру: плавно на будь-якій частоті кадрів. */
+const approach = (from: number, to: number, dt: number, rate: number) => to + (from - to) * Math.exp(-dt * rate);
+
+function Floating({ islands, theme, reduceMotion, view }: {
+  islands: DemoIsland[];
+  theme: 'light' | 'dark';
+  reduceMotion: boolean;
+  view: IslandsView;
+}) {
   const viewport = useThree((state) => state.viewport);
   const refs = useRef<(THREE.Group | null)[]>([]);
-  const places = slots(viewport.width, viewport.height);
+  const grownRef = useRef<THREE.Group | null>(null);
+  const initial = slots(viewport.width, viewport.height);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock }, delta) => {
     const t = reduceMotion ? 0 : clock.getElapsedTime();
+    // `delta` після вкладки у фоні буває секундами — тоді просто стаємо в ціль.
+    const dt = reduceMotion ? 10 : Math.min(delta, 0.1);
+    const choosing = view.mode === 'choose';
     refs.current.forEach((group, k) => {
       if (!group) return;
-      const place = places[k]!;
+      const demo = islands[k]!;
+      const target = targetOf(view, demo.species, k, viewport.width, viewport.height);
+      const bob = choosing ? 0.12 : 0.08;
+      group.position.x = approach(group.position.x, target.x, dt, 3);
+      const baseY = approach(group.userData.baseY ?? group.position.y, target.y, dt, 3);
+      group.userData.baseY = baseY;
       // Кожен острівець пливе у своєму темпі: не хором.
-      group.position.y = place.y + Math.sin(t * 0.45 + k * 2.1) * place.size * 0.08;
-      group.rotation.y = 0.5 + k * 2.2 + t * (0.05 + 0.02 * k);
+      group.position.y = baseY + Math.sin(t * 0.45 + k * 2.1) * Math.max(target.size, 0.001) * bob;
+      const size = approach(group.scale.x, target.size, dt, 3);
+      group.scale.setScalar(Math.max(size, 0.0001));
+      group.visible = size > 0.002;
+      // У виборі обертаються помітніше: їх розглядають, а не минають.
+      group.rotation.y = 0.5 + k * 2.2 + t * (choosing ? 0.35 : 0.05 + 0.02 * k);
     });
+    const grown = grownRef.current;
+    if (grown) {
+      const slot = growSlot(viewport.width, viewport.height);
+      const size = approach(grown.scale.x, view.mode === 'grow' ? slot.size : 0, dt, 1.2);
+      grown.scale.setScalar(Math.max(size, 0.0001));
+      grown.visible = size > 0.002;
+      grown.position.set(slot.x, slot.y + Math.sin(t * 0.5) * slot.size * 0.06, 0);
+      grown.rotation.y = 0.4 + t * 0.3;
+    }
   });
 
   return (
     <>
       {islands.map((demo, k) => {
-        const place = places[k]!;
+        const place = initial[k]!;
         return (
           <group key={demo.species} ref={(g) => { refs.current[k] = g; }} position={[place.x, place.y, 0]} scale={place.size}>
             <SpeciesIsland demo={demo} theme={theme} reduceMotion={reduceMotion} />
           </group>
         );
       })}
+      {view.grown && (
+        <group ref={grownRef} scale={0.0001}>
+          <SpeciesIsland demo={view.grown} theme={theme} reduceMotion={reduceMotion} />
+        </group>
+      )}
     </>
   );
 }
@@ -166,7 +252,7 @@ class Quiet extends Component<{ children: ReactNode }, { failed: boolean }> {
   }
 }
 
-export default function AuthIslands({ theme }: { theme: 'light' | 'dark' }) {
+export default function AuthIslands({ theme, view = BACKDROP }: { theme: 'light' | 'dark'; view?: IslandsView }) {
   // Зерно — одне на відкриття сторінки: острівці не міняються посеред вводу.
   const [islands] = useState(() => demoIslands(`demo-${freshSeed()}`, new Date().getFullYear()));
   const [reduceMotion, setReduceMotion] = useState(
@@ -180,7 +266,12 @@ export default function AuthIslands({ theme }: { theme: 'light' | 'dark' }) {
   }, []);
 
   return (
-    <div className="auth-islands" aria-hidden="true" data-auth-islands={islands.map((i) => i.species).join(',')}>
+    <div
+      className={`auth-islands${view.defocus ? ' is-defocused' : ''}`}
+      aria-hidden="true"
+      data-auth-islands={islands.map((i) => i.species).join(',')}
+      data-islands-mode={view.mode}
+    >
       <Quiet>
         <Canvas
           frameloop={reduceMotion ? 'demand' : 'always'}
@@ -189,7 +280,7 @@ export default function AuthIslands({ theme }: { theme: 'light' | 'dark' }) {
           gl={{ alpha: true, antialias: true }}
           onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
         >
-          <Floating islands={islands} theme={theme} reduceMotion={reduceMotion} />
+          <Floating islands={islands} theme={theme} reduceMotion={reduceMotion} view={view} />
         </Canvas>
       </Quiet>
     </div>

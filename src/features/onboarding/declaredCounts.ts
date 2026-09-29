@@ -42,10 +42,19 @@
 // ============================================================
 import type { EvolutionSourceSnapshot } from '@/engine/evolution/adapters';
 
-/** Роди, які пара може назвати числом. */
-export type DeclaredKind = 'photos' | 'movies' | 'series' | 'places';
+/**
+ * Роди, які пара може назвати числом.
+ *
+ * `milestones` і `wishes` додано з реєстрацією нових пар (ADR-0230): власник
+ * обрав для минулих років «кілька лічильників на рік» — подорожі й місця,
+ * важливі події, здійснені бажання, наскільки насиченим був рік. Перші три —
+ * роди тут; насиченість стає числом памʼятних знімків (`newCouple.ts`).
+ */
+export type DeclaredKind = 'photos' | 'movies' | 'series' | 'places' | 'milestones' | 'wishes';
 
-export const DECLARED_KINDS: readonly DeclaredKind[] = ['photos', 'movies', 'series', 'places'];
+export const DECLARED_KINDS: readonly DeclaredKind[] = [
+  'photos', 'movies', 'series', 'places', 'milestones', 'wishes',
+];
 
 /**
  * Стеля на один рід в одному році.
@@ -57,6 +66,11 @@ export const DECLARED_KINDS: readonly DeclaredKind[] = ['photos', 'movies', 'ser
  * власне дерево.
  */
 export const DECLARED_MAX = 100;
+
+/** Нуль по кожному роду — «нічого не бракує». Один на всіх, щоб новий рід не забувся. */
+export const NO_GAPS: Readonly<Record<DeclaredKind, number>> = Object.freeze({
+  photos: 0, movies: 0, series: 0, places: 0, milestones: 0, wishes: 0,
+});
 
 /** Скільки чого пара назвала в одному році. */
 export type DeclaredYear = Partial<Record<DeclaredKind, number>>;
@@ -201,6 +215,12 @@ export function declaredShortfall(
     movies: 0,
     series: 0,
     places: snapshot.mapPlaces.filter((row) => within(row.visitedAt, span)).length,
+    // Віха — разова подія з позначкою; щорічна (річниця) повторюється
+    // сама й віхою року не є.
+    milestones: snapshot.calendarEvents
+      .filter((row) => row.isMilestone && !row.yearly && within(row.date, span)).length,
+    wishes: snapshot.wishlistItems
+      .filter((row) => row.fulfilled && within(row.fulfilledAt ?? row.giftDate, span)).length,
   };
   const watched = snapshot.media.filter((row) => within(row.finishedAt, span)).length;
   const saidWatched = (declared.movies ?? 0) + (declared.series ?? 0);
@@ -214,6 +234,8 @@ export function declaredShortfall(
     movies: share(declared.movies ?? 0),
     series: share(declared.series ?? 0),
     places: Math.max(0, (declared.places ?? 0) - real.places),
+    milestones: Math.max(0, (declared.milestones ?? 0) - real.milestones),
+    wishes: Math.max(0, (declared.wishes ?? 0) - real.wishes),
   };
 }
 
@@ -251,6 +273,8 @@ export function padSnapshotWithDeclared(
   const memories: EvolutionSourceSnapshot['memories'][number][] = [];
   const media: EvolutionSourceSnapshot['media'][number][] = [];
   const mapPlaces: EvolutionSourceSnapshot['mapPlaces'][number][] = [];
+  const calendarEvents: EvolutionSourceSnapshot['calendarEvents'][number][] = [];
+  const wishlistItems: EvolutionSourceSnapshot['wishlistItems'][number][] = [];
   const gaps: Record<string, Record<DeclaredKind, number>> = {};
   let serial = 0;
 
@@ -300,9 +324,37 @@ export function padSnapshotWithDeclared(
         country: null,
       });
     }
+
+    for (const day of spreadWithinYear(missing.milestones, span)) {
+      serial += 1;
+      calendarEvents.push({ id: DECLARED_ID_BASE + serial, date: day, type: 'other', yearly: false, isMilestone: true });
+    }
+
+    for (const day of spreadWithinYear(missing.wishes, span)) {
+      serial += 1;
+      wishlistItems.push({
+        id: DECLARED_ID_BASE + serial,
+        fulfilled: true,
+        fulfilledAt: day,
+        giftDate: null,
+        /*
+         * Хто кому — невідомо, і вигадувати не можна. Модель кристала для
+         * бажання без власника чи дарувальника вже має правило: воно
+         * «спільне», тобто зелене (`crystalV2/model.ts`). Сказане числом
+         * бажання йде за тим самим правилом, а не за окремим.
+         */
+        isShared: false,
+        priority: null,
+        ownerId: null,
+        fulfilledById: null,
+      });
+    }
   }
 
-  if (memories.length === 0 && media.length === 0 && mapPlaces.length === 0) {
+  if (
+    memories.length === 0 && media.length === 0 && mapPlaces.length === 0 &&
+    calendarEvents.length === 0 && wishlistItems.length === 0
+  ) {
     return { snapshot, gaps };
   }
 
@@ -312,6 +364,8 @@ export function padSnapshotWithDeclared(
       memories: [...snapshot.memories, ...memories],
       media: [...snapshot.media, ...media],
       mapPlaces: [...snapshot.mapPlaces, ...mapPlaces],
+      calendarEvents: [...snapshot.calendarEvents, ...calendarEvents],
+      wishlistItems: [...snapshot.wishlistItems, ...wishlistItems],
     },
     gaps,
   };

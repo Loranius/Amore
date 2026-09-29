@@ -163,7 +163,14 @@ export function WishlistPage() {
   const archiveRequested = searchParams.get('archive') === '1';
   const notificationRequest = searchParams.get('notification');
   const archiveFocusWishId = requestedWishId(searchParams.get('wish'));
-  const [tab, setTab] = useState<Tab>(tabFromUrl);
+  const [selectedTab, setTab] = useState<Tab>(tabFromUrl);
+  /*
+   * Пара з однієї людини (ADR-0230): нова пара, чий партнер ще не
+   * приєднався. Це не помилка — вкладки партнера просто ще немає, а
+   * «Мої» й «Спільні» працюють. Помилкою лишається лише збій запиту.
+   */
+  const solo = !partnerPending && !partnerError && partner === null;
+  const tab: Tab = solo && selectedTab === 'partner' ? 'me' : selectedTab;
   const [archiveOpen, setArchiveOpen] = useState(
     archiveRequested && tabFromUrl !== 'partner',
   );
@@ -374,7 +381,7 @@ export function WishlistPage() {
   if (partnerSkeletonVisible) return <WishlistPageSkeleton />;
   if (partnerPending) return <section className="wishlist pink-page" aria-busy="true" />;
 
-  if (partnerError || !partner) {
+  if (partnerError) {
     return (
       <section className="wishlist pink-page">
         <div className="empty-state" role="alert">
@@ -387,19 +394,21 @@ export function WishlistPage() {
     );
   }
 
+  // Імʼя для підписів, поки партнер не приєднався: «партнер», а не порожнеча.
+  const partnerName = partner?.displayName ?? 'партнер';
   const tabs: TabBarItem<Tab>[] = [
     {
       value: 'me',
       label: 'Мої',
       ...(!ownQuery.isPending && !ownQuery.isError ? { count: ownItems.length } : {}),
     },
-    {
-      value: 'partner',
+    ...(partner ? [{
+      value: 'partner' as const,
       label: partnerGenitive(partner.displayName),
       ...(!partnerWishlistQuery.isPending && !partnerWishlistQuery.isError
         ? { count: partnerItems.length }
         : {}),
-    },
+    }] : []),
     {
       value: 'shared',
       label: 'Спільні',
@@ -408,7 +417,7 @@ export function WishlistPage() {
   ];
 
   const partnerEmptyCopy = tab === 'partner' ? partnerEmptyState(partnerFilter) : null;
-  const sharedEmptyCopy = tab === 'shared' ? sharedEmptyState(sharedFilter, partner.displayName) : null;
+  const sharedEmptyCopy = tab === 'shared' ? sharedEmptyState(sharedFilter, partnerName) : null;
   // Виконані видно на всіх трьох вкладках.
   //
   // Раніше вкладка партнера архіву не мала, і подаровані спогади діставались
@@ -416,7 +425,7 @@ export function WishlistPage() {
   // попросив прибрати ту кнопку й дати «Виконані» просто в аркуші: пара має
   // бачити, що вони здійснили одне для одного, там само, де все інше.
   const canShowArchive = !isSecretMode;
-  const archiveOwnerId = tab === 'me' ? me.id : tab === 'partner' ? partner.id : null;
+  const archiveOwnerId = tab === 'me' ? me.id : tab === 'partner' ? (partner?.id ?? null) : null;
 
   const changeTab = (nextTab: Tab) => {
     setTab(nextTab);
@@ -457,7 +466,7 @@ export function WishlistPage() {
         <WishlistHero
           tab={tab}
           meName={me.displayName}
-          partnerName={partner.displayName}
+          partnerName={partnerName}
           activeCount={isPending || isError ? null : items.length}
           stats={stats}
           busy={mutationBusy}
@@ -546,7 +555,7 @@ export function WishlistPage() {
           {tab === 'shared' && !worldVisible && !isPending && !isError && (
             <WishlistSharedToolbar
               value={sharedFilter}
-              partnerName={partner.displayName}
+              partnerName={partnerName}
               counts={sharedCounts}
               onChange={setSharedFilter}
             />

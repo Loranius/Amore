@@ -51,8 +51,13 @@ export type LoginResult =
 export type LinkResult =
   | { ok: true; state: 'member' }
   | { ok: true; state: 'claim'; seats: PortalSeat[] }
-  | { ok: true; state: 'empty' | 'taken' }
+  | { ok: true; state: 'empty' | 'taken' | 'new' }
   | { ok: false; reason: 'error' };
+
+/** Створення нової пари: людина готова, але в портал ще не заведена. */
+export type CreateCoupleResult =
+  | { ok: true; user: AppUser }
+  | { ok: false; reason: 'email_taken' | 'registration_closed' | 'bad_request' | 'error' };
 
 export type EmailLoginResult =
   | LinkResult
@@ -62,7 +67,7 @@ export type CodeResult =
   | { ok: true }
   | { ok: false; reason: 'rate_limited' | 'not_found' | 'invalid_code' | 'error' };
 
-interface AuthContextValue {
+export interface AuthContextValue {
   user: AppUser | null;
   status: AuthStatus;
   /** userId + 8-значний PIN. Не кидає — повертає структурований результат. */
@@ -77,10 +82,22 @@ interface AuthContextValue {
   /** Після пароля: чиє це місце. `member` одразу відчиняє портал. */
   linkAccount: () => Promise<LinkResult>;
   claimSeat: (userId: number, pin: string) => Promise<LoginResult>;
+  /**
+   * Нова пара (ADR-0230). Після успіху токен уже несе членство, тож можна
+   * писати дані пари (минулі роки, вибір виду), — але портал ще не
+   * відкрито: це робить `enterPortal`, коли реєстрація дійде до кінця.
+   */
+  createCouple: (v: { name: string; gender: 'male' | 'female'; startedAt: string }) => Promise<CreateCoupleResult>;
+  enterPortal: (user: AppUser) => void;
   logout: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+/**
+ * Експортовано для лабораторій (`src/labs`), що малюють екран входу без
+ * мережі й підставляють власне значення. Портал бере його лише через
+ * `AuthProvider` і `useAuth`.
+ */
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AppUser | null>(null);
@@ -190,6 +207,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (res.state === 'claim') return { ok: true, state: 'claim', seats: res.seats };
     return { ok: true, state: res.state };
   }, [enter]);
+
+  const createCouple = useCallback(async (
+    v: { name: string; gender: 'male' | 'female'; startedAt: string },
+  ): Promise<CreateCoupleResult> => {
+    let res;
+    try {
+      res = await invokeFn('portal-account', {
+        action: 'create', name: v.name.trim(), gender: v.gender, started_at: v.startedAt,
+      });
+    } catch (e) {
+      console.error('portal-account create transport error:', e);
+      return { ok: false, reason: 'error' };
+    }
+    if (res.ok && 'user' in res && !('state' in res)) {
+      const appUser = toAppUser(res.user);
+      if (!appUser) return { ok: false, reason: 'error' };
+      // Пошта щойно стала членом пари: старий токен хук видав ще як
+      // анонімний, і запис минулих років чи виду впав би на RLS.
+      const { error } = await supabase.auth.refreshSession();
+      if (error) {
+        console.error('refreshSession after create:', error);
+        return { ok: false, reason: 'error' };
+      }
+      return { ok: true, user: appUser };
+    }
+    if (!res.ok && (res.error === 'email_taken' || res.error === 'registration_closed' || res.error === 'bad_request')) {
+      return { ok: false, reason: res.error };
+    }
+    return { ok: false, reason: 'error' };
+  }, []);
 
   const loginWithEmail = useCallback(async (email: string, password: string): Promise<EmailLoginResult> => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -342,8 +389,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       user, status, login, logout,
       registrationOpen, loginWithEmail, sendCode, verifyCode, setPassword, linkAccount, claimSeat,
+      createCouple, enterPortal: enter,
     }),
-    [user, status, login, logout, registrationOpen, loginWithEmail, sendCode, verifyCode, setPassword, linkAccount, claimSeat],
+    [user, status, login, logout, registrationOpen, loginWithEmail, sendCode, verifyCode, setPassword, linkAccount, claimSeat, createCouple, enter],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

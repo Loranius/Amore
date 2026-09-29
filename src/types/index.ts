@@ -781,7 +781,9 @@ export interface PortalSeat { id: number; gender: 'male' | 'female' | null }
 export type PortalAccountRequest =
   | { action: 'ping' }
   | { action: 'link' }
-  | { action: 'claim'; user_id: number; pin: string };
+  | { action: 'claim'; user_id: number; pin: string }
+  /** Нова пара (ADR-0230): людина, членство й дата початку — однією транзакцією. */
+  | { action: 'create'; name: string; gender: 'male' | 'female'; started_at: string };
 
 /**
  * Відповідь `portal-account`. `state` у `link` каже, куди вести людину:
@@ -791,13 +793,13 @@ export type PortalAccountResponse =
   | { ok: true; registration: 'open' | 'closed'; configured?: boolean }
   | { ok: true; state: 'member'; user: { id: number; name: string } }
   | { ok: true; state: 'claim'; seats: PortalSeat[] }
-  | { ok: true; state: 'empty' | 'taken' }
+  | { ok: true; state: 'empty' | 'taken' | 'new' }
   | { ok: true; user: { id: number; name: string } }
   | {
       ok?: false;
       error:
         | 'bad_request' | 'unauthenticated' | 'email_unconfirmed' | 'email_taken'
-        | 'seat_unavailable' | 'invalid' | 'locked' | 'server_error';
+        | 'seat_unavailable' | 'invalid' | 'locked' | 'server_error' | 'registration_closed';
       retryAfterSeconds?: number;
     };
 

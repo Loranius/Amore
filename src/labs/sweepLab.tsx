@@ -141,8 +141,8 @@ function labSweep(state: LabState): HistorySweep {
       : {},
     declaredGapFor: () => (
       state === 'empty'
-        ? { photos: 0, movies: 0, series: 0, places: 0 }
-        : { photos: 24, movies: 7, series: 0, places: 3 }
+        ? { photos: 0, movies: 0, series: 0, places: 0, milestones: 0, wishes: 0 }
+        : { photos: 24, movies: 7, series: 0, places: 3, milestones: 0, wishes: 0 }
     ),
     setDeclared: noop,
     isSaving: false,

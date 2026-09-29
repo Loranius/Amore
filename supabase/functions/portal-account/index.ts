@@ -8,9 +8,16 @@
 //   { action: 'ping' }                      → { ok, registration: 'open' | 'closed' }
 //   { action: 'link' }       + Bearer токен → { ok, state: 'member', user }
 //                                             | { ok, state: 'claim', seats: [{ id, gender }] }
+//                                             | { ok, state: 'new' }     — нова пошта, реєстрацію відкрито
 //                                             | { ok, state: 'empty' }
 //                                             | { ok, state: 'taken' }
 //   { action: 'claim', user_id, pin } + Bearer → { ok, user } | { error }
+//   { action: 'create', name, gender, started_at } + Bearer → { ok, user } | { error }
+//
+// НОВА ПОШТА — НОВА ПАРА (ADR-0230). Пошта, що не прив'язана до жодного
+// місця, створює власну пару: людину, членство й дату початку стосунків —
+// однією транзакцією `create_couple_for`. Партнер приєднується пізніше
+// кодом-запрошенням (етап 4 ADR-0229).
 //
 // ЧОМУ МІСЦЕ, А НЕ НОВИЙ КОРИСТУВАЧ. Усі дані пари посилаються на
 // `users.id` (1 — Діма, 2 — Лєна). Новий рядок означав би чужу людину з
@@ -54,17 +61,15 @@ Deno.serve(async (req) => {
     const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
     const action = body?.action;
 
+    const raw = Deno.env.get("PORTAL_REGISTRATION_OPEN");
+    const open = registrationOpen(raw);
+
     if (action === "ping") {
-      // Значення секрету вводить людина в панелі: пробіл, лапки чи `true`
-      // замість `1` не мусять тихо тримати реєстрацію закритою.
-      const raw = Deno.env.get("PORTAL_REGISTRATION_OPEN");
-      const flag = (raw ?? "").trim().replace(/^["']+|["']+$/g, "").toLowerCase();
-      const open = flag === "1" || flag === "true";
       // `configured` каже лише, чи секрет із такою назвою взагалі є, —
       // без його значення: так видно, де помилка, у назві чи у значенні.
       return json({ ok: true, registration: open ? "open" : "closed", configured: raw !== undefined }, 200);
     }
-    if (action !== "link" && action !== "claim") return json({ error: "bad_request" }, 400);
+    if (action !== "link" && action !== "claim" && action !== "create") return json({ error: "bad_request" }, 400);
 
     const admin = createClient(
       Deno.env.get("SUPABASE_URL")!,
@@ -110,7 +115,45 @@ Deno.serve(async (req) => {
       }
       if (seats.length > 0) return json({ ok: true, state: "claim", seats }, 200);
       if (rows.length === 0) return json({ ok: true, state: "empty" }, 200);
+      // Пошта вже є в `users`, але не в парі — не нова людина; такого стану
+      // сюди не пускаємо, щоб не завести їй другу пару.
+      if (!mine && open) return json({ ok: true, state: "new" }, 200);
       return json({ ok: true, state: "taken" }, 200);
+    }
+
+    // ── create: нова пара ────────────────────────────────────
+    if (action === "create") {
+      if (!open) return json({ error: "registration_closed" }, 403);
+      if (mine) return json({ error: "email_taken" }, 409);
+      const name = typeof body?.name === "string" ? body.name.trim() : "";
+      const gender = body?.gender;
+      const startedAt = typeof body?.started_at === "string" ? body.started_at : "";
+      if (
+        name.length < 1 || name.length > 40 ||
+        (gender !== "male" && gender !== "female") ||
+        !/^\d{4}-\d{2}-\d{2}$/.test(startedAt)
+      ) {
+        return json({ error: "bad_request" }, 400);
+      }
+      const { data: created, error: createErr } = await admin
+        .rpc("create_couple_for", {
+          p_email: email,
+          p_auth_user_id: caller.user.id,
+          p_name: name,
+          p_gender: gender,
+          p_started_at: startedAt,
+        })
+        .maybeSingle();
+      if (createErr) {
+        const message = createErr.message ?? "";
+        if (message.includes("email_taken")) return json({ error: "email_taken" }, 409);
+        if (message.includes("bad_")) return json({ error: "bad_request" }, 400);
+        console.error("portal-account: create_couple_for error:", createErr);
+        return json({ error: "server_error" }, 500);
+      }
+      const userId = (created as { user_id?: number } | null)?.user_id;
+      if (!userId) return json({ error: "server_error" }, 500);
+      return json({ ok: true, user: { id: userId, name } }, 200);
     }
 
     // ── claim ────────────────────────────────────────────────
@@ -182,6 +225,15 @@ Deno.serve(async (req) => {
     return json({ error: "server_error" }, 500);
   }
 });
+
+/**
+ * Значення секрету вводить людина в панелі: пробіл, лапки чи `true`
+ * замість `1` не мусять тихо тримати реєстрацію закритою.
+ */
+function registrationOpen(raw: string | undefined): boolean {
+  const flag = (raw ?? "").trim().replace(/^["']+|["']+$/g, "").toLowerCase();
+  return flag === "1" || flag === "true";
+}
 
 async function sha256Hex(text: string): Promise<string> {
   const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));

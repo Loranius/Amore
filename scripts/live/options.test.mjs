@@ -197,3 +197,23 @@ describe('--seed: пам’ять минулого візиту', () => {
     expect(() => parseShotArgs(['--drag=:-40'])).toThrow(OptionError);
   });
 });
+
+describe('форма й лабораторія (ADR-0230)', () => {
+  it('--fill стає в чергу разом із тапами, у порядку команди', () => {
+    const parsed = parseShotArgs(['--tap=.a', '--fill=.reg-input=Олена, Марко', '--tap=.b']);
+    expect(parsed.taps).toEqual(['.a', { fill: '.reg-input', value: 'Олена, Марко' }, '.b']);
+  });
+
+  it('--fill з селектором атрибута ділиться за останнім «=»', () => {
+    expect(parseShotArgs(['--fill=input[type=date]=2021-05-01']).taps)
+      .toEqual([{ fill: 'input[type=date]', value: '2021-05-01' }]);
+  });
+
+  it('--fill без значення — помилка, а не тихий пропуск', () => {
+    expect(() => parseShotArgs(['--fill=.reg-input'])).toThrow();
+  });
+
+  it('сторінка лабораторії — окремий файл, а не маршрут порталу', () => {
+    expect(parseShotArgs(['/new-couple-lab.html?step=species']).routes).toEqual(['/new-couple-lab.html?step=species']);
+  });
+});

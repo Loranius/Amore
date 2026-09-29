@@ -62,6 +62,16 @@ const FIELDS: readonly Field[] = [
     label: 'Місць, де були',
     gapWord: (count) => plural(count, 'місце', 'місця', 'місць'),
   },
+  {
+    kind: 'milestones',
+    label: 'Важливих подій',
+    gapWord: (count) => plural(count, 'подія', 'події', 'подій'),
+  },
+  {
+    kind: 'wishes',
+    label: 'Здійснених бажань',
+    gapWord: (count) => plural(count, 'бажання', 'бажання', 'бажань'),
+  },
 ];
 
 /**

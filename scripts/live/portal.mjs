@@ -506,7 +506,9 @@ export async function goToRoute(page, path, { settle }) {
    * Тому запит — це повне перезавантаження. Сесія переживає його в
    * localStorage, тож логін не втрачається.
    */
-  const query = path.startsWith('?') || path.startsWith('/?');
+  // Окрема сторінка (лабораторія) — теж повне завантаження: це інший файл,
+  // не маршрут порталу.
+  const query = path.startsWith('?') || path.startsWith('/?') || /^\/[\w-]+\.html/.test(path);
   if (query) {
     await page.evaluate((href) => { window.location.href = href; }, path);
     await page.waitForLoadState('domcontentloaded').catch(() => {});
@@ -922,6 +924,15 @@ export async function dragSelector(page, { selector, dy, ms }, { after = 900 } =
 }
 
 /** Тап по першому збігу — те саме, що робить палець, разом із очікуванням. */
+/** Заповнити поле, як людина: фокус, текст, подія `input`. Кадру немає. */
+export async function fillSelector(page, selector, value) {
+  const field = page.locator(selector).first();
+  if ((await field.count()) === 0) return false;
+  await field.fill(value);
+  await page.waitForTimeout(150);
+  return true;
+}
+
 export async function tapSelector(page, selector, { after = 1200 } = {}) {
   const box = await page.evaluate((css) => {
     const node = document.querySelector(css);

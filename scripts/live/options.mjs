@@ -154,6 +154,8 @@ export function routePath(route) {
   const value = String(route).trim();
   if (value === '') throw new OptionError('Порожній маршрут.');
   if (value.startsWith('#') || value.startsWith('/?') || value.startsWith('?')) return value;
+  // Окрема сторінка dev-сервера (лабораторія): `/sweep-lab.html?state=years`.
+  if (/^\/[\w-]+\.html(\?.*)?$/.test(value)) return value;
   if (Object.prototype.hasOwnProperty.call(ROUTES, value)) return ROUTES[value];
   if (value.startsWith('/')) return `#${value}`;
   throw new OptionError(
@@ -208,6 +210,17 @@ export function parseSeed(raw) {
 }
 
 /**
+ * `--fill=.reg-input=Олена` → `{ fill: '.reg-input', value: 'Олена' }`.
+ * Ділиться за ОСТАННІМ `=`: селектор атрибута (`input[type=date]`) сам
+ * містить `=`, а значення поля — майже ніколи.
+ */
+export function parseFill(value) {
+  const at = String(value).lastIndexOf('=');
+  if (at <= 0) throw new OptionError('--fill має вигляд <css>=<значення>.');
+  return { fill: value.slice(0, at), value: value.slice(at + 1) };
+}
+
+/**
  * Розбирає рядок команди.
  *
  * Усе, що не починається з `--`, є маршрутом. Прапорці приймають форму
@@ -253,6 +266,10 @@ export function parseShotArgs(argv) {
       case 'ink': inks.push(...asList(value)); break;
       case 'tier': options.tier = value; break;
       case 'tap': taps.push(...asList(value)); break;
+      // Заповнити поле — у тій самій черзі, що й тапи, і без кадру: форму
+      // інакше не пройти (ім'я, дата), а знімок потрібен після дії, не після
+      // кожної літери. `--fill=<css>=<значення>`; значення не ділиться комами.
+      case 'fill': taps.push(parseFill(value)); break;
       // Дотик по координаті, а не по селектору. Для сцени це єдиний спосіб:
       // зірки живуть у полотні, і селектора в них немає.
       case 'tap-at': tapPoints.push(parsePoint(value)); break;

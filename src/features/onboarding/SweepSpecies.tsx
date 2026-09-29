@@ -29,7 +29,7 @@ import { plural } from '@/lib/plural';
  * них (виміряно — 4 роки дають 4, 12 років дають 12). Тому тут лише те,
  * що справді відрізняється: як ці одиниці стоять разом.
  */
-const SHAPE: Readonly<Record<HomeArtifact, string>> = {
+export const SPECIES_SHAPE: Readonly<Record<HomeArtifact, string>> = {
   crystal: 'Роки стають окремими кристалами й сідають кільцями навколо головного.',
   tree: 'Роки стають гілками одного стовбура — знизу вгору, від першого до цьогорічного.',
   reef: 'Роки стають колоніями коралів навколо спільної голови рифу.',
@@ -65,7 +65,7 @@ export function SweepSpecies({ yearCount }: SweepSpeciesProps) {
       <HomeArtifactSwitcher value={artifact} onChange={selectArtifact} />
 
       <p className="sweep-said">
-        <strong>{HOME_ARTIFACT_LABELS[artifact]}.</strong> {SHAPE[artifact]}
+        <strong>{HOME_ARTIFACT_LABELS[artifact]}.</strong> {SPECIES_SHAPE[artifact]}
         {artifact === 'reef' && ' Риф ще в розробці — його форма змінюватиметься.'}
       </p>
 

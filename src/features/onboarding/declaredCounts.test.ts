@@ -221,7 +221,48 @@ describe('домішка до знімка', () => {
     const { snapshot: padded, gaps } = padSnapshotWithDeclared(
       empty(), { '2022-12-26': { photos: 5, places: 2 } }, [SPAN],
     );
-    expect(gaps['2022-12-26']).toEqual({ photos: 5, movies: 0, series: 0, places: 2 });
+    expect(gaps['2022-12-26']).toEqual({ photos: 5, movies: 0, series: 0, places: 2, milestones: 0, wishes: 0 });
     expect(declaredShortfall(padded, { photos: 5 }, SPAN).photos).toBe(0);
+  });
+});
+
+describe('важливі події й здійснені бажання — лічильники реєстрації (ADR-0230)', () => {
+  const withRows = (
+    calendarEvents: EvolutionSourceSnapshot['calendarEvents'],
+    wishlistItems: EvolutionSourceSnapshot['wishlistItems'],
+  ): EvolutionSourceSnapshot => ({ ...empty(), calendarEvents, wishlistItems });
+
+  it('справжні віхи й виконані бажання року віднімаються; річниця віхою не є', () => {
+    const snapshot = withRows(
+      [
+        { id: 1, date: '2023-03-01', type: 'other', yearly: false, isMilestone: true },
+        { id: 2, date: '2023-04-01', type: 'anniversary', yearly: true, isMilestone: true },
+      ],
+      [
+        { id: 3, fulfilled: true, fulfilledAt: '2023-05-01', giftDate: null, isShared: true, priority: null },
+        { id: 4, fulfilled: false, fulfilledAt: null, giftDate: null, isShared: true, priority: null },
+      ],
+    );
+    const gap = declaredShortfall(snapshot, { milestones: 3, wishes: 2 }, SPAN);
+    expect(gap.milestones).toBe(2);
+    expect(gap.wishes).toBe(1);
+  });
+
+  it('домішані віхи — разові й позначені; бажання — виконані, без вигаданого дарувальника', () => {
+    const { snapshot } = padSnapshotWithDeclared(empty(), { [SPAN.startsAt]: { milestones: 2, wishes: 3 } }, [SPAN]);
+    expect(snapshot.calendarEvents).toHaveLength(2);
+    expect(snapshot.calendarEvents.every((e) => e.isMilestone && e.yearly === false)).toBe(true);
+    expect(snapshot.wishlistItems).toHaveLength(3);
+    for (const wish of snapshot.wishlistItems) {
+      expect(wish.fulfilled).toBe(true);
+      expect(wish.ownerId ?? null).toBeNull();
+      expect(wish.fulfilledById ?? null).toBeNull();
+      expect(wish.fulfilledAt! >= SPAN.startsAt && wish.fulfilledAt! < SPAN.endsAt).toBe(true);
+    }
+  });
+
+  it('нові роди переживають запис і читання', () => {
+    const counts = { [SPAN.startsAt]: { milestones: 4, wishes: 1 } };
+    expect(parseDeclaredCounts(serializeDeclaredCounts(counts))).toEqual(counts);
   });
 });
