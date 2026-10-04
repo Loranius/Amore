@@ -45,6 +45,9 @@ import { sfx, unlockAudio } from './sound';
 import { colliderFor, tileFeet, zoneAt } from './world/collide';
 import { homeInterior } from './world/interior';
 import { cityMap } from './world/maps';
+
+/** Стеля щільності пікселів полотна гри (власник: «оптимізуй під айфони»). */
+export const GAME_MAX_DPR = 2;
 import { TILE, type GameMap, type Zone } from './world/types';
 
 export type Panel =
@@ -385,7 +388,10 @@ export class GameController {
 
   private deviceScale(): { dpr: number; w: number; h: number } {
     const c = this.canvas!;
-    const dpr = Math.min(3, window.devicePixelRatio || 1);
+    // Не більше 2: на айфоні щільність 3, і гра малювала б 9 пікселів на
+    // кожен точковий щокадру — у 2.25 раза більше, ніж за щільності 2. Для
+    // піксельної графіки різниці не видно, а батарея й кадри — видно.
+    const dpr = Math.min(GAME_MAX_DPR, window.devicePixelRatio || 1);
     const w = Math.round(c.clientWidth * dpr);
     const h = Math.round(c.clientHeight * dpr);
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }

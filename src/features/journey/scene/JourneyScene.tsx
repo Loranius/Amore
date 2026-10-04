@@ -31,6 +31,7 @@ import { birthDuration } from './constellationLife';
 import { JourneyEnvironment, JOURNEY_SKY_RADIUS } from './JourneyEnvironment';
 import { StarPointer } from './StarPointer';
 import type { JourneyFraming } from './journeyFraming';
+import { useCanvasRecovery } from '@/features/world/canvasRecovery';
 
 /**
  * Сяйво — окремим чанком, але НЕ за вимогою.
@@ -160,6 +161,7 @@ export function JourneyScene({
 }: JourneySceneProps) {
   const constellation = useMemo(() => buildConstellation3D(events), [events]);
   const palette = useMemo(() => journeyPalette(seed), [seed]);
+  const recovery = useCanvasRecovery();
   /*
    * Камера кадрує САМІ ЗІРКИ, а не габаритну коробку сузір'я.
    *
@@ -356,6 +358,7 @@ export function JourneyScene({
       data-journey-triangles={runtime?.triangles ?? ''}
     >
       <Canvas
+        key={recovery.key}
         dpr={pixelRatio}
         camera={{
           // Справжня позиція ставиться ригом, щойно він дізнається форму
@@ -377,6 +380,7 @@ export function JourneyScene({
           gl.outputColorSpace = SRGBColorSpace;
           gl.toneMapping = ACESFilmicToneMapping;
           gl.toneMappingExposure = 1.1;
+          recovery.onCreated({ gl });
         }}
       >
         <SceneClock

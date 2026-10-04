@@ -12,6 +12,7 @@ import { useTheme } from '@/providers/ThemeProvider';
 import { useWorldPose } from '@/features/world/useWorldPose';
 import { useWorldMotionMode } from '@/features/world/useWorldMotionMode';
 import { useWorldFrameloop } from '@/features/world/useImmersiveRoute';
+import { useCanvasRecovery } from '@/features/world/canvasRecovery';
 import { MODULE_SPIN_RATE } from '@/features/world/sceneDirector';
 import { useEvolutionSandbox } from '@/features/home/evolutionSandbox';
 import { useGrowthSinceLastVisit } from '@/features/home/useGrowthSinceLastVisit';
@@ -48,6 +49,7 @@ export default function TreeV2Scene() {
   const motionMode = useWorldMotionMode();
   // Гаки — до ранніх виходів (див. той самий коментар у сцені кристала).
   const frameloop = useWorldFrameloop();
+  const recovery = useCanvasRecovery();
   const [runtime, setRuntime] = useState<EvolutionRuntimeMetrics | null>(null);
   const onRuntimeMetrics = useCallback((next: EvolutionRuntimeMetrics) => setRuntime(next), []);
 
@@ -109,6 +111,8 @@ export default function TreeV2Scene() {
       data-tree-blossoms={model.blossoms.length}
     >
       <Canvas
+        key={recovery.key}
+        onCreated={recovery.onCreated}
         frameloop={frameloop}
         dpr={[1, crystalRenderScale(quality, typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
         camera={{ position: [0, 0.685, 7.1], fov: 42, far: 400 }}

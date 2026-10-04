@@ -242,6 +242,32 @@ async function main() {
            * питання майже завжди саме таке: «а чи не рухається те, що не
            * мало б».
            */
+          /*
+           * ВТРАТА WEBGL-КОНТЕКСТУ (iOS). Айфон забирає контекст у згорнутої
+           * сторінки й часто не повертає. Тут контекст забирається в кожного
+           * полотна й НЕ відновлюється — як на айфоні; кадр через N мс
+           * показує, чи сцена повернулась сама (`canvasRecovery.ts`).
+           */
+          if (options.loseContext > 0) {
+            const lost = await portal.page.evaluate(() => {
+              let count = 0;
+              for (const canvas of document.querySelectorAll('canvas')) {
+                const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+                const ext = gl?.getExtension('WEBGL_lose_context');
+                if (ext) { ext.loseContext(); count += 1; }
+              }
+              return count;
+            });
+            await portal.page.waitForTimeout(options.loseContext);
+            const alive = await portal.page.evaluate(() => [...document.querySelectorAll('canvas')].filter((canvas) => {
+              const gl = canvas.getContext('webgl2') ?? canvas.getContext('webgl');
+              return gl !== null && !gl.isContextLost();
+            }).length);
+            const lostFile = `${outDir}/${name}-lost.png`;
+            await portal.page.screenshot({ path: lostFile });
+            console.log(`  контекст забрано в ${lost} полотен · за ${options.loseContext} мс живих: ${alive} → ${lostFile}`);
+          }
+
           if (options.again > 0) {
             const before = decodePng(readFileSync(file));
             await portal.page.waitForTimeout(options.again);

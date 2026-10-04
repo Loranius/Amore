@@ -250,6 +250,7 @@ export function parseShotArgs(argv) {
     breakdown: false,
     profile: null,
     again: 0,
+    loseContext: 0,
   };
 
   for (const raw of argv) {
@@ -286,6 +287,10 @@ export function parseShotArgs(argv) {
       // нічого не робить». Без цього анімацію сцени нема чим перевірити —
       // один знімок про рух не каже нічого.
       case 'again': options.again = Number(value); break;
+      // Забрати WebGL-контекст у кожного полотна, як це робить iOS зі
+      // згорнутою сторінкою, і через N мс зняти кадр: чи повернулась сцена.
+      // Контекст не відновлюється сам — саме так поводиться айфон.
+      case 'lose-context': options.loseContext = Number(value); break;
       case 'theme': options.theme = value; break;
       // Сховище ДО запуску застосунку: свіжий контекст браузера — це завжди
       // «перший раз», а частина порталу побудована саме на пам'яті між
@@ -317,6 +322,9 @@ export function parseShotArgs(argv) {
   }
   if (!Number.isFinite(options.settle) || options.settle < 0) {
     throw new OptionError('--settle має бути невід’ємним числом мілісекунд.');
+  }
+  if (!Number.isFinite(options.loseContext) || options.loseContext < 0) {
+    throw new OptionError('--lose-context приймає мілісекунди очікування після втрати контексту.');
   }
   if (!Number.isFinite(options.again) || options.again < 0) {
     throw new OptionError('--again має бути невід’ємним числом мілісекунд.');
@@ -350,6 +358,7 @@ export function parseShotArgs(argv) {
     breakdown: options.breakdown,
     profile: options.profile,
     again: options.again,
+    loseContext: options.loseContext,
     login: options.login,
   };
 }

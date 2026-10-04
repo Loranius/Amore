@@ -42,6 +42,7 @@ import { VolcanoWorld } from '@/features/home/volcano3d/VolcanoWorld';
 import { demoIslands, type DemoIsland, type DemoSpecies } from './demoIslands';
 
 import { BACKDROP, CHOICE_ORDER, type IslandsView } from './islandsView';
+import { useCanvasRecovery } from '@/features/world/canvasRecovery';
 
 interface IslandProps {
   demo: DemoIsland;
@@ -262,6 +263,7 @@ class Quiet extends Component<{ children: ReactNode }, { failed: boolean }> {
 export default function AuthIslands({ theme, view = BACKDROP }: { theme: 'light' | 'dark'; view?: IslandsView }) {
   // Зерно — одне на відкриття сторінки: острівці не міняються посеред вводу.
   const [islands] = useState(() => demoIslands(`demo-${freshSeed()}`, new Date().getFullYear()));
+  const recovery = useCanvasRecovery();
   const [reduceMotion, setReduceMotion] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches,
   );
@@ -281,11 +283,15 @@ export default function AuthIslands({ theme, view = BACKDROP }: { theme: 'light'
     >
       <Quiet>
         <Canvas
+          key={recovery.key}
           frameloop={reduceMotion ? 'demand' : 'always'}
           dpr={[1, 1.5]}
           camera={{ position: [0, 2.2, 12], fov: 36 }}
           gl={{ alpha: true, antialias: true }}
-          onCreated={({ camera }) => camera.lookAt(0, 0, 0)}
+          onCreated={(state) => {
+            state.camera.lookAt(0, 0, 0);
+            recovery.onCreated(state);
+          }}
         >
           <Floating islands={islands} theme={theme} reduceMotion={reduceMotion} view={view} />
         </Canvas>
