@@ -23,6 +23,7 @@
   --lg-night: #1b1420;
 }
 
+*, *::before, *::after { box-sizing: border-box; }
 html, body, #root { height: 100%; margin: 0; background: var(--lg-night); overflow: hidden; }
 body { color: var(--lg-ink); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
 .lg { position: fixed; inset: 0; }

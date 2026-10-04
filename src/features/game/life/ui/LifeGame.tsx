@@ -28,6 +28,11 @@ export function LifeGame() {
   useSyncExternalStore(controller.subscribe, controller.snapshot);
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => (canvas.current ? controller.attach(canvas.current) : undefined), [controller]);
+  // Лише в розробці: живий стенд (`scripts/live`) ставить Лєну в потрібне
+  // місто й пору року. У збірку для пари цей рядок не потрапляє.
+  useEffect(() => {
+    if (import.meta.env.DEV) (window as unknown as { __lifeGame?: GameController }).__lifeGame = controller;
+  }, [controller]);
 
   const { ui, life } = controller;
   return (
