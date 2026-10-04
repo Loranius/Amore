@@ -43,9 +43,11 @@ export const ICONS: Record<SignIcon | UiIcon, Bitmap> = {
   smile: { rows: ['.aaaaa.', 'abbbbba', 'abababa', 'abbbbba', 'ababbba', 'abbaaba', '.aaaaa.'], palette: { a: '#a8741a', b: '#f6d55c' } },
   sleep: { rows: ['aaaa....', '..a.....', '.a..bbb.', 'aaaa..b.', '.....b..', '....bbb.'], palette: { a: '#b8c4ff', b: '#8a96e0' } },
   arrow: { rows: ['aaaaaaa', '.abbba.', '..aba..', '...a...'], palette: { a: '#a8741a', b: '#f6c14e' } },
+  cross: { rows: ['a....a', '.a..a.', '..aa..', '..aa..', '.a..a.', 'a....a'], palette: { a: '#ffffff' } },
+  ring: { rows: ['..bcb..', '...b...', '.aaaaa.', 'a.....a', 'a.....a', 'a.....a', '.aaaaa.'], palette: { a: '#e8b83a', b: '#bfe8ff', c: '#ffffff' } },
 };
 
-export type UiIcon = 'coin' | 'bolt' | 'heart' | 'sun' | 'moon' | 'bag' | 'map' | 'album' | 'phone' | 'smile' | 'sleep' | 'arrow';
+export type UiIcon = 'coin' | 'bolt' | 'heart' | 'sun' | 'moon' | 'bag' | 'map' | 'album' | 'phone' | 'smile' | 'sleep' | 'arrow' | 'cross' | 'ring';
 
 export function drawBitmap(g: CanvasRenderingContext2D, name: keyof typeof ICONS, x: number, y: number): void {
   const bm = ICONS[name];

@@ -39,7 +39,7 @@ import { SAVE_KEY, SaveError, parseSave, serialize } from './sim/save';
 import { dayPlan, friendsGame, makeGame, type PlannedGame } from './games/day';
 import { Kit, type MiniGame } from './games/kit';
 import { lenaLook } from './look';
-import { DIMA, MOM, OLYA, townsfolkLook } from './render/people';
+import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
 import { colliderFor, tileFeet, zoneAt } from './world/collide';
@@ -873,6 +873,7 @@ export class GameController {
     });
     this.player.dir = 2;
     sfx.love();
+    this.setUi({ celebrate: true });
     await this.say([
       ['d', 'Класна ава, Лєна!'],
       ['l', 'У тебе також класна ава!'],
@@ -880,8 +881,9 @@ export class GameController {
       ['n', 'Трохи згодом…'],
       ['d', 'Бубос, люблю тебе.'],
       ['l', 'Люблю тебе, гівнюк.'],
-      ['n', 'І з цього почалося все ❤'],
+      ['n', 'І з цього почалося все.'],
     ]);
+    this.setUi({ celebrate: false });
     await this.attempt(meetDima);
     this.trail = [];
     this.busy = false;
@@ -981,6 +983,35 @@ export class GameController {
   /** Дія з панелі, що змінює стан (купити, взяти роботу, переїхати…). */
   async act(fn: (s: LifeState) => Outcome): Promise<boolean> {
     return this.attempt(fn);
+  }
+
+  commitWear(next: LifeState): void {
+    this.commit(next);
+    sfx.blip();
+  }
+
+  dimaLook(): Look {
+    return DIMA;
+  }
+
+  momLook(): Look {
+    return MOM;
+  }
+
+  /** Побачення: правило → маленька сцена з сердечками. */
+  async date(kind: 'walk' | 'cafe' | 'cinema', fn: (s: LifeState) => Outcome): Promise<void> {
+    const ok = await this.attempt(fn);
+    if (!ok) return;
+    this.closePanel();
+    sfx.love();
+    this.setUi({ celebrate: true });
+    const lines: Record<typeof kind, [Speaker, string][]> = {
+      walk: [['d', 'Дивись, яке небо сьогодні.'], ['l', 'Гарне. Але з тобою — ще краще.']],
+      cafe: [['d', 'Тобі капучино з корицею, як завжди?'], ['l', 'Ти пам\'ятаєш!']],
+      cinema: [['n', 'Попкорн, темна зала і рука в руці.'], ['l', 'Наступного разу фільм обираю я!']],
+    };
+    await this.say(lines[kind]);
+    this.setUi({ celebrate: false });
   }
 
   /** Поговорити з мамою: репліки за віком. */

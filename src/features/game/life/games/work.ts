@@ -300,8 +300,8 @@ class Teacher extends Shift {
     kit.rect(36, 80, 1, 110, '#f29a9a');
     kit.text(it.text, kit.W / 2 + 6, 134, { size: 12, color: '#2b3a8a', shadow: null, weight: 700, maxWidth: kit.W - 70 });
     kit.bar(kit.W / 2 - 60, 206, 120, 5, this.left / 30, this.left > 8 ? '#7ed957' : '#e8776a');
-    kit.button('yes', 14, kit.H - 70, kit.W / 2 - 20, 46, '✓ Правильно', { tone: 'green', size: 11 });
-    kit.button('no', kit.W / 2 + 6, kit.H - 70, kit.W / 2 - 20, 46, '✗ Помилка', { tone: 'red', size: 11 });
+    kit.button('yes', 14, kit.H - 70, kit.W / 2 - 20, 46, 'Правильно', { tone: 'green', size: 11 });
+    kit.button('no', kit.W / 2 + 6, kit.H - 70, kit.W / 2 - 20, 46, 'Помилка', { tone: 'red', size: 11 });
     kit.text(`Перевірено: ${this.k}/${this.items.length}`, kit.W / 2, 56, { size: 10 });
   }
 }

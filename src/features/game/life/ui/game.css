@@ -1,0 +1,182 @@
+/* ============================================================
+   «Життя Лєни» — інтерфейс гри (ADR-0239).
+   Окремий світ усередині порталу: пергамент у дерев'яній рамці, як у
+   Stardew Valley. Шрифт — той самий Nunito, що й у порталі (один шрифт);
+   оголошено його в `game.html`, бо гра — окремий документ, що не
+   вантажить `index.css`. Кути — зі шкали порталу: два щаблі нижче
+   повторюють `index.css` значення в значення.
+   ============================================================ */
+:root {
+  --radius-hair: 4px;
+  --radius-sm: 10px;
+  --lg-ink: #4a2a14;
+  --lg-ink-soft: #7a4f2a;
+  --lg-paper: #fbe7b8;
+  --lg-paper-deep: #f2d08f;
+  --lg-frame: #5a3218;
+  --lg-frame-light: #c8823e;
+  --lg-gold: #f2c14e;
+  --lg-gold-deep: #b8822a;
+  --lg-green: #7cc46a;
+  --lg-red: #e8776a;
+  --lg-blue: #7fb8e8;
+  --lg-night: #1b1420;
+}
+
+html, body, #root { height: 100%; margin: 0; background: var(--lg-night); overflow: hidden; }
+body { color: var(--lg-ink); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+.lg { position: fixed; inset: 0; }
+.lg-canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; touch-action: none; }
+
+/* Рамка: пергамент у дереві, тінь — жорсткий піксельний відступ. */
+.lg-panel {
+  background: var(--lg-paper);
+  border: 3px solid var(--lg-frame);
+  border-radius: var(--radius-hair);
+  box-shadow: inset 0 0 0 2px var(--lg-frame-light), inset 0 0 0 4px #f9d68f, 0 4px 0 #2a160a;
+  color: var(--lg-ink);
+}
+.lg-wood {
+  background: linear-gradient(#c98a4a, #a8682e);
+  border: 3px solid var(--lg-frame);
+  border-radius: var(--radius-hair);
+  box-shadow: inset 0 2px 0 #e8a868, inset 0 -2px 0 #7a4a20, 0 3px 0 #2a160a;
+  color: #fff2cf;
+}
+
+.lg-btn {
+  appearance: none;
+  font: inherit;
+  font-weight: 900;
+  font-size: 15px;
+  color: var(--lg-ink);
+  background: var(--lg-gold);
+  border: 3px solid var(--lg-frame);
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  box-shadow: inset 0 2px 0 #ffe39a, inset 0 -3px 0 var(--lg-gold-deep), 0 3px 0 #2a160a;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.lg-btn:active { transform: translateY(2px); box-shadow: inset 0 2px 0 #ffe39a, inset 0 -2px 0 var(--lg-gold-deep), 0 1px 0 #2a160a; }
+.lg-btn[disabled] { filter: grayscale(0.7) brightness(0.92); opacity: 0.7; cursor: default; }
+.lg-btn.is-paper { background: var(--lg-paper); box-shadow: inset 0 2px 0 #fff4dc, inset 0 -3px 0 var(--lg-paper-deep), 0 3px 0 #2a160a; }
+.lg-btn.is-green { background: var(--lg-green); box-shadow: inset 0 2px 0 #b2e8a0, inset 0 -3px 0 #4f9a3e, 0 3px 0 #2a160a; }
+.lg-btn.is-pink { background: #ff7aa8; color: #fff; box-shadow: inset 0 2px 0 #ffb3cf, inset 0 -3px 0 #c23a67, 0 3px 0 #2a160a; }
+.lg-btn.is-small { font-size: 13px; padding: 6px 10px; }
+.lg-btn:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+.lg-icon { image-rendering: pixelated; display: inline-block; vertical-align: middle; }
+
+/* ---------- HUD ---------- */
+.lg-hud { position: absolute; inset: 0; pointer-events: none; }
+.lg-hud > * { pointer-events: auto; }
+.lg-clock {
+  position: absolute; top: calc(8px + env(safe-area-inset-top)); right: 8px;
+  min-width: 132px; padding: 6px 10px 7px; display: grid; gap: 3px;
+}
+.lg-clock-day { font-weight: 900; font-size: 13px; display: flex; align-items: center; gap: 6px; }
+.lg-clock-time { font-weight: 900; font-size: 20px; line-height: 1; display: flex; align-items: center; gap: 6px; }
+.lg-clock-money { font-weight: 900; font-size: 14px; display: flex; align-items: center; gap: 6px; border-top: 2px dashed #e0b56c; padding-top: 4px; }
+.lg-place {
+  position: absolute; top: calc(8px + env(safe-area-inset-top)); left: 8px; max-width: 46vw;
+  padding: 6px 10px; display: grid; gap: 5px;
+}
+.lg-place-name { font-weight: 900; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lg-meter { display: grid; grid-template-columns: 14px 1fr; align-items: center; gap: 6px; }
+.lg-meter-bar { height: 8px; border: 2px solid var(--lg-frame); border-radius: var(--radius-hair); background: #5a3a2a; overflow: hidden; }
+.lg-meter-fill { height: 100%; transition: width 0.3s; }
+.lg-goal {
+  position: absolute; left: 50%; transform: translateX(-50%); top: calc(96px + env(safe-area-inset-top));
+  padding: 4px 12px; font-weight: 800; font-size: 13px; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis;
+}
+.lg-menu { position: absolute; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); display: grid; gap: 8px; }
+.lg-menu .lg-btn { width: 52px; height: 52px; padding: 0; display: grid; place-items: center; }
+.lg-action {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom));
+  font-size: 17px; padding: 12px 20px; max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  animation: lg-bob 1.2s ease-in-out infinite;
+}
+@keyframes lg-bob { 50% { transform: translateX(-50%) translateY(-3px); } }
+.lg-toasts { position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom)); display: grid; gap: 6px; justify-items: center; pointer-events: none; width: 92vw; }
+.lg-toast { padding: 7px 12px; font-weight: 800; font-size: 14px; text-align: center; animation: lg-in 0.2s ease-out both; }
+@keyframes lg-in { from { opacity: 0; transform: translateY(8px); } }
+.lg-warn { position: absolute; left: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); max-width: 60vw; padding: 6px 10px; font-size: 12px; font-weight: 800; }
+
+/* ---------- Діалог ---------- */
+.lg-dialog {
+  position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(14px + env(safe-area-inset-bottom));
+  width: min(600px, 94vw); display: grid; grid-template-columns: 76px 1fr; gap: 12px; padding: 12px; cursor: pointer;
+  animation: lg-in 0.18s ease-out both;
+}
+.lg-portrait { width: 76px; height: 76px; border: 3px solid var(--lg-frame); border-radius: var(--radius-hair); background: linear-gradient(#bfe3f5, #e8f4fb); display: grid; place-items: center; overflow: hidden; }
+.lg-dialog-who { font-weight: 900; font-size: 14px; letter-spacing: 0.5px; margin-bottom: 2px; }
+.lg-dialog-text { font-weight: 700; font-size: 17px; line-height: 1.4; min-height: 48px; }
+.lg-dialog-next { text-align: right; color: var(--lg-gold-deep); font-weight: 900; animation: lg-blink 0.9s infinite; }
+@keyframes lg-blink { 50% { opacity: 0.2; } }
+
+/* ---------- Модальні ---------- */
+.lg-scrim { position: absolute; inset: 0; background: rgba(27, 20, 32, 0.55); display: grid; place-items: center; padding: 16px; animation: lg-fade 0.2s both; }
+@keyframes lg-fade { from { opacity: 0; } }
+.lg-card { width: min(420px, 92vw); padding: 20px 18px 16px; text-align: center; display: grid; gap: 10px; animation: lg-pop 0.22s cubic-bezier(0.2, 1.4, 0.4, 1) both; }
+@keyframes lg-pop { from { transform: scale(0.9); opacity: 0; } }
+.lg-card h2 { margin: 0; font-size: 22px; font-weight: 900; line-height: 1.2; }
+.lg-card p { margin: 0; font-size: 15px; font-weight: 700; color: var(--lg-ink-soft); line-height: 1.4; }
+.lg-card.is-gold { background: #fff1c4; }
+.lg-card.is-love { background: #ffe3ec; }
+.lg-card.is-love h2 { color: #c23a67; }
+
+.lg-sheet {
+  width: min(560px, 96vw); max-height: min(86vh, 760px); display: flex; flex-direction: column; padding: 0; overflow: hidden;
+  animation: lg-pop 0.2s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.lg-sheet-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px 10px; border-bottom: 3px dashed #e0b56c; }
+.lg-sheet-head h2 { margin: 0; font-size: 19px; font-weight: 900; }
+.lg-sheet-head small { display: block; font-size: 12px; font-weight: 800; color: var(--lg-ink-soft); }
+.lg-sheet-body { overflow-y: auto; padding: 10px 14px 14px; display: grid; gap: 8px; overscroll-behavior: contain; touch-action: pan-y; }
+.lg-btn.is-red { background: var(--lg-red); color: #fff; box-shadow: inset 0 2px 0 #f6b0a6, inset 0 -3px 0 #b8473a, 0 3px 0 #2a160a; }
+.lg-btn.is-square { width: 40px; height: 40px; padding: 0; display: grid; place-items: center; }
+
+.lg-row { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; padding: 8px; background: #fff4dc; border: 2px solid #e0b56c; border-radius: var(--radius-hair); }
+.lg-row.is-off { opacity: 0.6; }
+.lg-row-title { font-weight: 900; font-size: 15px; }
+.lg-row-sub { font-weight: 700; font-size: 12px; color: var(--lg-ink-soft); line-height: 1.3; }
+.lg-swatch { width: 40px; height: 40px; border: 2px solid var(--lg-frame); border-radius: var(--radius-hair); display: grid; place-items: center; }
+.lg-price { font-weight: 900; font-size: 14px; display: flex; align-items: center; gap: 4px; justify-content: flex-end; }
+.lg-note { font-size: 13px; font-weight: 800; color: var(--lg-ink-soft); margin: 0; }
+.lg-tag { display: inline-block; font-size: 11px; font-weight: 900; padding: 2px 6px; border-radius: var(--radius-hair); background: #e9d29a; margin: 2px 4px 0 0; }
+.lg-tag.is-ok { background: #c5ecb4; }
+.lg-tag.is-no { background: #f6c4bc; }
+
+.lg-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.lg-tile { padding: 8px; background: #fff4dc; border: 2px solid #e0b56c; border-radius: var(--radius-hair); font-weight: 800; font-size: 13px; display: grid; gap: 4px; }
+.lg-tile.is-locked { background: #e9dcc0; color: #a08a6a; }
+.lg-bars { display: grid; gap: 8px; }
+.lg-hearts { display: flex; gap: 2px; flex-wrap: wrap; }
+
+.lg-map { width: 100%; aspect-ratio: 1.45; background: #bfe3f5; border: 3px solid var(--lg-frame); border-radius: var(--radius-hair); touch-action: manipulation; }
+
+/* ---------- Титул ---------- */
+.lg-title { position: absolute; inset: 0; display: grid; place-items: center; padding: 16px; background: linear-gradient(rgba(27, 20, 32, 0.1), rgba(27, 20, 32, 0.55)); }
+.lg-title-box { width: min(420px, 92vw); padding: 22px 18px 16px; text-align: center; display: grid; gap: 12px; animation: lg-pop 0.35s both; }
+.lg-title-box h1 { margin: 0; font-size: clamp(30px, 9vw, 44px); font-weight: 900; line-height: 1; color: #c23a67; text-shadow: 0 3px 0 #ffd0dc; letter-spacing: 0.5px; }
+.lg-title-box .lg-sub { margin: 0; font-weight: 800; color: var(--lg-ink-soft); font-size: 14px; }
+.lg-chapters { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.lg-foot { font-size: 13px; font-weight: 800; color: #c23a67; margin: 2px 0 0; }
+
+/* ---------- Пропозиція ---------- */
+.lg-ask { position: absolute; inset: 0; display: grid; place-items: center; background: rgba(40, 10, 30, 0.55); padding: 16px; }
+.lg-ask .lg-card { background: #ffe3ec; }
+.lg-celebrate { position: absolute; inset: 0; pointer-events: none; overflow: hidden; }
+.lg-celebrate span { position: absolute; bottom: -24px; animation: lg-rise linear infinite; }
+@keyframes lg-rise { to { transform: translateY(-110vh); } }
+
+/* ---------- Розклад дня ---------- */
+.lg-plan { display: grid; gap: 6px; text-align: left; margin: 4px 0; padding: 0; list-style: none; }
+.lg-plan li { display: flex; align-items: center; gap: 8px; font-weight: 800; padding: 6px 10px; background: #fff4dc; border: 2px solid #e0b56c; border-radius: var(--radius-hair); }
+.lg-plan li b { color: var(--lg-gold-deep); min-width: 18px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lg-action, .lg-dialog-next { animation: none; }
+  .lg-card, .lg-sheet, .lg-title-box, .lg-toast, .lg-dialog { animation: none; }
+}

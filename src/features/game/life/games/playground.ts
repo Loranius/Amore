@@ -542,7 +542,7 @@ class Butterflies extends Base {
     for (const b of this.bugs) {
       const x = b.x * s;
       const y = b.y * s * sy;
-      if (b.caught > 0) { kit.text(b.bee ? 'Ай!' : '♥', x, y - 6, { size: 9, color: b.bee ? '#ffb3b3' : '#ff7aa8' }); continue; }
+      if (b.caught > 0) { if (b.bee) kit.text('Ай!', x, y - 6, { size: 9, color: '#ffb3b3' }); else kit.icon('heart', x - 3, y - 10); continue; }
       const flap = Math.floor(this.t * 10 + b.ph) % 2;
       if (b.bee) {
         kit.ellipse(x, y, 4, 3, '#f6c14e');

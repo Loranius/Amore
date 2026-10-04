@@ -1,0 +1,433 @@
+// ============================================================
+// Панелі «Життя Лєни» (ADR-0239): крамниця, дорога, вакансії, ріелтор,
+// шафа, альбом, телефон (стан і налаштування), сумка, побачення, сон,
+// мама. Кожна кнопка, якої не можна натиснути, каже чому.
+// ============================================================
+import { useState, type ReactNode } from 'react';
+import { DAY_END_MIN, clockLabel, dayInfo } from '../sim/calendar';
+import {
+  CITIES,
+  CITY_IDS,
+  EDUCATION_NAME,
+  ITEMS,
+  JOBS,
+  MAX_HEARTS,
+  MODE_NAME,
+  PERSON_NAME,
+  ROUTES,
+  SHOP_NAME,
+  SIGHTS,
+  SKILL_NAME,
+  itemById,
+  shopStock,
+  type CityId,
+  type Item,
+  type PersonId,
+  type ShopId,
+  type SkillId,
+} from '../sim/content';
+import {
+  DATE_PRICE,
+  MILESTONES,
+  RENT,
+  albumProgress,
+  buy,
+  canBuy,
+  education,
+  giveGift,
+  goOnDate,
+  jobCheck,
+  moveHome,
+  personNearby,
+  quitJob,
+  shiftPay,
+  studying,
+  takeJob,
+  today,
+  travelCheck,
+  wear,
+  type DateKind,
+  type LifeState,
+} from '../sim/life';
+import { UA_OUTLINE } from '../games/banks';
+import type { GameController, Panel } from '../controller';
+import { lenaLook } from '../look';
+import { isMuted, setMuted } from '../sound';
+import { PixelIcon, Portrait } from './pixels';
+
+function Sheet({ title, sub, onClose, children }: { title: string; sub?: string; onClose: () => void; children: ReactNode }) {
+  return (
+    <div className="lg-scrim" onPointerDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <section className="lg-panel lg-sheet" role="dialog" aria-modal="true" aria-label={title}>
+        <header className="lg-sheet-head">
+          <div>
+            <h2>{title}</h2>
+            {sub && <small>{sub}</small>}
+          </div>
+          <button type="button" className="lg-btn is-red is-square" onClick={onClose} aria-label="Закрити"><PixelIcon name="cross" size={3} /></button>
+        </header>
+        <div className="lg-sheet-body">{children}</div>
+      </section>
+    </div>
+  );
+}
+
+function Money({ value }: { value: number }) {
+  return <span className="lg-price"><PixelIcon name="coin" size={2} /> {value} ₴</span>;
+}
+
+function ItemBadge({ item }: { item: Item }) {
+  const icon = { food: 'cake', outfit: 'smile', decor: 'star', book: 'album', gift: 'heart', gadget: 'phone', souvenir: 'star' } as const;
+  const tint = item.outfit?.top ?? item.tint;
+  return (
+    <div className="lg-swatch" style={{ background: tint ?? '#fff4dc' }}>
+      {item.kind === 'outfit' ? <span style={{ width: 16, height: 16, background: item.outfit!.bottom, border: '2px solid #5a3218', borderRadius: 3 }} /> : <PixelIcon name={item.kind === 'book' ? 'album' : icon[item.kind]} size={3} />}
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+function ShopPanel({ c, life, shop }: { c: GameController; life: LifeState; shop: ShopId }) {
+  const stock = shopStock(shop, life.city, today(life).week);
+  return (
+    <Sheet title={SHOP_NAME[shop]} sub={`${CITIES[life.city].name} · у гаманці ${life.money} ₴`} onClose={() => c.closePanel()}>
+      {stock.length === 0 && <p className="lg-note">Полиці порожні — заходь пізніше.</p>}
+      {stock.map((item) => {
+        const check = canBuy(life, shop, item.id);
+        const owned = life.owned.includes(item.id);
+        return (
+          <div key={item.id} className={`lg-row${check.ok ? '' : ' is-off'}`}>
+            <ItemBadge item={item} />
+            <div>
+              <div className="lg-row-title">{item.name}</div>
+              <div className="lg-row-sub">{item.blurb}{!check.ok && !owned ? ` · ${check.reason}` : ''}</div>
+            </div>
+            <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
+              <Money value={item.price} />
+              <button type="button" className="lg-btn is-small" disabled={!check.ok} onClick={() => void c.act((s) => buy(s, shop, item.id))}>
+                {owned ? 'Є' : item.kind === 'food' ? 'З\'їсти' : 'Купити'}
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function TravelPanel({ c, life }: { c: GameController; life: LifeState }) {
+  const [pick, setPick] = useState<CityId | null>(null);
+  const W = 300;
+  const H = 207;
+  const check = pick ? travelCheck(life, pick) : null;
+  return (
+    <Sheet title="Куди поїдемо?" sub={`Зараз: ${CITIES[life.city].name} · ${clockLabel(life.minute)}`} onClose={() => c.closePanel()}>
+      <svg className="lg-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Мапа України">
+        <polygon points={UA_OUTLINE.map(([x, y]) => `${x * W},${y * H}`).join(' ')} fill="#a8d890" stroke="#4f8a5a" strokeWidth="2" />
+        {ROUTES.map((r) => {
+          const a = CITIES[r.a].pos;
+          const b = CITIES[r.b].pos;
+          return <line key={`${r.a}-${r.b}`} x1={a[0] * W} y1={a[1] * H} x2={b[0] * W} y2={b[1] * H} stroke={r.mode === 'train' ? '#8a5a34' : r.mode === 'bus' ? '#3a6fd8' : '#c9a46a'} strokeWidth="2" strokeDasharray={r.mode === 'walk' ? '3 3' : r.mode === 'bus' ? '6 3' : undefined} />;
+        })}
+        {CITY_IDS.map((id) => {
+          const [x, y] = CITIES[id].pos;
+          const here = id === life.city;
+          return (
+            <g key={id} onClick={() => setPick(id)} style={{ cursor: 'pointer' }}>
+              <circle cx={x * W} cy={y * H} r={here ? 7 : pick === id ? 7 : 5} fill={here ? '#ff5d8f' : pick === id ? '#f2c14e' : '#fff4dc'} stroke="#5a3218" strokeWidth="2" />
+              <text x={x * W} y={y * H - 10} textAnchor="middle" fontSize="11" fontWeight="900" fill="#4a2a14" stroke="#fbe7b8" strokeWidth="3" paintOrder="stroke">{CITIES[id].name}</text>
+              <circle cx={x * W} cy={y * H} r="16" fill="transparent" />
+            </g>
+          );
+        })}
+      </svg>
+      {!pick && <p className="lg-note">Торкнись міста на мапі.</p>}
+      {pick && check && (
+        <div className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+          <div>
+            <div className="lg-row-title">{CITIES[pick].name}</div>
+            <div className="lg-row-sub">{CITIES[pick].blurb}</div>
+            {check.ok && (
+              <div className="lg-row-sub">
+                {check.plan.legs.map((l) => MODE_NAME[l.mode]).join(' → ')} · {Math.round(check.plan.minutes / 6) / 10} год · {check.withMom ? 'з мамою, мама платить' : `${check.plan.price} ₴`}
+              </div>
+            )}
+            {!check.ok && <div className="lg-row-sub" style={{ color: '#b8323a' }}>{check.reason}</div>}
+          </div>
+          <button type="button" className="lg-btn" disabled={!check.ok} onClick={() => void c.goTo(pick)}>Їхати</button>
+        </div>
+      )}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function JobsPanel({ c, life, focus }: { c: GameController; life: LifeState; focus?: string | undefined }) {
+  const jobs = [...JOBS].sort((a, b) => (a.id === focus ? -1 : b.id === focus ? 1 : 0));
+  const edu = education(life);
+  return (
+    <Sheet title="Робота" sub={`Освіта: ${EDUCATION_NAME[edu]}${studying(life) ? ' · поки вчишся — лише підробіток' : ''}`} onClose={() => c.closePanel()}>
+      {life.job && (
+        <div className="lg-row" style={{ gridTemplateColumns: '1fr auto', background: '#e8f6dc' }}>
+          <div>
+            <div className="lg-row-title">Зараз: {c.shiftJobTitle()}</div>
+            <div className="lg-row-sub">Змін відпрацьовано: {life.job.shifts}</div>
+          </div>
+          <button type="button" className="lg-btn is-small is-paper" onClick={() => void c.act(quitJob)}>Звільнитись</button>
+        </div>
+      )}
+      {jobs.map((job) => {
+        const check = jobCheck(life, job);
+        const mine = life.job?.id === job.id;
+        const here = life.city === job.city;
+        return (
+          <div key={job.id} className={`lg-row${check.ok ? '' : ' is-off'}`} style={{ gridTemplateColumns: '1fr auto' }}>
+            <div>
+              <div className="lg-row-title">{job.title}</div>
+              <div className="lg-row-sub">{job.place} · {CITIES[job.city].name} · {job.blurb}</div>
+              <div>
+                <span className="lg-tag">{shiftPay(job, 0, 0.8, 60)} ₴ за зміну</span>
+                <span className={`lg-tag ${EDUCATION_NAME[job.education] && (job.education === 'none' || edu === 'diploma' || (edu === 'school' && job.education === 'school')) ? 'is-ok' : 'is-no'}`}>{EDUCATION_NAME[job.education]}</span>
+                {Object.entries(job.skills ?? {}).map(([k, v]) => (
+                  <span key={k} className={`lg-tag ${life.skills[k as SkillId] >= v ? 'is-ok' : 'is-no'}`}>{SKILL_NAME[k as SkillId]} {v}+</span>
+                ))}
+                {job.partTime && <span className="lg-tag">можна підробляти</span>}
+              </div>
+              {!check.ok && <div className="lg-row-sub" style={{ color: '#b8323a' }}>{check.reason}</div>}
+            </div>
+            {mine ? <span className="lg-tag is-ok">Твоя робота</span> : (
+              <button type="button" className="lg-btn is-small" disabled={!check.ok || !here} onClick={() => void c.act((s) => takeJob(s, job.id))} title={here ? '' : `Співбесіда — у місті ${CITIES[job.city].name}`}>
+                {here ? 'Влаштуватися' : CITIES[job.city].name}
+              </button>
+            )}
+          </div>
+        );
+      })}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function RealtorPanel({ c, life }: { c: GameController; life: LifeState }) {
+  const rent = life.flags.livingWithDima ? Math.round(RENT[life.city] * 0.6) : RENT[life.city];
+  const can = !studying(life) && life.home !== life.city && life.money >= rent;
+  return (
+    <Sheet title="Ріелтор" sub={`Зараз живеш: ${life.homeName} · оренда ${life.rent} ₴/тиждень`} onClose={() => c.closePanel()}>
+      <p className="lg-note">Оренда списується щопонеділка. {life.flags.livingWithDima ? 'Удвох із Дімою — платите навпіл (60% ціни на тебе).' : ''}</p>
+      <div className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+        <div>
+          <div className="lg-row-title">Квартира: {CITIES[life.city].name}</div>
+          <div className="lg-row-sub">{rent} ₴ на тиждень · застава {rent} ₴</div>
+          {studying(life) && <div className="lg-row-sub" style={{ color: '#b8323a' }}>Переїзд — після диплома</div>}
+          {life.home === life.city && <div className="lg-row-sub">Ти вже тут живеш</div>}
+        </div>
+        <button type="button" className="lg-btn" disabled={!can} onClick={() => void c.act((s) => moveHome(s, s.city))}>Орендувати</button>
+      </div>
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function WardrobePanel({ c, life }: { c: GameController; life: LifeState }) {
+  const outfits = life.owned.filter((id) => itemById(id).kind === 'outfit');
+  return (
+    <Sheet title="Шафа" sub="Що вдягнути сьогодні?" onClose={() => c.closePanel()}>
+      <div style={{ display: 'grid', placeItems: 'center', padding: 6, background: 'linear-gradient(#bfe3f5,#e8f4fb)', border: '3px solid #5a3218', borderRadius: 6 }}>
+        <Portrait look={lenaLook(life)} scale={6} crop={false} />
+      </div>
+      <div className="lg-grid">
+        <button type="button" className={`lg-btn is-paper${life.outfit === null ? ' is-green' : ''}`} onClick={() => c.commitWear(wear(life, null))}>Звичайний одяг</button>
+        {outfits.map((id) => (
+          <button key={id} type="button" className={`lg-btn is-paper${life.outfit === id ? ' is-green' : ''}`} onClick={() => c.commitWear(wear(life, id))}>{itemById(id).name}</button>
+        ))}
+      </div>
+      {outfits.length === 0 && <p className="lg-note">Новий одяг продають у містах — у крамниці «Одяг».</p>}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function AlbumPanel({ c, life }: { c: GameController; life: LifeState }) {
+  const { done, total } = albumProgress(life);
+  const souvenirs = ITEMS.filter((i) => i.kind === 'souvenir');
+  return (
+    <Sheet title="Альбом життя" sub={`Зібрано ${done} з ${total}`} onClose={() => c.closePanel()}>
+      <div className="lg-meter-bar" style={{ height: 12 }}><div className="lg-meter-fill" style={{ width: `${(done / total) * 100}%`, background: '#ff7aa8' }} /></div>
+      <h3 style={{ margin: '6px 0 0' }}>Віхи</h3>
+      <div className="lg-grid">
+        {MILESTONES.map((m) => {
+          const got = life.milestones.includes(m.id);
+          return (
+            <div key={m.id} className={`lg-tile${got ? '' : ' is-locked'}`}>
+              <span>{got ? <PixelIcon name="star" /> : '?'} {got ? m.title : '…'}</span>
+              {got && <span style={{ fontWeight: 700, fontSize: 12 }}>{m.text}</span>}
+            </div>
+          );
+        })}
+      </div>
+      <h3 style={{ margin: '6px 0 0' }}>Фото</h3>
+      <div className="lg-grid">
+        {SIGHTS.map((s) => {
+          const got = life.photos.includes(s.id);
+          return <div key={s.id} className={`lg-tile${got ? '' : ' is-locked'}`}>{got ? s.name : '???'}<span style={{ fontWeight: 700, fontSize: 11 }}>{CITIES[s.city].name}</span></div>;
+        })}
+      </div>
+      <h3 style={{ margin: '6px 0 0' }}>Сувеніри й одяг</h3>
+      <div className="lg-grid">
+        {souvenirs.map((s) => <div key={s.id} className={`lg-tile${life.owned.includes(s.id) ? '' : ' is-locked'}`}>{life.owned.includes(s.id) ? s.name : '???'}</div>)}
+        {ITEMS.filter((i) => i.kind === 'outfit').map((s) => <div key={s.id} className={`lg-tile${life.owned.includes(s.id) ? '' : ' is-locked'}`}>{life.owned.includes(s.id) ? s.name : '???'}</div>)}
+      </div>
+      {life.marks.length > 0 && (
+        <>
+          <h3 style={{ margin: '6px 0 0' }}>Оцінки за роки</h3>
+          <div className="lg-grid">
+            {life.marks.map((m) => {
+              const info = dayInfo(m.week * 7);
+              return <div key={m.week} className="lg-tile">{info.stage === 'uni' ? `${info.level} курс` : `${info.level} клас`}<span style={{ fontSize: 18 }}>{m.mark}</span></div>;
+            })}
+          </div>
+        </>
+      )}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function Hearts({ n }: { n: number }) {
+  return (
+    <span className="lg-hearts" aria-label={`${Math.floor(n)} з ${MAX_HEARTS}`}>
+      {Array.from({ length: MAX_HEARTS }, (_, i) => <span key={i} style={{ opacity: i < Math.floor(n) ? 1 : 0.22 }}><PixelIcon name="heart" size={2} /></span>)}
+    </span>
+  );
+}
+
+function PhonePanel({ c, life }: { c: GameController; life: LifeState }) {
+  const info = today(life);
+  const [muted, setMute] = useState(isMuted());
+  const avg = life.marks.length ? Math.round((life.marks.reduce((a, m) => a + m.mark, 0) / life.marks.length) * 10) / 10 : null;
+  return (
+    <Sheet title="Телефон" sub={`Лєні ${info.age} · ${info.schoolYear}`} onClose={() => c.closePanel()}>
+      <div className="lg-bars">
+        {(Object.keys(SKILL_NAME) as SkillId[]).map((k) => (
+          <div key={k}>
+            <div className="lg-row-title" style={{ fontSize: 13 }}>{SKILL_NAME[k]} · {life.skills[k]}</div>
+            <div className="lg-meter-bar"><div className="lg-meter-fill" style={{ width: `${life.skills[k]}%`, background: '#7fb8e8' }} /></div>
+          </div>
+        ))}
+      </div>
+      {(['mom', 'friend', 'dima'] as PersonId[]).filter((p) => p !== 'dima' || life.flags.metDima).map((p) => (
+        <div key={p} className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+          <div className="lg-row-title">{c.personName(p)}</div>
+          <Hearts n={life.hearts[p]} />
+        </div>
+      ))}
+      <div className="lg-tile">
+        <span>Освіта: {EDUCATION_NAME[education(life)]}{avg !== null ? ` · середній бал ${avg}` : ''}</span>
+        <span>Робота: {c.shiftJobTitle() ?? '—'}</span>
+        <span>Дім: {life.homeName}{life.rent ? ` · ${life.rent} ₴/тиждень` : ''}</span>
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button type="button" className="lg-btn is-paper" onClick={() => { setMuted(!muted); setMute(!muted); }}>{muted ? 'Звук: вимкнено' : 'Звук: увімкнено'}</button>
+        <button type="button" className="lg-btn is-paper" onClick={() => c.toTitle()}>Головне меню</button>
+      </div>
+      <p className="lg-note">Гра зберігається сама після кожної дії.</p>
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function BagPanel({ c, life }: { c: GameController; life: LifeState }) {
+  const counts = new Map<string, number>();
+  for (const g of life.gifts) counts.set(g, (counts.get(g) ?? 0) + 1);
+  const people: PersonId[] = ['mom', 'friend', 'dima'];
+  const keep = life.owned.filter((id) => ['book', 'gadget', 'souvenir'].includes(itemById(id).kind));
+  return (
+    <Sheet title="Сумка" sub={`${life.money} ₴`} onClose={() => c.closePanel()}>
+      <h3 style={{ margin: 0 }}>Подарунки</h3>
+      {counts.size === 0 && <p className="lg-note">Подарунки купують у «Квіти й подарунки» та «Техніка».</p>}
+      {[...counts.entries()].map(([id, n]) => (
+        <div key={id} className="lg-row" style={{ gridTemplateColumns: '44px 1fr' }}>
+          <ItemBadge item={itemById(id)} />
+          <div>
+            <div className="lg-row-title">{itemById(id).name} × {n}</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 4 }}>
+              {people.filter((p) => p !== 'dima' || life.flags.metDima).map((p) => (
+                <button key={p} type="button" className="lg-btn is-small is-pink" disabled={!personNearby(life, p) || life.doneToday.includes(`gift:${p}`)} onClick={() => void c.act((s) => giveGift(s, p, id))}>{PERSON_NAME[p]}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ))}
+      <h3 style={{ margin: '6px 0 0' }}>Речі</h3>
+      <div className="lg-grid">{keep.map((id) => <div key={id} className="lg-tile">{itemById(id).name}<span style={{ fontWeight: 700, fontSize: 11 }}>{itemById(id).blurb}</span></div>)}</div>
+      {keep.length === 0 && <p className="lg-note">Поки порожньо.</p>}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function DatePanel({ c, life }: { c: GameController; life: LifeState }) {
+  const options: [DateKind, string, string][] = [['walk', 'Прогулянка', 'Безкоштовно · +½ серця'], ['cafe', 'Кава й десерт', `${DATE_PRICE.cafe} ₴ · +1 серце`], ['cinema', 'Кіно', `${DATE_PRICE.cinema} ₴ · +1 серце`]];
+  const done = life.doneToday.includes('date');
+  return (
+    <Sheet title="Побачення з Дімою" sub={done ? 'Сьогодні вже бачились — завтра ще' : 'Куди підемо?'} onClose={() => c.closePanel()}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+        <Portrait look={lenaLook(life)} scale={4} />
+        <Portrait look={c.dimaLook()} scale={4} />
+      </div>
+      <Hearts n={life.hearts.dima} />
+      {options.map(([kind, title, sub]) => (
+        <div key={kind} className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+          <div>
+            <div className="lg-row-title">{title}</div>
+            <div className="lg-row-sub">{sub}</div>
+          </div>
+          <button type="button" className="lg-btn is-pink" disabled={done || life.money < DATE_PRICE[kind]} onClick={() => void c.date(kind, (s) => goOnDate(s, kind))}>Іти</button>
+        </div>
+      ))}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function SleepPanel({ c, life }: { c: GameController; life: LifeState }) {
+  const late = life.minute > 24 * 60;
+  return (
+    <Sheet title="Лягти спати?" sub={`Зараз ${clockLabel(life.minute)} · до півночі сон відновлює всі сили`} onClose={() => c.closePanel()}>
+      <p className="lg-note">{late ? 'Вже за північ — зранку буде важкувато.' : life.minute < 18 * 60 ? 'Ще світло надворі. Може, погуляти?' : 'Гарний час для сну.'}</p>
+      <p className="lg-note">Залишок дня: {Math.max(0, Math.round((DAY_END_MIN - life.minute) / 60))} год.</p>
+      <button type="button" className="lg-btn" onClick={() => void c.goToSleep()}>Спати до ранку</button>
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+function MomPanel({ c, life }: { c: GameController; life: LifeState }) {
+  return (
+    <Sheet title="Мама" sub="Рідна хата в Жилинцях" onClose={() => c.closePanel()}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div className="lg-portrait"><Portrait look={c.momLook()} scale={4} /></div>
+        <Hearts n={life.hearts.mom} />
+      </div>
+      <button type="button" className="lg-btn is-paper" onClick={() => { c.closePanel(); void c.say(c.momLines()); }}>Поговорити</button>
+      <button type="button" className="lg-btn is-paper" onClick={() => c.openPanel({ kind: 'bag' })}>Подарувати щось…</button>
+    </Sheet>
+  );
+}
+
+export function Panels({ c, life, panel }: { c: GameController; life: LifeState; panel: Panel }) {
+  switch (panel.kind) {
+    case 'shop': return <ShopPanel c={c} life={life} shop={panel.shop} />;
+    case 'travel': return <TravelPanel c={c} life={life} />;
+    case 'jobs': return <JobsPanel c={c} life={life} focus={panel.focus} />;
+    case 'realtor': return <RealtorPanel c={c} life={life} />;
+    case 'wardrobe': return <WardrobePanel c={c} life={life} />;
+    case 'album': return <AlbumPanel c={c} life={life} />;
+    case 'phone': return <PhonePanel c={c} life={life} />;
+    case 'bag': return <BagPanel c={c} life={life} />;
+    case 'date': return <DatePanel c={c} life={life} />;
+    case 'sleep': return <SleepPanel c={c} life={life} />;
+    case 'mom': return <MomPanel c={c} life={life} />;
+  }
+}

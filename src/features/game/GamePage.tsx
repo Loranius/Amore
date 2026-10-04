@@ -1,17 +1,17 @@
 // ============================================================
-// GamePage — «Наша історія» (порт game.js)
+// GamePage — «Життя Лєни» (ADR-0239)
 // ------------------------------------------------------------
-// Піксельна гра — самодостатній game.html у public/. У React лінивість
-// із оригіналу досягається природно: iframe монтується лише коли
-// відкрито цей роут. BASE_URL — щоб шлях працював і під підкаталогом
-// на GitHub Pages.
+// Гра — окрема сторінка збірки `game.html` (симулятор життя Лєни). У
+// React лінивість досягається природно: iframe монтується лише коли
+// відкрито цей роут, тож портал не тягне гру за собою. BASE_URL — щоб
+// шлях працював і під підкаталогом на GitHub Pages.
 // ============================================================
-const GAME_SRC = `${import.meta.env.BASE_URL}game.html?v=4`;
+const GAME_SRC = `${import.meta.env.BASE_URL}game.html?v=5`;
 
 export function GamePage() {
   return (
     <section className="game">
-      <iframe className="game-frame" src={GAME_SRC} title="Наша історія" />
+      <iframe className="game-frame" src={GAME_SRC} title="Життя Лєни" />
     </section>
   );
 }

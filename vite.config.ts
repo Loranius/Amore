@@ -12,7 +12,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icons/icon-192.png', 'icons/icon-512.png', 'game.html'],
+      includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
       manifest: {
         name: 'Amore',
         short_name: 'Amore',
@@ -148,6 +148,18 @@ export default defineConfig({
    * рівно так само, як без явної адреси воркера взагалі.
    */
   worker: { format: 'es' },
+  /*
+   * Дві сторінки: портал і гра «Життя Лєни» (ADR-0239). Гра — окремий
+   * вхід, бо живе в iframe на `/game` і не тягне портал за собою.
+   */
+  build: {
+    rollupOptions: {
+      input: {
+        main: fileURLToPath(new URL('./index.html', import.meta.url)),
+        game: fileURLToPath(new URL('./game.html', import.meta.url)),
+      },
+    },
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

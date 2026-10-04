@@ -508,7 +508,7 @@ export class PixelCopy extends Lesson {
       if (i === this.brush) kit.rect(x, py + 24, 24, 3, '#f6c14e');
       kit.region(`p${i}`, x, py, 24, 26);
     });
-    kit.button('done', kit.W - 70, py, 56, 24, this.checked ? '✓' : 'Готово', { tone: 'gold' });
+    kit.button('done', kit.W - 70, py, 56, 24, this.checked ? 'Здано' : 'Готово', { tone: 'gold' });
   }
 }
 

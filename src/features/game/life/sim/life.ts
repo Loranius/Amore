@@ -277,7 +277,7 @@ export type DutyCheck = { ok: true; late: boolean } | { ok: false; reason: strin
 export function canDoDuty(state: LifeState): DutyCheck {
   const duty = dutyToday(state);
   if (!duty) return { ok: false, reason: 'Сьогодні вільний день' };
-  if (state.doneToday.includes('duty')) return { ok: false, reason: 'На сьогодні вже все 🙂' };
+  if (state.doneToday.includes('duty')) return { ok: false, reason: 'На сьогодні вже все' };
   if (state.city !== duty.city) return { ok: false, reason: `Це в місті ${CITIES[duty.city].name}` };
   if (state.minute > duty.startBy + LATE_GRACE_MIN) return { ok: false, reason: 'Сьогодні вже запізно — завтра зранку' };
   if (state.energy < 10) return { ok: false, reason: 'Немає сил — поїж або поспи' };
@@ -470,7 +470,7 @@ export function routePlan(from: CityId, to: CityId): TravelPlan | null {
   const best = new Map<CityId, { price: number; minutes: number; legs: Route[] }>([[from, { price: 0, minutes: 0, legs: [] }]]);
   const open: CityId[] = [from];
   while (open.length > 0) {
-    open.sort((a, b) => best.get(a)!.price - best.get(b)!.price || best.get(a)!.minutes - best.get(b)!.minutes || a.localeCompare(b, 'en'));
+    open.sort((a, b) => best.get(a)!.price - best.get(b)!.price || best.get(a)!.minutes - best.get(b)!.minutes || (a < b ? -1 : a > b ? 1 : 0));
     const at = open.shift()!;
     const here = best.get(at)!;
     for (const r of ROUTES) {
@@ -579,7 +579,7 @@ export function dimaCity(state: LifeState): CityId | null {
 }
 
 export function goOnDate(state: LifeState, kind: DateKind): Outcome {
-  if (!state.flags.metDima) throw new LifeRuleError('Ще не знайомі 😉');
+  if (!state.flags.metDima) throw new LifeRuleError('Ви ще не знайомі');
   if (dimaCity(state) !== state.city) throw new LifeRuleError('Діма зараз у Вінниці');
   if (state.doneToday.includes('date')) throw new LifeRuleError('Побачення вже було сьогодні');
   if (state.money < DATE_PRICE[kind]) throw new LifeRuleError(`Треба ${DATE_PRICE[kind]} ₴`);
@@ -622,7 +622,7 @@ export function giveGift(state: LifeState, person: PersonId, itemId: string): Ou
       hearts: { ...state.hearts, [person]: clamp(state.hearts[person] + (item.hearts ?? 1), 0, MAX_HEARTS) },
       doneToday: [...state.doneToday, key],
     },
-    events: [{ kind: 'toast', text: 'Подарунок вручено ❤' }],
+    events: [{ kind: 'toast', text: 'Подарунок вручено' }],
   };
 }
 
@@ -667,8 +667,8 @@ export type ProposalCheck = { ok: true } | { ok: false; reason: string };
 
 export function proposalCheck(state: LifeState): ProposalCheck {
   const info = today(state);
-  if (state.flags.proposed) return { ok: false, reason: 'Вона вже сказала «так» ❤' };
-  if (!state.flags.metDima) return { ok: false, reason: 'Просто гарний камінь 💛' };
+  if (state.flags.proposed) return { ok: false, reason: 'Вона вже сказала «так»' };
+  if (!state.flags.metDima) return { ok: false, reason: 'Просто гарний жовтий камінь' };
   if (info.week < PROPOSAL_WEEK) return { ok: false, reason: 'Гарний камінь. Колись ми сюди повернемось…' };
   if (info.season !== 'summer') return { ok: false, reason: 'Холодно — повернемось улітку' };
   if (state.city !== 'odesa') return { ok: false, reason: 'Жовтий камінь — в Одесі' };
@@ -760,7 +760,7 @@ function newYear(state: LifeState, before: DayInfo, after: DayInfo, events: Life
     next = withMilestone(next, 'diploma', events);
     if (next.flags.metDima) {
       next = withMilestone({ ...next, homeName: 'Квартира на Вишеньці', rent: 700, flags: { ...next.flags, livingWithDima: true } }, 'together', events);
-      events.push({ kind: 'story', text: 'Переїзд на Вишеньку: разом на роботу, разом додому 🏠' });
+      events.push({ kind: 'story', text: 'Переїзд на Вишеньку: разом на роботу, разом додому.' });
     } else {
       next = { ...next, homeName: 'Орендована квартира', rent: 1100 };
       events.push({ kind: 'story', text: 'Диплом є — гуртожиток позаду. Тепер своя орендована квартира.' });
