@@ -9,6 +9,8 @@
 import { DAY_END_MIN, dayInfo, type Season } from './sim/calendar';
 import { CITIES, JOB_BY_ID, SIGHTS, type CityId, type DecorSlot, type PersonId, type ShopId } from './sim/content';
 import { moveFurniture } from './sim/economy';
+import { RESIDENT_BY_ID, acquainted, residentsIn } from './sim/people';
+import { RESIDENT_LOOKS } from './render/residents';
 import {
   LifeRuleError,
   attendStudy,
@@ -65,6 +67,7 @@ export type Panel =
   | { kind: 'sleep' }
   | { kind: 'mom' }
   | { kind: 'dima' }
+  | { kind: 'person'; id: string }
   | { kind: 'laptop' }
   | { kind: 'decorate' };
 
@@ -127,6 +130,8 @@ export class GameController {
   map: GameMap = cityMap('zhylyntsi');
   private player: Actor = { id: 'lena', x: 0, y: 0, dir: 0, moving: false, t: 0, look: lenaLook(newLife(0)) };
   private folk: Walker[] = [];
+  /** Мешканці, з якими можна познайомитись: стоять біля свого місця. */
+  private residents: (Walker & { home: { x: number; y: number } })[] = [];
   private extras: Actor[] = [];
   private dima: Actor | null = null;
   /**
@@ -358,15 +363,40 @@ export class GameController {
     this.map = cityMap(city);
     this.place(this.map.spawns[spawnName] ?? this.map.spawns.default!);
     this.spawnFolk();
+    this.spawnResidents();
     this.setupCompanions();
     this.ui = { ...this.ui, near: null };
     this.emit();
+  }
+
+  /** Мешканці міста стоять біля свого місця й трохи прогулюються. */
+  private spawnResidents(): void {
+    const life = this.life;
+    this.residents = [];
+    if (!life || this.map.interior || !this.map.city) return;
+    const c = colliderFor(this.map);
+    for (const r of residentsIn(life, this.map.city)) {
+      const look = RESIDENT_LOOKS[r.id];
+      if (!look) continue;
+      let spot: { x: number; y: number } | null = null;
+      for (let rad = 0; rad < 6 && !spot; rad += 1) {
+        for (let dx = -rad; dx <= rad && !spot; dx += 1) {
+          for (let dy = -rad; dy <= rad && !spot; dy += 1) {
+            const f = tileFeet(r.tile[0] + dx, r.tile[1] + dy);
+            if (c.canStand(f.x, f.y)) spot = f;
+          }
+        }
+      }
+      if (!spot) continue;
+      this.residents.push({ id: `res:${r.id}`, x: spot.x, y: spot.y, dir: 0, moving: false, t: 0, look, target: null, wait: 1, speed: 18, home: spot });
+    }
   }
 
   enterHome(spawnName: 'wake' | 'door'): void {
     this.map = homeInterior(this.life!);
     this.place(this.map.spawns[spawnName]!);
     this.folk = [];
+    this.residents = [];
     this.setupCompanions();
     this.ui = { ...this.ui, near: null };
     this.emit();
@@ -540,6 +570,7 @@ export class GameController {
     if (!life) return;
     this.player.t += dt;
     this.updateFolk(dt);
+    this.updateResidents(dt);
     if (!this.blocked()) {
       this.movePlayer(dt);
       // Час іде, поки Лєна в місті.
@@ -608,6 +639,16 @@ export class GameController {
     if (!z && d && this.dimaRole !== 'arriving' && this.life?.flags.metDima && Math.hypot(d.x - this.player.x, d.y - this.player.y) < 26) {
       z = { id: 'talk:dima', x: d.x, y: d.y, w: 1, h: 1, action: { type: 'talk' }, label: 'Діма' };
     }
+    // Мешканець поруч — підійти й заговорити.
+    if (!z && this.life) {
+      const near = this.residents.find((r) => Math.hypot(r.x - this.player.x, r.y - this.player.y) < 24);
+      if (near) {
+        const id = near.id.slice(4);
+        const known = acquainted(this.life, id);
+        const who = RESIDENT_BY_ID.get(id)!;
+        z = { id: `talk:${id}`, x: near.x, y: near.y, w: 1, h: 1, action: { type: 'talk', who: id }, label: known ? who.name : who.female ? 'Незнайомка' : 'Незнайомець' };
+      }
+    }
     if (z?.id !== this.ui.near?.id) this.setUi({ near: z });
   }
 
@@ -647,6 +688,41 @@ export class GameController {
       d.moving = true;
       d.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 2 : 1) : (dy > 0 ? 0 : 3);
     } else d.moving = false;
+  }
+
+  private updateResidents(dt: number): void {
+    const c = colliderFor(this.map);
+    for (const f of this.residents) {
+      f.t += dt;
+      // Поки Лєна поруч — стоїть і дивиться на неї.
+      const dx0 = this.player.x - f.x;
+      const dy0 = this.player.y - f.y;
+      if (Math.hypot(dx0, dy0) < 40) {
+        f.moving = false;
+        f.dir = Math.abs(dx0) > Math.abs(dy0) ? (dx0 > 0 ? 2 : 1) : (dy0 > 0 ? 0 : 3);
+        continue;
+      }
+      if (f.wait > 0) { f.wait -= dt; f.moving = false; continue; }
+      if (!f.target) {
+        const r = rngFor(f.id, Math.floor(f.t * 10));
+        const tx = f.home.x + (r() - 0.5) * 48;
+        const ty = f.home.y + (r() - 0.5) * 32;
+        if (c.canStand(tx, ty)) f.target = { x: tx, y: ty };
+        else f.wait = 0.6;
+        continue;
+      }
+      const dx = f.target.x - f.x;
+      const dy = f.target.y - f.y;
+      const d = Math.hypot(dx, dy);
+      if (d < 2) { f.target = null; f.wait = 2 + (f.t % 3); f.moving = false; continue; }
+      const nx = f.x + (dx / d) * f.speed * dt;
+      const ny = f.y + (dy / d) * f.speed * dt;
+      if (!c.canStand(nx, ny)) { f.target = null; f.wait = 0.8; continue; }
+      f.x = nx;
+      f.y = ny;
+      f.moving = true;
+      f.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 2 : 1) : (dy > 0 ? 0 : 3);
+    }
   }
 
   private updateFolk(dt: number): void {
@@ -706,7 +782,7 @@ export class GameController {
     this.cameraX += (tx - this.cameraX) * 0.15;
     this.cameraY += (ty - this.cameraY) * 0.15;
     const info = dayInfo(life?.day ?? 3);
-    const actors: Actor[] = [...this.folk, ...this.extras];
+    const actors: Actor[] = [...this.folk, ...this.residents, ...this.extras];
     if (this.ui.screen === 'world') actors.push(this.player);
     if (this.dima) actors.push({ ...this.dima, emote: this.ui.celebrate ? 'heart' : null });
     renderScene(g, this.map, actors, {
@@ -811,7 +887,7 @@ export class GameController {
         this.openPanel({ kind: 'date' });
         return;
       case 'mom': this.openPanel({ kind: 'mom' }); return;
-      case 'talk': this.openPanel({ kind: 'dima' }); return;
+      case 'talk': this.openPanel(a.who ? { kind: 'person', id: a.who } : { kind: 'dima' }); return;
       case 'laptop': this.openPanel({ kind: 'laptop' }); return;
       case 'decorate': this.openPanel({ kind: 'decorate' }); return;
       case 'walk': return this.goTo(a.to);
@@ -1123,6 +1199,10 @@ export class GameController {
     }
     this.map = homeInterior(this.life!);
     this.emit();
+  }
+
+  residentLook(id: string): Look {
+    return RESIDENT_LOOKS[id] ?? DIMA;
   }
 
   dimaLook(): Look {

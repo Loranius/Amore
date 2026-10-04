@@ -188,3 +188,6 @@ body { color: var(--lg-ink); -webkit-user-select: none; user-select: none; -webk
 
 /* Стрілки облаштування кімнати. */
 .lg-arrows { display: grid; grid-template-columns: repeat(4, auto); gap: 4px; }
+
+/* Репліка мешканця. */
+.lg-quote { margin: 4px 0; font-style: italic; text-align: center; color: #5a3218; }

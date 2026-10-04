@@ -57,6 +57,20 @@ import {
   type LifeState,
 } from '../sim/life';
 import {
+  CLOSE_LEVEL,
+  COFFEE_PRICE,
+  RESIDENT_BY_ID,
+  acquainted,
+  chat,
+  coffeeCheck,
+  coffeeWith,
+  friendship,
+  giftResident,
+  lineFor,
+  meetResident,
+  relationName,
+} from '../sim/people';
+import {
   BUSINESSES,
   BUSINESS_BY_ID,
   BUSINESS_NEGLECT_DAYS,
@@ -411,6 +425,48 @@ function BusinessRow({ c, life, b }: { c: GameController; life: LifeState; b: Bu
 }
 
 // ------------------------------------------------------------
+/**
+ * Розмова з мешканцем (знайомства, 2026-10-04): познайомитись, поговорити,
+ * подарувати, а з подругою чи другом — кава вдвох.
+ */
+function PersonPanel({ c, life, id }: { c: GameController; life: LifeState; id: string }) {
+  const r = RESIDENT_BY_ID.get(id)!;
+  const known = acquainted(life, id);
+  const level = friendship(life, id);
+  const talked = life.doneToday.includes(`talk:${id}`);
+  const coffee = coffeeCheck(life, id);
+  const gifts = [...new Set(life.gifts)];
+  return (
+    <Sheet title={known ? r.name : r.female ? 'Незнайомка' : 'Незнайомець'} sub={known ? `${r.role} · ${relationName(life, id)}` : r.role} onClose={() => c.closePanel()}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+        <Portrait look={lenaLook(life)} scale={4} />
+        <Portrait look={c.residentLook(id)} scale={4} />
+      </div>
+      <p className="lg-quote">«{lineFor(life, id)}»</p>
+      {known && <Hearts n={level} />}
+      <div style={{ display: 'grid', gap: 8 }}>
+        {!known
+          ? <button type="button" className="lg-btn is-pink" onClick={() => void c.act((s) => meetResident(s, id))}>Познайомитись</button>
+          : <button type="button" className="lg-btn" disabled={talked} onClick={() => void c.act((s) => chat(s, id))}>{talked ? 'Сьогодні вже говорили' : 'Поговорити'}</button>}
+        {known && (
+          <button type="button" className="lg-btn is-paper" disabled={!coffee.ok} onClick={() => void c.act((s) => coffeeWith(s, id))} title={coffee.ok ? '' : coffee.reason}>
+            Запросити на каву · {COFFEE_PRICE} ₴{coffee.ok ? '' : ` — ${coffee.reason}`}
+          </button>
+        )}
+        {known && gifts.length > 0 && !life.doneToday.includes(`gift:${id}`) && (
+          <div className="lg-city-list">
+            {gifts.map((g) => (
+              <button key={g} type="button" className="lg-btn is-small is-paper" onClick={() => void c.act((s) => giftResident(s, id, g))}>Подарувати: {itemById(g).name}</button>
+            ))}
+          </div>
+        )}
+      </div>
+      {known && level >= CLOSE_LEVEL && <p className="lg-note">Близька дружба: кожна розмова вчить ({SKILL_NAME[r.teaches].toLowerCase()} +1).</p>}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
 /** Ноутбук удома: замовлення онлайн і свій інтернет-магазин. */
 function LaptopPanel({ c, life }: { c: GameController; life: LifeState }) {
   const left = GIGS_PER_DAY - life.doneToday.filter((d) => d === 'gig').length;
@@ -582,6 +638,20 @@ function PhonePanel({ c, life }: { c: GameController; life: LifeState }) {
           <button type="button" className="lg-btn is-pink is-small" disabled={life.dima.mode === 'follow'} onClick={() => { c.closePanel(); void c.act(callDima); }}>Дзвонити</button>
         </div>
       )}
+      {Object.keys(life.people).length > 0 && (
+        <>
+          <h3 style={{ margin: 0 }}>Знайомі</h3>
+          {Object.entries(life.people).sort((a, b) => b[1] - a[1]).map(([pid, level]) => (
+            <div key={pid} className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+              <div>
+                <div className="lg-row-title">{RESIDENT_BY_ID.get(pid)?.name}</div>
+                <div className="lg-row-sub">{relationName(life, pid)} · {CITIES[RESIDENT_BY_ID.get(pid)!.city].name}</div>
+              </div>
+              <Hearts n={level} />
+            </div>
+          ))}
+        </>
+      )}
       {(life.businesses.length > 0 || life.properties.length > 0) && (
         <div className="lg-tile">
           {life.businesses.map((owned) => <span key={owned.id}>{BUSINESS_BY_ID.get(owned.id)!.name} · рівень {owned.level}</span>)}
@@ -722,6 +792,7 @@ export function Panels({ c, life, panel }: { c: GameController; life: LifeState;
     case 'mom': return <MomPanel c={c} life={life} />;
     case 'dima': return <DimaPanel c={c} life={life} />;
     case 'laptop': return <LaptopPanel c={c} life={life} />;
+    case 'person': return <PersonPanel c={c} life={life} id={panel.id} />;
     case 'decorate': return <DecoratePanel c={c} life={life} />;
   }
 }

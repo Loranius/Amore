@@ -115,6 +115,8 @@ export interface LifeState {
   properties: string[];
   /** Де стоять меблі в кімнаті (клітинки); немає — типове місце. */
   layout: Partial<Record<DecorSlot, [number, number]>>;
+  /** Знайомства: дружба з мешканцями (id → 0..10). */
+  people: Record<string, number>;
 }
 
 export type LifeEventKind = 'toast' | 'card' | 'milestone' | 'story';
@@ -208,6 +210,7 @@ function baseState(seed: number): LifeState {
     businesses: [],
     properties: [],
     layout: {},
+    people: {},
   };
 }
 

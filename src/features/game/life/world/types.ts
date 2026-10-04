@@ -38,7 +38,7 @@ export type ZoneAction =
   | { type: 'mom' }
   | { type: 'walk'; to: CityId }
   | { type: 'wardrobe' }
-  | { type: 'talk' }
+  | { type: 'talk'; who?: string }
   | { type: 'laptop' }
   | { type: 'decorate' }
   | { type: 'info'; text: string };

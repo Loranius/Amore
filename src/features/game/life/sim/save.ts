@@ -7,6 +7,7 @@
 // гра питає, що з ним робити.
 // ============================================================
 import { CITY_IDS, ITEM_BY_ID, JOB_BY_ID, SIGHTS, type CityId, type DecorSlot } from './content';
+import { RESIDENT_BY_ID } from './people';
 import { BUSINESS_BY_ID, DEFAULT_SPOT, PROPERTY_BY_ID, type BusinessId } from './economy';
 import { MILESTONE_BY_ID, SAVE_VERSION, type LifeState } from './life';
 
@@ -54,6 +55,17 @@ function parseLayout(v: unknown): LifeState['layout'] {
   for (const [slot, at] of Object.entries(v)) {
     if (!(slot in DEFAULT_SPOT) || !Array.isArray(at) || at.length !== 2) fail(`layout.${slot}`);
     out[slot as DecorSlot] = [num(at[0], `layout.${slot}`, 0, 16), num(at[1], `layout.${slot}`, 0, 12)];
+  }
+  return out;
+}
+
+function parsePeople(v: unknown): LifeState['people'] {
+  if (v === undefined) return {};
+  if (!isObj(v)) fail('people');
+  const out: LifeState['people'] = {};
+  for (const [id, level] of Object.entries(v)) {
+    if (!RESIDENT_BY_ID.has(id)) fail(`people.${id}`);
+    out[id] = num(level, `people.${id}`, 0, 10);
   }
   return out;
 }
@@ -137,5 +149,6 @@ export function parseSave(text: string): LifeState {
     businesses: parseBusinesses(raw.businesses),
     properties: raw.properties === undefined ? [] : strList(raw.properties, 'properties', (id) => PROPERTY_BY_ID.has(id)),
     layout: parseLayout(raw.layout),
+    people: parsePeople(raw.people),
   };
 }
