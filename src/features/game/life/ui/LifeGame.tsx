@@ -18,7 +18,7 @@ import './game.css';
 const VERB: Record<Zone['action']['type'], string> = {
   duty: 'Зайти', workplace: 'Зайти', home: 'Додому', bed: 'Спати', exit: 'Вийти', station: 'Квитки', shop: 'Зайти',
   sight: 'Фото', jobs: 'Вакансії', realtor: 'Квартири', friends: 'Гратися', date: 'Побачення', lyceum: 'Зайти',
-  stone: 'Підійти', mom: 'Мама', walk: 'Іти', wardrobe: 'Шафа', info: 'Глянути', talk: 'Поговорити', laptop: 'Ноутбук', decorate: 'Облаштувати',
+  stone: 'Підійти', mom: 'Мама', walk: 'Іти', wardrobe: 'Шафа', info: 'Глянути', talk: 'Поговорити', laptop: 'Ноутбук', decorate: 'Облаштувати', activity: 'Почати',
 };
 
 const NAME: Record<Speaker, string> = { n: '', l: 'Лєна', d: 'Діма', m: 'Мама', o: 'Оля' };

@@ -40,6 +40,7 @@ export type ZoneAction =
   | { type: 'wardrobe' }
   | { type: 'talk'; who?: string }
   | { type: 'laptop' }
+  | { type: 'activity'; id: string }
   | { type: 'decorate' }
   | { type: 'info'; text: string };
 

@@ -52,6 +52,9 @@ function zhylyntsi(): GameMap {
   m.fill(1, 26, 8, 4, 'w');
   m.prop('duck', 3, 27).prop('duck', 5.5, 28.2).prop('bench', 9.3, 26.4);
   m.zone('pond', 9, 26, 3, 2, { type: 'sight', sight: 'pond' }, 'Ставок за хатою');
+  m.zone('fishing', 1, 25, 5, 1, { type: 'activity', id: 'fishing' }, 'Рибалка на ставку');
+  m.zone('garden', 2, 5, 9, 1, { type: 'activity', id: 'garden' }, 'Город · допомогти мамі');
+  m.prop('bike', 11.2, 12.4, { solid: false }).prop('flowerBed', 15, 12.2).prop('bench', 29, 13).prop('cat', 37.5, 4.6, { tint: '#e0a43c' });
   m.tree(11, 28, 'willow');
 
   // Оголошення: у селі продається будинок (нерухомість, 2026-10-04).
@@ -93,6 +96,8 @@ function pravdivka(): GameMap {
   for (let x = 1.5; x < 11; x += 2.2) for (let y = 15.5; y < 22; y += 2.4) m.prop('sunflowers', x, y);
   m.zone('field', 12, 16, 2, 4, { type: 'sight', sight: 'sunflowers' }, 'Соняшникове поле');
   m.prop('haystack', 25, 17).prop('well', 27, 13.6).prop('chicken', 24, 9).prop('chicken', 29, 9.4);
+  m.zone('mushrooms', 17, 3, 5, 1, { type: 'activity', id: 'mushrooms' }, 'Лісосмуга · по гриби');
+  m.prop('signpost', 16.2, 13.4).prop('bench', 10, 9.6).prop('flowerBed', 22, 13.4).prop('cat', 8, 13.6, { tint: '#3a3a40' });
   m.scatterTrees(0, 0, 32, 3, ['oak', 'birch', 'poplar'], 0.4, 3);
   m.scatterTrees(16, 13, 16, 11, ['apple', 'cherry', 'oak'], 0.25, 4);
   return m.build();
@@ -116,6 +121,8 @@ function khmelnytskyi(): GameMap {
   m.fill(23, 16, 19, 4, 'c');
   for (let x = 24; x < 42; x += 4) m.prop('lamp', x, 15.2, { solid: false });
   m.zone('prosk', 30, 17, 4, 2, { type: 'sight', sight: 'proskurivska' }, 'Проскурівська вулиця');
+  m.zone('concert', 25, 17, 4, 2, { type: 'activity', id: 'concert' }, 'Вуличний концерт');
+  m.prop('statue', 40, 17.6).prop('planter', 23.4, 19.6).prop('bench', 37, 19.4).prop('bike', 29.4, 19.6, { solid: false }).prop('bin', 33.2, 15.6);
   m.prop('fountain', 34.5, 20.5);
   m.building({ id: 'clothes', x: 24, y: 21, w: 5, h: 4, style: 'shop', label: 'Одяг', sign: 'shirt', roof: '#5a5aa8', action: { type: 'shop', shop: 'clothes' } });
   m.building({ id: 'books', x: 30, y: 21, w: 4, h: 4, style: 'shop', label: 'Книгарня', sign: 'book', wall: '#b8a07a', action: { type: 'shop', shop: 'books' } });
@@ -172,6 +179,8 @@ function vinnytsia(): GameMap {
   m.building({ id: 'grocery', x: 42, y: 23, w: 3, h: 4, style: 'kiosk', label: 'Продукти', sign: 'bread', action: { type: 'shop', shop: 'grocery' } });
   m.fill(25, 27, 21, 1, 'p');
   m.prop('board', 29, 8).zone('jobs', 28, 9, 3, 1, { type: 'jobs' }, 'Дошка вакансій');
+  m.building({ id: 'gym', x: 9, y: 4, w: 6, h: 5, style: 'shop', label: 'Спортзал', sign: 'star', wall: '#b8c4d0', roof: '#3a5ab5', action: { type: 'activity', id: 'gym' } });
+  m.prop('bike', 31.6, 21.6, { solid: false }).prop('bike', 32.4, 21.6, { solid: false }).prop('planter', 25.4, 13.6).prop('statue', 44, 29).prop('cat', 13, 21.4, { tint: '#f4f4f7' });
   m.building({ id: 'realtor', x: 35, y: 4, w: 5, h: 5, style: 'shop', label: 'Ріелтор', sign: 'key', wall: '#d8d2c6', action: { type: 'realtor' } });
   m.building({ id: 'block2', x: 40, y: 3, w: 5, h: 6, style: 'block', label: 'Вишенька', wall: '#e3d8c6' });
   // Набережна Бугу з фонтаном.
@@ -203,6 +212,8 @@ function kyiv(): GameMap {
   for (let x = 2; x < 46; x += 5) m.tree(x, 15, 'chestnut');
   for (let x = 4; x < 46; x += 5) m.prop('lamp', x, 19, { solid: false });
   m.zone('khreshchatyk', 18, 16, 6, 3, { type: 'sight', sight: 'khreshchatyk' }, 'Хрещатик');
+  m.prop('statue', 30, 16.4).zone('museum', 28, 17, 4, 2, { type: 'activity', id: 'museum' }, 'Музей історії · вхід');
+  m.prop('bench', 10, 17.4).prop('bench', 40, 17.4).prop('planter', 14, 18.4).prop('bike', 34, 18.6, { solid: false });
   m.building({ id: 'studio', x: 16, y: 3, w: 8, h: 6, style: 'office', label: 'Студія дизайну', sign: 'pencil', action: { type: 'workplace', job: 'designer' } });
   m.building({ id: 'realtor', x: 26, y: 4, w: 5, h: 5, style: 'shop', label: 'Ріелтор', sign: 'key', action: { type: 'realtor' } });
   m.building({ id: 'tech', x: 32, y: 4, w: 6, h: 5, style: 'shop', label: 'Техніка', sign: 'tv', wall: '#9aa4b0', action: { type: 'shop', shop: 'tech' } });
@@ -243,6 +254,8 @@ function lviv(): GameMap {
   m.building({ id: 'cafe', x: 27, y: 4, w: 5, h: 5, style: 'cafe', label: 'Кав\'ярня', sign: 'cup', action: { type: 'shop', shop: 'cafe' } });
   m.building({ id: 'souv', x: 33, y: 4, w: 6, h: 5, style: 'shop', label: 'Сувеніри', sign: 'gift', wall: '#d8b06a', action: { type: 'shop', shop: 'souvenirs' } });
   m.prop('cafeTable', 28, 9.6, { solid: false }).zone('date', 30, 9, 2, 2, { type: 'date' }, 'Побачення в кав\'ярні');
+  m.zone('coffeeMine', 33, 9, 3, 2, { type: 'activity', id: 'coffeeMine' }, 'Копальня кави');
+  m.prop('lamp', 15, 19.4, { solid: false }).prop('lamp', 25, 19.4, { solid: false }).prop('planter', 2, 19).prop('bike', 37, 18.6, { solid: false });
   m.building({ id: 'clothes', x: 1, y: 21, w: 5, h: 5, style: 'shop', label: 'Одяг', sign: 'shirt', wall: '#c4a0b8', action: { type: 'shop', shop: 'clothes' } });
   m.building({ id: 'books', x: 7, y: 21, w: 5, h: 5, style: 'shop', label: 'Книгарня', sign: 'book', wall: '#9ab0a0', action: { type: 'shop', shop: 'books' } });
   m.building({ id: 'grocery', x: 13, y: 21, w: 4, h: 5, style: 'shop', label: 'Продукти', sign: 'bread', wall: '#e3d8a8', action: { type: 'shop', shop: 'grocery' } });
@@ -280,6 +293,7 @@ function odesa(): GameMap {
   m.prop('stairs', 20, 19.3);
   m.fill(0, 20, 46, 7, 's').fill(0, 27, 46, 2, 'b').fill(0, 29, 46, 7, 'w');
   m.zone('otrada', 16, 23, 6, 3, { type: 'sight', sight: 'otrada' }, 'Пляж Отрада');
+  m.zone('swim', 22, 27, 8, 2, { type: 'activity', id: 'swim' }, 'Поплавати в морі');
   m.prop('yellowStone', 34, 23.4);
   m.zone('stone', 33, 25, 4, 2, { type: 'stone' }, 'Жовтий камінь');
   for (const [x, y, c] of [[6, 22, '#ff5d8f'], [11, 24, '#5aa7e0'], [26, 22, '#f6c14e'], [40, 24, '#7ed957']] as const) {

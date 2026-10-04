@@ -9,6 +9,7 @@
 import { DAY_END_MIN, dayInfo, type Season } from './sim/calendar';
 import { CITIES, JOB_BY_ID, SIGHTS, type CityId, type DecorSlot, type PersonId, type ShopId } from './sim/content';
 import { moveFurniture } from './sim/economy';
+import { ACTIVITY_BY_ID, activityCheck, doActivity } from './sim/activities';
 import { RESIDENT_BY_ID, acquainted, residentsIn } from './sim/people';
 import { RESIDENT_LOOKS } from './render/residents';
 import {
@@ -889,6 +890,16 @@ export class GameController {
       case 'mom': this.openPanel({ kind: 'mom' }); return;
       case 'talk': this.openPanel(a.who ? { kind: 'person', id: a.who } : { kind: 'dima' }); return;
       case 'laptop': this.openPanel({ kind: 'laptop' }); return;
+      case 'activity': {
+        const check = activityCheck(life, a.id);
+        if (!check.ok) { this.toast(check.reason); return; }
+        this.busy = true;
+        const act = ACTIVITY_BY_ID.get(a.id)!;
+        await this.showCard({ title: act.title, body: act.blurb, button: 'Далі' });
+        this.busy = false;
+        await this.attempt((s) => doActivity(s, a.id));
+        return;
+      }
       case 'decorate': this.openPanel({ kind: 'decorate' }); return;
       case 'walk': return this.goTo(a.to);
       case 'sight': return this.photo(a.sight);
