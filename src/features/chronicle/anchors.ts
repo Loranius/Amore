@@ -4,7 +4,7 @@
 // Кожен запис показує ТУ частину, яку він справді виростив за таблицею
 // ADR-0237 §3. Точки беруться з тих самих функцій геометрії, що малюють
 // об'єкт, а не вгадуються з екрана: квітка бажання — там, де квітка,
-// бічний конус плану — там, де конус.
+// тріщина лави плану — там, де вона на схилі.
 //
 // Одиниці: `object` — одиниці моделі виду, від землі під об'єктом (сцена
 // множить на масштаб кадру); `island` — частки радіуса острова (друзи
@@ -131,7 +131,7 @@ function volcanoAnchor(model: VolcanoModel, trace: ChronicleTrace): ChronicleAnc
     }
     case 'plans': {
       const vent = model.vents[trace.index % Math.max(1, model.vents.length)];
-      if (!vent) return at(crater, 0.6, 'object', 'Бічний конус з\'явиться на третьому виконаному плані');
+      if (!vent) return at(crater, 0.6, 'object', 'Тріщина лави з\'явиться на третьому виконаному плані');
       return at(onSlope(vent.azimuth, vent.at * model.height + vent.size * 0.6));
     }
     case 'memories': {
@@ -196,7 +196,7 @@ export const MODULE_TRACE: Record<'crystal' | 'tree' | 'reef', Record<ActivityKi
   },
   reef: {
     memories: 'Спогади — корали колонії свого року',
-    plans: 'Виконані плани — бічні конуси',
+    plans: 'Виконані плани — тріщини лави на схилі',
     wishes: 'Виконані бажання — актинії, колір — хто виконав',
     milestones: 'Віхи — мушлі з перлиною',
     events: 'Події живлять шар свого року',

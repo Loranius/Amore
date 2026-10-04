@@ -197,3 +197,27 @@ describe('вулкан: меш', () => {
     expect(Array.from(again.lava.positions)).toEqual(Array.from(geometry.lava.positions));
   });
 });
+
+describe('вулкан: без бічних конусів, більше граней (власник, 2026-10-04)', () => {
+  const plans = (n: number) => Array.from({ length: n }, (_, i) => ({ id: i, date: '2016-05-05' }));
+  const model = buildVolcanoModel(at('2030-10-15', { plans: plans(21) }));
+
+  it('жодна вершина каменю не стирчить зі схилу: бічних конусів немає', () => {
+    const rock = buildVolcanoGeometry(model).rock.positions;
+    for (let i = 0; i < rock.length; i += 3) {
+      const y = rock[i + 1]!;
+      if (y < 0.05 || y > model.height * 0.95) continue;
+      expect(Math.hypot(rock[i]!, rock[i + 2]!)).toBeLessThan(volcanoSlopeRadius(model, y) * 1.2);
+    }
+  });
+
+  it('кожна грань конуса — чотири трикутники, а плани лишають тріщини лави', () => {
+    const rings = volcanoRings(model);
+    const bare = buildVolcanoModel(at('2030-10-15', { plans: [] }));
+    const lavaWith = buildVolcanoGeometry(model).lava.positions.length;
+    const lavaBare = buildVolcanoGeometry(bare).lava.positions.length;
+    expect(lavaWith).toBeGreaterThan(lavaBare);
+    const cone = (rings.length - 1) * 12 * 4;
+    expect(buildVolcanoGeometry(model).rock.positions.length / 9).toBeGreaterThan(cone);
+  });
+});

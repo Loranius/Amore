@@ -29,15 +29,6 @@ type V3 = [number, number, number];
 
 const SIDES = 12;
 
-const norm = (a: V3): V3 => {
-  const l = Math.hypot(a[0], a[1], a[2]);
-  return [a[0] / l, a[1] / l, a[2] / l];
-};
-
-function onSlope(model: VolcanoModel, azimuth: number, y: number, inset = 0.97): V3 {
-  const r = volcanoSlopeRadius(model, y) * inset;
-  return [Math.cos(azimuth) * r, y, Math.sin(azimuth) * r];
-}
 
 interface Ring { y: number; key: string; points: V3[] }
 
@@ -193,39 +184,6 @@ export function volcanoRockHeat(model: VolcanoModel, veins: readonly VeinPoint[]
   return Math.min(1, heat);
 }
 
-/** Бічний конус: 7 граней, власний маленький кратер. */
-function ventTriangles(model: VolcanoModel, vent: VolcanoModel['vents'][number]): { tris: Tri[]; tone: number[]; heat: number[] } {
-  const seed = model.startDate;
-  const a = (vent.azimuth * Math.PI) / 180;
-  const y0 = vent.at * model.height;
-  const base = onSlope(model, a, y0, 0.93);
-  const out: V3 = [Math.cos(a), 0, Math.sin(a)];
-  // Конус стоїть на схилі й хилиться назовні.
-  const axis = norm([out[0] * 0.35, 1, out[2] * 0.35]);
-  const tip: V3 = [base[0] + axis[0] * vent.size, base[1] + axis[1] * vent.size, base[2] + axis[2] * vent.size];
-  const n = 7;
-  const r0 = vent.size * 0.95;
-  const r1 = vent.size * 0.28;
-  const ring = (centre: V3, r: number, tag: string): V3[] => Array.from({ length: n }, (_, i) => {
-    const t = ((i + 0.3 * (unit(seed, `${tag}:${i}`) - 0.5)) / n) * Math.PI * 2;
-    return [centre[0] + Math.cos(t) * r, centre[1] - (tag.endsWith('lo') ? 0.03 : 0), centre[2] + Math.sin(t) * r];
-  });
-  const lo = ring([base[0], base[1] - vent.size * 0.15, base[2]], r0, `vent${vent.index}:lo`);
-  const hi = ring(tip, r1, `vent${vent.index}:hi`);
-  const pit: V3 = [tip[0], tip[1] - vent.size * 0.2, tip[2]];
-  const tris: Tri[] = [];
-  const tone: number[] = [];
-  const heat: number[] = [];
-  for (let i = 0; i < n; i += 1) {
-    const j = (i + 1) % n;
-    const t = 0.8 + 0.25 * unit(seed, `vent${vent.index}:f${i}`);
-    tris.push([lo[i]!, hi[j]!, lo[j]!], [lo[i]!, hi[i]!, hi[j]!], [hi[i]!, pit, hi[j]!]);
-    tone.push(t, t * 0.95, 0.5);
-    heat.push(0, 0.35, 0.35, 0, 0.35, 0.35, 0.35, 0.9, 0.35);
-  }
-  return { tris, tone, heat };
-}
-
 /**
  * Кільця жерла. Корона — зубці через один: високі й низькі, як у
  * референсі власника; вал під нею випирає назовні.
@@ -262,16 +220,34 @@ export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: 
   const veins = volcanoVeinPaths(model);
   const tris: Tri[] = [];
   const tone: number[] = [];
+  // Кожна грань конуса — чотири трикутники довкола втиснутого центру
+  // (власник, 2026-10-04: «додай йому трикутників і трошки тіней»). Центр
+  // лише западає, ніколи не випирає: ріки лави лежать над гранями кілець і
+  // не ховаються під жоден горбик. Тон кожного трикутника свій і темнішає
+  // донизу — тінь біля підніжжя, світло біля жерла.
+  const shadeAt = (tri: Tri) => {
+    const y = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
+    return 0.74 + 0.26 * Math.min(1, Math.max(0, y / Math.max(1e-6, model.height)));
+  };
   for (let k = 0; k < rings.length - 1; k += 1) {
     const lo = rings[k]!;
     const hi = rings[k + 1]!;
     for (let i = 0; i < SIDES; i += 1) {
       const j = (i + 1) % SIDES;
+      const corners = [lo.points[i]!, hi.points[i]!, hi.points[j]!, lo.points[j]!];
+      const mid: V3 = [0, 0, 0];
+      for (const c of corners) { mid[0] += c[0] / 4; mid[1] += c[1] / 4; mid[2] += c[2] / 4; }
+      const dent = 1 - 0.045 * unit(seed, `${hi.key}:dent${i}`);
+      const lift = (unit(seed, `${hi.key}:lift${i}`) - 0.5) * 0.25 * (hi.y - lo.y);
+      const c: V3 = [mid[0] * dent, mid[1] + lift, mid[2] * dent];
       // Сильніша різниця між гранями, без горизонтальних смуг: low-poly
       // референсу читається гранями, а не поясами.
       const t = 0.72 + 0.4 * unit(seed, `${hi.key}:f${i}`);
-      tris.push([lo.points[i]!, hi.points[j]!, lo.points[j]!], [lo.points[i]!, hi.points[i]!, hi.points[j]!]);
-      tone.push(t, t * 0.96);
+      for (let q = 0; q < 4; q += 1) {
+        const tri: Tri = [corners[q]!, corners[(q + 1) % 4]!, c];
+        tris.push(tri);
+        tone.push(t * (0.86 + 0.24 * unit(seed, `${hi.key}:f${i}:${q}`)) * shadeAt(tri));
+      }
     }
   }
   // Жерло — кам'яне: комір → вал, що випирає назовні → рівна губа →
@@ -296,12 +272,6 @@ export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: 
   // Вал і губа теплі; внутрішня стінка жерла підсвічена лавою знизу.
   for (let k = (innerFrom - SIDES * 4) * 3; k < innerFrom * 3; k += 1) heat[k] = Math.max(heat[k]!, 0.35);
   for (let k = innerFrom * 3; k < heat.length; k += 1) heat[k] = Math.max(heat[k]!, 0.75);
-  for (const vent of model.vents) {
-    const v = ventTriangles(model, vent);
-    tris.push(...v.tris);
-    tone.push(...v.tone);
-    heat.push(...v.heat);
-  }
   const ledges = volcanoLedges(model);
   for (const tri of ledges.tris) for (const v of tri) heat.push(volcanoRockHeat(model, veins, v));
   tris.push(...ledges.tris);
@@ -427,19 +397,37 @@ export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
       prev = point;
     }
   }
-  // Кратери бічних конусів тліють.
+  // Виконані плани — тріщини лави на схилі (ADR-0237, поправка
+  // 2026-10-04): власник прибрав бічні конуси, але план не зникає зі
+  // світу вулкана — він лишає жевріючу зигзагом розколину там, де стояв
+  // конус. Тріщина лежить трохи над справжньою гранню, щоб жодна її не
+  // перекрила.
+  const rings = volcanoRings(model);
   for (const vent of model.vents) {
     const a = (vent.azimuth * Math.PI) / 180;
-    const base = onSlope(model, a, vent.at * model.height, 0.93);
-    const axis = norm([Math.cos(a) * 0.35, 1, Math.sin(a) * 0.35]);
-    const c: V3 = [base[0] + axis[0] * vent.size * 0.85, base[1] + axis[1] * vent.size * 0.85, base[2] + axis[2] * vent.size * 0.85];
-    const r = vent.size * 0.22;
-    for (let i = 0; i < 6; i += 1) {
-      const t0 = (i / 6) * Math.PI * 2;
-      const t1 = ((i + 1) / 6) * Math.PI * 2;
-      push(c, 0.95);
-      push([c[0] + Math.cos(t1) * r, c[1], c[2] + Math.sin(t1) * r], 0.7);
-      push([c[0] + Math.cos(t0) * r, c[1], c[2] + Math.sin(t0) * r], 0.7);
+    const y0 = vent.at * model.height;
+    const len = vent.size * 1.3;
+    const width = vent.size * 0.13;
+    const side: V3 = [-Math.sin(a), 0, Math.cos(a)];
+    const N = 6;
+    const spine = Array.from({ length: N + 1 }, (_, k) => {
+      const y = y0 + len * (0.55 - k / N);
+      const r = volcanoConeRadiusAt(rings, a, y) * 1.015;
+      const zig = (k % 2 === 0 ? 1 : -1) * width * 0.8 * (0.5 + unit(model.startDate, `fissure${vent.index}:${k}`));
+      const w = width * Math.sin(((k + 0.5) / (N + 1)) * Math.PI);
+      return { at: [Math.cos(a) * r + side[0] * zig, y, Math.sin(a) * r + side[2] * zig] as V3, w };
+    });
+    for (let k = 0; k < N; k += 1) {
+      const p0 = spine[k]!;
+      const p1 = spine[k + 1]!;
+      const l0: V3 = [p0.at[0] + side[0] * p0.w, p0.at[1], p0.at[2] + side[2] * p0.w];
+      const r0: V3 = [p0.at[0] - side[0] * p0.w, p0.at[1], p0.at[2] - side[2] * p0.w];
+      const l1: V3 = [p1.at[0] + side[0] * p1.w, p1.at[1], p1.at[2] + side[2] * p1.w];
+      const r1: V3 = [p1.at[0] - side[0] * p1.w, p1.at[1], p1.at[2] - side[2] * p1.w];
+      push(l0, 0.7); push(l1, 0.7); push(p0.at, 1);
+      push(p0.at, 1); push(l1, 0.7); push(p1.at, 1);
+      push(r0, 0.7); push(p0.at, 1); push(r1, 0.7);
+      push(p0.at, 1); push(p1.at, 1); push(r1, 0.7);
     }
   }
   return { positions: new Float32Array(p), heat: new Float32Array(h), flow: new Float32Array(f) };

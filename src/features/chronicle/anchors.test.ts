@@ -50,7 +50,7 @@ describe('опорні точки хроніки', () => {
     expect(limbEnds).toContainEqual(chronicleAnchor(subject, plan).point);
   });
 
-  it('вулкан: бажання — до своєї актинії; план без конусів чесно каже, куди дивиться замість нього', () => {
+  it('вулкан: бажання — до своєї актинії; план без тріщин чесно каже, куди дивиться замість нього', () => {
     const model = buildVolcanoModel(BUSY);
     const orn = volcanoOrnaments(model);
     const wish = traces.filter((t) => t.kind === 'wishes').at(-1)!;
@@ -58,7 +58,7 @@ describe('опорні точки хроніки', () => {
     expect(chronicleAnchor({ species: 'reef', model }, wish).point).toEqual(orn.anemones[k]!.position);
     const bare = buildVolcanoModel({ ...BUSY, plans: [] });
     const plan = { kind: 'plans' as const, id: 1, date: BUSY.asOf.slice(0, 10), year: 0, index: 0 };
-    expect(chronicleAnchor({ species: 'reef', model: bare }, plan).note).toMatch(/конус/);
+    expect(chronicleAnchor({ species: 'reef', model: bare }, plan).note).toMatch(/[Тт]ріщин/);
   });
 
   it('кристал: вихідний — до своєї друзи на острові', () => {
