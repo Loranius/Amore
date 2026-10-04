@@ -440,9 +440,9 @@ export function treeV2WoodSegment(b: TreeV2Branch): { start: V3; end: V3 } {
 }
 
 /** Пласкі трикутники призми, закручені НАЗОВНІ (перевіряє тест). */
-function prism(start: V3, end: V3, r0: number, r1: number, sides: number): V3[][] {
+function prism(start: V3, end: V3, r0: number, r1: number, sides: number, frame?: V3, cap = false): V3[][] {
   const d = norm([end[0] - start[0], end[1] - start[1], end[2] - start[2]]);
-  const [a, b] = basis(d);
+  const [a, b] = frame ? [frame, cross(d, frame)] : basis(d);
   const ring0: V3[] = [];
   const ring1: V3[] = [];
   for (let i = 0; i < sides; i += 1) {
@@ -456,7 +456,54 @@ function prism(start: V3, end: V3, r0: number, r1: number, sides: number): V3[][
     const j = (i + 1) % sides;
     tris.push([ring0[i]!, ring0[j]!, ring1[j]!], [ring0[i]!, ring1[j]!, ring1[i]!]);
   }
+  // Кінчик закритий низьким конусом: відкрита труба знизу читається як
+  // зрізаний короб (власник, 2026-10-04: «проблема у верхній частині дерева»).
+  if (cap) {
+    const tip = add(end, mul(d, r1 * 1.1));
+    for (let i = 0; i < sides; i += 1) tris.push([ring1[i]!, ring1[(i + 1) % sides]!, tip]);
+  }
   return tris;
+}
+
+/**
+ * Грані деревини йдуть одна в одну через стик (власник, 2026-10-04).
+ *
+ * Шестигранна призма кожної гілки досі брала довільний базис зі свого
+ * напрямку, тож грань №k гілки дивилась кудись інакше, ніж грань №k її
+ * батьківської: на стику ребра не сходились, світло стрибало, і продовження
+ * читалось окремим коробом. Тепер базис ПЕРЕНОСИТЬСЯ від батьківської гілки
+ * (паралельне перенесення: її вісь «a» проєктується на площину, перпендикулярну
+ * до нової осі). Батько — гілка, з кінця якої росте ця; для гілок року й
+ * верхівки — сегмент стовбура на тій висоті.
+ */
+export function treeV2WoodFrames(branches: readonly TreeV2Branch[]): Map<string, V3> {
+  const frames = new Map<string, V3>();
+  const trunk = branches.filter((b) => b.order === 0);
+  const parentOf = (b: TreeV2Branch): string | null => {
+    const dot = b.key.lastIndexOf('.');
+    if (dot > 0) return b.key.slice(0, dot);
+    if (b.order === 0) {
+      const i = trunk.indexOf(b);
+      return i > 0 ? trunk[i - 1]!.key : null;
+    }
+    // Гілка від стовбура: сегмент, що закінчується найближче до її початку.
+    let best: TreeV2Branch | null = null;
+    for (const t of trunk) if (!best || Math.abs(t.end[1] - b.start[1]) < Math.abs(best.end[1] - b.start[1])) best = t;
+    return best?.key ?? null;
+  };
+  for (const b of branches) {
+    const d = norm([b.end[0] - b.start[0], b.end[1] - b.start[1], b.end[2] - b.start[2]]);
+    const parent = parentOf(b);
+    const up = parent === null ? undefined : frames.get(parent);
+    let a: V3 | null = null;
+    if (up) {
+      const k = up[0] * d[0] + up[1] * d[1] + up[2] * d[2];
+      const p: V3 = [up[0] - k * d[0], up[1] - k * d[1], up[2] - k * d[2]];
+      if (Math.hypot(p[0], p[1], p[2]) > 1e-3) a = norm(p);
+    }
+    frames.set(b.key, a ?? basis(d)[0]);
+  }
+  return frames;
 }
 
 
@@ -472,7 +519,12 @@ export interface TreeV2Geometry {
    * RGB 0..1); `sway` — 0 там, де прикраса тримається, … 1 на кінчику, для
    * вітру в шейдері. Каналу «хто виконав» немає: це мова кристала.
    */
-  wishes: { positions: Float32Array; colour: Float32Array; sway: Float32Array };
+  /**
+   * `anchor` — точка, якою прикраса тримається за крону (однакова для всіх
+   * вершин однієї прикраси). Шейдер зсуває прикрасу тим самим вітром, що й
+   * листя в цій точці, тож квітка не ховається під кроною, коли та гойдається.
+   */
+  wishes: { positions: Float32Array; colour: Float32Array; sway: Float32Array; anchor: Float32Array };
   fruits: Float32Array;
   fireflies: Float32Array;
   flowers: { positions: Float32Array; tint: Float32Array };
@@ -618,7 +670,9 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   const woodTone: number[] = [];
   const pushTris = (tris: V3[][], out: number[], tones: number[], tone: (face: number) => number) => {
     tris.forEach((tri, k) => {
-      const value = tone(Math.floor(k / 2));
+      // Дві трикутники на грань призми, далі — по одному на грань ковпачка;
+      // ковпачок бере тон своєї грані, тож кінчик не плямистий.
+      const value = tone(k < 12 ? Math.floor(k / 2) : k - 12);
       for (const p of tri) {
         out.push(p[0], p[1], p[2]);
         tones.push(value);
@@ -631,14 +685,19 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   // верх не стирчить «обрубком» товщим за крону.
   const spruceTop = FORMS.spruce.top * model.height - 0.04 * model.height;
   const taper = (y: number) => Math.max(0.3, 1.12 - y / Math.max(1e-6, spruceTop));
+  const frames = treeV2WoodFrames(branches);
+  const topTrunk = branches.filter((x) => x.order === 0).at(-1);
   for (const b of spruce ? branches.filter((x) => x.order === 0 && x.start[1] < spruceTop) : branches) {
     const seg = treeV2WoodSegment(b);
     if (spruce) {
       const end: V3 = b.end[1] > spruceTop ? trunkAt(norm([b.end[0] - b.start[0], b.end[1] - b.start[1], b.end[2] - b.start[2]]), spruceTop) : b.end;
-      pushTris(prism(seg.start, end, b.r0 * taper(b.start[1]), b.r1 * taper(end[1]), 6), wood, woodTone, (face) => 0.86 + 0.28 * unit(seed, `bark:${face}`));
+      pushTris(prism(seg.start, end, b.r0 * taper(b.start[1]), b.r1 * taper(end[1]), 6, frames.get(b.key), true), wood, woodTone, (face) => 0.86 + 0.28 * unit(seed, `bark:${face}`));
       continue;
     }
-    pushTris(prism(seg.start, seg.end, b.r0, b.r1, 6), wood, woodTone, (face) => 0.86 + 0.28 * unit(seed, `bark:${face}`));
+    // Верхній сегмент стовбура звужується до товщини гілок верхівки (0.6):
+    // інакше над розвилкою стирчало широке «плече» стовбура.
+    const r1 = b === topTrunk ? b.r1 * 0.6 : b.r1;
+    pushTris(prism(seg.start, seg.end, b.r0, r1, 6, frames.get(b.key), true), wood, woodTone, (face) => 0.86 + 0.28 * unit(seed, `bark:${face}`));
   }
   for (const r of treeV2Roots(model)) {
     pushTris(prism(r.start, r.end, r.r0, r.r1, 5), wood, woodTone, (face) => 0.75 + 0.3 * unit(seed, `${r.key}:w${face}`));
@@ -678,17 +737,25 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     const n = parseInt(hex.slice(1), 16);
     return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
   };
-  const tri = (a: V3, b: V3, c: V3, col: V3, sa = 0, sb = 0, sc = 0) => {
-    for (const [p, s] of [[a, sa], [b, sb], [c, sc]] as const) {
-      wishPos.push(p[0], p[1], p[2]);
-      wishCol.push(col[0], col[1], col[2]);
-      wishSway.push(s);
-    }
+  const wishAnchor: number[] = [];
+  let anchor: V3 = [0, 0, 0];
+  const vert = (p: V3, col: V3, sway: number) => {
+    wishPos.push(p[0], p[1], p[2]);
+    wishCol.push(col[0], col[1], col[2]);
+    wishSway.push(sway);
+    wishAnchor.push(anchor[0], anchor[1], anchor[2]);
   };
+  const tri = (a: V3, b: V3, c: V3, col: V3, sa = 0, sb = 0, sc = 0) => {
+    vert(a, col, sa);
+    vert(b, col, sb);
+    vert(c, col, sc);
+  };
+  const mix = (x: V3, y: V3, t: number): V3 => [x[0] + (y[0] - x[0]) * t, x[1] + (y[1] - x[1]) * t, x[2] + (y[2] - x[2]) * t];
   // Прикрасу видно з відстані камери: яблуко завбільшки з кулачок листя.
   const size = Math.max(0.08, model.height * 0.045);
   const flowerSpots = form === 'sakura' ? treeV2SakuraFlowerSpots(model, clusters, model.blossoms.length) : [];
   treeV2WishPoints(model, form, { branches, clusters }).forEach((p, k) => {
+    anchor = p;
     const phi = 2 * Math.PI * unit(seed, `wish${k}:phi`);
     const out: V3 = [Math.cos(phi), 0, Math.sin(phi)];
     if (form === 'oak') {
@@ -713,31 +780,47 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
       tri(p, add(add(p, mul(out, size * 0.28)), [0, size * 0.12, 0]), leafTip, green, 0, 0.3, 0.5);
       tri(p, leafTip, add(add(p, mul(out, size * 0.28)), [0, -size * 0.14, 0]), rgb('#3f8a32'), 0, 0.5, 0.3);
     } else if (form === 'sakura') {
-      // Квітка: п'ять пелюсток і жовта серединка, лежить на грані листя
-      // (у її площині), трохи піднята, щоб не мерехтіла з нею.
+      // Квітка сакури (власник, 2026-10-04: «перемалювати на ніжніші й
+      // кругліші, як квіти сакури»): п'ять круглих пелюсток із виїмкою на
+      // кінчику, блідо-рожеві, темніші до серця; трохи чашею. Серце —
+      // рожеве, з тичинками з жовтими кінчиками. Лежить на грані листя.
       const n = flowerSpots[k]?.normal ?? norm([out[0], 0.9, out[2]]);
       const [u, v] = basis(n);
-      // Крона сакури блідо-рожева: квітка бажання — насичено-рожева зі
-      // світлими кінчиками й жовтою серединкою, інакше її не видно.
-      const R = size * 1.3;
+      const R = size * 1.05;
       const centre: V3 = add(p, mul(n, size * 0.03));
-      const petal = rgb('#ff5d8f');
-      const tip = rgb('#ffc2d6');
+      const dir = (a: number) => add(mul(u, Math.cos(a)), mul(v, Math.sin(a)));
+      const at = (a: number, f: number): V3 => add(add(centre, mul(dir(a), R * f)), mul(n, R * 0.2 * f * f));
+      const base = rgb('#f48fb1');
+      const blush = rgb('#ffd3e2');
+      const edge = rgb('#fff3f7');
+      const shade = (f: number) => (f < 0.6 ? mix(base, blush, f / 0.6) : mix(blush, edge, (f - 0.6) / 0.4));
+      // Обрис пелюстки: [кут від осі, частка радіуса]; посередині — виїмка.
+      const outline: [number, number][] = [[-0.46, 0.3], [-0.55, 0.56], [-0.5, 0.8], [-0.34, 0.96], [-0.15, 1], [0, 0.87], [0.15, 1], [0.34, 0.96], [0.5, 0.8], [0.55, 0.56], [0.46, 0.3]];
       for (let q = 0; q < 5; q += 1) {
         const a0 = phi + (q / 5) * Math.PI * 2;
-        const dir = (a: number) => add(mul(u, Math.cos(a)), mul(v, Math.sin(a)));
-        const mid = add(centre, mul(dir(a0), R));
-        const l = add(centre, mul(dir(a0 - 0.5), R * 0.62));
-        const rr = add(centre, mul(dir(a0 + 0.5), R * 0.62));
-        tri(centre, l, mid, petal, 0, 0.6, 1);
-        tri(centre, mid, rr, tip, 0, 1, 0.6);
+        for (let i = 0; i + 1 < outline.length; i += 1) {
+          const [oa, fa] = outline[i]!;
+          const [ob, fb] = outline[i + 1]!;
+          vert(centre, base, 0);
+          vert(at(a0 + oa, fa), shade(fa), 0);
+          vert(at(a0 + ob, fb), shade(fb), 0);
+        }
       }
-      const yellow = rgb('#f6c14e');
-      for (let q = 0; q < 5; q += 1) {
-        const a0 = (q / 5) * Math.PI * 2;
-        const a1 = ((q + 1) / 5) * Math.PI * 2;
-        const raised = add(centre, mul(n, size * 0.06));
-        tri(raised, add(raised, add(mul(u, Math.cos(a0) * R * 0.22), mul(v, Math.sin(a0) * R * 0.22))), add(raised, add(mul(u, Math.cos(a1) * R * 0.22), mul(v, Math.sin(a1) * R * 0.22))), yellow);
+      const heart = rgb('#e8668f');
+      const raised = add(centre, mul(n, R * 0.06));
+      for (let q = 0; q < 6; q += 1) {
+        const a0 = phi + (q / 6) * Math.PI * 2;
+        const a1 = phi + ((q + 1) / 6) * Math.PI * 2;
+        tri(raised, add(raised, mul(dir(a0), R * 0.15)), add(raised, mul(dir(a1), R * 0.15)), heart);
+      }
+      const stamen = rgb('#e05a86');
+      const pollen = rgb('#ffd36b');
+      for (let q = 0; q < 8; q += 1) {
+        const a0 = phi + 0.2 + (q / 8) * Math.PI * 2;
+        const tip = add(add(raised, mul(dir(a0), R * 0.38)), mul(n, R * 0.12));
+        vert(add(raised, mul(dir(a0 - 0.12), R * 0.1)), stamen, 0);
+        vert(add(raised, mul(dir(a0 + 0.12), R * 0.1)), stamen, 0);
+        vert(tip, pollen, 0);
       }
     } else {
       // Шишка: витягнутий лускатий конус, що звисає кінчиком донизу.
@@ -772,7 +855,7 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   return {
     wood: { positions: new Float32Array(wood), tone: new Float32Array(woodTone) },
     leaves: { positions: new Float32Array(leaves), tone: new Float32Array(leafTone), autumn: new Float32Array(leafAutumn) },
-    wishes: { positions: new Float32Array(wishPos), colour: new Float32Array(wishCol), sway: new Float32Array(wishSway) },
+    wishes: { positions: new Float32Array(wishPos), colour: new Float32Array(wishCol), sway: new Float32Array(wishSway), anchor: new Float32Array(wishAnchor) },
     fruits: new Float32Array(orn.fruits.flat()),
     fireflies: new Float32Array(orn.fireflies.flat()),
     flowers: {

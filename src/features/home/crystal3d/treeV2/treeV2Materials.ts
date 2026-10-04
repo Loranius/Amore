@@ -235,27 +235,42 @@ export function createBlossomMaterial(colours: readonly string[] = BLOSSOM_COLOU
  * Плоди й квіти бажань (яблука, квітки сакури, шишки): колір на вершину,
  * пласке освітлення граней і легке гойдання від точки, де прикраса тримається.
  */
-export function createWishMaterial(): THREE.ShaderMaterial {
+export function createWishMaterial(ground: number): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
-    uniforms: { uTime: { value: 0 }, uWind: { value: 1 } },
+    uniforms: { uTime: { value: 0 }, uWind: { value: 1 }, uGround: { value: ground } },
     vertexShader: /* glsl */ `
       attribute vec3 colour;
       attribute float sway;
+      attribute vec3 anchor;
       uniform float uTime;
       uniform float uWind;
+      uniform float uGround;
       varying vec3 vWorld;
       varying vec3 vColour;
       void main() {
         vec4 w = modelMatrix * vec4(position, 1.0);
+        // Прикраса їде разом із листям, за яке тримається: той самий вітер,
+        // що в \`createLeafMaterial\`, узятий у точці кріплення. Без цього
+        // крона й квітка гойдались кожна по-своєму, і квітка пірнала під
+        // листя (власник, 2026-10-04).
+        vec4 a = modelMatrix * vec4(anchor, 1.0);
+        float lift = max(0.0, a.y - uGround);
+        float phase = a.x * 1.7 + a.z * 1.3;
+        w.x += sin(uTime * 1.1 + phase) * 0.018 * lift * uWind;
+        w.z += cos(uTime * 0.9 + phase) * 0.012 * lift * uWind;
         float s = sway * uWind;
-        w.x += sin(uTime * 1.4 + w.y * 7.0 + w.z * 3.0) * 0.012 * s;
-        w.z += cos(uTime * 1.1 + w.x * 5.0) * 0.01 * s;
+        w.x += sin(uTime * 1.4 + a.y * 7.0 + a.z * 3.0) * 0.012 * s;
+        w.z += cos(uTime * 1.1 + a.x * 5.0) * 0.01 * s;
         vWorld = w.xyz;
         // Кольори вершин записані в sRGB; рендер чекає лінійних — інакше
         // червоне яблуко вицвітає до рожевого, а рожева квітка до білої.
         vColour = pow(colour, vec3(2.2));
-        gl_Position = projectionMatrix * viewMatrix * w;
+        // Трохи ближче до камери: прикраса лежить НА листі, і там, де грань
+        // кулачка вигинається, листя не має права її перекрити.
+        vec4 view = viewMatrix * w;
+        view.xyz += normalize(-view.xyz) * 0.02;
+        gl_Position = projectionMatrix * view;
       }
     `,
     fragmentShader: /* glsl */ `

@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CRYSTAL_FORMS, buildCrystalV2Geometry } from '../crystalV2/geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from '../crystalV2/model';
-import { TREE_FORMS, buildTreeV2Geometry, treeV2Skeleton, treeV2SpruceSkirts, treeV2WishPoints } from '../treeV2/geometry';
+import { TREE_FORMS, buildTreeV2Geometry, treeV2Roots, treeV2Skeleton, treeV2SpruceSkirts, treeV2WishPoints, treeV2WoodFrames } from '../treeV2/geometry';
 import { buildTreeV2Model } from '../treeV2/model';
 
 // ============================================================
@@ -103,6 +103,48 @@ describe('форми дерева: той самий ріст, інший мал
     expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan((Math.max(...crown) - Math.min(...crown)) * 0.5);
     const sides = new Set(flowers.map((p) => Math.floor(((Math.atan2(p[2], p[0]) + Math.PI) / (2 * Math.PI)) * 4) % 4));
     expect(sides.size).toBe(4);
+  });
+
+  it('деревина без коробів: грані продовження йдуть з гранями батьківської, кінчики закриті (власник, 2026-10-04)', () => {
+    for (const form of TREE_FORMS) {
+      const { branches } = treeV2Skeleton(model, form);
+      const frames = treeV2WoodFrames(branches);
+      const dirOf = (b: (typeof branches)[number]) => {
+        const d = [b.end[0] - b.start[0], b.end[1] - b.start[1], b.end[2] - b.start[2]];
+        const l = Math.hypot(d[0]!, d[1]!, d[2]!);
+        return d.map((x) => x / l);
+      };
+      const byKey = new Map(branches.map((b) => [b.key, b]));
+      for (const b of branches) {
+        const a = frames.get(b.key)!;
+        const d = dirOf(b);
+        // Вісь грані лежить поперек гілки.
+        expect(Math.abs(a[0] * d[0]! + a[1] * d[1]! + a[2] * d[2]!)).toBeLessThan(1e-9);
+        const dot = b.key.lastIndexOf('.');
+        if (dot < 0) continue;
+        const parent = byKey.get(b.key.slice(0, dot))!;
+        const pa = frames.get(parent.key)!;
+        const pd = dirOf(parent);
+        // Паралельне перенесення: грань повертається не більше, ніж сама гілка.
+        const bend = pd[0]! * d[0]! + pd[1]! * d[1]! + pd[2]! * d[2]!;
+        expect(pa[0] * a[0] + pa[1] * a[1] + pa[2] * a[2]).toBeGreaterThanOrEqual(bend - 1e-9);
+      }
+    }
+    // Кожна гілка — 12 трикутників боків і 6 ковпачка; корені — 10.
+    const oak = buildTreeV2Geometry(model, 'oak');
+    const { branches } = treeV2Skeleton(model, 'oak');
+    expect(oak.wood.positions.length / 9).toBe(branches.length * 18 + treeV2Roots(model).length * 10);
+  });
+
+  it('квітка сакури тримається за листя: одна точка кріплення на квітку, власного гойдання немає', () => {
+    const g = buildTreeV2Geometry(model, 'sakura');
+    const points = treeV2WishPoints(model, 'sakura');
+    const anchors = new Set<string>();
+    for (let i = 0; i < g.wishes.anchor.length; i += 3) anchors.add(Array.from(g.wishes.anchor.slice(i, i + 3)).map((x) => x.toFixed(5)).join(','));
+    expect(anchors).toEqual(new Set(points.map((p) => p.map((x) => Math.fround(x).toFixed(5)).join(','))));
+    expect(Array.from(g.wishes.sway).every((x) => x === 0)).toBe(true);
+    // Кругла квітка: п'ять пелюсток по десять клинців обрису.
+    expect(g.wishes.positions.length / 9 / points.length).toBeGreaterThanOrEqual(50);
   });
 
   it('бажання на дереві — за формою: яблука на дубі, квітки на сакурі, шишки на ялині (власник, 2026-10-04)', () => {

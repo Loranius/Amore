@@ -127,6 +127,7 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     g.setAttribute('position', new THREE.BufferAttribute(geometry.wishes.positions, 3));
     g.setAttribute('colour', new THREE.BufferAttribute(geometry.wishes.colour, 3));
     g.setAttribute('sway', new THREE.BufferAttribute(geometry.wishes.sway, 1));
+    g.setAttribute('anchor', new THREE.BufferAttribute(geometry.wishes.anchor, 3));
     return g;
   }, [geometry]);
   const flowers = useMemo(
@@ -147,7 +148,7 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     grass: createGrassMaterial(palette),
     wood: createWoodMaterial(palette),
     leaves: createLeafMaterial(palette, PORTAL_GROUND_Y),
-    blossoms: createWishMaterial(),
+    blossoms: createWishMaterial(PORTAL_GROUND_Y),
     flowers: createBlossomMaterial(FLOWER_COLOURS),
     fruits: createGlowPointsMaterial('#ffc94a', 1.3, 0.3, false),
     fireflies: createGlowPointsMaterial(palette.firefly, palette.fireflyStrength, 0.12, true),
