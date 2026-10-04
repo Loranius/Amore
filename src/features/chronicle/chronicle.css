@@ -1,0 +1,144 @@
+/* ============================================================
+   Хроніка росту (ADR-0238) — шторка над доком.
+   Без розмиття (One Blur Rule): тло — щільна поверхня світу, тож об'єкт над
+   шторкою лишається чистим, а текст на ній читається завжди.
+   ============================================================ */
+.chronicle {
+  position: fixed;
+  /* Над круглою кнопкою світу в куті: шторка — те, з чим пара зараз говорить. */
+  z-index: 12;
+  left: 12px;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--fab-lift, 92px));
+  max-height: min(46vh, 440px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 16px 14px;
+  border-radius: var(--radius-lg);
+  /* На головній `--surface` — м'яка напівпрозора поверхня світу; шторці,
+     де читають список, потрібна щільна. */
+  background: var(--world-surface-strong, var(--surface));
+  color: var(--text);
+  box-shadow: var(--glass-edge), 0 18px 40px rgb(0 0 0 / 0.22);
+  overflow: hidden;
+  /* Головна пропускає дотики крізь вміст до сцени (`artifactWorld.css`),
+     щоб об'єкт крутився пальцем; шторка — вміст, з яким говорять руками. */
+  pointer-events: auto;
+  animation: chronicle-rise 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes chronicle-rise {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@media (min-width: 760px) {
+  .chronicle { left: auto; right: 24px; width: 420px; }
+}
+
+.chronicle-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.chronicle-head .modal-close { position: static; flex: none; }
+.chronicle-title { margin: 0; font-size: 18px; font-weight: 800; }
+.chronicle-when { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+.chronicle-time { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 10px; }
+.chronicle-range { width: 100%; accent-color: var(--accent); }
+.chronicle-edge {
+  appearance: none;
+  border: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-1);
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.chronicle-edge[aria-pressed='true'] { color: var(--accent); }
+
+.chronicle-kinds {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -16px;
+  padding: 0 16px 2px;
+}
+.chronicle-kinds::-webkit-scrollbar { display: none; }
+.chronicle-kind {
+  appearance: none;
+  border: 0;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  border-radius: var(--radius-pill);
+  background: var(--glass-1);
+  box-shadow: var(--glass-edge);
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+.chronicle-kind.is-on { background-color: var(--accent-strong); color: #fff; }
+.chronicle-count { font-weight: 600; opacity: 0.75; }
+.chronicle-empty { margin: 0; color: var(--muted); font-size: 13px; }
+
+.chronicle-list-wrap { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.chronicle-trace { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
+.chronicle-note { margin: 0 0 6px; color: var(--accent); font-size: 12px; }
+.chronicle-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
+.chronicle-item {
+  appearance: none;
+  border: 0;
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 9px 10px;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.chronicle-item.is-on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.chronicle-item-title { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chronicle-item-date { flex: none; color: var(--muted); font-size: 12px; }
+.chronicle-more {
+  appearance: none;
+  border: 0;
+  margin-top: 6px;
+  padding: 8px;
+  width: 100%;
+  border-radius: var(--radius-md);
+  background: var(--glass-1);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chronicle-edge:focus-visible,
+.chronicle-kind:focus-visible,
+.chronicle-item:focus-visible,
+.chronicle-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* Поки відкрита хроніка, назва виду не лежить на наближеному об'єкті. */
+.home-title { transition: opacity 0.3s ease; }
+.home[data-chronicle='open'] .home-title { opacity: 0; }
+
+/* Кнопка конструктора (лише власнику) стоїть у тому самому куті, що й
+   шторка; поки відкрита хроніка, вона їй не потрібна. */
+body:has(.chronicle) .evolution-constructor-fab { visibility: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .chronicle { animation: none; }
+  .chronicle-kind,
+  .home-title { transition: none; }
+}

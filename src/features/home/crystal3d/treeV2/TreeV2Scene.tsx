@@ -1,3 +1,8 @@
+import { buildTreeV2Geometry } from '@/engine/species/treeV2/geometry';
+import { buildTreeV2Model } from '@/engine/species/treeV2/model';
+import { useChronicleScene, type ChroniclePlacement } from '@/features/chronicle/useChronicleScene';
+import { PORTAL_GROUND_Y } from '../scene/portalScene';
+import { treeIslandBase } from './treeIsland';
 import { useArtifactForms } from '@/features/world/artifactForms';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -61,6 +66,22 @@ export default function TreeV2Scene() {
   // Острів того самого розміру, що в кристала й рифу (ADR-0220).
   const island = frame ? dioramaIslandRadius(frame.reach * 0.9) : 0;
 
+  // Хроніка росту (ADR-0238): дотик по дереву, камера огляду й дерево на
+  // дату з повзунка при сьогоднішньому кадрі.
+  const placement = useMemo<ChroniclePlacement | null>(() => {
+    if (!frame) return null;
+    const base = PORTAL_GROUND_Y + treeIslandBase(island);
+    return {
+      object: ([x, y, z]) => [x * frame.scale, base + y * frame.scale, z * frame.scale],
+      island: ([x, y, z]) => [x * island, PORTAL_GROUND_Y + y * island, z * island],
+    };
+  }, [frame, island]);
+  const chronicle = useChronicleScene('tree', snapshot, region === 'centre', placement);
+  const shownGeometry = useMemo(() => {
+    if (!state || !chronicle.asOf) return state?.geometry ?? null;
+    return buildTreeV2Geometry(buildTreeV2Model({ ...state.snapshot, asOf: chronicle.asOf }), form);
+  }, [state, chronicle.asOf, form]);
+
   if (error) {
     console.error('[Tree v2] rollback to the previous tree:', error);
     return (
@@ -69,7 +90,7 @@ export default function TreeV2Scene() {
       </Suspense>
     );
   }
-  if (isPending || !state || !frame) return <CrystalPlaceholder />;
+  if (isPending || !state || !frame || !shownGeometry) return <CrystalPlaceholder />;
 
   const { model } = state;
   return (
@@ -108,16 +129,18 @@ export default function TreeV2Scene() {
           allowOrbit={region === 'centre'}
           freeCamera={freeCameraActive}
           motionMode={motionMode}
+          inspect={chronicle.inspect}
           world="none"
         >
           <TreeV2World
             seed={model.startDate}
-            geometry={state.geometry}
+            geometry={shownGeometry}
             scale={frame.scale}
             theme={theme}
             reduceMotion={reduceMotion}
             island={island}
             form={form}
+            treeEvents={chronicle.tap}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

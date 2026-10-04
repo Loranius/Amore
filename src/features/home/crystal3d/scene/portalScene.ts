@@ -388,6 +388,15 @@ export function portalCameraView(
 }
 
 /**
+ * Поза, що дивиться на висоту `y` сцени — обернене до `targetY` у
+ * `portalCameraView`. Потрібне хроніці росту (ADR-0238): камера веде до
+ * частини об'єкта, а поза знає лише частку висоти артефакта.
+ */
+export function portalTargetShareAt(frame: PortalCameraFrame, y: number): number {
+  return TARGET_SHARE_OF_ARTIFACT + (y - frame.target[1]) / Math.max(1e-3, frame.artifactHeight);
+}
+
+/**
  * Where a camera actually stands — the inverse of `portalCameraView`.
  *
  * The director needs this to notice what the couple's finger did: orbit

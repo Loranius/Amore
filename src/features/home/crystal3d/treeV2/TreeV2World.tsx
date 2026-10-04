@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { unit } from '@/engine/species/crystalV2/hash';
 import type { TreeForm, TreeV2Geometry } from '@/engine/species/treeV2/geometry';
@@ -80,6 +80,11 @@ interface TreeV2WorldProps {
   bare?: boolean;
   /** Форма дерева: колір крони (ADR-0237). Геометрію форми вже несе `geometry`. */
   form?: TreeForm;
+  /** Дотик по самому дереву (не по острову) — хроніка росту (ADR-0238). */
+  treeEvents?: {
+    onPointerDown: (event: ThreeEvent<PointerEvent>) => void;
+    onClick: (event: ThreeEvent<MouseEvent>) => void;
+  } | undefined;
 }
 
 /**
@@ -90,7 +95,7 @@ interface TreeV2WorldProps {
  * (`PORTAL_GROUND_Y`), тож камера порталу кадрує дерево тими самими
  * правилами, що й кристал, і жест повороту той самий.
  */
-export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island, bare = false, form = 'oak' }: TreeV2WorldProps) {
+export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island, bare = false, form = 'oak', treeEvents }: TreeV2WorldProps) {
   const palette = useMemo(
     () => (form === 'oak' ? TREE_PALETTES[theme] : { ...TREE_PALETTES[theme], ...TREE_FORM_LEAVES[form][theme] }),
     [form, theme],
@@ -188,7 +193,7 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         <instancedMesh ref={grassRef} args={[tuft, materials.grass, grass.length]} frustumCulled={false} />
         {/* Дерево стоїть на пласкій середині купола, а не під нею (ADR-0222). */}
-        <group position={[0, treeIslandBase(island), 0]} scale={scale}>
+        <group position={[0, treeIslandBase(island), 0]} scale={scale} {...treeEvents}>
           <mesh geometry={wood} material={materials.wood} />
           <mesh geometry={leaves} material={materials.leaves} />
           {blossoms && <mesh geometry={blossoms} material={materials.blossoms} />}

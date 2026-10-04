@@ -21,6 +21,9 @@ import { canSwitchArtifact } from './artifactChoice';
 import { useAuth } from '@/providers/AuthProvider';
 import { useArtifactWorld } from '../world/artifactWorldContext';
 import { useWorldVisibleRoute } from '../world/useWorldVisibleRoute';
+import { useEffect } from 'react';
+import { ChronicleSheet } from '../chronicle/ChronicleSheet';
+import { closeChronicle, useChronicle } from '../chronicle/chronicleStore';
 
 export function HomePage() {
   const { artifact, selectArtifact } = useArtifactWorld();
@@ -30,12 +33,17 @@ export function HomePage() {
   // route whose chrome follows it. Phase 2 adds the rest.
   // Головна віддає дотики артефакту: кристал тут і є сторінка.
   useWorldVisibleRoute({ artifactInput: true });
+  // Хроніка росту (ADR-0238) належить головній: пішли з неї або змінили
+  // вид — камера повертається до звичайного кадру.
+  useEffect(() => closeChronicle, [artifact]);
+  const chronicleOpen = useChronicle().open;
 
   return (
-    <section className="home home--world" data-home-artifact={artifact}>
+    <section className="home home--world" data-home-artifact={artifact} data-chronicle={chronicleOpen ? 'open' : undefined}>
       <Hero />
       {explorer && <HomeArtifactSwitcher value={artifact} onChange={selectArtifact} />}
       <h1 className="home-title">{HOME_ARTIFACT_LABELS[artifact]} Amore</h1>
+      <ChronicleSheet />
     </section>
   );
 }

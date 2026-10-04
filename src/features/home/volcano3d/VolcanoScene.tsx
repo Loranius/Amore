@@ -1,3 +1,7 @@
+import { buildVolcanoGeometry } from '@/engine/species/volcano/geometry';
+import { buildVolcanoModel } from '@/engine/species/volcano/model';
+import { useChronicleScene, type ChroniclePlacement } from '@/features/chronicle/useChronicleScene';
+import { PORTAL_GROUND_Y } from '../crystal3d/scene/portalScene';
 import { seasonOf } from '@/engine/species/grammar/season';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -60,6 +64,19 @@ export default function VolcanoScene() {
   // Острівець ширший за підніжжя: на ньому ще трава, мушлі й зірки.
   const island = frame ? volcanoIsland(frame) : 0;
 
+  // Хроніка росту (ADR-0238): дотик по вулкану, камера огляду й вулкан на
+  // дату з повзунка при сьогоднішньому кадрі.
+  const placement = useMemo<ChroniclePlacement | null>(() => (frame ? {
+    object: ([x, y, z]) => [x * frame.scale, PORTAL_GROUND_Y + y * frame.scale, z * frame.scale],
+    island: ([x, y, z]) => [x * island, PORTAL_GROUND_Y + y * island, z * island],
+  } : null), [frame, island]);
+  const chronicle = useChronicleScene('reef', snapshot, region === 'centre', placement);
+  const shown = useMemo(() => {
+    if (!state || !chronicle.asOf) return state ? { model: state.model, geometry: state.geometry } : null;
+    const model = buildVolcanoModel({ ...state.snapshot, asOf: chronicle.asOf });
+    return { model, geometry: buildVolcanoGeometry(model) };
+  }, [state, chronicle.asOf]);
+
   if (error) {
     console.error('[Volcano] rollback to reef v2:', error);
     return (
@@ -68,9 +85,9 @@ export default function VolcanoScene() {
       </Suspense>
     );
   }
-  if (isPending || !state || !frame) return <CrystalPlaceholder />;
+  if (isPending || !state || !frame || !shown) return <CrystalPlaceholder />;
 
-  const { model } = state;
+  const { model } = shown;
   return (
     <div
       className="crystal-wrap evolution-preview-wrap"
@@ -111,11 +128,12 @@ export default function VolcanoScene() {
           allowOrbit={region === 'centre'}
           freeCamera={freeCameraActive}
           motionMode={motionMode}
+          inspect={chronicle.inspect}
           world="none"
         >
           <VolcanoWorld
             seed={model.startDate}
-            geometry={state.geometry}
+            geometry={shown.geometry}
             scale={frame.scale}
             theme={theme}
             reduceMotion={reduceMotion}
@@ -124,6 +142,7 @@ export default function VolcanoScene() {
             glow={model.glow}
             fishKinds={model.fishKinds}
             season={seasonOf(model.asOf)}
+            onTap={chronicle.onTap}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

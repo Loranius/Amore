@@ -206,6 +206,17 @@ function druse(p: Painter, seed: string, key: string, c: V3, size: number) {
   }
 }
 
+/**
+ * Де стоїть друза `k` на острові радіуса `R` (ADR-0237): одна формула на
+ * острів і хроніку росту (ADR-0238), щоб камера летіла саме до неї.
+ */
+export function druseAt(seed: string, R: number, k: number): V3 {
+  const key = `isle:druse${k}`;
+  const turn = unit(seed, 'isle:turn') * Math.PI * 2;
+  const a = turn + k * 2.399963 + (unit(seed, `${key}:a`) - 0.5) * 0.3;
+  return polar(R * (0.5 + 0.32 * unit(seed, `${key}:r`)), a, R * 0.01);
+}
+
 export function buildCrystalIsland(seed: string, radius: number, druses = 0, season: Season = 'summer'): CrystalIsland {
   const R = radius;
   const p = new Painter();
@@ -398,9 +409,7 @@ export function buildCrystalIsland(seed: string, radius: number, druses = 0, sea
   // розсипані, і кожна нова лягає на своє місце, не зсуваючи старих.
   for (let k = 0; k < druses; k += 1) {
     const key = `isle:druse${k}`;
-    const a = turn + k * 2.399963 + (unit(seed, `${key}:a`) - 0.5) * 0.3;
-    const r = R * (0.5 + 0.32 * unit(seed, `${key}:r`));
-    druse(p, seed, key, polar(r, a, R * 0.01), R * (0.07 + 0.05 * unit(seed, `${key}:s`)));
+    druse(p, seed, key, druseAt(seed, R, k), R * (0.07 + 0.05 * unit(seed, `${key}:s`)));
   }
 
   // ── Пора року (ADR-0237): іній узимку, квіти навесні ──────

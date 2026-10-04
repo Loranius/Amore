@@ -1,3 +1,7 @@
+import { buildCrystalV2Geometry } from '@/engine/species/crystalV2/geometry';
+import { buildCrystalV2Model } from '@/engine/species/crystalV2/model';
+import { useArtifactForms } from '@/features/world/artifactForms';
+import { useChronicleScene, type ChroniclePlacement } from '@/features/chronicle/useChronicleScene';
 import { seasonOf } from '@/engine/species/grammar/season';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
@@ -70,6 +74,20 @@ export default function CrystalV2Scene() {
   // арки й колони, а центр лишився кристалу.
   const island = frame ? dioramaIslandRadius(frame.reach * 1.3) : 0;
 
+  // Хроніка росту (ADR-0238): дотик по кристалу, камера огляду й кристал на
+  // дату з повзунка. Кадр — сьогоднішній: молодий кристал видно меншим.
+  const form = useArtifactForms().crystal;
+  const placement = useMemo<ChroniclePlacement | null>(() => (frame ? {
+    object: ([x, y, z]) => [x * frame.scale, CRYSTAL_GROUND_BASELINE + y * frame.scale, z * frame.scale],
+    island: ([x, y, z]) => [x * island, CRYSTAL_GROUND_BASELINE + y * island, z * island],
+  } : null), [frame, island]);
+  const chronicle = useChronicleScene('crystal', snapshot, region === 'centre', placement);
+  const shown = useMemo(() => {
+    if (!state || !chronicle.asOf) return state ? { model: state.model, geometry: state.geometry } : null;
+    const model = buildCrystalV2Model({ ...state.snapshot, asOf: chronicle.asOf });
+    return { model, geometry: buildCrystalV2Geometry(model, form) };
+  }, [state, chronicle.asOf, form]);
+
   if (error) {
     console.error('[Crystal v2] rollback to the Evolution pipeline:', error);
     return (
@@ -78,9 +96,9 @@ export default function CrystalV2Scene() {
       </Suspense>
     );
   }
-  if (isPending || !state || !frame) return <CrystalPlaceholder />;
+  if (isPending || !state || !frame || !shown) return <CrystalPlaceholder />;
 
-  const { model } = state;
+  const { model } = shown;
   return (
     <div
       className="crystal-wrap evolution-preview-wrap"
@@ -123,6 +141,7 @@ export default function CrystalV2Scene() {
           allowOrbit={region === 'centre'}
           freeCamera={freeCameraActive}
           motionMode={motionMode}
+          inspect={chronicle.inspect}
           // Діорама замість летючого острова (ADR-0220, стиль AbyssRium).
           world="none"
         >
@@ -146,13 +165,15 @@ export default function CrystalV2Scene() {
             druses={model.druses}
             season={seasonOf(model.asOf)}
           />
-          <CrystalV2Object
-            model={model}
-            geometry={state.geometry}
-            scale={frame.scale}
-            theme={theme}
-            reduceMotion={reduceMotion}
-          />
+          <group {...chronicle.tap}>
+            <CrystalV2Object
+              model={model}
+              geometry={shown.geometry}
+              scale={frame.scale}
+              theme={theme}
+              reduceMotion={reduceMotion}
+            />
+          </group>
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
       </Canvas>

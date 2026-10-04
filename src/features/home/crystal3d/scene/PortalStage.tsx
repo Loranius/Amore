@@ -7,7 +7,9 @@
 // передавати аспект трьома шляхами — тож вони живуть разом.
 // ============================================================
 import { useMemo, useRef, useState, type ReactNode } from 'react';
-import { useThree } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
+import * as THREE from 'three';
+import { reportChronicleCamera } from '@/features/chronicle/chronicleStore';
 import { OrbitControls } from '@react-three/drei';
 import {
   PORTAL_ORBIT_DAMPING,
@@ -27,7 +29,47 @@ import {
   PORTAL_PALETTES,
   PORTAL_RIM_LIGHT,
   portalCameraFrame,
+  portalTargetShareAt,
 } from './portalScene';
+
+/**
+ * Огляд для хроніки росту (ADR-0238). `point` — частина об'єкта в
+ * координатах сцени, до якої веде камера; без неї камера лише повертає на
+ * `azimuth` і трохи наближається.
+ */
+export interface PortalInspect {
+  azimuth: number;
+  point: readonly [number, number, number] | null;
+  /** Частка звичайної відстані: 0.82 — легкий зум, 0.5 — впритул до частини. */
+  zoom: number;
+}
+
+/** Наскільки піднімається зображення, щоб об'єкт стояв над шторкою хроніки. */
+const INSPECT_LIFT = 0.2;
+
+/**
+ * Зсув зображення вгору (`setViewOffset`) і звіт про азимут камери.
+ *
+ * Зсув — не рух камери: ракурс лишається тим, що обрав режисер, лише кадр
+ * з'їжджає вгору, як сторінка. Плавний, з тим самим згасанням, що й
+ * поворот, щоб шторка й об'єкт рухались разом.
+ */
+function InspectView({ lift, target, reduceMotion }: { lift: number; target: readonly number[]; reduceMotion: boolean }) {
+  const current = useRef(0);
+  useFrame(({ camera, size }, delta) => {
+    reportChronicleCamera(Math.atan2(camera.position.x - target[0]!, camera.position.z - target[2]!));
+    if (!(camera instanceof THREE.PerspectiveCamera)) return;
+    const k = reduceMotion ? 1 : 1 - Math.exp(-delta / 0.18);
+    current.current += (lift - current.current) * k;
+    if (current.current < 1e-3 && lift === 0) {
+      if (camera.view?.enabled) camera.clearViewOffset();
+      current.current = 0;
+      return;
+    }
+    camera.setViewOffset(size.width, size.height, 0, size.height * current.current, size.width, size.height);
+  });
+  return null;
+}
 
 export interface PortalStageProps {
   seed: number;
@@ -100,6 +142,8 @@ export interface PortalStageProps {
    * «дерево — луг», PRODUCT.md, а не острів кристала).
    */
   world?: 'island' | 'none' | undefined;
+  /** Огляд хроніки росту (ADR-0238); `null` — звичайна камера маршруту. */
+  inspect?: PortalInspect | null | undefined;
   children: ReactNode;
 }
 
@@ -119,6 +163,7 @@ export function PortalStage({
   freeCamera = false,
   sky = false,
   world = 'island',
+  inspect = null,
   children,
 }: PortalStageProps) {
   const size = useThree((state) => state.size);
@@ -131,6 +176,25 @@ export function PortalStage({
     [aspect, crystalsSceneRadius, artifactSceneHeight],
   );
   const palette = PORTAL_PALETTES[theme];
+  /*
+   * Хроніка росту (ADR-0238) — лише ще одна поза для режисера. Перехід до
+   * неї, розчинення ручного повороту й повернення назад робить він сам, тим
+   * самим згасанням, що й між маршрутами: окремої анімації тут немає.
+   */
+  const shownPose = useMemo<WorldCameraPose | undefined>(() => {
+    if (!inspect) return pose;
+    const base = pose ?? CRYSTAL_CENTRE_POSE;
+    if (!inspect.point) return { ...base, azimuth: inspect.azimuth, distance: base.distance * inspect.zoom };
+    const [x, y, z] = inspect.point;
+    const dx = x - frame.target[0];
+    const dz = z - frame.target[2];
+    return {
+      ...base,
+      azimuth: Math.hypot(dx, dz) > 1e-3 ? Math.atan2(dx, dz) : inspect.azimuth,
+      targetHeight: portalTargetShareAt(frame, y),
+      distance: base.distance * inspect.zoom,
+    };
+  }, [inspect, pose, frame]);
   /*
    * Від чого відлічується ×5 (ADR-0160).
    *
@@ -145,6 +209,8 @@ export function PortalStage({
    * розійшлись би — між ними з'явилась би мертва зона, у якій палець
    * тягне, а камера стоїть.
    */
+  // Від пози МАРШРУТУ, а не хроніки: найближчий підхід хроніки (0.42) лежить
+  // усередині ручних меж маршруту (÷5), тож орбіта з ним не сперечається.
   const zoomAnchor = frame.distance * (pose?.distance ?? CRYSTAL_CENTRE_POSE.distance);
   const handZoom = freeCamera || allowOrbit;
   /*
@@ -240,10 +306,11 @@ export function PortalStage({
         veinBearings={veinBearings}
         veinReach={veinReach}
       />}
+      <InspectView lift={inspect ? INSPECT_LIFT : 0} target={frame.target} reduceMotion={reduceMotion} />
       <PortalCameraRig
         frame={frame}
         controls={controls}
-        pose={pose}
+        pose={shownPose}
         mode={motionMode}
         spin={spin}
         freeCamera={freeCamera}

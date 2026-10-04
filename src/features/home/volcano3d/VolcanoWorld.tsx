@@ -108,9 +108,11 @@ interface VolcanoWorldProps {
   fishKinds?: number;
   /** Пора року: світло й морський сніг у воді (ADR-0237). */
   season?: Season;
+  /** Дотик по вулкану, крім виверження, відкриває хроніку росту (ADR-0238). */
+  onTap?: (() => void) | undefined;
 }
 
-export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, glow, bare = false, fishKinds = 1, season }: VolcanoWorldProps) {
+export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, glow, bare = false, fishKinds = 1, season, onTap }: VolcanoWorldProps) {
   const lava = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(geometry.lava.positions, 3));
@@ -186,6 +188,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         if (!isCrystalTap(start, { x: event.nativeEvent.clientX, y: event.nativeEvent.clientY, at: performance.now() })) return;
         event.stopPropagation();
         tappedAt.current = clockRef.current;
+        onTap?.();
       }}
     >
       <ReefV2World
