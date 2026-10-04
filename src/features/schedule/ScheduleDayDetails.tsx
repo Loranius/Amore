@@ -4,9 +4,17 @@
 // Плани приходять із модуля «Плани», а не з колишньої таблиці `dates`.
 // Тому рядок веде на сторінку плану, а кнопка — у самі «Плани»:
 // графік показує, а створюють в одному місці.
+//
+// Панель рендериться в `document.body` (власник, 2026-10-04: «нижню
+// модалку при натисканні на день сховано вниз»). Усередині сторінки вона
+// жила в шарі вмісту, і її `z-index` не міг піднятися над доком — док
+// (`z-index: 50`, свій шар) перекривав нижню половину аркуша з планами й
+// кнопкою «Запланувати». Із `body` затемнення лягає й на док, як у
+// шторках вішлиста.
 // ============================================================
 import { CloseIcon } from '@/components/icons/UiIcon';
 import { type MouseEvent } from 'react';
+import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import { todayLocal } from '@/features/_shared/month';
 import { PLAN_CATEGORIES, PLAN_STATUSES } from '@/features/plans/planConstants';
@@ -25,7 +33,7 @@ export function ScheduleDayDetails({ date, status, names, plans, onClose, onPlan
   onPlan: () => void;
 }) {
   const canPlan = status === 'both-off' && date >= todayLocal();
-  return (
+  return createPortal(
     <div className="sched-day-overlay" onClick={(event: MouseEvent<HTMLDivElement>) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="sched-day-sheet" role="dialog" aria-modal="true" aria-label={`Деталі за ${fmtLongDate(date)}`}>
         <div className="sched-day-handle" />
@@ -56,6 +64,7 @@ export function ScheduleDayDetails({ date, status, names, plans, onClose, onPlan
         ) : <p className="sched-day-empty">На цей день спільних планів ще немає.</p>}
         {canPlan && <button type="button" className="btn sched-day-plan-btn" onClick={onPlan}>Запланувати</button>}
       </section>
-    </div>
+    </div>,
+    document.body,
   );
 }
