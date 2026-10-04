@@ -12,7 +12,8 @@ import {
   LifeRuleError,
   attendStudy,
   canDoDuty,
-  dimaCity,
+  dimaArrived,
+  dimaWithLena,
   dutyToday,
   meetDima,
   meetingDue,
@@ -61,7 +62,8 @@ export type Panel =
   | { kind: 'bag' }
   | { kind: 'date' }
   | { kind: 'sleep' }
-  | { kind: 'mom' };
+  | { kind: 'mom' }
+  | { kind: 'dima' };
 
 export type Speaker = 'n' | 'l' | 'd' | 'm' | 'o';
 export interface Line { who: Speaker; text: string }
@@ -124,6 +126,11 @@ export class GameController {
   private folk: Walker[] = [];
   private extras: Actor[] = [];
   private dima: Actor | null = null;
+  /**
+   * Що Діма робить на екрані: іде за Лєною, стоїть у кімнаті (чекає вдома),
+   * або підходить після дзвінка. `null` — його тут немає.
+   */
+  private dimaRole: 'follow' | 'room' | 'arriving' | null = null;
   private trail: { x: number; y: number }[] = [];
   private keys = new Set<string>();
   private joy: { id: number; ox: number; oy: number; dx: number; dy: number } | null = null;
@@ -193,8 +200,72 @@ export class GameController {
   private commit(next: LifeState): void {
     this.life = next;
     this.player.look = lenaLook(next);
+    this.syncDima();
     this.persist();
     this.emit();
+  }
+
+  /**
+   * Діма на екрані відповідає правилам (власник, 2026-10-04): за Лєною — лише
+   * коли вона попросила; «йди додому» — він іде й чекає вдома (у спільній
+   * квартирі його видно в кімнаті); після дзвінка — підходить до неї.
+   */
+  private syncDima(): void {
+    const life = this.life;
+    if (!life || this.ui.screen !== 'world') return;
+    const want: 'follow' | 'room' | null = dimaWithLena(life)
+      ? 'follow'
+      : life.flags.metDima && life.dima.mode === 'home' && this.map.interior && life.flags.livingWithDima
+        ? 'room'
+        : null;
+    if (want === null) {
+      this.dima = null;
+      this.dimaRole = null;
+      return;
+    }
+    if (want === 'room') {
+      if (this.dimaRole !== 'room') {
+        const spot = this.roomSpot();
+        this.dima = { id: 'dima', x: spot.x, y: spot.y, dir: 0, moving: false, t: 0, look: DIMA };
+        this.dimaRole = 'room';
+      }
+      return;
+    }
+    // follow
+    if (this.dima && (this.dimaRole === 'follow' || this.dimaRole === 'arriving')) return;
+    if (this.dima && this.dimaRole === 'room') { this.dimaRole = 'follow'; this.trail = []; return; }
+    // Приходить здалеку: з краю видимого світу, потім іде до Лєни.
+    const from = this.arrivalSpot();
+    this.dima = { id: 'dima', x: from.x, y: from.y, dir: 1, moving: true, t: 0, look: DIMA };
+    this.dimaRole = 'arriving';
+    this.trail = [];
+  }
+
+  /** Де Діма стоїть у кімнаті: найближча вільна клітинка до середини. */
+  private roomSpot(): { x: number; y: number } {
+    const c = colliderFor(this.map);
+    const cx = Math.floor(this.map.w / 2) + 2;
+    const cy = Math.floor(this.map.h / 2);
+    for (let r = 0; r < 6; r += 1) {
+      for (let dx = -r; dx <= r; dx += 1) {
+        for (let dy = -r; dy <= r; dy += 1) {
+          const f = tileFeet(cx + dx, cy + dy);
+          if (c.canStand(f.x, f.y) && Math.hypot(f.x - this.player.x, f.y - this.player.y) > 18) return f;
+        }
+      }
+    }
+    return { x: this.player.x + 16, y: this.player.y };
+  }
+
+  /** Звідки приходить Діма: вільне місце ~7 клітинок від Лєни. */
+  private arrivalSpot(): { x: number; y: number } {
+    const c = colliderFor(this.map);
+    for (const [dx, dy] of [[7, 0], [-7, 0], [0, 6], [0, -6], [5, 5], [-5, 5], [3, 0], [-3, 0]] as const) {
+      const x = this.player.x + dx * TILE;
+      const y = this.player.y + dy * TILE;
+      if (c.canStand(x, y)) return { x, y };
+    }
+    return { x: this.player.x + 16, y: this.player.y };
   }
 
   private async apply(outcome: Outcome): Promise<void> {
@@ -333,9 +404,13 @@ export class GameController {
       const m = tileFeet(12, 6);
       this.extras.push({ id: 'mom', x: m.x, y: m.y, dir: 1, moving: false, t: 0, look: MOM });
     }
-    if (life.flags.metDima && dimaCity(life) === (this.map.interior ? life.home : this.map.city)) {
+    // Діма йде разом із Лєною лише тоді, коли вона його покликала.
+    this.dimaRole = null;
+    if (dimaWithLena(life)) {
       this.dima = { id: 'dima', x: this.player.x - 14, y: this.player.y + 2, dir: this.player.dir, moving: false, t: 0, look: DIMA };
+      this.dimaRole = 'follow';
     }
+    this.syncDima();
   }
 
   // ------------------------------------------------------------
@@ -471,6 +546,12 @@ export class GameController {
         this.minuteAcc -= m;
         this.life = passTime(life, m);
         if (Math.floor(this.life.minute / 10) !== Math.floor(life.minute / 10)) this.emit();
+        // Діма дійшов після дзвінка — з'являється й підходить.
+        if (!dimaArrived(life) && dimaArrived(this.life)) {
+          this.syncDima();
+          sfx.love();
+          this.toast('Діма прийшов!');
+        }
         this.timeWarnings();
       }
     } else {
@@ -518,7 +599,12 @@ export class GameController {
   }
 
   private checkZone(): void {
-    const z = zoneAt(this.map, this.player.x, this.player.y);
+    let z = zoneAt(this.map, this.player.x, this.player.y);
+    // Поруч Діма й немає дверей — можна поговорити.
+    const d = this.dima;
+    if (!z && d && this.dimaRole !== 'arriving' && this.life?.flags.metDima && Math.hypot(d.x - this.player.x, d.y - this.player.y) < 26) {
+      z = { id: 'talk:dima', x: d.x, y: d.y, w: 1, h: 1, action: { type: 'talk' }, label: 'Діма' };
+    }
     if (z?.id !== this.ui.near?.id) this.setUi({ near: z });
   }
 
@@ -526,6 +612,26 @@ export class GameController {
     const d = this.dima;
     if (!d) return;
     d.t += dt;
+    if (this.dimaRole === 'room') {
+      // Чекає вдома: стоїть і дивиться на Лєну.
+      d.moving = false;
+      const dx = this.player.x - d.x;
+      const dy = this.player.y - d.y;
+      d.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 2 : 1) : (dy > 0 ? 0 : 3);
+      return;
+    }
+    if (this.dimaRole === 'arriving') {
+      const dx = this.player.x - d.x;
+      const dy = this.player.y - d.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 18) { this.dimaRole = 'follow'; this.trail = []; d.moving = false; return; }
+      const st = Math.min(70 * dt, dist);
+      d.x += (dx / dist) * st;
+      d.y += (dy / dist) * st;
+      d.moving = true;
+      d.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 2 : 1) : (dy > 0 ? 0 : 3);
+      return;
+    }
     const tgt = this.trail.length > 12 ? this.trail[this.trail.length - 12]! : null;
     if (!tgt) { d.moving = false; return; }
     const dx = tgt.x - d.x;
@@ -698,9 +804,11 @@ export class GameController {
       case 'realtor': this.openPanel({ kind: 'realtor' }); return;
       case 'date':
         if (!life.flags.metDima) { this.toast(life.city === 'vinnytsia' ? 'Гарне місце для побачення… колись' : 'Гарне місце'); return; }
+        if (!dimaWithLena(life)) { this.toast('Без Діми — ніяк. Поклич його або подзвони'); return; }
         this.openPanel({ kind: 'date' });
         return;
       case 'mom': this.openPanel({ kind: 'mom' }); return;
+      case 'talk': this.openPanel({ kind: 'dima' }); return;
       case 'walk': return this.goTo(a.to);
       case 'sight': return this.photo(a.sight);
       case 'friends': return this.playFriends();
@@ -891,6 +999,7 @@ export class GameController {
       ['n', 'І з цього почалося все.'],
     ]);
     this.setUi({ celebrate: false });
+    await this.say([['d', 'Напиши, як захочеш погуляти. Я завжди на зв\'язку.']]);
     await this.attempt(meetDima);
     this.trail = [];
     this.busy = false;

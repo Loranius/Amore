@@ -32,7 +32,12 @@ import {
   MILESTONES,
   RENT,
   albumProgress,
+  askDimaAlong,
   buy,
+  callDima,
+  dimaWithLena,
+  hugDima,
+  sendDimaHome,
   canBuy,
   education,
   giveGift,
@@ -405,6 +410,17 @@ function PhonePanel({ c, life }: { c: GameController; life: LifeState }) {
           <Hearts n={life.hearts[p]} />
         </div>
       ))}
+      {life.flags.metDima && (
+        <div className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+          <div>
+            <div className="lg-row-title">Подзвонити Дімі</div>
+            <div className="lg-row-sub">
+              {dimaWithLena(life) ? 'Він поруч' : life.dima.mode === 'follow' && life.dima.eta !== null ? `Уже в дорозі · буде о ${clockLabel(life.dima.eta)}` : 'Попросити прийти до тебе'}
+            </div>
+          </div>
+          <button type="button" className="lg-btn is-pink is-small" disabled={life.dima.mode === 'follow'} onClick={() => { c.closePanel(); void c.act(callDima); }}>Дзвонити</button>
+        </div>
+      )}
       <div className="lg-tile">
         <span>Освіта: {EDUCATION_NAME[education(life)]}{avg !== null ? ` · середній бал ${avg}` : ''}</span>
         <span>Робота: {c.shiftJobTitle() ?? '—'}</span>
@@ -474,6 +490,31 @@ function DatePanel({ c, life }: { c: GameController; life: LifeState }) {
 }
 
 // ------------------------------------------------------------
+/**
+ * Розмова з Дімою (власник, 2026-10-04): він іде з Лєною лише тоді, коли
+ * вона попросить, і йде додому чекати, коли вона скаже.
+ */
+function DimaPanel({ c, life }: { c: GameController; life: LifeState }) {
+  const along = dimaWithLena(life);
+  return (
+    <Sheet title="Діма" sub={along ? 'Ходить із тобою' : 'Чекає вдома'} onClose={() => c.closePanel()}>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+        <Portrait look={lenaLook(life)} scale={4} />
+        <Portrait look={c.dimaLook()} scale={4} />
+      </div>
+      <Hearts n={life.hearts.dima} />
+      <div style={{ display: 'grid', gap: 8 }}>
+        {along && <button type="button" className="lg-btn is-pink" disabled={life.doneToday.includes('hug')} onClick={() => void c.act(hugDima)}>Обійняти</button>}
+        {along
+          ? <button type="button" className="lg-btn" onClick={() => { c.closePanel(); void c.act(sendDimaHome); }}>«Йди додому, я пізніше»</button>
+          : <button type="button" className="lg-btn" onClick={() => { c.closePanel(); void c.act(askDimaAlong); }}>«Ходімо зі мною»</button>}
+        {along && <button type="button" className="lg-btn is-paper" onClick={() => c.openPanel({ kind: 'date' })}>Побачення…</button>}
+      </div>
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
 function SleepPanel({ c, life }: { c: GameController; life: LifeState }) {
   const late = life.minute > 24 * 60;
   return (
@@ -512,5 +553,6 @@ export function Panels({ c, life, panel }: { c: GameController; life: LifeState;
     case 'date': return <DatePanel c={c} life={life} />;
     case 'sleep': return <SleepPanel c={c} life={life} />;
     case 'mom': return <MomPanel c={c} life={life} />;
+    case 'dima': return <DimaPanel c={c} life={life} />;
   }
 }

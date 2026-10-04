@@ -38,6 +38,7 @@ export type ZoneAction =
   | { type: 'mom' }
   | { type: 'walk'; to: CityId }
   | { type: 'wardrobe' }
+  | { type: 'talk' }
   | { type: 'info'; text: string };
 
 export interface Building {

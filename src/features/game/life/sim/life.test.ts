@@ -3,7 +3,12 @@ import { DAY_END_MIN, MEET_DOW, MEET_WEEK, PROPOSAL_WEEK, dayInfo, firstDayOfWee
 import { JOB_BY_ID, ROUTES, itemById } from './content';
 import {
   LifeRuleError,
+  askDimaAlong,
   attendStudy,
+  callDima,
+  dimaCity,
+  dimaWithLena,
+  sendDimaHome,
   buy,
   canDoDuty,
   dutyToday,
@@ -221,7 +226,10 @@ describe('§5 справжня історія всередині вільног�
     const met = meetDima(due).state;
     expect(met.flags.metDima).toBe(true);
     expect(meetingDue(met)).toBe(false);
-    expect(goOnDate(met, 'walk').state.hearts.dima).toBeGreaterThan(met.hearts.dima);
+    // Після знайомства Діма вдома; побачення — коли Лєна покличе його з собою.
+    expect(() => goOnDate(met, 'walk')).toThrow(LifeRuleError);
+    const along = askDimaAlong(met).state;
+    expect(goOnDate(along, 'walk').state.hearts.dima).toBeGreaterThan(met.hearts.dima);
   });
 
   it('після диплома з Дімою — спільна квартира на Вишеньці', () => {
@@ -234,8 +242,10 @@ describe('§5 справжня історія всередині вільног�
 
   it('пропозиція — літо 2026 на Отраді, коли сердець досить; інакше пояснює, чого бракує', () => {
     const adult = newLife(10, 'adult');
-    const odesa = at({ ...adult, city: 'odesa', hearts: { ...adult.hearts, dima: 8 } }, firstDayOfWeek(PROPOSAL_WEEK) + 5, 19 * 60);
+    const odesa = at({ ...adult, city: 'odesa', hearts: { ...adult.hearts, dima: 8 }, dima: { mode: 'follow', eta: null } }, firstDayOfWeek(PROPOSAL_WEEK) + 5, 19 * 60);
     expect(proposalCheck(odesa).ok).toBe(true);
+    const alone = proposalCheck({ ...odesa, dima: { mode: 'home', eta: null } });
+    expect(alone.ok ? '' : alone.reason).toMatch(/поклич/);
     const done = propose(odesa).state;
     expect(done.flags.proposed).toBe(true);
     expect(done.milestones).toContain('proposal');
@@ -243,6 +253,31 @@ describe('§5 справжня історія всередині вільног�
     expect(lowHearts.ok ? '' : lowHearts.reason).toMatch(/разом/);
     const winter = proposalCheck(at(odesa, firstDayOfWeek(PROPOSAL_WEEK) + 2));
     expect(winter.ok ? '' : winter.reason).toMatch(/улітку/);
+  });
+
+  it('Діма ходить за Лєною лише на її прохання, іде додому за словом, приходить на дзвінок (власник, 2026-10-04)', () => {
+    const adult = at(newLife(4, 'adult'), firstDayOfWeek(17) + 1, 10 * 60);
+    // Удома й на вулиці свого міста — чекає, поки покличуть.
+    expect(adult.dima.mode).toBe('home');
+    expect(dimaWithLena(adult)).toBe(false);
+    const along = askDimaAlong(adult).state;
+    expect(dimaWithLena(along)).toBe(true);
+    // Їде разом із Лєною.
+    const trip = travel(along, 'kyiv').state;
+    expect(dimaCity(trip)).toBe('kyiv');
+    // «Йди додому» — і він уже не поруч.
+    const alone = sendDimaHome(trip).state;
+    expect(dimaWithLena(alone)).toBe(false);
+    expect(dimaCity(alone)).toBe('vinnytsia');
+    // Дзвінок з іншого міста: Діма в дорозі, потім поруч.
+    const called = callDima(alone).state;
+    expect(dimaCity(called)).toBeNull();
+    expect(called.dima.eta).toBeGreaterThan(alone.minute + 60);
+    expect(dimaWithLena({ ...called, minute: called.dima.eta! })).toBe(true);
+    expect(() => callDima(called)).toThrow(/в дорозі/);
+    // Ніч — і він знову вдома.
+    const home = travel({ ...called, minute: called.dima.eta! }, 'vinnytsia').state;
+    expect(sleep(home).state.dima.mode).toBe('home');
   });
 
   it('пам\'ятка — фото в альбом один раз', () => {
@@ -258,6 +293,11 @@ describe('§6 сейв', () => {
     const play = () => buy(attendStudy(newLife(42, 'school'), [0.7]).state, 'grocery', 'bun').state;
     const s = play();
     expect(parseSave(serialize(s))).toEqual(s);
+    // Сейв версії 1 (до Діми-супутника) читається: Діма чекає вдома.
+    const old = JSON.parse(serialize(s)) as Record<string, unknown>;
+    delete old.dima;
+    old.version = 1;
+    expect(parseSave(JSON.stringify(old)).dima).toEqual({ mode: 'home', eta: null });
     expect(serialize(play())).toBe(serialize(s));
   });
 

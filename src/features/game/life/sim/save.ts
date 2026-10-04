@@ -35,6 +35,13 @@ const city = (v: unknown, field: string): CityId => {
   return v as CityId;
 };
 
+function parseDima(v: unknown): LifeState['dima'] {
+  if (v === undefined) return { mode: 'home', eta: null };
+  if (!isObj(v) || (v.mode !== 'home' && v.mode !== 'follow')) fail('dima');
+  const eta = v.eta === null ? null : num(v.eta, 'dima.eta', 0, 30 * 60);
+  return { mode: v.mode, eta };
+}
+
 export function parseSave(text: string): LifeState {
   let raw: unknown;
   try {
@@ -43,7 +50,9 @@ export function parseSave(text: string): LifeState {
     throw new SaveError('Сейв пошкоджено: не JSON');
   }
   if (!isObj(raw)) fail('корінь');
-  if (raw.version !== SAVE_VERSION) throw new SaveError(`Сейв іншої версії: ${String(raw.version)}`);
+  // Версія 1 — до Діми-супутника: читається, нові поля беруть типові
+  // значення. Нові поля й далі додаються так само, без втрати життя.
+  if (raw.version !== SAVE_VERSION && raw.version !== 1) throw new SaveError(`Сейв іншої версії: ${String(raw.version)}`);
   const skills = isObj(raw.skills) ? raw.skills : fail('skills');
   const hearts = isObj(raw.hearts) ? raw.hearts : fail('hearts');
   const flags = isObj(raw.flags) ? raw.flags : fail('flags');
@@ -100,5 +109,6 @@ export function parseSave(text: string): LifeState {
       lyceumVisit: bool(flags.lyceumVisit, 'flags.lyceumVisit'),
     },
     doneToday: strList(raw.doneToday, 'doneToday', () => true),
+    dima: parseDima(raw.dima),
   };
 }

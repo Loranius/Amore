@@ -41,7 +41,11 @@ import {
   type SkillId,
 } from './content';
 
-export const SAVE_VERSION = 1;
+/**
+ * Версія сейву. 2 — додано Діму-супутника (`dima`); сейв версії 1
+ * читається й доповнюється типовими значеннями (`save.ts`).
+ */
+export const SAVE_VERSION = 2;
 
 export interface JobState {
   id: string;
@@ -54,6 +58,17 @@ export interface LifeFlags {
   livingWithDima: boolean;
   proposed: boolean;
   lyceumVisit: boolean;
+}
+
+/**
+ * Де Діма (власник, 2026-10-04: «Діма не має постійно бігати за Лєною —
+ * лише коли вона попросить; скаже піти — чекає вдома; подзвонить — прийде»).
+ * `home` — чекає вдома; `follow` — з Лєною. `eta` — хвилина дня, коли він
+ * дійде після дзвінка (`null` — уже поруч).
+ */
+export interface DimaState {
+  mode: 'home' | 'follow';
+  eta: number | null;
 }
 
 export interface LifeState {
@@ -92,6 +107,7 @@ export interface LifeState {
   flags: LifeFlags;
   /** Що вже зроблено сьогодні: 'duty', 'date', 'friends', 'sight:<id>', 'gift:<person>'. */
   doneToday: string[];
+  dima: DimaState;
 }
 
 export type LifeEventKind = 'toast' | 'card' | 'milestone' | 'story';
@@ -181,6 +197,7 @@ function baseState(seed: number): LifeState {
     marks: [],
     flags: { metDima: false, livingWithDima: false, proposed: false, lyceumVisit: false },
     doneToday: [],
+    dima: { mode: 'home', eta: null },
   };
 }
 
@@ -572,15 +589,83 @@ export type DateKind = 'walk' | 'cafe' | 'cinema';
 export const DATE_PRICE: Record<DateKind, number> = { walk: 0, cafe: 160, cinema: 240 };
 const DATE_MOOD: Record<DateKind, number> = { walk: 10, cafe: 14, cinema: 16 };
 
-/** Де сьогодні Діма: з тією, з ким живе, або у Вінниці. */
+/** Дім Діми: спільна квартира, якщо живуть разом, інакше — Вінниця. */
+export function dimaHome(state: LifeState): CityId {
+  return state.flags.livingWithDima ? state.home : 'vinnytsia';
+}
+
+/** Чи Діма вже дійшов після дзвінка. */
+export function dimaArrived(state: LifeState): boolean {
+  return state.dima.eta === null || state.minute >= state.dima.eta;
+}
+
+/**
+ * Де зараз Діма: поруч із Лєною, якщо вона покликала і він дійшов, інакше —
+ * вдома. `null` — ще не знайомі або в дорозі.
+ */
 export function dimaCity(state: LifeState): CityId | null {
   if (!state.flags.metDima) return null;
-  return state.flags.livingWithDima ? state.city : 'vinnytsia';
+  if (state.dima.mode === 'home') return dimaHome(state);
+  return dimaArrived(state) ? state.city : null;
+}
+
+/** Діма йде поруч із Лєною. */
+export function dimaWithLena(state: LifeState): boolean {
+  return state.flags.metDima && state.dima.mode === 'follow' && dimaArrived(state);
+}
+
+/** «Ходімо зі мною» — коли Діма поруч (удома чи на вулиці його міста). */
+export function askDimaAlong(state: LifeState): Outcome {
+  if (!state.flags.metDima) throw new LifeRuleError('Ви ще не знайомі');
+  if (state.dima.mode === 'follow') throw new LifeRuleError('Діма вже з тобою');
+  if (dimaHome(state) !== state.city) throw new LifeRuleError('Діми тут немає — подзвони йому');
+  return { state: { ...state, dima: { mode: 'follow', eta: null } }, events: [{ kind: 'toast', text: 'Діма: «Ходімо!»' }] };
+}
+
+/** «Йди додому, я пізніше» — Діма повертається додому й чекає. */
+export function sendDimaHome(state: LifeState): Outcome {
+  if (state.dima.mode !== 'follow') throw new LifeRuleError('Діма й так удома');
+  return { state: { ...state, dima: { mode: 'home', eta: null } }, events: [{ kind: 'toast', text: 'Діма: «Чекаю вдома. Не барись!»' }] };
+}
+
+/** Обійняти Діму — раз на день, коли він поруч. */
+export function hugDima(state: LifeState): Outcome {
+  if (!dimaWithLena(state)) throw new LifeRuleError('Поклич Діму з собою — і обіймай скільки хочеш');
+  if (state.doneToday.includes('hug')) throw new LifeRuleError('Сьогодні вже обіймались — але можна ще й завтра');
+  return {
+    state: {
+      ...state,
+      mood: clamp(state.mood + 4, 0, 100),
+      hearts: { ...state.hearts, dima: clamp(state.hearts.dima + 0.25, 0, MAX_HEARTS) },
+      doneToday: [...state.doneToday, 'hug'],
+    },
+    events: [{ kind: 'toast', text: 'Обійми — і на душі тепло' }],
+  };
+}
+
+/** Скільки йти Дімі до Лєни: містом — пів години, з іншого міста — дорога. */
+export function dimaTravelMinutes(state: LifeState): number {
+  const from = dimaHome(state);
+  if (from === state.city) return 30;
+  return (routePlan(from, state.city)?.minutes ?? 240) + 20;
+}
+
+/** Подзвонити Дімі й попросити прийти: він вирушає до Лєни. */
+export function callDima(state: LifeState): Outcome {
+  if (!state.flags.metDima) throw new LifeRuleError('Номера Діми ще немає');
+  if (state.dima.mode === 'follow') throw new LifeRuleError(dimaArrived(state) ? 'Діма вже поруч' : 'Діма вже в дорозі');
+  const minutes = dimaTravelMinutes(state);
+  if (state.minute + minutes > DAY_END_MIN - 30) throw new LifeRuleError('Діма: «Сьогодні вже не встигну, давай завтра?»');
+  const far = dimaHome(state) !== state.city;
+  const text = far
+    ? `Діма: «Їду! Буду через ${Math.round(minutes / 6) / 10} год»`
+    : 'Діма: «Уже йду, хвилин за тридцять буду»';
+  return { state: { ...state, minute: state.minute + 5, dima: { mode: 'follow', eta: state.minute + 5 + minutes } }, events: [{ kind: 'toast', text }] };
 }
 
 export function goOnDate(state: LifeState, kind: DateKind): Outcome {
   if (!state.flags.metDima) throw new LifeRuleError('Ви ще не знайомі');
-  if (dimaCity(state) !== state.city) throw new LifeRuleError('Діма зараз у Вінниці');
+  if (!dimaWithLena(state)) throw new LifeRuleError('Діми поруч немає — поклич його або подзвони');
   if (state.doneToday.includes('date')) throw new LifeRuleError('Побачення вже було сьогодні');
   if (state.money < DATE_PRICE[kind]) throw new LifeRuleError(`Треба ${DATE_PRICE[kind]} ₴`);
   const events: LifeEvent[] = [{ kind: 'toast', text: kind === 'walk' ? 'Прогулянка вдвох' : kind === 'cafe' ? 'Кава вдвох' : 'Кіно вдвох' }];
@@ -601,7 +686,7 @@ export function goOnDate(state: LifeState, kind: DateKind): Outcome {
 /** Хто поруч, щоб отримати подарунок. */
 export function personNearby(state: LifeState, person: PersonId): boolean {
   if (person === 'mom') return state.city === 'zhylyntsi';
-  if (person === 'dima') return dimaCity(state) === state.city;
+  if (person === 'dima') return dimaWithLena(state);
   return state.city === 'zhylyntsi' || state.city === state.home;
 }
 
@@ -673,6 +758,7 @@ export function proposalCheck(state: LifeState): ProposalCheck {
   if (info.season !== 'summer') return { ok: false, reason: 'Холодно — повернемось улітку' };
   if (state.city !== 'odesa') return { ok: false, reason: 'Жовтий камінь — в Одесі' };
   if (state.hearts.dima < PROPOSAL_HEARTS) return { ok: false, reason: 'Діма щось задумав… Побудьте ще трохи разом' };
+  if (!dimaWithLena(state)) return { ok: false, reason: 'Без Діми тут не те — поклич його з собою' };
   return { ok: true };
 }
 
@@ -725,6 +811,8 @@ export function sleep(state: LifeState, passedOut = false): Outcome {
     energy: clamp(sleepEnergy(state, passedOut), 0, 100),
     mood: clamp(Math.round(state.mood + (62 - state.mood) * 0.15) + Math.min(6, decorMood) - (passedOut ? 8 : 0), 0, 100),
     doneToday: [],
+    // На ніч Діма вдома; уранці Лєна кличе його знову, якщо хоче.
+    dima: { mode: 'home', eta: null },
   };
   if (passedOut) events.push({ kind: 'toast', text: 'Заснула від утоми — прокинулась удома' });
 
