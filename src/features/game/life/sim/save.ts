@@ -6,7 +6,8 @@
 // сейв не підмішується мовчки до нового життя, а повертається помилкою, і
 // гра питає, що з ним робити.
 // ============================================================
-import { CITY_IDS, ITEM_BY_ID, JOB_BY_ID, SIGHTS, type CityId } from './content';
+import { CITY_IDS, ITEM_BY_ID, JOB_BY_ID, SIGHTS, type CityId, type DecorSlot } from './content';
+import { BUSINESS_BY_ID, DEFAULT_SPOT, PROPERTY_BY_ID, type BusinessId } from './economy';
 import { MILESTONE_BY_ID, SAVE_VERSION, type LifeState } from './life';
 
 export const SAVE_KEY = 'amore:game:life:v1';
@@ -34,6 +35,28 @@ const city = (v: unknown, field: string): CityId => {
   if (typeof v !== 'string' || !(CITY_IDS as string[]).includes(v)) fail(field);
   return v as CityId;
 };
+
+function parseBusinesses(v: unknown): LifeState['businesses'] {
+  if (v === undefined) return [];
+  if (!Array.isArray(v)) fail('businesses');
+  return v.map((b, i) => {
+    if (!isObj(b) || typeof b.id !== 'string' || !BUSINESS_BY_ID.has(b.id as BusinessId)) fail(`businesses.${i}`);
+    const level = num(b.level, `businesses.${i}.level`, 1, 3);
+    if (!Number.isInteger(level)) fail(`businesses.${i}.level`);
+    return { id: b.id as BusinessId, level: level as 1 | 2 | 3, visited: num(b.visited, `businesses.${i}.visited`, 0, 100000) };
+  });
+}
+
+function parseLayout(v: unknown): LifeState['layout'] {
+  if (v === undefined) return {};
+  if (!isObj(v)) fail('layout');
+  const out: LifeState['layout'] = {};
+  for (const [slot, at] of Object.entries(v)) {
+    if (!(slot in DEFAULT_SPOT) || !Array.isArray(at) || at.length !== 2) fail(`layout.${slot}`);
+    out[slot as DecorSlot] = [num(at[0], `layout.${slot}`, 0, 16), num(at[1], `layout.${slot}`, 0, 12)];
+  }
+  return out;
+}
 
 function parseDima(v: unknown): LifeState['dima'] {
   if (v === undefined) return { mode: 'home', eta: null };
@@ -110,5 +133,9 @@ export function parseSave(text: string): LifeState {
     },
     doneToday: strList(raw.doneToday, 'doneToday', () => true),
     dima: parseDima(raw.dima),
+    // Нові поля (2026-10-04): сейв без них — до справ, житла й облаштування.
+    businesses: parseBusinesses(raw.businesses),
+    properties: raw.properties === undefined ? [] : strList(raw.properties, 'properties', (id) => PROPERTY_BY_ID.has(id)),
+    layout: parseLayout(raw.layout),
   };
 }

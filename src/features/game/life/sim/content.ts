@@ -133,7 +133,7 @@ export interface Outfit {
   accent?: string;
 }
 
-export type DecorSlot = 'bed' | 'rug' | 'plant' | 'lamp' | 'poster' | 'shelf' | 'tv' | 'pet' | 'table';
+export type DecorSlot = 'bed' | 'rug' | 'plant' | 'lamp' | 'poster' | 'shelf' | 'tv' | 'pet' | 'table' | 'desk' | 'sofa';
 
 export interface Item {
   id: string;
@@ -184,6 +184,8 @@ export const ITEMS: readonly Item[] = [
   { id: 'poster', name: 'Постер з Одесою', kind: 'decor', shop: 'souvenirs', price: 150, cities: ['odesa', 'kyiv'], decor: 'poster', tint: '#3f7fc1', mood: 4, blurb: 'Море на стіні' },
   { id: 'shelf', name: 'Книжкова полиця', kind: 'decor', shop: 'home', price: 450, decor: 'shelf', tint: '#8a5a34', skills: { knowledge: 3 }, blurb: '+3 знань' },
   { id: 'bedQueen', name: 'Велике ліжко', kind: 'decor', shop: 'home', price: 1600, decor: 'bed', tint: '#f2a5c0', energy: 10, minWeek: 12, blurb: 'Сон відновлює більше енергії' },
+  { id: 'desk', name: 'Письмовий стіл', kind: 'decor', shop: 'home', price: 900, decor: 'desk', tint: '#a8784a', skills: { knowledge: 2 }, minWeek: 9, blurb: 'Місце для ноутбука й навчання' },
+  { id: 'sofa', name: 'М\'який диван', kind: 'decor', shop: 'home', price: 2200, decor: 'sofa', tint: '#c46b8f', mood: 8, minWeek: 12, blurb: 'Вечори з серіалами вдвох' },
   { id: 'tv', name: 'Телевізор', kind: 'decor', shop: 'tech', price: 2400, decor: 'tv', tint: '#23232c', mood: 8, minWeek: 12, blurb: 'Серіали вечорами' },
   { id: 'kitten', name: 'Кошеня Пиріжок', kind: 'decor', shop: 'home', price: 0, decor: 'pet', tint: '#e8a25a', mood: 12, minWeek: 16, blurb: 'Безкоштовно, з притулку. Мур!' },
   { id: 'table', name: 'Столик на двох', kind: 'decor', shop: 'home', price: 700, decor: 'table', tint: '#c49a6c', mood: 4, blurb: 'Вечері вдвох' },

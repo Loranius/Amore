@@ -22,6 +22,7 @@ import {
   itemById,
   shopStock,
   type CityId,
+  type DecorSlot,
   type Item,
   type PersonId,
   type ShopId,
@@ -55,6 +56,29 @@ import {
   type DateKind,
   type LifeState,
 } from '../sim/life';
+import {
+  BUSINESSES,
+  BUSINESS_BY_ID,
+  BUSINESS_NEGLECT_DAYS,
+  GIGS,
+  GIGS_PER_DAY,
+  PROPERTIES,
+  buyProperty,
+  buyPropertyCheck,
+  doGig,
+  gigCheck,
+  gigPay,
+  livesIn,
+  manageBusiness,
+  manageCheck,
+  moveToOwned,
+  openBusiness,
+  openBusinessCheck,
+  rentIncome,
+  upgradeBusiness,
+  upgradeCheck,
+  type Business,
+} from '../sim/economy';
 import { UA_OUTLINE } from '../games/banks';
 import type { GameController, Panel } from '../controller';
 import { lenaLook } from '../look';
@@ -300,9 +324,13 @@ function JobsPanel({ c, life, focus }: { c: GameController; life: LifeState; foc
 function RealtorPanel({ c, life }: { c: GameController; life: LifeState }) {
   const rent = life.flags.livingWithDima ? Math.round(RENT[life.city] * 0.6) : RENT[life.city];
   const can = !studying(life) && life.home !== life.city && life.money >= rent;
+  const here = PROPERTIES.filter((p) => p.city === life.city);
+  const mine = PROPERTIES.filter((p) => life.properties.includes(p.id));
+  const biz = BUSINESSES.filter((b) => b.city === life.city);
   return (
-    <Sheet title="Ріелтор" sub={`Зараз живеш: ${life.homeName} · оренда ${life.rent} ₴/тиждень`} onClose={() => c.closePanel()}>
-      <p className="lg-note">Оренда списується щопонеділка. {life.flags.livingWithDima ? 'Удвох із Дімою — платите навпіл (60% ціни на тебе).' : ''}</p>
+    <Sheet title="Нерухомість і справи" sub={`Зараз живеш: ${life.homeName}${life.rent ? ` · оренда ${life.rent} ₴/тиждень` : ' · без оренди'}`} onClose={() => c.closePanel()}>
+      <h3 style={{ margin: 0 }}>Оренда</h3>
+      <p className="lg-note">Оренда списується щотижня. {life.flags.livingWithDima ? 'Удвох із Дімою — платите навпіл (60% ціни на тебе).' : ''}</p>
       <div className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
         <div>
           <div className="lg-row-title">Квартира: {CITIES[life.city].name}</div>
@@ -312,6 +340,139 @@ function RealtorPanel({ c, life }: { c: GameController; life: LifeState }) {
         </div>
         <button type="button" className="lg-btn" disabled={!can} onClick={() => void c.act((s) => moveHome(s, s.city))}>Орендувати</button>
       </div>
+
+      <h3 style={{ margin: '6px 0 0' }}>Купити житло</h3>
+      {here.length === 0 && <p className="lg-note">У цьому місті житла на продаж немає.</p>}
+      {here.map((p) => {
+        const owned = life.properties.includes(p.id);
+        const check = buyPropertyCheck(life, p.id);
+        const living = owned && livesIn(life, p.id);
+        return (
+          <div key={p.id} className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+            <div>
+              <div className="lg-row-title">{p.name}</div>
+              <div className="lg-row-sub">{p.blurb} · здавати: +{p.rentOut} ₴/тиждень</div>
+              {!owned && !check.ok && <div className="lg-row-sub" style={{ color: '#b8323a' }}>{check.reason}</div>}
+            </div>
+            {!owned
+              ? <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}><Money value={p.price} /><button type="button" className="lg-btn is-small" disabled={!check.ok} onClick={() => void c.act((s) => buyProperty(s, p.id))}>Купити</button></div>
+              : living
+                ? <span className="lg-tag is-ok">Твій дім</span>
+                : <button type="button" className="lg-btn is-small is-green" onClick={() => void c.act((s) => moveToOwned(s, p.id))}>Переїхати</button>}
+          </div>
+        );
+      })}
+      {mine.length > 0 && (
+        <p className="lg-note">Твоє житло: {mine.map((p) => p.name).join(' · ')}. Порожнє здається — квартиранти платять щотижня (зараз +{rentIncome(life)} ₴).</p>
+      )}
+
+      {biz.length > 0 && <h3 style={{ margin: '6px 0 0' }}>Своя справа</h3>}
+      {biz.map((b) => <BusinessRow key={b.id} c={c} life={life} b={b} />)}
+      <p className="lg-note">Інші міста — інше житло й інші справи. Інтернет-магазин відкривається з ноутбука вдома.</p>
+    </Sheet>
+  );
+}
+
+/** Рядок справи: відкрити, навідатися, розвинути. */
+function BusinessRow({ c, life, b }: { c: GameController; life: LifeState; b: Business }) {
+  const owned = life.businesses.find((x) => x.id === b.id);
+  if (!owned) {
+    const check = openBusinessCheck(life, b.id);
+    return (
+      <div className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+        <div>
+          <div className="lg-row-title">{b.name}</div>
+          <div className="lg-row-sub">{b.blurb} · від {b.income[0]} ₴ за день</div>
+          {!check.ok && <div className="lg-row-sub" style={{ color: '#b8323a' }}>{check.reason}</div>}
+        </div>
+        <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
+          <Money value={b.open} />
+          <button type="button" className="lg-btn is-small" disabled={!check.ok} onClick={() => void c.act((s) => openBusiness(s, b.id))}>Відкрити</button>
+        </div>
+      </div>
+    );
+  }
+  const manage = manageCheck(life, b.id);
+  const up = upgradeCheck(life, b.id);
+  const idle = life.day - owned.visited > BUSINESS_NEGLECT_DAYS;
+  return (
+    <div className="lg-row" style={{ gridTemplateColumns: '1fr auto', background: '#e8f6dc' }}>
+      <div>
+        <div className="lg-row-title">{b.name} · {b.levels[owned.level - 1]}</div>
+        <div className="lg-row-sub">~{b.income[owned.level - 1]} ₴ за день{idle ? ' · без хазяйки — пів доходу' : ''}</div>
+        {!manage.ok && <div className="lg-row-sub">{manage.reason}</div>}
+      </div>
+      <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
+        <button type="button" className="lg-btn is-small is-green" disabled={!manage.ok} onClick={() => void c.act((s) => manageBusiness(s, b.id))}>Навідатись</button>
+        {owned.level < 3 && <button type="button" className="lg-btn is-small is-paper" disabled={!up.ok} onClick={() => void c.act((s) => upgradeBusiness(s, b.id))} title={up.ok ? '' : up.reason}>Розвинути · {b.upgrade[owned.level - 1]} ₴</button>}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+/** Ноутбук удома: замовлення онлайн і свій інтернет-магазин. */
+function LaptopPanel({ c, life }: { c: GameController; life: LifeState }) {
+  const left = GIGS_PER_DAY - life.doneToday.filter((d) => d === 'gig').length;
+  return (
+    <Sheet title="Ноутбук" sub={`Замовлень сьогодні ще: ${left} · ${clockLabel(life.minute)}`} onClose={() => c.closePanel()}>
+      <h3 style={{ margin: 0 }}>Робота онлайн</h3>
+      {GIGS.map((g) => {
+        const check = gigCheck(life, g);
+        return (
+          <div key={g.id} className={`lg-row${check.ok ? '' : ' is-off'}`} style={{ gridTemplateColumns: '1fr auto' }}>
+            <div>
+              <div className="lg-row-title">{g.title}</div>
+              <div className="lg-row-sub">{g.blurb} · {Math.round(g.minutes / 6) / 10} год · {SKILL_NAME[g.skill]} {g.need}+</div>
+              {!check.ok && <div className="lg-row-sub" style={{ color: '#b8323a' }}>{check.reason}</div>}
+            </div>
+            <div style={{ display: 'grid', gap: 4, justifyItems: 'end' }}>
+              <Money value={gigPay(life, g)} />
+              <button type="button" className="lg-btn is-small" disabled={!check.ok} onClick={() => void c.act((s) => doGig(s, g.id))}>Взятись</button>
+            </div>
+          </div>
+        );
+      })}
+      <h3 style={{ margin: '6px 0 0' }}>Свої справи</h3>
+      <BusinessRow c={c} life={life} b={BUSINESS_BY_ID.get('shop')!} />
+      {life.businesses.filter((b) => b.id !== 'shop').map((owned) => {
+        const b = BUSINESS_BY_ID.get(owned.id)!;
+        return (
+          <div key={b.id} className="lg-tile">
+            <span>{b.name} · {b.levels[owned.level - 1]}</span>
+            <span>Навідатись — на місці: {b.city ? CITIES[b.city].name : ''}</span>
+          </div>
+        );
+      })}
+    </Sheet>
+  );
+}
+
+// ------------------------------------------------------------
+const DECOR_NAME: Record<DecorSlot, string> = {
+  bed: 'Ліжко', rug: 'Килим', plant: 'Вазон', lamp: 'Лампа', poster: 'Постер', shelf: 'Полиця', tv: 'Телевізор', pet: 'Улюбленець', table: 'Стіл', desk: 'Письмовий стіл', sofa: 'Диван',
+};
+
+/** Облаштування: переставити кожну річ стрілками. */
+function DecoratePanel({ c, life }: { c: GameController; life: LifeState }) {
+  const slots = (['bed', ...(Object.keys(life.decor) as DecorSlot[]).filter((s) => s !== 'bed')] as DecorSlot[]);
+  return (
+    <Sheet title="Облаштувати кімнату" sub={life.homeName} onClose={() => c.closePanel()}>
+      <p className="lg-note">Переставляй меблі стрілками — кімната змінюється одразу. Нові речі — у «Дім і затишок».</p>
+      {slots.map((slot) => (
+        <div key={slot} className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
+          <div>
+            <div className="lg-row-title">{DECOR_NAME[slot]}</div>
+            <div className="lg-row-sub">{life.decor[slot] ? itemById(life.decor[slot]!).name : 'Звичайне'}</div>
+          </div>
+          <div className="lg-arrows">
+            <button type="button" className="lg-btn is-small is-paper" aria-label="Вліво" onClick={() => c.rearrange(slot, -1, 0)}>←</button>
+            <button type="button" className="lg-btn is-small is-paper" aria-label="Вгору" onClick={() => c.rearrange(slot, 0, -1)}>↑</button>
+            <button type="button" className="lg-btn is-small is-paper" aria-label="Вниз" onClick={() => c.rearrange(slot, 0, 1)}>↓</button>
+            <button type="button" className="lg-btn is-small is-paper" aria-label="Вправо" onClick={() => c.rearrange(slot, 1, 0)}>→</button>
+          </div>
+        </div>
+      ))}
     </Sheet>
   );
 }
@@ -419,6 +580,12 @@ function PhonePanel({ c, life }: { c: GameController; life: LifeState }) {
             </div>
           </div>
           <button type="button" className="lg-btn is-pink is-small" disabled={life.dima.mode === 'follow'} onClick={() => { c.closePanel(); void c.act(callDima); }}>Дзвонити</button>
+        </div>
+      )}
+      {(life.businesses.length > 0 || life.properties.length > 0) && (
+        <div className="lg-tile">
+          {life.businesses.map((owned) => <span key={owned.id}>{BUSINESS_BY_ID.get(owned.id)!.name} · рівень {owned.level}</span>)}
+          {life.properties.length > 0 && <span>Своє житло: {life.properties.length} · здача +{rentIncome(life)} ₴/тиждень</span>}
         </div>
       )}
       <div className="lg-tile">
@@ -554,5 +721,7 @@ export function Panels({ c, life, panel }: { c: GameController; life: LifeState;
     case 'sleep': return <SleepPanel c={c} life={life} />;
     case 'mom': return <MomPanel c={c} life={life} />;
     case 'dima': return <DimaPanel c={c} life={life} />;
+    case 'laptop': return <LaptopPanel c={c} life={life} />;
+    case 'decorate': return <DecoratePanel c={c} life={life} />;
   }
 }

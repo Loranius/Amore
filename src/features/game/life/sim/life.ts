@@ -40,6 +40,7 @@ import {
   type ShopId,
   type SkillId,
 } from './content';
+import { economyNight, economyWeek, type OwnedBusiness } from './economy';
 
 /**
  * Версія сейву. 2 — додано Діму-супутника (`dima`); сейв версії 1
@@ -108,6 +109,12 @@ export interface LifeState {
   /** Що вже зроблено сьогодні: 'duty', 'date', 'friends', 'sight:<id>', 'gift:<person>'. */
   doneToday: string[];
   dima: DimaState;
+  /** Свої справи (ADR-0239, поправка 2026-10-04). */
+  businesses: OwnedBusiness[];
+  /** Куплене житло (id з `PROPERTIES`). */
+  properties: string[];
+  /** Де стоять меблі в кімнаті (клітинки); немає — типове місце. */
+  layout: Partial<Record<DecorSlot, [number, number]>>;
 }
 
 export type LifeEventKind = 'toast' | 'card' | 'milestone' | 'story';
@@ -198,6 +205,9 @@ function baseState(seed: number): LifeState {
     flags: { metDima: false, livingWithDima: false, proposed: false, lyceumVisit: false },
     doneToday: [],
     dima: { mode: 'home', eta: null },
+    businesses: [],
+    properties: [],
+    layout: {},
   };
 }
 
@@ -815,6 +825,7 @@ export function sleep(state: LifeState, passedOut = false): Outcome {
     dima: { mode: 'home', eta: null },
   };
   if (passedOut) events.push({ kind: 'toast', text: 'Заснула від утоми — прокинулась удома' });
+  next = economyNight(next, events);
 
   const before = today(state);
   const after = today(next);
@@ -872,6 +883,7 @@ function newYear(state: LifeState, before: DayInfo, after: DayInfo, events: Life
     next = { ...next, money: next.money - paid, mood: clamp(next.mood - (paid < next.rent ? 12 : 0), 0, 100) };
     events.push({ kind: 'toast', text: paid < next.rent ? `Оренда: не вистачило ${next.rent - paid} ₴ — тривожно` : `Оренда за тиждень: −${paid} ₴` });
   }
+  next = economyWeek(next, after, events);
   return next;
 }
 
@@ -896,7 +908,7 @@ export function moveHome(state: LifeState, city: CityId): Outcome {
   if (state.money < rent) throw new LifeRuleError(`Потрібна застава ${rent} ₴`);
   const name = city === 'zhylyntsi' ? 'Хата в Жилинцях' : `Квартира: ${CITIES[city].name}`;
   return {
-    state: { ...state, home: city, homeName: name, rent, money: state.money - rent, minute: state.minute + 60 },
+    state: { ...state, home: city, homeName: name, rent, money: state.money - rent, minute: state.minute + 60, layout: {} },
     events: [{ kind: 'card', text: `Новий дім: ${name}` }],
   };
 }

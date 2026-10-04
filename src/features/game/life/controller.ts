@@ -7,7 +7,8 @@
 // стану через `subscribe/snapshot` і викликає методи-дії.
 // ============================================================
 import { DAY_END_MIN, dayInfo, type Season } from './sim/calendar';
-import { CITIES, JOB_BY_ID, SIGHTS, type CityId, type PersonId, type ShopId } from './sim/content';
+import { CITIES, JOB_BY_ID, SIGHTS, type CityId, type DecorSlot, type PersonId, type ShopId } from './sim/content';
+import { moveFurniture } from './sim/economy';
 import {
   LifeRuleError,
   attendStudy,
@@ -63,7 +64,9 @@ export type Panel =
   | { kind: 'date' }
   | { kind: 'sleep' }
   | { kind: 'mom' }
-  | { kind: 'dima' };
+  | { kind: 'dima' }
+  | { kind: 'laptop' }
+  | { kind: 'decorate' };
 
 export type Speaker = 'n' | 'l' | 'd' | 'm' | 'o';
 export interface Line { who: Speaker; text: string }
@@ -809,6 +812,8 @@ export class GameController {
         return;
       case 'mom': this.openPanel({ kind: 'mom' }); return;
       case 'talk': this.openPanel({ kind: 'dima' }); return;
+      case 'laptop': this.openPanel({ kind: 'laptop' }); return;
+      case 'decorate': this.openPanel({ kind: 'decorate' }); return;
       case 'walk': return this.goTo(a.to);
       case 'sight': return this.photo(a.sight);
       case 'friends': return this.playFriends();
@@ -1104,6 +1109,20 @@ export class GameController {
   commitWear(next: LifeState): void {
     this.commit(next);
     sfx.blip();
+  }
+
+  /** Переставити меблі й одразу перебудувати кімнату (Лєна стоїть де стояла). */
+  rearrange(slot: DecorSlot, dx: number, dy: number): void {
+    const life = this.life;
+    if (!life || !this.map.interior) return;
+    try {
+      this.commit(moveFurniture(life, slot, dx, dy));
+    } catch (e) {
+      if (e instanceof LifeRuleError) { this.toast(e.message); return; }
+      throw e;
+    }
+    this.map = homeInterior(this.life!);
+    this.emit();
   }
 
   dimaLook(): Look {

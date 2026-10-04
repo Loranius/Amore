@@ -54,6 +54,8 @@ function zhylyntsi(): GameMap {
   m.zone('pond', 9, 26, 3, 2, { type: 'sight', sight: 'pond' }, 'Ставок за хатою');
   m.tree(11, 28, 'willow');
 
+  // Оголошення: у селі продається будинок (нерухомість, 2026-10-04).
+  m.prop('board', 30, 11.4).zone('forSale', 29, 12, 3, 1, { type: 'realtor' }, 'Оголошення · продається будинок');
   m.prop('busStop', 37, 11, { solid: false });
   m.zone('bus', 36, 12, 4, 2, { type: 'station' }, 'Зупинка · автобус');
   m.spawn('station', 37, 13);
@@ -126,6 +128,8 @@ function khmelnytskyi(): GameMap {
   m.building({ id: 'grocery', x: 11, y: 3, w: 5, h: 4, style: 'shop', label: 'Продукти', sign: 'bread', action: { type: 'shop', shop: 'grocery' } });
   m.fill(13, 7, 1, 4, 'p');
   m.prop('board', 16, 9).zone('jobs', 15, 10, 3, 1, { type: 'jobs' }, 'Дошка вакансій');
+  // Агенція нерухомості й оренди приміщень — тут квартири й своя справа.
+  m.prop('board', 24.5, 9).zone('realtor', 23, 10, 3, 1, { type: 'realtor' }, 'Агенція нерухомості');
   m.prop('car', 26, 12.2).prop('car', 4, 12.6, { tint: '#f4f4f7' });
   for (const y of [1, 5, 9, 18, 23, 27]) m.tree(17, y, 'chestnut');
   m.scatterTrees(0, 0, 18, 3, ['chestnut', 'oak'], 0.5, 5);
