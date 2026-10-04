@@ -181,3 +181,7 @@ body { color: var(--lg-ink); -webkit-user-select: none; user-select: none; -webk
   .lg-action, .lg-dialog-next { animation: none; }
   .lg-card, .lg-sheet, .lg-title-box, .lg-toast, .lg-dialog { animation: none; }
 }
+
+/* Мапа дороги: перемикач Поділля/Україна і список міст (власник, 2026-10-04). */
+.lg-tabs { display: flex; gap: 6px; margin-bottom: 8px; }
+.lg-city-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }

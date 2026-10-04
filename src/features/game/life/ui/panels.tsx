@@ -15,6 +15,7 @@ import {
   MODE_NAME,
   PERSON_NAME,
   ROUTES,
+  REGION_CITY_IDS,
   SHOP_NAME,
   SIGHTS,
   SKILL_NAME,
@@ -118,31 +119,103 @@ function ShopPanel({ c, life, shop }: { c: GameController; life: LifeState; shop
 // ------------------------------------------------------------
 function TravelPanel({ c, life }: { c: GameController; life: LifeState }) {
   const [pick, setPick] = useState<CityId | null>(null);
+  // Поділля — за замовчуванням, коли Лєна там: на мапі країни три села й
+  // місто лягали в одну точку (власник, 2026-10-04).
+  const [view, setView] = useState<'region' | 'country'>(CITIES[life.city].local ? 'region' : 'country');
   const W = 300;
   const H = 207;
   const check = pick ? travelCheck(life, pick) : null;
+  const choose = (id: CityId) => setPick(id);
+  const routeStroke = (mode: string) => (mode === 'train' ? '#8a5a34' : mode === 'bus' ? '#3a6fd8' : '#c9a46a');
+  const routeDash = (mode: string) => (mode === 'walk' ? '3 3' : mode === 'bus' ? '6 3' : undefined);
+  const marker = (id: CityId, x: number, y: number, big: boolean) => {
+    const here = id === life.city;
+    const chosen = pick === id;
+    const village = CITIES[id].kind === 'village';
+    return (
+      <g key={id} onClick={() => choose(id)} style={{ cursor: 'pointer' }} role="button" aria-label={CITIES[id].name}>
+        {village ? (
+          // Хатка: дах і стіна.
+          <g transform={`translate(${x},${y})`}>
+            <rect x={-6} y={-3} width={12} height={8} fill={here ? '#ff5d8f' : chosen ? '#f2c14e' : '#fff4dc'} stroke="#5a3218" strokeWidth="1.5" />
+            <polygon points="-8,-3 0,-10 8,-3" fill="#c0503a" stroke="#5a3218" strokeWidth="1.5" />
+          </g>
+        ) : (
+          // Місто: три будинки різної висоти.
+          <g transform={`translate(${x},${y})`}>
+            {[[-9, -4, 6, 10], [-3, -9, 7, 15], [4, -6, 6, 12]].map(([bx, by, bw, bh], i) => (
+              <rect key={i} x={bx} y={by} width={bw} height={bh} fill={here ? '#ff5d8f' : chosen ? '#f2c14e' : '#fff4dc'} stroke="#5a3218" strokeWidth="1.5" />
+            ))}
+          </g>
+        )}
+        <text x={x} y={y - (big ? 16 : 13)} textAnchor="middle" fontSize={big ? 12 : 11} fontWeight="900" fill="#4a2a14" stroke="#fbe7b8" strokeWidth="3" paintOrder="stroke">{CITIES[id].name}</text>
+        <circle cx={x} cy={y} r="18" fill="transparent" />
+      </g>
+    );
+  };
   return (
     <Sheet title="Куди поїдемо?" sub={`Зараз: ${CITIES[life.city].name} · ${clockLabel(life.minute)}`} onClose={() => c.closePanel()}>
-      <svg className="lg-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Мапа України">
-        <polygon points={UA_OUTLINE.map(([x, y]) => `${x * W},${y * H}`).join(' ')} fill="#a8d890" stroke="#4f8a5a" strokeWidth="2" />
-        {ROUTES.map((r) => {
-          const a = CITIES[r.a].pos;
-          const b = CITIES[r.b].pos;
-          return <line key={`${r.a}-${r.b}`} x1={a[0] * W} y1={a[1] * H} x2={b[0] * W} y2={b[1] * H} stroke={r.mode === 'train' ? '#8a5a34' : r.mode === 'bus' ? '#3a6fd8' : '#c9a46a'} strokeWidth="2" strokeDasharray={r.mode === 'walk' ? '3 3' : r.mode === 'bus' ? '6 3' : undefined} />;
-        })}
-        {CITY_IDS.map((id) => {
-          const [x, y] = CITIES[id].pos;
-          const here = id === life.city;
-          return (
-            <g key={id} onClick={() => setPick(id)} style={{ cursor: 'pointer' }}>
-              <circle cx={x * W} cy={y * H} r={here ? 7 : pick === id ? 7 : 5} fill={here ? '#ff5d8f' : pick === id ? '#f2c14e' : '#fff4dc'} stroke="#5a3218" strokeWidth="2" />
-              <text x={x * W} y={y * H - 10} textAnchor="middle" fontSize="11" fontWeight="900" fill="#4a2a14" stroke="#fbe7b8" strokeWidth="3" paintOrder="stroke">{CITIES[id].name}</text>
-              <circle cx={x * W} cy={y * H} r="16" fill="transparent" />
-            </g>
-          );
-        })}
-      </svg>
-      {!pick && <p className="lg-note">Торкнись міста на мапі.</p>}
+      <div className="lg-tabs" role="tablist">
+        <button type="button" role="tab" aria-selected={view === 'region'} className={`lg-btn is-small${view === 'region' ? '' : ' is-paper'}`} onClick={() => setView('region')}>Поділля</button>
+        <button type="button" role="tab" aria-selected={view === 'country'} className={`lg-btn is-small${view === 'country' ? '' : ' is-paper'}`} onClick={() => setView('country')}>Україна</button>
+      </div>
+      {view === 'country' ? (
+        <svg className="lg-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Мапа України">
+          <polygon points={UA_OUTLINE.map(([x, y]) => `${x * W},${y * H}`).join(' ')} fill="#a8d890" stroke="#4f8a5a" strokeWidth="2" />
+          {ROUTES.filter((r) => !(CITIES[r.a].local && CITIES[r.b].local)).map((r) => {
+            const a = CITIES[r.a].local ? REGION_DOT : CITIES[r.a].pos;
+            const b = CITIES[r.b].local ? REGION_DOT : CITIES[r.b].pos;
+            return <line key={`${r.a}-${r.b}`} x1={a[0] * W} y1={a[1] * H} x2={b[0] * W} y2={b[1] * H} stroke={routeStroke(r.mode)} strokeWidth="2" strokeDasharray={routeDash(r.mode)} />;
+          })}
+          {/* Поділля — одна рамка: торкнись, і відкриється детальна мапа. */}
+          <g onClick={() => setView('region')} style={{ cursor: 'pointer' }} role="button" aria-label="Поділля — детальна мапа">
+            <rect x={REGION_DOT[0] * W - 22} y={REGION_DOT[1] * H - 14} width="44" height="28" fill="#fff4dc" fillOpacity="0.85" stroke="#5a3218" strokeWidth="2" strokeDasharray="4 2" />
+            <text x={REGION_DOT[0] * W} y={REGION_DOT[1] * H + 4} textAnchor="middle" fontSize="10" fontWeight="900" fill="#4a2a14">Поділля</text>
+          </g>
+          {CITY_IDS.filter((id) => !CITIES[id].local).map((id) => marker(id, CITIES[id].pos[0] * W, CITIES[id].pos[1] * H, false))}
+        </svg>
+      ) : (
+        <svg className="lg-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Мапа Поділля">
+          <rect x="0" y="0" width={W} height={H} fill="#b9e09a" />
+          {/* Поля й ліс — щоб мапа не була порожньою. */}
+          {REGION_FIELDS.map(([x, y, w, h, fill], i) => <rect key={i} x={x * W} y={y * H} width={w * W} height={h * H} fill={fill} opacity="0.75" />)}
+          {REGION_FOREST.map(([x, y], i) => (
+            <g key={i} transform={`translate(${x * W},${y * H})`}><circle r="5" fill="#4f9a4a" /><rect x="-1" y="3" width="2" height="4" fill="#6e4426" /></g>
+          ))}
+          {/* Південний Буг і ставок у Жилинцях. */}
+          <path d={`M ${0.55 * W} 0 C ${0.6 * W} ${0.3 * H}, ${0.75 * W} ${0.3 * H}, ${0.78 * W} ${0.62 * H} S ${0.9 * W} ${0.95 * H}, ${W} ${H}`} fill="none" stroke="#5aa8e0" strokeWidth="5" />
+          <ellipse cx={0.31 * W} cy={0.69 * H} rx="9" ry="5" fill="#5aa8e0" />
+          {ROUTES.filter((r) => CITIES[r.a].local && CITIES[r.b].local).map((r) => {
+            const a = CITIES[r.a].local!;
+            const b = CITIES[r.b].local!;
+            return <line key={`${r.a}-${r.b}`} x1={a[0] * W} y1={a[1] * H} x2={b[0] * W} y2={b[1] * H} stroke={routeStroke(r.mode)} strokeWidth={r.mode === 'train' ? 4 : 3} strokeDasharray={routeDash(r.mode)} />;
+          })}
+          {/* Залізниця далі: стрілки до міст поза Поділлям. */}
+          {ROUTES.filter((r) => Boolean(CITIES[r.a].local) !== Boolean(CITIES[r.b].local)).map((r) => {
+            const inside = CITIES[r.a].local ? r.a : r.b;
+            const outside = inside === r.a ? r.b : r.a;
+            const from = CITIES[inside].local!;
+            const dx = CITIES[outside].pos[0] - CITIES[inside].pos[0];
+            const dy = CITIES[outside].pos[1] - CITIES[inside].pos[1];
+            const l = Math.hypot(dx, dy) || 1;
+            const to: [number, number] = [from[0] + (dx / l) * 0.17, from[1] + (dy / l) * 0.17];
+            return (
+              <g key={`${r.a}-${r.b}`} onClick={() => choose(outside)} style={{ cursor: 'pointer' }}>
+                <line x1={from[0] * W} y1={from[1] * H} x2={to[0] * W} y2={to[1] * H} stroke={routeStroke(r.mode)} strokeWidth="3" strokeDasharray="2 2" />
+                <text x={to[0] * W} y={to[1] * H + (dy > 0 ? 12 : -4)} textAnchor="middle" fontSize="9" fontWeight="800" fill="#4a2a14" stroke="#fbe7b8" strokeWidth="2.5" paintOrder="stroke">→ {CITIES[outside].name}</text>
+              </g>
+            );
+          })}
+          {REGION_CITY_IDS.map((id) => marker(id, CITIES[id].local![0] * W, CITIES[id].local![1] * H, true))}
+        </svg>
+      )}
+      {/* Список — завжди: місто можна обрати й без влучання в мапу. */}
+      <div className="lg-city-list">
+        {CITY_IDS.map((id) => (
+          <button key={id} type="button" className={`lg-btn is-small${pick === id ? '' : ' is-paper'}`} disabled={id === life.city} onClick={() => choose(id)}>{CITIES[id].name}</button>
+        ))}
+      </div>
+      {!pick && <p className="lg-note">Обери місто на мапі або в списку.</p>}
       {pick && check && (
         <div className="lg-row" style={{ gridTemplateColumns: '1fr auto' }}>
           <div>
@@ -161,6 +234,16 @@ function TravelPanel({ c, life }: { c: GameController; life: LifeState }) {
     </Sheet>
   );
 }
+
+/** Де Поділля на мапі країни: середина його міст. */
+const REGION_DOT: [number, number] = [0.31, 0.39];
+const REGION_FIELDS: [number, number, number, number, string][] = [
+  [0.05, 0.4, 0.14, 0.12, '#e8d27a'], [0.32, 0.3, 0.16, 0.1, '#d9e88a'], [0.55, 0.7, 0.18, 0.14, '#e8d27a'],
+  [0.08, 0.78, 0.2, 0.12, '#cfe58a'], [0.6, 0.08, 0.14, 0.12, '#d9e88a'],
+];
+const REGION_FOREST: [number, number][] = [
+  [0.44, 0.52], [0.47, 0.56], [0.5, 0.51], [0.66, 0.24], [0.69, 0.28], [0.08, 0.2], [0.11, 0.24], [0.62, 0.84], [0.93, 0.2], [0.9, 0.25],
+];
 
 // ------------------------------------------------------------
 function JobsPanel({ c, life, focus }: { c: GameController; life: LifeState; focus?: string | undefined }) {

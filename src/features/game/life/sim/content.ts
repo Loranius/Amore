@@ -17,20 +17,29 @@ export interface City {
   kind: 'village' | 'city';
   /** Положення на мапі України, частки 0..1 (захід → схід, північ → південь). */
   pos: [number, number];
+  /**
+   * Положення на детальній мапі Поділля (частки 0..1). На мапі країни
+   * Жилинці, Правдівка й Хмельницький лягали в одну точку й Жилинці не
+   * можна було обрати (власник, 2026-10-04) — тут між ними видно дорогу.
+   */
+  local?: [number, number];
   blurb: string;
 }
 
 export const CITIES: Record<CityId, City> = {
-  zhylyntsi: { id: 'zhylyntsi', name: 'Жилинці', toName: 'до Жилинців', kind: 'village', pos: [0.285, 0.4], blurb: 'Рідне село на Хмельниччині: хата, садочок, школа, ставок.' },
-  pravdivka: { id: 'pravdivka', name: 'Правдівка', toName: 'до Правдівки', kind: 'village', pos: [0.302, 0.425], blurb: 'Сусіднє село за стежкою: тут школа для 10–11 класів.' },
-  khmelnytskyi: { id: 'khmelnytskyi', name: 'Хмельницький', toName: 'до Хмельницького', kind: 'city', pos: [0.28, 0.35], blurb: 'Обласний центр: ліцей, ринок, Проскурівська.' },
-  vinnytsia: { id: 'vinnytsia', name: 'Вінниця', toName: 'до Вінниці', kind: 'city', pos: [0.36, 0.4], blurb: 'ВДПУ, Вишенька, фонтан на Південному Бузі.' },
+  zhylyntsi: { id: 'zhylyntsi', name: 'Жилинці', toName: 'до Жилинців', kind: 'village', pos: [0.285, 0.4], local: [0.26, 0.62], blurb: 'Рідне село на Хмельниччині: хата, садочок, школа, ставок.' },
+  pravdivka: { id: 'pravdivka', name: 'Правдівка', toName: 'до Правдівки', kind: 'village', pos: [0.302, 0.425], local: [0.42, 0.8], blurb: 'Сусіднє село за стежкою: тут школа для 10–11 класів.' },
+  khmelnytskyi: { id: 'khmelnytskyi', name: 'Хмельницький', toName: 'до Хмельницького', kind: 'city', pos: [0.28, 0.35], local: [0.34, 0.24], blurb: 'Обласний центр: ліцей, ринок, Проскурівська.' },
+  vinnytsia: { id: 'vinnytsia', name: 'Вінниця', toName: 'до Вінниці', kind: 'city', pos: [0.36, 0.4], local: [0.82, 0.45], blurb: 'ВДПУ, Вишенька, фонтан на Південному Бузі.' },
   kyiv: { id: 'kyiv', name: 'Київ', toName: 'до Києва', kind: 'city', pos: [0.47, 0.25], blurb: 'Столиця: Хрещатик, Лавра, кар\'єра й метро.' },
   lviv: { id: 'lviv', name: 'Львів', toName: 'до Львова', kind: 'city', pos: [0.115, 0.32], blurb: 'Бруківка, ратуша, кава й шоколад.' },
   odesa: { id: 'odesa', name: 'Одеса', toName: 'до Одеси', kind: 'city', pos: [0.485, 0.74], blurb: 'Море, Отрада, Жовтий камінь.' },
 };
 
 export const CITY_IDS = Object.keys(CITIES) as CityId[];
+
+/** Міста детальної мапи Поділля. */
+export const REGION_CITY_IDS = CITY_IDS.filter((id) => CITIES[id].local);
 
 export type RouteMode = 'walk' | 'bus' | 'train';
 
