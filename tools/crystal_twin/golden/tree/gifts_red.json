@@ -4,27 +4,22 @@
   "autumn": 0.25,
   "blossoms": [
    {
-    "channel": "red",
     "id": 0,
     "year": 0
    },
    {
-    "channel": "red",
     "id": 1,
     "year": 0
    },
    {
-    "channel": "red",
     "id": 2,
     "year": 0
    },
    {
-    "channel": "red",
     "id": 3,
     "year": 0
    },
    {
-    "channel": "red",
     "id": 4,
     "year": 0
    }
@@ -54,7 +49,7 @@
   "startDate": "2022-12-26",
   "tiers": 2,
   "trunkRadius": 0.066928,
-  "version": "tree-v3/2026-09-29",
+  "version": "tree-v3/2026-10-04",
   "yearBranches": [
    {
     "activity": 10.0,
@@ -100,9 +95,9 @@
   "clusters": 14,
   "crownRadius": 1.2625,
   "firstBlossom": [
-   0.8088,
-   0.9938,
-   0.0313
+   0.8099,
+   0.8538,
+   0.0312
   ],
   "meadowRadius": 3.16,
   "reach": 1.0594,

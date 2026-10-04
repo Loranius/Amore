@@ -85,13 +85,17 @@ class OneModuleOneEffect(unittest.TestCase):
         self.assertEqual({f for f in self.FIELDS if a[f] != b[f]}, set())
         self.assertNotEqual(a["yearBranches"], b["yearBranches"])
 
-    def test_blossom_colour_is_who_granted_the_wish(self):
+    def test_wish_is_a_ribbon_without_gift_colour(self):
+        # ADR-0237, поправка 2026-10-04: на дереві бажання — стрічка без
+        # каналу «хто виконав»; RGB-канали дарування — мова кристала.
         wishes = [
             {"id": 1, "date": "2024-01-01", "ownerId": 1, "fulfilledById": 2},
             {"id": 2, "date": "2024-02-01", "ownerId": 2, "fulfilledById": 1},
             {"id": 3, "date": "2024-03-01", "isShared": True},
         ]
-        self.assertEqual([b["channel"] for b in with_(wishes=wishes)["blossoms"]], ["red", "blue", "green"])
+        blossoms = with_(wishes=wishes)["blossoms"]
+        self.assertEqual(len(blossoms), 3)
+        self.assertTrue(all(sorted(b) == ["id", "year"] for b in blossoms))
 
     def test_events_outside_the_story_do_not_count(self):
         self.assertEqual(with_(memories=dated(5, "1971-03-03"))["leafiness"], with_()["leafiness"])

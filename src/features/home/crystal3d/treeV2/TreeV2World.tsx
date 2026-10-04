@@ -13,6 +13,8 @@ import {
   TREE_FORM_LEAVES,
   TREE_PALETTES,
   createBlossomMaterial,
+  createRibbonMaterial,
+  TREE_RIBBON_COLOUR,
   createGlowPointsMaterial,
   createGrassMaterial,
   createLeafMaterial,
@@ -118,10 +120,10 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     [geometry],
   );
   const blossoms = useMemo(() => {
-    if (geometry.blossoms.positions.length === 0) return null;
+    if (geometry.ribbons.positions.length === 0) return null;
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(geometry.blossoms.positions, 3));
-    g.setAttribute('channel', new THREE.BufferAttribute(geometry.blossoms.channel, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(geometry.ribbons.positions, 3));
+    g.setAttribute('sway', new THREE.BufferAttribute(geometry.ribbons.sway, 1));
     return g;
   }, [geometry]);
   const flowers = useMemo(
@@ -142,7 +144,7 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     grass: createGrassMaterial(palette),
     wood: createWoodMaterial(palette),
     leaves: createLeafMaterial(palette, PORTAL_GROUND_Y),
-    blossoms: createBlossomMaterial(),
+    blossoms: createRibbonMaterial(TREE_RIBBON_COLOUR[form]),
     flowers: createBlossomMaterial(FLOWER_COLOURS),
     fruits: createGlowPointsMaterial('#ffc94a', 1.3, 0.3, false),
     fireflies: createGlowPointsMaterial(palette.firefly, palette.fireflyStrength, 0.12, true),
@@ -176,7 +178,7 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
   useFrame(({ clock, size }) => {
     const t = reduceMotion ? 0 : clock.getElapsedTime();
     const wind = reduceMotion ? 0 : 1;
-    for (const m of [materials.leaves, materials.grass]) {
+    for (const m of [materials.leaves, materials.grass, materials.blossoms]) {
       m.uniforms.uTime!.value = t;
       m.uniforms.uWind!.value = wind;
     }

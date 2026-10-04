@@ -32,7 +32,7 @@ from .hashing import unit
 from .grammar import tier_slot, year_elements
 from .model import _dated_items, _gift_channel, r6
 
-TREE_MODEL_VERSION = "tree-v3/2026-09-29"
+TREE_MODEL_VERSION = "tree-v3/2026-10-04"
 
 # ── Основа росту (не змінена, ADR-0090) ──────────────────────
 FULL_TERM_YEARS = 40.0
@@ -91,11 +91,11 @@ def build_tree_model(snapshot: dict[str, Any]) -> dict[str, Any]:
             continue
         day = parse_day(text)
         if start <= day <= as_of:
-            wishes.append((day.isoformat(), row["id"], _gift_channel(row, partners)))
+            wishes.append((day.isoformat(), row["id"]))
     wishes.sort()
     blossoms = [
-        {"id": wid, "channel": channel, "year": year_index(start, parse_day(day))}
-        for day, wid, channel in wishes[-MAX_BLOSSOMS:]
+        {"id": wid, "year": year_index(start, parse_day(day))}
+        for day, wid in wishes[-MAX_BLOSSOMS:]
     ]
 
     return {

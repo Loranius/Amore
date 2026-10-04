@@ -4,62 +4,50 @@
   "autumn": 0.25,
   "blossoms": [
    {
-    "channel": "green",
     "id": 0,
     "year": 0
    },
    {
-    "channel": "red",
     "id": 1,
     "year": 0
    },
    {
-    "channel": "blue",
     "id": 2,
     "year": 0
    },
    {
-    "channel": "green",
     "id": 3,
     "year": 0
    },
    {
-    "channel": "blue",
     "id": 4,
     "year": 0
    },
    {
-    "channel": "red",
     "id": 5,
     "year": 1
    },
    {
-    "channel": "green",
     "id": 6,
     "year": 1
    },
    {
-    "channel": "red",
     "id": 7,
     "year": 1
    },
    {
-    "channel": "blue",
     "id": 8,
     "year": 1
    },
    {
-    "channel": "green",
     "id": 9,
     "year": 1
    },
    {
-    "channel": "blue",
     "id": 10,
     "year": 1
    },
    {
-    "channel": "red",
     "id": 11,
     "year": 2
    }
@@ -89,7 +77,7 @@
   "startDate": "2022-12-26",
   "tiers": 2,
   "trunkRadius": 0.066928,
-  "version": "tree-v3/2026-09-29",
+  "version": "tree-v3/2026-10-04",
   "yearBranches": [
    {
     "activity": 68.0,
@@ -135,9 +123,9 @@
   "clusters": 23,
   "crownRadius": 1.5974,
   "firstBlossom": [
-   1.0527,
-   0.9371,
-   0.026
+   1.0545,
+   0.7077,
+   0.0259
   ],
   "meadowRadius": 3.4279,
   "reach": 1.3069,

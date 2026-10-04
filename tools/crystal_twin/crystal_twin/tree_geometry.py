@@ -94,7 +94,7 @@ def skeleton(model: dict[str, Any]) -> dict[str, Any]:
         cont = _deviate(direction, 18.0 + 16.0 * unit(seed, f"{key}:ca") - 8.0, turn)
         side = _deviate(direction, 42.0 + 24.0 * unit(seed, f"{key}:sa") - 12.0, turn + 180.0)
         thin = 0.7 if order + 1 < last else 0.5
-        grow(end, cont, length * 0.74, order + 1, last, f"{key}.c", r1 * 0.85, thin)
+        grow(end, cont, length * 0.74, order + 1, last, f"{key}.c", r1, thin)
         grow(end, side, length * 0.62, order + 1, last, f"{key}.s", r1 * 0.65, thin)
 
     stops = [tier_height(model, t) for t in range(model["tiers"])]
@@ -172,11 +172,11 @@ def ornaments(model: dict[str, Any], clusters: list[dict[str, Any]]) -> dict[str
         d = (ring * math.cos(phi), y, ring * math.sin(phi))
         return _add(c["centre"], _mul(d, c["radius"] * depth))
 
-    # Квітка бажання сідає на гілку свого року (ADR-0237).
+    # Стрічка бажання — знизу на кроні гілки свого року (ADR-0237, поправка 2026-10-04).
     blossoms = []
     for b in model["blossoms"]:
         own = [c for c in clusters if c["key"] == f"y{b['year']}" or c["key"].startswith(f"y{b['year']}.")]
-        blossoms.append({"position": on_cluster(f"blossom{b['id']}", True, 0.98, own), "channel": b["channel"]})
+        blossoms.append({"position": on_cluster(f"blossom{b['id']}", False, 1.0, own)})
     fruits = [on_cluster(f"fruit{k}", False, 0.92) for k in range(model["fruits"])]
 
     crown_mid = sum(c["centre"][1] for c in clusters) / n

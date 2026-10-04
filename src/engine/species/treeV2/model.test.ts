@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { ICO_INRADIUS, buildTreeV2Geometry, treeV2Knuckles, treeV2Skeleton, treeV2Summary, treeV2TierHeight } from './geometry';
+import { JOINT_OVERLAP, buildTreeV2Geometry, treeV2Skeleton, treeV2WoodSegment, treeV2Summary, treeV2TierHeight } from './geometry';
 import { buildTreeV2Model, treeAgeProgressV2, type TreeV2Snapshot } from './model';
 
 // ============================================================
@@ -84,7 +84,10 @@ describe('дерево v2: догми власника', () => {
         { id: 3, date: '2024-03-01', isShared: true },
       ],
     });
-    expect(model.blossoms.map((b) => b.channel)).toEqual(['red', 'blue', 'green']);
+    // Дерево не фарбує бажання каналами дарування (власник, 2026-10-04):
+    // RGB — мова кристала; на дереві кожне бажання — однакова стрічка.
+    expect(model.blossoms).toHaveLength(3);
+    for (const b of model.blossoms) expect(Object.keys(b).sort()).toEqual(['id', 'year']);
   });
 });
 
@@ -93,7 +96,7 @@ describe('дерево v2: меш', () => {
   const geometry = buildTreeV2Geometry(model);
 
   it('усі числа скінченні, трикутники цілі', () => {
-    for (const array of [geometry.wood.positions, geometry.leaves.positions, geometry.blossoms.positions]) {
+    for (const array of [geometry.wood.positions, geometry.leaves.positions, geometry.ribbons.positions]) {
       expect(array.length % 9).toBe(0);
       for (const value of array) expect(Number.isFinite(value)).toBe(true);
     }
@@ -116,25 +119,26 @@ describe('дерево v2: меш', () => {
     }
   });
 
-  it('розвилки закриті вузлами: кінець батьківської гілки й початки дочірніх — усередині вузла (регресія «розходяться шви»)', () => {
-    // Скрін власника 2026-09-29: на тестовій парі 13 років крізь розвилку
-    // видно нутро стовбура — відкриті призми сходились без стику.
+  it('розвилки монолітні: без куль-наростів, дочірня гілка починається всередині батьківської (регресії «розходяться шви» й «нарости на швах»)', () => {
+    // 2026-09-29: крізь розвилку видно нутро — відкриті призми сходились без
+    // стику. 2026-10-04: кулі-вузли, що закривали стик, читались наростами.
     const { branches } = treeV2Skeleton(model);
-    const knots = treeV2Knuckles(branches);
-    const startsAt = (c: (typeof branches)[number], p: readonly number[]) =>
-      c.start[0] === p[0] && c.start[1] === p[1] && c.start[2] === p[2];
-    const withChildren = branches.filter((b) => branches.some((c) => c !== b && startsAt(c, b.end)));
-    expect(knots.length).toBe(withChildren.length);
-    expect(knots.length).toBeGreaterThan(0);
-    for (const b of withChildren) {
-      const knot = knots.find((k) => k.centre === b.end)!;
-      // Куля гранчаста: гарантію дає відстань до площини грані, а не до вершини.
-      const covered = knot.radius * ICO_INRADIUS;
-      expect(covered).toBeGreaterThan(b.r1);
-      for (const c of branches.filter((x) => x !== b && startsAt(x, b.end))) {
-        expect(covered).toBeGreaterThan(c.r0);
+    const same = (a: readonly number[], b: readonly number[]) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+    let joints = 0;
+    for (const parent of branches) {
+      for (const child of branches.filter((c) => c !== parent && c.order > 0 && same(c.start, parent.end))) {
+        joints += 1;
+        const seg = treeV2WoodSegment(child);
+        // Призма дочірньої заходить назад у батьківську на JOINT_OVERLAP свого радіуса.
+        expect(Math.hypot(seg.start[0] - child.start[0], seg.start[1] - child.start[1], seg.start[2] - child.start[2])).toBeCloseTo(child.r0 * JOINT_OVERLAP, 9);
+        // Продовження (.c) — без сходинки в товщині.
+        if (child.key === `${parent.key}.c`) expect(child.r0).toBeCloseTo(parent.r1, 12);
       }
     }
+    expect(joints).toBeGreaterThan(0);
+    // Деревина — лише призми (по 12 трикутників): жодної кулі.
+    const g = buildTreeV2Geometry(model);
+    expect((g.wood.positions.length / 9) % 2).toBe(0);
   });
 
   it('детерміновано: той самий знімок — побітово та сама геометрія', () => {
@@ -184,11 +188,11 @@ describe('дерево v3: гілка року ярусами (ADR-0237, вла�
     expect(shape(branchOf(rich, 0)).length).toBeCloseTo(shape(branchOf(quiet, 0)).length, 9);
   });
 
-  it('квітка бажання — на гілці свого року', () => {
+  it('стрічка бажання — на гілці свого року', () => {
     const model = buildTreeV2Model({ ...BASE, asOf: '2030-01-01', wishes: [{ id: 7, date: '2024-06-01', isShared: true }] });
     const { clusters } = treeV2Skeleton(model);
     const own = clusters.filter((c) => c.key === 'y1' || c.key.startsWith('y1.'));
-    const blossom = buildTreeV2Geometry(model).blossoms.positions;
+    const blossom = buildTreeV2Geometry(model).ribbons.positions;
     const at = [blossom[0]!, blossom[1]!, blossom[2]!];
     const near = Math.min(...own.map((c) => Math.hypot(at[0]! - c.centre[0], at[1]! - c.centre[1], at[2]! - c.centre[2]) - c.radius));
     expect(near).toBeLessThan(0.1);

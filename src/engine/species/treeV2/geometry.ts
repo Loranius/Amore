@@ -13,7 +13,6 @@
 // Модуль чистий: лише масиви, без three, без React.
 // ============================================================
 import { unit } from '../crystalV2/hash';
-import type { GiftChannel } from '../crystalV2/model';
 import { yearBoost } from '../grammar/grammar';
 import { treeHeightAt, type TreeV2Model } from './model';
 
@@ -105,7 +104,8 @@ const FORMS: Record<TreeForm, FormRules> = {
   // хмаринка крони.
   sakura: {
     top: 0.58, rise: 32, fall: 26,
-    reach: (H, tier) => (0.51 * H) / (1 + 0.12 * tier),
+    // 0.51 → 0.36 (власник, 2026-10-04: «у сакури дуже довгі гілки»).
+    reach: (H, tier) => (0.36 * H) / (1 + 0.12 * tier),
     depth: (age) => 1 + Math.min(2, Math.floor(age / 2)),
     squash: 0.6, leaf: 1.12, lean: 2.2, tierAt: 0.62,
   },
@@ -157,7 +157,8 @@ export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { br
     const cont = deviate(direction, 18 + 16 * unit(seed, `${key}:ca`) - 8, turn);
     const side = deviate(direction, 42 + 24 * unit(seed, `${key}:sa`) - 12, turn + 180);
     const thin = order + 1 < last ? 0.7 : 0.5;
-    grow(end, cont, length * 0.74, order + 1, last, `${key}.c`, r1 * 0.85, thin);
+    // Продовження — тієї ж товщини, що й кінець батьківської: без сходинки.
+    grow(end, cont, length * 0.74, order + 1, last, `${key}.c`, r1, thin);
     grow(end, side, length * 0.62, order + 1, last, `${key}.s`, r1 * 0.65, thin);
   };
 
@@ -224,7 +225,7 @@ export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { br
     const az = (i * 360) / model.crownLimbs + (unit(seed, `${key}:az`) - 0.5) * 40;
     const el = 55 + 15 * unit(seed, `${key}:el`);
     const d: V3 = [Math.cos(rad(el)) * Math.cos(rad(az)), Math.sin(rad(el)), Math.cos(rad(el)) * Math.sin(rad(az))];
-    const limb = form === 'spruce' ? 0.1 : form === 'sakura' ? 0.34 : 0.28;
+    const limb = form === 'spruce' ? 0.1 : form === 'sakura' ? 0.24 : 0.28;
     grow(top, d, limb * H * (0.85 + 0.3 * unit(seed, `${key}:len`)), 1, 2, key, trunkRel(topY) * 0.6, 0.6);
   }
 
@@ -256,7 +257,8 @@ export function treeV2Roots(model: TreeV2Model): Omit<TreeV2Branch, 'order'>[] {
 }
 
 export interface TreeV2Ornaments {
-  blossoms: { position: V3; channel: GiftChannel }[];
+  /** Стрічки бажань: де стрічку зав'язано (низ крони гілки свого року). */
+  blossoms: { position: V3 }[];
   fruits: V3[];
   fireflies: V3[];
   flowers: { position: V3; tint: number }[];
@@ -274,10 +276,11 @@ export function treeV2Ornaments(model: TreeV2Model, clusters: readonly TreeV2Clu
     const phi = 2 * Math.PI * unit(seed, `${tag}:phi`);
     return add(c.centre, mul([ring * Math.cos(phi), y, ring * Math.sin(phi)], c.radius * depth));
   };
-  // Квітка бажання сідає на гілку СВОГО року (ADR-0237), якщо та вже має листя.
+  // Стрічка бажання зав'язана знизу на кроні гілки СВОГО року (ADR-0237,
+  // поправка 2026-10-04): звисає з-під листя, а не лежить на ньому.
   const blossoms = model.blossoms.map((b) => {
     const own = clusters.filter((c) => c.key === `y${b.year}` || c.key.startsWith(`y${b.year}.`));
-    return { position: onCluster(`blossom${b.id}`, true, 0.98, own.length > 0 ? own : clusters), channel: b.channel };
+    return { position: onCluster(`blossom${b.id}`, false, 1.0, own.length > 0 ? own : clusters) };
   });
   const fruits = Array.from({ length: model.fruits }, (_, k) => onCluster(`fruit${k}`, false, 0.92));
 
@@ -353,40 +356,22 @@ function icosphere(): { verts: V3[]; faces: [number, number, number][] } {
 const ICO = icosphere();
 
 /**
- * Найменша відстань від центру до площини грані — наскільки кругла сфера
- * з ICO насправді. Вузол має накрити кільце радіуса r, тож його радіус
- * рахується від цієї величини, а не від радіуса вершин.
- */
-export const ICO_INRADIUS = Math.min(...ICO.faces.map(([a, b, c]) => {
-  const pa = ICO.verts[a]!;
-  const n = norm(cross(
-    [ICO.verts[b]![0] - pa[0], ICO.verts[b]![1] - pa[1], ICO.verts[b]![2] - pa[2]],
-    [ICO.verts[c]![0] - pa[0], ICO.verts[c]![1] - pa[1], ICO.verts[c]![2] - pa[2]],
-  ));
-  return Math.abs(n[0] * pa[0] + n[1] * pa[1] + n[2] * pa[2]);
-}));
-
-/**
- * Вузли деревини — там, де з кінця гілки виходять дочірні.
+ * Стик гілок без наростів (власник, 2026-10-04: «на місцях швів ти додав
+ * нарости … зробити весь стовбур монолітним, шви непомітними»).
  *
- * Кожна гілка — окрема відкрита призма. Дочірня тонша (0.85 чи 0.65 від
- * кінця батьківської), дивиться деінде й має власний поворот граней, тож на
- * розвилці лишалась щілина й видно було нутро стовбура: «розходяться шви»
- * (скрін власника, тестова пара 13 років, 2026-09-29). Вузол — гранчаста
- * куля трохи ширша за кінець гілки — закриває стик, як потовщення на справжній
- * розвилці. Модель і скелет не змінюються: лише те, як стик намальовано.
+ * Раніше щілину на розвилці закривала гранчаста куля-«вузол», і вона
+ * читалась як наріст. Тепер щілину закриває сама гілка: кожна, крім
+ * стовбура, починається трохи ВСЕРЕДИНІ батьківської — подовжена назад
+ * уздовж власного напрямку на `JOINT_OVERLAP` свого радіуса. Продовження
+ * гілки не тоншає стрибком (`r0` = `r1` батьківської), а грані всієї
+ * деревини мають один тон за номером грані, тож стик не видно й за кольором.
  */
-export const KNUCKLE_MARGIN = 1.06;
+export const JOINT_OVERLAP = 1.3;
 
-export function treeV2Knuckles(branches: readonly TreeV2Branch[]): { centre: V3; radius: number; key: string }[] {
-  const out: { centre: V3; radius: number; key: string }[] = [];
-  for (const b of branches) {
-    const children = branches.filter((c) => c !== b && c.start[0] === b.end[0] && c.start[1] === b.end[1] && c.start[2] === b.end[2]);
-    if (children.length === 0) continue;
-    const widest = Math.max(b.r1, ...children.map((c) => c.r0));
-    out.push({ centre: b.end, radius: (widest * KNUCKLE_MARGIN) / ICO_INRADIUS, key: `${b.key}:knot` });
-  }
-  return out;
+export function treeV2WoodSegment(b: TreeV2Branch): { start: V3; end: V3 } {
+  if (b.order === 0) return { start: b.start, end: b.end };
+  const d = norm([b.end[0] - b.start[0], b.end[1] - b.start[1], b.end[2] - b.start[2]]);
+  return { start: add(b.start, mul(d, -b.r0 * JOINT_OVERLAP)), end: b.end };
 }
 
 /** Пласкі трикутники призми, закручені НАЗОВНІ (перевіряє тест). */
@@ -409,7 +394,6 @@ function prism(start: V3, end: V3, r0: number, r1: number, sides: number): V3[][
   return tris;
 }
 
-const CHANNEL_INDEX: Record<GiftChannel, number> = { red: 0, blue: 1, green: 2 };
 
 export interface TreeV2Geometry {
   /** Стовбур, гілки й коріння: позиції та тон кожної грані. */
@@ -417,7 +401,12 @@ export interface TreeV2Geometry {
   /** Крона: позиції, тон грані й чи осіння вона (0/1). */
   leaves: { positions: Float32Array; tone: Float32Array; autumn: Float32Array };
   /** Квіти бажань: крихітні октаедри, канал кольору на вершину (0 червоний, 1 блакитний, 2 зелений). */
-  blossoms: { positions: Float32Array; channel: Float32Array };
+  /**
+   * Стрічки бажань (дерево бажань): вузлик і два хвости, що звисають.
+   * `sway` — 0 біля вузлика … 1 на кінчику хвоста, для вітру в шейдері.
+   * Колір — один на форму дерева (`TREE_RIBBON_COLOUR`), а не «хто виконав».
+   */
+  ribbons: { positions: Float32Array; sway: Float32Array };
   fruits: Float32Array;
   fireflies: Float32Array;
   flowers: { positions: Float32Array; tint: Float32Array };
@@ -533,19 +522,8 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   // Ялина: гілки сховані під «спідничками» хвої — видно лише стовбур.
   const spruce = form === 'spruce';
   for (const b of spruce ? branches.filter((x) => x.order === 0) : branches) {
-    // Тонкі гілки — п'ять граней, стовбур і скелетні — шість: той самий вигляд, менше трикутників.
-    pushTris(prism(b.start, b.end, b.r0, b.r1, b.order < 2 ? 6 : 5), wood, woodTone,
-      (face) => 0.82 + 0.36 * unit(seed, `${b.key}:w${face}`));
-  }
-  for (const k of treeV2Knuckles(spruce ? branches.filter((x) => x.order === 0) : branches)) {
-    const tris = ICO.faces.map(([a, b, c]) => [a, b, c].map((i) => add(k.centre, mul(ICO.verts[i]!, k.radius))));
-    tris.forEach((tri, f) => {
-      const value = 0.82 + 0.36 * unit(seed, `${k.key}:w${f}`);
-      for (const p of tri) {
-        wood.push(p[0], p[1], p[2]);
-        woodTone.push(value);
-      }
-    });
+    const seg = treeV2WoodSegment(b);
+    pushTris(prism(seg.start, seg.end, b.r0, b.r1, 6), wood, woodTone, (face) => 0.86 + 0.28 * unit(seed, `bark:${face}`));
   }
   for (const r of treeV2Roots(model)) {
     pushTris(prism(r.start, r.end, r.r0, r.r1, 5), wood, woodTone, (face) => 0.75 + 0.3 * unit(seed, `${r.key}:w${face}`));
@@ -581,26 +559,52 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     });
   }
 
-  const blossom: number[] = [];
-  const blossomChannel: number[] = [];
-  // Квітку видно з відстані камери: 0.02 висоти на першому кадрі губилось у кроні.
-  const size = Math.max(0.06, model.height * 0.035);
-  const octa: V3[] = [[1, 0, 0], [-1, 0, 0], [0, 1, 0], [0, -1, 0], [0, 0, 1], [0, 0, -1]];
-  const octaFaces = [[0, 2, 4], [4, 2, 1], [1, 2, 5], [5, 2, 0], [4, 3, 0], [1, 3, 4], [5, 3, 1], [0, 3, 5]];
-  for (const b of orn.blossoms) {
-    for (const face of octaFaces) {
-      for (const i of face) {
-        const v = octa[i]!;
-        blossom.push(b.position[0] + v[0] * size, b.position[1] + v[1] * size * 0.6, b.position[2] + v[2] * size);
-        blossomChannel.push(CHANNEL_INDEX[b.channel]);
+  const ribbon: number[] = [];
+  const ribbonSway: number[] = [];
+  // Стрічку видно з відстані камери, але вона не важча за гілку.
+  const size = Math.max(0.05, model.height * 0.03);
+  const push = (p: V3, sway: number) => { ribbon.push(p[0], p[1], p[2]); ribbonSway.push(sway); };
+  orn.blossoms.forEach((b, k) => {
+    const phi = 2 * Math.PI * unit(seed, `ribbon${k}:phi`);
+    const side: V3 = [Math.cos(phi), 0, Math.sin(phi)];
+    const p = b.position;
+    // Вузлик — маленький ромб.
+    const knot = size * 0.35;
+    const up: V3 = [p[0], p[1] + knot, p[2]];
+    const dn: V3 = [p[0], p[1] - knot, p[2]];
+    const l: V3 = add(p, mul(side, -knot));
+    const r: V3 = add(p, mul(side, knot));
+    push(up, 0); push(l, 0); push(dn, 0);
+    push(up, 0); push(dn, 0); push(r, 0);
+    // Два хвости розходяться й звисають хвилею.
+    for (const dir of [-1, 1]) {
+      const N = 4;
+      const len = size * (2.6 + 0.8 * unit(seed, `ribbon${k}:len${dir}`));
+      const w = size * 0.45;
+      const at = (t: number): V3 => add(p, add(mul(side, dir * (knot * 0.6 + t * size * 0.5) + Math.sin(t * 6 + k) * size * 0.12), [0, -t * len, 0]));
+      for (let q = 0; q < N; q += 1) {
+        const t0 = q / N;
+        const t1 = (q + 1) / N;
+        const a0 = at(t0);
+        const a1 = at(t1);
+        const o: V3 = mul(side, w * 0.5);
+        const a0l = add(a0, mul(o, -1));
+        const a0r = add(a0, o);
+        // Кінчик хвоста — вирізаний «ластівчиним хвостом».
+        const a1l = add(a1, mul(o, -1));
+        const a1r = add(a1, o);
+        const tip = q === N - 1 ? add(a1, [0, size * 0.25, 0]) : null;
+        push(a0l, t0); push(a1l, t1); push(a0r, t0);
+        if (tip) { push(a0r, t0); push(a1l, t1); push(tip, t1); push(a0r, t0); push(tip, t1); push(a1r, t1); }
+        else { push(a0r, t0); push(a1l, t1); push(a1r, t1); }
       }
     }
-  }
+  });
 
   return {
     wood: { positions: new Float32Array(wood), tone: new Float32Array(woodTone) },
     leaves: { positions: new Float32Array(leaves), tone: new Float32Array(leafTone), autumn: new Float32Array(leafAutumn) },
-    blossoms: { positions: new Float32Array(blossom), channel: new Float32Array(blossomChannel) },
+    ribbons: { positions: new Float32Array(ribbon), sway: new Float32Array(ribbonSway) },
     fruits: new Float32Array(orn.fruits.flat()),
     fireflies: new Float32Array(orn.fireflies.flat()),
     flowers: {

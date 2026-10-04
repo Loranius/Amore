@@ -16,7 +16,9 @@
 //   активність року     → гілка року довша (≤ ×1.35) і горизонтальніша
 //   виконані плани      → гілки верхівки
 //   спогади             → пишність крони
-//   виконані бажання    → квіти; колір кожної — хто виконав бажання
+//   виконані бажання    → стрічки на гілці свого року (дерево бажань);
+//                         колір — за формою дерева, а не «хто виконав»:
+//                         RGB-канали дарування — мова кристала, не дерева
 //   віхи «Нашого шляху» → золоті плоди
 //   місця на мапі       → коріння
 //   переглянуте (медіа) → світлячки
@@ -29,15 +31,13 @@ import { DAYS_PER_YEAR, dayNumber, daysBetween, parseDay, yearIndex } from '../c
 import { unit } from '../crystalV2/hash';
 import {
   datedItems,
-  giftChannel,
   r6,
   type ActivityCounts,
   type CrystalV2Snapshot,
-  type GiftChannel,
 } from '../crystalV2/model';
 import { tierSlot, yearElements } from '../grammar/grammar';
 
-export const TREE_V2_VERSION = 'tree-v3/2026-09-29';
+export const TREE_V2_VERSION = 'tree-v3/2026-10-04';
 
 const FULL_TERM_YEARS = 40;
 const GROWTH_SATURATION = 3.8;
@@ -60,9 +60,9 @@ const MAX_BLOSSOMS = 60;
 
 export type TreeV2Snapshot = CrystalV2Snapshot;
 
+/** Виконане бажання: стрічка на гілці свого року. */
 export interface TreeV2Blossom {
   id: number;
-  channel: GiftChannel;
   year: number;
 }
 
@@ -110,7 +110,6 @@ export function buildTreeV2Model(snapshot: TreeV2Snapshot): TreeV2Model {
   const startText = snapshot.startDate.slice(0, 10);
   const start = parseDay(startText);
   const asOf = parseDay(snapshot.asOf);
-  const partners = snapshot.partners ?? {};
   const seed = startText;
 
   const days = Math.max(0, daysBetween(start, asOf));
@@ -127,7 +126,7 @@ export function buildTreeV2Model(snapshot: TreeV2Snapshot): TreeV2Model {
 
   // Квіти: по одній на виконане бажання, найновіші — якщо їх забагато.
   // Порядок — дата, тоді id, тоді канал: той самий, що в Python (кортежі).
-  const wishes: [string, number, GiftChannel][] = [];
+  const wishes: [string, number][] = [];
   const from = dayNumber(start);
   const to = dayNumber(asOf);
   for (const row of snapshot.wishes ?? []) {
@@ -136,13 +135,12 @@ export function buildTreeV2Model(snapshot: TreeV2Snapshot): TreeV2Model {
     const at = dayNumber(day);
     if (at >= from && at <= to) {
       const iso = `${String(day.year).padStart(4, '0')}-${String(day.month).padStart(2, '0')}-${String(day.day).padStart(2, '0')}`;
-      wishes.push([iso, row.id, giftChannel(row, partners)]);
+      wishes.push([iso, row.id]);
     }
   }
-  wishes.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1] || (a[2] < b[2] ? -1 : a[2] > b[2] ? 1 : 0)));
-  const blossoms = wishes.slice(-MAX_BLOSSOMS).map(([iso, id, channel]) => ({
+  wishes.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : a[1] - b[1]));
+  const blossoms = wishes.slice(-MAX_BLOSSOMS).map(([iso, id]) => ({
     id,
-    channel,
     year: yearIndex(start, parseDay(iso)),
   }));
 

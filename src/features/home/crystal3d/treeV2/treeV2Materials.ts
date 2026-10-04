@@ -231,6 +231,52 @@ export function createBlossomMaterial(colours: readonly string[] = BLOSSOM_COLOU
   });
 }
 
+/**
+ * Колір стрічок бажань — один на форму дерева (власник, 2026-10-04): дуб
+ * носить червоні стрічки, як вишиванка; ялина — золоті, як святкова; на
+ * рожевій сакурі — білі. Без каналів «хто виконав»: це мова кристала.
+ */
+export const TREE_RIBBON_COLOUR: Record<'oak' | 'spruce' | 'sakura', string> = {
+  oak: '#d8323e',
+  spruce: '#f2c14e',
+  sakura: '#fff8f4',
+};
+
+/** Стрічки бажань: двобічні, хвости колишуться на вітрі від вузлика донизу. */
+export function createRibbonMaterial(tint: string): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    side: THREE.DoubleSide,
+    uniforms: { uColour: { value: colour(tint) }, uTime: { value: 0 }, uWind: { value: 1 } },
+    vertexShader: /* glsl */ `
+      attribute float sway;
+      uniform float uTime;
+      uniform float uWind;
+      varying vec3 vWorld;
+      varying float vSway;
+      void main() {
+        vec4 w = modelMatrix * vec4(position, 1.0);
+        float s = sway * sway * uWind;
+        w.x += sin(uTime * 1.7 + w.y * 9.0 + w.z * 3.0) * 0.035 * s;
+        w.z += cos(uTime * 1.3 + w.x * 7.0) * 0.025 * s;
+        vWorld = w.xyz;
+        vSway = sway;
+        gl_Position = projectionMatrix * viewMatrix * w;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColour;
+      varying vec3 vWorld;
+      varying float vSway;
+      void main() {
+        vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+        float shade = 0.72 + 0.28 * abs(n.y) + 0.12 * abs(n.x);
+        gl_FragColor = vec4(uColour * shade * (1.08 - 0.12 * vSway), 1.0);
+        ${END}
+      }
+    `,
+  });
+}
+
 /** Трава: пучки інстансами; верхівка світліша й гойдається. */
 export function createGrassMaterial(p: TreePalette): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({

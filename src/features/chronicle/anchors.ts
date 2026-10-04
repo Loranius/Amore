@@ -3,7 +3,7 @@
 // ------------------------------------------------------------
 // Кожен запис показує ТУ частину, яку він справді виростив за таблицею
 // ADR-0237 §3. Точки беруться з тих самих функцій геометрії, що малюють
-// об'єкт, а не вгадуються з екрана: квітка бажання — там, де квітка,
+// об'єкт, а не вгадуються з екрана: стрічка бажання — там, де стрічка,
 // тріщина лави плану — там, де вона на схилі.
 //
 // Одиниці: `object` — одиниці моделі виду, від землі під об'єктом (сцена
@@ -85,7 +85,7 @@ function treeAnchor(model: TreeV2Model, form: TreeForm, trace: ChronicleTrace): 
     case 'wishes': {
       const k = model.blossoms.findIndex((b) => b.id === trace.id);
       const blossom = k >= 0 ? orn.blossoms[k] : undefined;
-      return blossom ? at(blossom.position, 0.42) : at(crown, WHOLE, 'object', 'Квітка цього бажання вже серед найновіших у кроні');
+      return blossom ? at(blossom.position, 0.42) : at(crown, WHOLE, 'object', 'На гілках — стрічки найновіших бажань; ця вже серед давніх');
     }
     case 'plans': {
       const limbs = branches.filter((b) => /^c\d+$/.test(b.key));
@@ -187,7 +187,7 @@ export const MODULE_TRACE: Record<'crystal' | 'tree' | 'reef', Record<ActivityKi
   tree: {
     memories: 'Спогади — пишність крони на гілці свого року',
     plans: 'Виконані плани — гілки верхівки',
-    wishes: 'Виконані бажання — квіти в кроні, колір — хто виконав',
+    wishes: 'Виконані бажання — стрічки на гілці свого року',
     milestones: 'Віхи — золоті плоди',
     events: 'Події живлять гілку свого року',
     places: 'Місця — коріння',
