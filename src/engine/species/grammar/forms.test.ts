@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CRYSTAL_FORMS, buildCrystalV2Geometry } from '../crystalV2/geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from '../crystalV2/model';
-import { TREE_FORMS, buildTreeV2Geometry, treeV2Skeleton, treeV2WishPoints } from '../treeV2/geometry';
+import { TREE_FORMS, buildTreeV2Geometry, treeV2Skeleton, treeV2SpruceSkirts, treeV2WishPoints } from '../treeV2/geometry';
 import { buildTreeV2Model } from '../treeV2/model';
 
 // ============================================================
@@ -97,12 +97,16 @@ describe('форми дерева: той самий ріст, інший мал
     const [cr, cg, cb] = dominant('spruce');
     expect(cr).toBeGreaterThan(cb); // коричневі шишки
     expect(Math.max(cr, cg, cb)).toBeLessThan(0.7);
-    // Шишка висить на кінчику гілки свого року, а не під хвоєю.
-    const { branches } = treeV2Skeleton(model, 'spruce');
-    treeV2WishPoints(model, 'spruce').forEach((p, k) => {
-      const own = branches.find((x) => x.key === `y${model.blossoms[k]!.year}`);
-      if (own) expect(p).toEqual(own.end);
-    });
+    // Шишка висить на краю лапи — біля вершини «спіднички», не під хвоєю
+    // і не в повітрі за нею (власник бачив шишку поза кроною, 2026-10-04).
+    const rim = treeV2SpruceSkirts(model, treeV2Skeleton(model, 'spruce').clusters).tris.flat();
+    const H = model.height;
+    for (const p of treeV2WishPoints(model, 'spruce')) {
+      const gap = Math.min(...rim.map((v) => Math.hypot(v[0] - p[0], v[1] - p[1], v[2] - p[2])));
+      expect(gap).toBeLessThan(0.12 * H);
+      const band = rim.filter((v) => Math.abs(v[1] - p[1]) < 0.1 * H).map((v) => Math.hypot(v[0], v[2]));
+      expect(Math.hypot(p[0], p[2])).toBeLessThan(Math.max(...band));
+    }
   });
 
   it('сакура — розлога: крона ширша, ніж у дуба, а дерево нижче', () => {

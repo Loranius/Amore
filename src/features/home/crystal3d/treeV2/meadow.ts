@@ -41,3 +41,27 @@ export function grassInstances(seed: string, clear: number, reach: number, count
   }
   return out;
 }
+
+/**
+ * Трава під низькою кроною (власник, 2026-10-04: «через ялинку проходять
+ * зелені смужки, схожі на траву»). Нижні «спіднички» ялини опускаються майже
+ * до землі, і травинка, вища за них, проколює хвою. Тут кожен пучок стає
+ * нижчим за найнижчу хвою над своїм радіусом — трава ховається під лапами,
+ * а не проходить крізь них. Де крона висока (дуб, сакура), нічого не міняється.
+ * `leaves` — у координатах дерева, `scale` — його масштаб у сцені.
+ */
+export function tuckGrassUnderCanopy(grass: readonly GrassInstance[], leaves: Float32Array, scale: number): GrassInstance[] {
+  const BAND = 0.08; // ширина кільця, сцени
+  const ceiling = (d: number) => {
+    let low = Infinity;
+    for (let i = 0; i < leaves.length; i += 3) {
+      const r = Math.hypot(leaves[i]!, leaves[i + 2]!) * scale;
+      if (r >= d - BAND && r <= d + BAND) low = Math.min(low, leaves[i + 1]! * scale);
+    }
+    return low;
+  };
+  return grass.map((g) => {
+    const room = ceiling(Math.hypot(g.x, g.z)) * 0.7;
+    return room < g.scale ? { ...g, scale: Math.max(0.005, room) } : g;
+  });
+}

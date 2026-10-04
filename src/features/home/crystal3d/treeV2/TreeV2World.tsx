@@ -5,7 +5,7 @@ import { unit } from '@/engine/species/crystalV2/hash';
 import type { TreeForm, TreeV2Geometry } from '@/engine/species/treeV2/geometry';
 import { PORTAL_GROUND_Y } from '../scene/portalScene';
 import { Diorama } from '@/features/home/diorama/Diorama';
-import { buildGrassTuft, grassInstances } from './meadow';
+import { buildGrassTuft, grassInstances, tuckGrassUnderCanopy } from './meadow';
 import { TreeIsland } from './TreeIsland';
 import { treeIslandBase, treeIslandGround } from './treeIsland';
 import {
@@ -104,7 +104,10 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
 
   // ── Світ (не залежить від дерева) ────────────────────────
   const clear = Math.max(0.25, geometry.height * scale * 0.06);
-  const grass = useMemo(() => grassInstances(seed, clear, island * 0.85), [seed, clear, island]);
+  const grass = useMemo(
+    () => tuckGrassUnderCanopy(grassInstances(seed, clear, island * 0.85), geometry.leaves.positions, scale),
+    [seed, clear, island, geometry, scale],
+  );
   const tuft = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(buildGrassTuft(), 3));
