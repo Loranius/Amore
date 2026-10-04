@@ -35,8 +35,16 @@
   .chronicle { left: auto; right: 24px; width: 420px; }
 }
 
+/* Заголовок, час і модулі не стискаються: місце віддає лише список. */
+.chronicle-head,
+.chronicle-time,
+.chronicle-kinds { flex: none; }
 .chronicle-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.chronicle-head .modal-close { position: static; flex: none; }
+/* Хрестик стоїть у рядку заголовка, а не в куті шторки. `relative`, не
+   `static`: його невидиме поле дотику (`::before`, inset −3px) рахується від
+   найближчого позиційованого предка, і зі `static` цим предком ставала вся
+   шторка — хрестик ловив кожен дотик по модулях і записах (регресія). */
+.chronicle-head .modal-close { position: relative; top: auto; right: auto; flex: none; }
 .chronicle-title { margin: 0; font-size: 18px; font-weight: 800; }
 .chronicle-when { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 
@@ -87,7 +95,7 @@
 .chronicle-count { font-weight: 600; opacity: 0.75; }
 .chronicle-empty { margin: 0; color: var(--muted); font-size: 13px; }
 
-.chronicle-list-wrap { min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.chronicle-list-wrap { flex: 1 1 auto; min-height: 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
 .chronicle-trace { margin: 0 0 6px; color: var(--muted); font-size: 13px; }
 .chronicle-note { margin: 0 0 6px; color: var(--accent); font-size: 12px; }
 .chronicle-list { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 2px; }
