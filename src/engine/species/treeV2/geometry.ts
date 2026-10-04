@@ -795,12 +795,16 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
       const red = rgb('#d8323e');
       const blush = rgb('#f2734a');
       const dark = rgb('#a8202e');
-      ICO.faces.forEach(([i, j, l], f) => {
-        const v = [ICO.verts[i]!, ICO.verts[j]!, ICO.verts[l]!].map((q): V3 => [c[0] + q[0] * r, c[1] + q[1] * r * 0.9, c[2] + q[2] * r]);
-        const up = (v[0]![1] + v[1]![1] + v[2]![1]) / 3 > c[1];
-        const col = unit(seed, `wish${k}:f${f}`) < 0.25 ? blush : up ? red : dark;
-        tri(v[0]!, v[1]!, v[2]!, col, 0.6, 0.6, 0.6);
-      });
+      // Колір — на вершину, плавно: темніше донизу, рум'янець на боці до
+      // світла. Раніше рум'янець падав на випадкові грані, і яблуко було
+      // плямистим (власник, 2026-10-04: «без гострих кутів на текстурах»).
+      const shade = (q: V3): V3 => {
+        const lit = Math.max(0, q[0] * -0.55 + q[1] * 0.6 + q[2] * 0.58);
+        return mix(mix(dark, red, (q[1] + 1) / 2), blush, lit * lit * 0.8);
+      };
+      for (const [i, j, l] of ICO.faces) {
+        for (const q of [ICO.verts[i]!, ICO.verts[j]!, ICO.verts[l]!]) vert([c[0] + q[0] * r, c[1] + q[1] * r * 0.9, c[2] + q[2] * r], shade(q), 0.6);
+      }
       const side: V3 = [-out[2], 0, out[0]];
       const top: V3 = [c[0], c[1] + r * 0.9, c[2]];
       const brown = rgb('#6e4426');

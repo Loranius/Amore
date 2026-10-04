@@ -1,3 +1,5 @@
+import { softNormals, softScalar } from '@/features/home/diorama/softNormals';
+import { ISLAND_CREASE_DEG } from '@/features/home/crystal3d/v2/CrystalIsland';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -99,10 +101,13 @@ interface ReefV2WorldProps {
 export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false, fishKinds = 3, season }: ReefV2WorldProps) {
   const palette = useMemo(() => (season ? seasonalReefPalette(REEF_PALETTES[theme], season, theme) : REEF_PALETTES[theme]), [season, theme]);
 
-  const rock = useMemo(
-    () => tonedGeometry(geometry.rock.positions, rockHeat ? { tone: geometry.rock.tone, heat: rockHeat } : { tone: geometry.rock.tone }),
-    [geometry, rockHeat],
-  );
+  const rock = useMemo(() => {
+    const tone = softScalar(geometry.rock.positions, geometry.rock.tone, ISLAND_CREASE_DEG);
+    const g = tonedGeometry(geometry.rock.positions, rockHeat ? { tone, heat: rockHeat } : { tone });
+    // Плавне світло на скелі рифу й конусі вулкана; злами за 55° лишаються.
+    g.setAttribute('normal', new THREE.BufferAttribute(softNormals(geometry.rock.positions, ISLAND_CREASE_DEG), 3));
+    return g;
+  }, [geometry, rockHeat]);
   const corals = useMemo(() => tonedGeometry(geometry.corals.positions, {
     tone: geometry.corals.tone, form: geometry.corals.form, hue: geometry.corals.hue, rise: geometry.corals.rise,
   }), [geometry]);

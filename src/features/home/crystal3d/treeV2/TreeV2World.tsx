@@ -1,3 +1,4 @@
+import { softNormals, softScalar } from '@/features/home/diorama/softNormals';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -19,6 +20,9 @@ import {
   createLeafMaterial,
   createWoodMaterial,
 } from './treeV2Materials';
+
+/** Кулачки листя згладжуються цілком; гострі складки «спідничок» ялини лишаються. */
+const LEAF_CREASE_DEG = 65;
 
 function toneGeometry(positions: Float32Array, tone: Float32Array, extra?: Record<string, Float32Array>) {
   const g = new THREE.BufferGeometry();
@@ -122,7 +126,12 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     return g;
   }, [geometry]);
   const leaves = useMemo(
-    () => toneGeometry(geometry.leaves.positions, geometry.leaves.tone, { autumn: geometry.leaves.autumn }),
+    () => {
+      const g = toneGeometry(geometry.leaves.positions, softScalar(geometry.leaves.positions, geometry.leaves.tone, LEAF_CREASE_DEG), { autumn: geometry.leaves.autumn });
+      // Плавне світло на кулачках листя й «спідничках» ялини (власник, 2026-10-04).
+      g.setAttribute('normal', new THREE.BufferAttribute(softNormals(geometry.leaves.positions, LEAF_CREASE_DEG), 3));
+      return g;
+    },
     [geometry],
   );
   const blossoms = useMemo(() => {
@@ -132,6 +141,8 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     g.setAttribute('colour', new THREE.BufferAttribute(geometry.wishes.colour, 3));
     g.setAttribute('sway', new THREE.BufferAttribute(geometry.wishes.sway, 1));
     g.setAttribute('anchor', new THREE.BufferAttribute(geometry.wishes.anchor, 3));
+    // Яблука й шишки — круглі на світлі; пелюстки пласкі й так.
+    g.setAttribute('normal', new THREE.BufferAttribute(softNormals(geometry.wishes.positions, LEAF_CREASE_DEG), 3));
     return g;
   }, [geometry]);
   const flowers = useMemo(

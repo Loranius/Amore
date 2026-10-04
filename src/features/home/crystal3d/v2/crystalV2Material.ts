@@ -12,6 +12,7 @@
 // «обмилок», якого власник не хоче.
 // ============================================================
 import * as THREE from 'three';
+import { SOFT_NORMAL_GLSL } from '@/features/home/diorama/softNormals';
 import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 
 const VERTEX = /* glsl */ `
@@ -69,7 +70,29 @@ const FRAGMENT = /* glsl */ `
     colour = mix(colour, mix(uColour, vec3(1.0), 0.3) * body, rim * 0.18);
     // Світло зсередини — медіа (ADR-0217): лише сяйво, не розмір.
     colour += uColour * uGlow * uPulse * (0.25 + 0.75 * vRise) * 0.08;
-    gl_FragColor = vec4(colour, 1.0);
+    /*
+     * КРИСТАЛЬНІСТЬ (власник, 2026-10-04: «зроби кристал більш кристальним —
+     * трішки прозорим і блискучим»).
+     *
+     * Блиск — відблиск ключа (Блінн-Фонг, вузький) і френелівське сяйво на
+     * силуеті: грань, що дивиться повз камеру, світліє, як скло. Відблиск
+     * білий, але слабкий на темних гранях, щоб колір колонії не вицвітав.
+     *
+     * Прозорість — легка й лише в серці грані: кант і силует майже
+     * непрозорі, тож дальні ребра не просвічують сіткою (урок ADR-0227 —
+     * відкрите скло читалось каркасом). Задні грані не малюються взагалі.
+     */
+    vec3 halfway = normalize(uKey + view);
+    float spec = pow(max(0.0, dot(n, halfway)), 56.0);
+    float facing = max(0.0, dot(n, view));
+    float fresnel = pow(1.0 - facing, 3.0);
+    // Іскра грані: кожна грань ловить світло трохи по-своєму (зсув тону грані).
+    float glint = spec * (0.75 + 0.5 * vTone);
+    colour += vec3(1.0) * glint * 0.85;
+    colour = mix(colour, mix(uColour, vec3(1.0), 0.55), fresnel * 0.35);
+    float alpha = mix(0.84, 1.0, max(rim, fresnel));
+    alpha = max(alpha, clamp(glint * 1.5, 0.0, 1.0));
+    gl_FragColor = vec4(colour, alpha);
     #include <tonemapping_fragment>
     #include <colorspace_fragment>
   }
@@ -78,10 +101,12 @@ const FRAGMENT = /* glsl */ `
 const ROCK_VERTEX = /* glsl */ `
   attribute float tone;
   varying vec3 vWorld;
+  varying vec3 vNormal;
   varying float vTone;
   void main() {
     vec4 world = modelMatrix * vec4(position, 1.0);
     vWorld = world.xyz;
+    vNormal = mat3(modelMatrix) * normal;
     vTone = tone;
     gl_Position = projectionMatrix * viewMatrix * world;
   }
@@ -95,12 +120,13 @@ const ROCK_FRAGMENT = /* glsl */ `
   uniform float uGlow;
   uniform float uAmbient;
   varying vec3 vWorld;
+  varying vec3 vNormal;
   varying float vTone;
   ${DIORAMA_SHADE}
+  ${SOFT_NORMAL_GLSL}
   void main() {
-    vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+    vec3 n = softNormal(vNormal, vWorld);
     vec3 view = normalize(cameraPosition - vWorld);
-    if (dot(n, view) < 0.0) n = -n;
     // Пастельна брила діорами (ADR-0220): м'яке світло замість різкого.
     vec3 colour = dioramaShade(uRock * vTone, n, view);
     // Світло з-поміж каменів: сяйво кристала на низі жеоди.
@@ -122,6 +148,11 @@ export function createCrystalV2Material(rgb: readonly [number, number, number], 
   return new THREE.ShaderMaterial({
     vertexShader: VERTEX,
     fragmentShader: FRAGMENT,
+    // Трішки прозорий (власник, 2026-10-04); пише глибину, тож дальні грані
+    // власного тіла не просвічують.
+    transparent: true,
+    depthWrite: true,
+    side: THREE.FrontSide,
     uniforms: {
       uColour: { value: linearColour(rgb) },
       uKey: { value: KEY.clone() },

@@ -10,6 +10,7 @@
 // Небо дерева денне в обох темах (artifactThemes.css): світла тема —
 // ясний день, темна — вечірнє світло того ж дня, а не ніч.
 // ============================================================
+import { SOFT_NORMAL_GLSL } from '@/features/home/diorama/softNormals';
 import * as THREE from 'three';
 import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 
@@ -78,6 +79,7 @@ const LIT = /* glsl */ `
     return n;
   }
   ${DIORAMA_SHADE}
+  ${SOFT_NORMAL_GLSL}
   // М'яке пастельне світло діорами (ADR-0220). Кожен шейдер, що кличе
   // lit(), оголошує varying vWorld перед цим шматком.
   vec3 lit(vec3 base, vec3 n) {
@@ -155,9 +157,11 @@ export function createLeafMaterial(p: TreePalette, ground: number): THREE.Shader
       uniform float uWind;
       uniform float uGround;
       varying vec3 vWorld;
+      varying vec3 vNormal;
       varying float vTone;
       varying float vAutumn;
       void main() {
+        vNormal = mat3(modelMatrix) * normal;
         vec4 w = modelMatrix * vec4(position, 1.0);
         float lift = max(0.0, w.y - uGround);
         float phase = w.x * 1.7 + w.z * 1.3;
@@ -174,11 +178,13 @@ export function createLeafMaterial(p: TreePalette, ground: number): THREE.Shader
       uniform vec3 uAutumn;
       uniform vec3 uSunLeaf;
       varying vec3 vWorld;
+      varying vec3 vNormal;
       varying float vTone;
       varying float vAutumn;
       ${LIT}
       void main() {
-        vec3 n = flatNormal(vWorld);
+        // Крона обтічна: гранчастий силует, плавне світло (власник, 2026-10-04).
+        vec3 n = softNormal(vNormal, vWorld);
         vec3 base = mix(uLeaf, uAutumn, vAutumn) * vTone;
         base = mix(base, uSunLeaf * vTone, smoothstep(0.35, 0.95, n.y) * 0.2 * (1.0 - vAutumn));
         vec3 c = lit(base, n) + base * pow(max(0.0, n.y), 3.0) * 0.18;
@@ -252,7 +258,9 @@ export function createWishMaterial(ground: number): THREE.ShaderMaterial {
       uniform float uGround;
       varying vec3 vWorld;
       varying vec3 vColour;
+      varying vec3 vNormal;
       void main() {
+        vNormal = mat3(modelMatrix) * normal;
         vec4 w = modelMatrix * vec4(position, 1.0);
         // Прикраса їде разом із листям, за яке тримається: той самий вітер,
         // що в \`createLeafMaterial\`, узятий у точці кріплення. Без цього
@@ -280,8 +288,10 @@ export function createWishMaterial(ground: number): THREE.ShaderMaterial {
     fragmentShader: /* glsl */ `
       varying vec3 vWorld;
       varying vec3 vColour;
+      varying vec3 vNormal;
+      ${SOFT_NORMAL_GLSL}
       void main() {
-        vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+        vec3 n = softNormal(vNormal, vWorld);
         float light = 0.7 + 0.3 * max(0.0, dot(n, normalize(vec3(-0.45, 0.8, 0.4)))) + 0.12 * abs(n.y);
         gl_FragColor = vec4(vColour * light * 1.05, 1.0);
         ${END}

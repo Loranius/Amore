@@ -1,3 +1,4 @@
+import { SOFT_NORMAL_GLSL, softNormals, softScalar } from '@/features/home/diorama/softNormals';
 import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard } from '@react-three/drei';
@@ -91,9 +92,11 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       varying float vPaint;
       varying float vTone;
       varying float vGlow;
+      varying vec3 vNormal;
       void main() {
         vec4 w = modelMatrix * vec4(position, 1.0);
         vWorld = w.xyz;
+        vNormal = mat3(modelMatrix) * normal;
         vPaint = paint;
         vTone = tone;
         vGlow = glow;
@@ -111,11 +114,13 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       varying float vPaint;
       varying float vTone;
       varying float vGlow;
+      varying vec3 vNormal;
       ${DIORAMA_SHADE}
+      ${SOFT_NORMAL_GLSL}
       void main() {
-        vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
+        // Обтічне світло на гранчастому острові (власник, 2026-10-04).
+        vec3 n = softNormal(vNormal, vWorld);
         vec3 view = normalize(cameraPosition - vWorld);
-        if (dot(n, view) < 0.0) n = -n;
         int i = int(vPaint + 0.5);
         vec3 base = uPaint[0];
         for (int k = 1; k < ${count}; k++) if (k == i) base = uPaint[k];
@@ -135,12 +140,16 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
   });
 }
 
+/** Пологіше за цей кут — світло плавне; гостріше — злам (край скелі, ребро брили). */
+export const ISLAND_CREASE_DEG = 55;
+
 export function meshGeometry(mesh: IslandMesh) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
   g.setAttribute('paint', new THREE.BufferAttribute(mesh.paint, 1));
-  g.setAttribute('tone', new THREE.BufferAttribute(mesh.tone, 1));
+  g.setAttribute('tone', new THREE.BufferAttribute(softScalar(mesh.positions, mesh.tone, ISLAND_CREASE_DEG), 1));
   g.setAttribute('glow', new THREE.BufferAttribute(mesh.glow, 1));
+  g.setAttribute('normal', new THREE.BufferAttribute(softNormals(mesh.positions, ISLAND_CREASE_DEG), 3));
   g.computeBoundingSphere();
   return g;
 }

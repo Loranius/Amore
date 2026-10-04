@@ -11,6 +11,7 @@
 // Світла тема — мілка лагуна опівдні; темна — нічний риф, де корали й
 // планктон світяться самі (біолюмінесценція).
 // ============================================================
+import { SOFT_NORMAL_GLSL } from '@/features/home/diorama/softNormals';
 import * as THREE from 'three';
 import type { Season } from '@/engine/species/grammar/season';
 import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
@@ -100,6 +101,7 @@ const WATER = /* glsl */ `
     return n;
   }
   ${DIORAMA_SHADE}
+  ${SOFT_NORMAL_GLSL}
   vec3 underwater(vec3 base, vec3 n, vec3 world) {
     // М'яке пастельне світло діорами (ADR-0220), трохи тоноване кольором
     // підводного світла; світло слабне до підніжжя.
@@ -124,10 +126,12 @@ function waterUniforms(p: ReefPalette, ground: number) {
 const BASIC_VERTEX = /* glsl */ `
   attribute float tone;
   varying vec3 vWorld;
+  varying vec3 vNormal;
   varying float vTone;
   void main() {
     vec4 w = modelMatrix * vec4(position, 1.0);
     vWorld = w.xyz;
+    vNormal = mat3(modelMatrix) * normal;
     vTone = tone;
     gl_Position = projectionMatrix * viewMatrix * w;
   }
@@ -142,10 +146,12 @@ export function createSeabedMaterial(p: ReefPalette, base: string, ground: numbe
     fragmentShader: /* glsl */ `
       uniform vec3 uBase;
       varying vec3 vWorld;
+      varying vec3 vNormal;
       varying float vTone;
       ${WATER}
       void main() {
-        vec3 c = underwater(uBase * vTone, flatNormal(vWorld), vWorld);
+        // Обтічне світло на гранчастому камені (власник, 2026-10-04).
+        vec3 c = underwater(uBase * vTone, softNormal(vNormal, vWorld), vWorld);
         gl_FragColor = vec4(c, 1.0);
         ${END}
       }
@@ -166,11 +172,13 @@ export function createVolcanoRockMaterial(p: ReefPalette, base: string, ground: 
       attribute float tone;
       attribute float heat;
       varying vec3 vWorld;
+      varying vec3 vNormal;
       varying float vTone;
       varying float vHeat;
       void main() {
         vec4 w = modelMatrix * vec4(position, 1.0);
         vWorld = w.xyz;
+        vNormal = mat3(modelMatrix) * normal;
         vTone = tone;
         vHeat = heat;
         gl_Position = projectionMatrix * viewMatrix * w;
@@ -181,11 +189,13 @@ export function createVolcanoRockMaterial(p: ReefPalette, base: string, ground: 
       uniform float uBeat;
       uniform float uGlow;
       varying vec3 vWorld;
+      varying vec3 vNormal;
       varying float vTone;
       varying float vHeat;
       ${WATER}
       void main() {
-        vec3 c = underwater(uBase * vTone, flatNormal(vWorld), vWorld);
+        // Обтічний базальт: гранчастий силует, плавне світло (власник, 2026-10-04).
+        vec3 c = underwater(uBase * vTone, softNormal(vNormal, vWorld), vWorld);
         // Легка тінь біля дна: камінь «сидить» на плато, а не висить.
         c *= mix(0.72, 1.0, smoothstep(uGround - 0.05, uGround + 0.9, vWorld.y));
         float h = vHeat * (0.6 + 0.4 * uGlow);

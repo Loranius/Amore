@@ -1,3 +1,5 @@
+import { softNormals, softScalar } from '@/features/home/diorama/softNormals';
+import { ISLAND_CREASE_DEG } from './CrystalIsland';
 import { useEffect, useMemo } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
@@ -38,7 +40,9 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
   const rocks = useMemo(() => {
     const buffer = new THREE.BufferGeometry();
     buffer.setAttribute('position', new THREE.BufferAttribute(geometry.rocks.positions, 3));
-    buffer.setAttribute('tone', new THREE.BufferAttribute(geometry.rocks.tone, 1));
+    buffer.setAttribute('tone', new THREE.BufferAttribute(softScalar(geometry.rocks.positions, geometry.rocks.tone, ISLAND_CREASE_DEG), 1));
+    // Уламки біля підніжжя — обтічні; гострим лишається лише кристал (власник, 2026-10-04).
+    buffer.setAttribute('normal', new THREE.BufferAttribute(softNormals(geometry.rocks.positions, ISLAND_CREASE_DEG), 3));
     buffer.computeBoundingSphere();
     return buffer;
   }, [geometry]);
