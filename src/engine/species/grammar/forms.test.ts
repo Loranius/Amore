@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CRYSTAL_FORMS, buildCrystalV2Geometry } from '../crystalV2/geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from '../crystalV2/model';
-import { TREE_FORMS, buildTreeV2Geometry, treeV2Roots, treeV2Skeleton, treeV2SpruceSkirts, treeV2WishPoints, treeV2WoodFrames } from '../treeV2/geometry';
+import { TREE_FORMS, buildTreeV2Geometry, treeV2Roots, treeV2Skeleton, treeV2SpruceSkirts, treeV2WishPoints, treeV2WoodFrames, WOOD_SIDES } from '../treeV2/geometry';
 import { buildTreeV2Model } from '../treeV2/model';
 
 // ============================================================
@@ -105,7 +105,7 @@ describe('форми дерева: той самий ріст, інший мал
     expect(sides.size).toBe(4);
   });
 
-  it('деревина без коробів: грані продовження йдуть з гранями батьківської, кінчики закриті (власник, 2026-10-04)', () => {
+  it('деревина без коробів і брусків: грані продовження йдуть з гранями батьківської, переріз круглий (≥8 граней), кінчики закриті (власник, 2026-10-04)', () => {
     for (const form of TREE_FORMS) {
       const { branches } = treeV2Skeleton(model, form);
       const frames = treeV2WoodFrames(branches);
@@ -130,10 +130,27 @@ describe('форми дерева: той самий ріст, інший мал
         expect(pa[0] * a[0] + pa[1] * a[1] + pa[2] * a[2]).toBeGreaterThanOrEqual(bend - 1e-9);
       }
     }
-    // Кожна гілка — 12 трикутників боків і 6 ковпачка; корені — 10.
+    // Гілка року біля стовбура — не товща за 0.45 стовбура там: товща
+    // читалась брусом («прибери і ці брусочки біля основи гілок»).
+    for (const form of TREE_FORMS) {
+      const { branches } = treeV2Skeleton(model, form);
+      const trunk = branches.filter((b) => b.order === 0);
+      for (const b of branches.filter((x) => /^y\d+$/.test(x.key))) {
+        const seg = trunk.reduce((best, t) => (Math.abs(t.end[1] - b.start[1]) < Math.abs(best.end[1] - b.start[1]) ? t : best));
+        expect(b.r0).toBeLessThanOrEqual(seg.r1 * 0.45);
+      }
+    }
+    // Кожна гілка — 2·WOOD_SIDES трикутників боків; корені — 10.
     const oak = buildTreeV2Geometry(model, 'oak');
     const { branches } = treeV2Skeleton(model, 'oak');
-    expect(oak.wood.positions.length / 9).toBe(branches.length * 18 + treeV2Roots(model).length * 10);
+    expect(WOOD_SIDES).toBeGreaterThanOrEqual(8);
+    // Ковпачок — лише на кінчиках, де гілка не продовжується (на лікті він
+    // стирчав тупим кінцем-брусочком); стовбур закритий лише згори.
+    const parents = new Set(branches.filter((b) => b.order > 0 && b.key.includes('.')).map((b) => b.key.slice(0, b.key.lastIndexOf('.'))));
+    const trunk = branches.filter((b) => b.order === 0).length;
+    const tips = branches.filter((b) => b.order > 0 && !parents.has(b.key)).length + 1;
+    expect(oak.wood.positions.length / 9).toBe(branches.length * WOOD_SIDES * 2 + tips * WOOD_SIDES + treeV2Roots(model).length * 10);
+    expect(trunk).toBeGreaterThan(1);
   });
 
   it('квітка сакури тримається за листя: одна точка кріплення на квітку, власного гойдання немає', () => {

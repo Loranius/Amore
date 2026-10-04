@@ -106,10 +106,12 @@ export function createWoodMaterial(p: TreePalette): THREE.ShaderMaterial {
     vertexShader: /* glsl */ `
       attribute float tone;
       varying vec3 vWorld;
+      varying vec3 vNormal;
       varying float vTone;
       void main() {
         vec4 w = modelMatrix * vec4(position, 1.0);
         vWorld = w.xyz;
+        vNormal = normalize(mat3(modelMatrix) * normal);
         vTone = tone;
         gl_Position = projectionMatrix * viewMatrix * w;
       }
@@ -117,10 +119,12 @@ export function createWoodMaterial(p: TreePalette): THREE.ShaderMaterial {
     fragmentShader: /* glsl */ `
       uniform vec3 uBark;
       varying vec3 vWorld;
+      varying vec3 vNormal;
       varying float vTone;
       ${LIT}
       void main() {
-        vec3 c = lit(uBark * vTone, flatNormal(vWorld));
+        // Кругле світло на гранчастому силуеті: гілка не балка (ADR-0237).
+        vec3 c = lit(uBark * vTone, normalize(vNormal));
         gl_FragColor = vec4(c, 1.0);
         ${END}
       }

@@ -116,7 +116,11 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
   const grassRef = useRef<THREE.InstancedMesh>(null);
 
   // ── Дерево ──────────────────────────────────────────────
-  const wood = useMemo(() => toneGeometry(geometry.wood.positions, geometry.wood.tone), [geometry]);
+  const wood = useMemo(() => {
+    const g = toneGeometry(geometry.wood.positions, geometry.wood.tone);
+    g.setAttribute('normal', new THREE.BufferAttribute(geometry.wood.normal, 3));
+    return g;
+  }, [geometry]);
   const leaves = useMemo(
     () => toneGeometry(geometry.leaves.positions, geometry.leaves.tone, { autumn: geometry.leaves.autumn }),
     [geometry],
