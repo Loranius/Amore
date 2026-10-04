@@ -355,6 +355,71 @@ function icosphere(): { verts: V3[]; faces: [number, number, number][] } {
 
 const ICO = icosphere();
 
+/** Вершини гранчастого «кулачка» листя кластера — одні для меша й для квіток на ньому. */
+function leafBlob(seed: string, c: TreeV2Cluster): V3[] {
+  return ICO.verts.map((v, i): V3 => {
+    const k = c.radius * 1.14 * (0.82 + 0.3 * unit(seed, `${c.key}:v${i}`));
+    return [c.centre[0] + v[0] * k, c.centre[1] + v[1] * k * (c.squash ?? 0.82), c.centre[2] + v[2] * k];
+  });
+}
+
+/**
+ * Де сидять квітки бажань на сакурі (власник, 2026-10-04: «квіти неначе
+ * літають у повітрі — прикріпи їх на листя і розподіли по дереву рівномірно»).
+ *
+ * Квітка лежить на самій грані листя (центр грані, площина грані), а не на
+ * сфері 1.32 радіуса кластера, яка у западинах гранчастого листя висіла над
+ * ним. Кандидати — грані, що дивляться назовні й хоч трохи вгору (бічну квітку
+ * з камери видно рискою) і не сховані в сусідньому
+ * кластері; з них беремо найвіддаленіші одна від одної (жадібно, від
+ * найвищої), тож квітки розходяться по всій кроні, а не купчаться на гілці
+ * свого року.
+ */
+export function treeV2SakuraFlowerSpots(model: TreeV2Model, clusters: readonly TreeV2Cluster[], count: number): { point: V3; normal: V3 }[] {
+  if (count <= 0) return [];
+  const seed = model.startDate;
+  const buried = (p: V3, own: TreeV2Cluster) =>
+    clusters.some((o) => {
+      if (o === own) return false;
+      const k = o.radius * 1.14 * 0.82 * 0.95;
+      const dy = (p[1] - o.centre[1]) / (o.squash ?? 0.82);
+      return (p[0] - o.centre[0]) ** 2 + dy * dy + (p[2] - o.centre[2]) ** 2 < k * k;
+    });
+  const spots: { point: V3; normal: V3 }[] = [];
+  for (const c of clusters) {
+    const pts = leafBlob(seed, c);
+    for (const [a, b, cc] of ICO.faces) {
+      const A = pts[a]!;
+      const B = pts[b]!;
+      const C = pts[cc]!;
+      const point: V3 = [(A[0] + B[0] + C[0]) / 3, (A[1] + B[1] + C[1]) / 3, (A[2] + B[2] + C[2]) / 3];
+      const e1: V3 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
+      const e2: V3 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+      let normal = norm([e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]);
+      const outward: V3 = [point[0] - c.centre[0], point[1] - c.centre[1], point[2] - c.centre[2]];
+      if (normal[0] * outward[0] + normal[1] * outward[1] + normal[2] * outward[2] < 0) normal = [-normal[0], -normal[1], -normal[2]];
+      if (normal[1] < 0.1 || buried(point, c)) continue;
+      spots.push({ point, normal });
+    }
+  }
+  if (spots.length === 0) return [];
+  const chosen: { point: V3; normal: V3 }[] = [];
+  const gap = spots.map(() => Infinity);
+  let next = spots.reduce((best, s, i) => (s.point[1] > spots[best]!.point[1] ? i : best), 0);
+  for (let k = 0; k < count; k += 1) {
+    const pick = spots[next]!;
+    chosen.push(pick);
+    let far = 0;
+    spots.forEach((s, i) => {
+      const d = Math.hypot(s.point[0] - pick.point[0], s.point[1] - pick.point[1], s.point[2] - pick.point[2]);
+      if (d < gap[i]!) gap[i] = d;
+      if (gap[i]! > gap[far]!) far = i;
+    });
+    next = far;
+  }
+  return chosen;
+}
+
 /**
  * Стик гілок без наростів (власник, 2026-10-04: «на місцях швів ти додав
  * нарости … зробити весь стовбур монолітним, шви непомітними»).
@@ -514,17 +579,18 @@ export function treeV2SpruceSkirts(model: TreeV2Model, clusters: readonly TreeV2
 /**
  * Де висить прикраса кожного бажання (у порядку `model.blossoms`): дуб —
  * яблуко з-під крони гілки свого року (`treeV2Ornaments`, звіряє двійник);
- * сакура — квітка на верхньому боці крони, де її видно; ялина — шишка на
- * кінчику гілки свого року, на краю «спіднички», а не під хвоєю.
+ * сакура — квітка на грані листя, рівномірно по всій кроні
+ * (`treeV2SakuraFlowerSpots`); ялина — шишка на краю лапи «спіднички» біля
+ * кінчика гілки свого року.
  */
 export function treeV2WishPoints(model: TreeV2Model, form: TreeForm, skeleton?: { branches: readonly TreeV2Branch[]; clusters: readonly TreeV2Cluster[] }): V3[] {
-  const seed = model.startDate;
   const { branches, clusters } = skeleton ?? treeV2Skeleton(model, form);
   const orn = treeV2Ornaments(model, clusters);
   // Ялина: «спіднички» йдуть рівнями, а не кільцями гілок, тож кінчик гілки
   // буває поза хвоєю — шишка тоді висіла б у повітрі. Її місце — найближча
   // за азимутом і висотою вершина краю «спіднички», трохи під лапою.
   const rim = form === 'spruce' ? treeV2SpruceSkirts(model, clusters).tris.flat() : [];
+  const flowers = form === 'sakura' ? treeV2SakuraFlowerSpots(model, clusters, model.blossoms.length) : [];
   const H = model.height;
   return model.blossoms.map((b, k) => {
     if (form === 'oak') return orn.blossoms[k]!.position;
@@ -539,16 +605,7 @@ export function treeV2WishPoints(model: TreeV2Model, form: TreeForm, skeleton?: 
       const best = pool.reduce((a, v) => (Math.hypot(v[0], v[2]) > Math.hypot(a[0], a[2]) ? v : a));
       return [best[0] * 0.94, best[1] - 0.015 * H, best[2] * 0.94];
     }
-    const own = clusters.filter((c) => c.key === `y${b.year}` || c.key.startsWith(`y${b.year}.`));
-    const pool = own.length > 0 ? own : clusters;
-    const c = pool[Math.min(pool.length - 1, Math.floor(unit(seed, `wish${b.id}:c`) * pool.length))]!;
-    const y = 0.25 + 0.6 * unit(seed, `wish${b.id}:y`);
-    const ring = Math.sqrt(1 - y * y);
-    const a = 2 * Math.PI * unit(seed, `wish${b.id}:a`);
-    const sq = c.squash ?? 0.82;
-    // Крона сакури гранчаста й нерівна (вершини до 1.28 радіуса): квітка
-    // сидить зовні неї, а не тоне в листі.
-    return add(c.centre, [ring * Math.cos(a) * c.radius * 1.32, y * c.radius * sq * 1.32, ring * Math.sin(a) * c.radius * 1.32]);
+    return flowers[k]?.point ?? orn.blossoms[k]!.position;
   });
 }
 
@@ -602,10 +659,7 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     });
   }
   for (const c of spruce ? [] : clusters) {
-    const pts = ICO.verts.map((v, i): V3 => {
-      const k = c.radius * 1.14 * (0.82 + 0.3 * unit(seed, `${c.key}:v${i}`));
-      return [c.centre[0] + v[0] * k, c.centre[1] + v[1] * k * (c.squash ?? 0.82), c.centre[2] + v[2] * k];
-    });
+    const pts = leafBlob(seed, c);
     const autumn = unit(seed, `${c.key}:autumn`) < model.autumn ? 1 : 0;
     ICO.faces.forEach(([a, b, cc], k) => {
       const tone = 0.85 + 0.3 * unit(seed, `${c.key}:f${k}`);
@@ -633,6 +687,7 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   };
   // Прикрасу видно з відстані камери: яблуко завбільшки з кулачок листя.
   const size = Math.max(0.08, model.height * 0.045);
+  const flowerSpots = form === 'sakura' ? treeV2SakuraFlowerSpots(model, clusters, model.blossoms.length) : [];
   treeV2WishPoints(model, form, { branches, clusters }).forEach((p, k) => {
     const phi = 2 * Math.PI * unit(seed, `wish${k}:phi`);
     const out: V3 = [Math.cos(phi), 0, Math.sin(phi)];
@@ -658,13 +713,14 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
       tri(p, add(add(p, mul(out, size * 0.28)), [0, size * 0.12, 0]), leafTip, green, 0, 0.3, 0.5);
       tri(p, leafTip, add(add(p, mul(out, size * 0.28)), [0, -size * 0.14, 0]), rgb('#3f8a32'), 0, 0.5, 0.3);
     } else if (form === 'sakura') {
-      // Квітка: п'ять пелюсток і жовта серединка, дивиться назовні й угору.
-      const n = norm([out[0], 0.9, out[2]]);
+      // Квітка: п'ять пелюсток і жовта серединка, лежить на грані листя
+      // (у її площині), трохи піднята, щоб не мерехтіла з нею.
+      const n = flowerSpots[k]?.normal ?? norm([out[0], 0.9, out[2]]);
       const [u, v] = basis(n);
       // Крона сакури блідо-рожева: квітка бажання — насичено-рожева зі
       // світлими кінчиками й жовтою серединкою, інакше її не видно.
       const R = size * 1.3;
-      const centre: V3 = add(p, mul(n, size * 0.05));
+      const centre: V3 = add(p, mul(n, size * 0.03));
       const petal = rgb('#ff5d8f');
       const tip = rgb('#ffc2d6');
       for (let q = 0; q < 5; q += 1) {

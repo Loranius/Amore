@@ -80,6 +80,31 @@ describe('форми дерева: той самий ріст, інший мал
     expect(toward(withFirst(1))).toBeGreaterThan(toward(withFirst(0)) * 1.1);
   });
 
+  it('сакура: квітки лежать на гранях листя й розходяться по всій кроні (власник, 2026-10-04: «літають у повітрі»)', () => {
+    const g = buildTreeV2Geometry(model, 'sakura');
+    const leaf = g.leaves.positions;
+    const flowers = treeV2WishPoints(model, 'sakura');
+    expect(flowers.length).toBe(model.blossoms.length);
+    // Кожна квітка — у центрі однієї з граней листя, а не над ним.
+    const centroids: number[][] = [];
+    for (let i = 0; i < leaf.length; i += 9) centroids.push([0, 1, 2].map((a) => (leaf[i + a]! + leaf[i + 3 + a]! + leaf[i + 6 + a]!) / 3));
+    for (const p of flowers) {
+      const gap = Math.min(...centroids.map((c) => Math.hypot(c[0]! - p[0], c[1]! - p[1], c[2]! - p[2])));
+      expect(gap).toBeLessThan(1e-4);
+    }
+    // Рівномірно: жодні дві не злипаються — найближча сусідка щонайменше
+    // вдвічі ближча за середню відстань до найближчої.
+    const nearest = flowers.map((p, i) => Math.min(...flowers.filter((_, j) => j !== i).map((q) => Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]))));
+    const mean = nearest.reduce((a, b) => a + b, 0) / nearest.length;
+    expect(Math.min(...nearest)).toBeGreaterThan(mean * 0.5);
+    // І по всій кроні: від низу до верху, з усіх боків.
+    const ys = flowers.map((p) => p[1]);
+    const crown = centroids.map((c) => c[1]!);
+    expect(Math.max(...ys) - Math.min(...ys)).toBeGreaterThan((Math.max(...crown) - Math.min(...crown)) * 0.5);
+    const sides = new Set(flowers.map((p) => Math.floor(((Math.atan2(p[2], p[0]) + Math.PI) / (2 * Math.PI)) * 4) % 4));
+    expect(sides.size).toBe(4);
+  });
+
   it('бажання на дереві — за формою: яблука на дубі, квітки на сакурі, шишки на ялині (власник, 2026-10-04)', () => {
     expect(model.blossoms.length).toBeGreaterThan(0);
     const dominant = (form: (typeof TREE_FORMS)[number]) => {
