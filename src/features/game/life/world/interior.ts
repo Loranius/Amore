@@ -25,7 +25,7 @@ export function homeInterior(state: LifeState): GameMap {
   m.fill(0, 0, 1, H, 'x').fill(W - 1, 0, 1, H, 'x').fill(0, H - 1, W, 1, 'x');
   m.fill(7, H - 1, 2, 1, kind === 'dorm' ? 't' : 'f');
   m.zone('exit', 7, H - 2, 2, 2, { type: 'exit' }, 'Вийти надвір');
-  m.spawn('door', 8, H - 2).spawn('default', 8, H - 2);
+  m.spawn('door', 8, H - 2).spawn('default', 8, H - 2).spawn('wake', 4, 7);
 
   const tint = (slot: keyof LifeState['decor']) => {
     const id = state.decor[slot];
