@@ -43,6 +43,43 @@ describe('форми дерева: той самий ріст, інший мал
     expect(buildTreeV2Geometry({ ...model, autumn: 0.7 }, 'spruce').leaves.autumn.every((a) => a === 0)).toBe(true);
   });
 
+  it('ялина за референсом власника: ярусні «спіднички» вужчають догори, гілки сховані, видно стовбур', () => {
+    const g = buildTreeV2Geometry(model, 'spruce');
+    const p = g.leaves.positions;
+    const widthAt = (lo: number, hi: number) => {
+      let w = 0;
+      for (let i = 0; i < p.length; i += 3) if (p[i + 1]! >= lo && p[i + 1]! < hi) w = Math.max(w, Math.hypot(p[i]!, p[i + 2]!));
+      return w;
+    };
+    const H = model.height;
+    expect(widthAt(H * 0.2, H * 0.4)).toBeGreaterThan(widthAt(H * 0.5, H * 0.7));
+    expect(widthAt(H * 0.5, H * 0.7)).toBeGreaterThan(widthAt(H * 0.85, H * 1.2));
+    // Гостра верхівка над провідником.
+    expect(Math.max(...Array.from(p).filter((_, i) => i % 3 === 1))).toBeGreaterThan(H);
+    // Нижче першої «спіднички» хвої немає: там видно стовбур.
+    expect(Array.from(p).filter((_, i) => i % 3 === 1).every((y) => y > H * 0.06)).toBe(true);
+    // Деревина — лише стовбур і коріння: її менше, ніж у дуба з тими ж гілками.
+    expect(g.wood.positions.length).toBeLessThan(buildTreeV2Geometry(model, 'oak').wood.positions.length / 2);
+  });
+
+  it('ялина: насичений рік — довша лапа «спіднички» в бік своєї гілки', () => {
+    const base = buildTreeV2Model(OLD);
+    const withFirst = (fertility: number) => ({ ...base, yearBranches: base.yearBranches.map((b, i) => (i === 0 ? { ...b, activity: fertility * 1000, fertility } : b)) });
+    const first = base.yearBranches[0]!;
+    const toward = (m: typeof base) => {
+      const paw = treeV2Skeleton(m, 'spruce').clusters.find((c) => c.key === `y${first.year}:paw`)!;
+      const az = Math.atan2(paw.centre[2], paw.centre[0]);
+      const p = buildTreeV2Geometry(m, 'spruce').leaves.positions;
+      let w = 0;
+      for (let i = 0; i < p.length; i += 3) {
+        const d = Math.abs(((Math.atan2(p[i + 2]!, p[i]!) - az + 3 * Math.PI) % (2 * Math.PI)) - Math.PI);
+        if (d < 0.2) w = Math.max(w, Math.hypot(p[i]!, p[i + 2]!));
+      }
+      return w;
+    };
+    expect(toward(withFirst(1))).toBeGreaterThan(toward(withFirst(0)) * 1.1);
+  });
+
   it('сакура — розлога: крона ширша, ніж у дуба, а дерево нижче', () => {
     const oak = buildTreeV2Geometry(model, 'oak');
     const sakura = buildTreeV2Geometry(model, 'sakura');
