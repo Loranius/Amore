@@ -1,5 +1,5 @@
 // ============================================================
-// Зміст світу «Життя Лєни» (ADR-0239): міста, дороги, крамниці, речі,
+// Зміст світу «Дєвочка в городі» (ADR-0239): міста, дороги, крамниці, речі,
 // роботи, пам'ятки. Лише дані — правила в `life.ts`.
 //
 // Міста — ті, що були в справжній історії (Жилинці, Правдівка,
@@ -24,7 +24,7 @@ export const CITIES: Record<CityId, City> = {
   zhylyntsi: { id: 'zhylyntsi', name: 'Жилинці', toName: 'до Жилинців', kind: 'village', pos: [0.285, 0.4], blurb: 'Рідне село на Хмельниччині: хата, садочок, школа, ставок.' },
   pravdivka: { id: 'pravdivka', name: 'Правдівка', toName: 'до Правдівки', kind: 'village', pos: [0.302, 0.425], blurb: 'Сусіднє село за стежкою: тут школа для 10–11 класів.' },
   khmelnytskyi: { id: 'khmelnytskyi', name: 'Хмельницький', toName: 'до Хмельницького', kind: 'city', pos: [0.28, 0.35], blurb: 'Обласний центр: ліцей, ринок, Проскурівська.' },
-  vinnytsia: { id: 'vinnytsia', name: 'Вінниця', toName: 'до Вінниці', kind: 'city', pos: [0.36, 0.4], blurb: 'ВТЕІ, Вишенька, фонтан на Південному Бузі.' },
+  vinnytsia: { id: 'vinnytsia', name: 'Вінниця', toName: 'до Вінниці', kind: 'city', pos: [0.36, 0.4], blurb: 'ВДПУ, Вишенька, фонтан на Південному Бузі.' },
   kyiv: { id: 'kyiv', name: 'Київ', toName: 'до Києва', kind: 'city', pos: [0.47, 0.25], blurb: 'Столиця: Хрещатик, Лавра, кар\'єра й метро.' },
   lviv: { id: 'lviv', name: 'Львів', toName: 'до Львова', kind: 'city', pos: [0.115, 0.32], blurb: 'Бруківка, ратуша, кава й шоколад.' },
   odesa: { id: 'odesa', name: 'Одеса', toName: 'до Одеси', kind: 'city', pos: [0.485, 0.74], blurb: 'Море, Отрада, Жовтий камінь.' },
@@ -70,7 +70,7 @@ export const SIGHTS: readonly Sight[] = [
   { id: 'sunflowers', city: 'pravdivka', name: 'Соняшникове поле', mood: 10 },
   { id: 'proskurivska', city: 'khmelnytskyi', name: 'Проскурівська вулиця', mood: 10 },
   { id: 'fountain', city: 'vinnytsia', name: 'Фонтан на Бузі', mood: 14 },
-  { id: 'vtei', city: 'vinnytsia', name: 'ВТЕІ', mood: 6 },
+  { id: 'vtei', city: 'vinnytsia', name: 'ВДПУ', mood: 6 },
   { id: 'khreshchatyk', city: 'kyiv', name: 'Хрещатик', mood: 14 },
   { id: 'lavra', city: 'kyiv', name: 'Лавра', mood: 16 },
   { id: 'ratusha', city: 'lviv', name: 'Ратуша', mood: 16 },
@@ -229,7 +229,7 @@ export type Education = 'none' | 'school' | 'diploma';
 export const EDUCATION_NAME: Record<Education, string> = {
   none: 'без атестата',
   school: 'атестат',
-  diploma: 'диплом ВТЕІ',
+  diploma: 'диплом ВДПУ',
 };
 
 export type ShiftGame = 'barista' | 'cashier' | 'accountant' | 'florist' | 'teacher' | 'designer' | 'baker' | 'guide' | 'post';

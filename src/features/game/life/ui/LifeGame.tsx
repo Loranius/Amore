@@ -1,5 +1,5 @@
 // ============================================================
-// «Життя Лєни» — корінь інтерфейсу (ADR-0239): полотно світу й усе,
+// «Дєвочка в городі» — корінь інтерфейсу (ADR-0239): полотно світу й усе,
 // що лежить над ним (годинник, гроші, сили, кнопка дії, діалоги,
 // картки, панелі, титул).
 // ============================================================
@@ -37,7 +37,7 @@ export function LifeGame() {
   const { ui, life } = controller;
   return (
     <div className="lg">
-      <canvas ref={canvas} className="lg-canvas" aria-label="Світ гри «Життя Лєни»" />
+      <canvas ref={canvas} className="lg-canvas" aria-label="Світ гри «Дєвочка в городі»" />
       {ui.screen === 'title' && <Title c={controller} />}
       {ui.screen === 'world' && life && !ui.activity && <Hud c={controller} />}
       {ui.activity?.phase === 'intro' && <ActivityIntro c={controller} />}
@@ -55,7 +55,7 @@ function Title({ c }: { c: GameController }) {
   const [choose, setChoose] = useState(false);
   const saved = c.saved.state;
   const savedInfo = saved ? dayInfo(saved.day) : null;
-  const chapters: [Chapter, string][] = [['sadok', 'Садочок'], ['school', 'Школа'], ['uni', 'ВТЕІ'], ['adult', 'Доросле життя']];
+  const chapters: [Chapter, string][] = [['sadok', 'Садочок'], ['school', 'Школа'], ['uni', 'ВДПУ'], ['adult', 'Доросле життя']];
   const begin = (chapter: Chapter) => {
     if (saved && !window.confirm('Почати нове життя? Збережене буде замінене.')) return;
     void c.newGame(freshSeed(), chapter);
@@ -63,8 +63,7 @@ function Title({ c }: { c: GameController }) {
   return (
     <div className="lg-title">
       <div className="lg-panel lg-title-box">
-        <h1>Життя Лєни</h1>
-        <p className="lg-sub">Жилинці → Хмельницький → Правдівка → Вінниця → Одеса</p>
+        <h1>Дєвочка в городі</h1>
         {!choose && (
           <>
             {saved && savedInfo && (

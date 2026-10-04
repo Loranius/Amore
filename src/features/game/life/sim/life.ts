@@ -1,5 +1,5 @@
 // ============================================================
-// «Життя Лєни» — правила (ADR-0239).
+// «Дєвочка в городі» — правила (ADR-0239).
 // ------------------------------------------------------------
 // Стан — звичайний об'єкт, що серіалізується в JSON; кожна дія — чиста
 // функція `(стан, …) → { state, events }`. Жодного годинника, жодного
@@ -128,9 +128,9 @@ export const MILESTONES: readonly Milestone[] = [
   { id: 'firstMoney', title: 'Перші заробітки', text: 'Гроші, зароблені своїми руками.' },
   { id: 'lyceum', title: 'Ліцей', text: 'Хмельницький ліцей — і рішення повернутись додому.' },
   { id: 'graduation', title: 'Випускний', text: 'Одинадцять класів позаду.' },
-  { id: 'student', title: 'Студентка', text: 'ВТЕІ, гуртожиток, Вінниця.' },
+  { id: 'student', title: 'Студентка', text: 'ВДПУ, гуртожиток, Вінниця.' },
   { id: 'met', title: 'Дайвінчик', text: '«Класна ава, Лєна!» — 26 грудня 2022.' },
-  { id: 'diploma', title: 'Диплом', text: 'Чотири курси ВТЕІ.' },
+  { id: 'diploma', title: 'Диплом', text: 'Чотири курси ВДПУ.' },
   { id: 'together', title: 'Своя квартира', text: 'Вишенька: разом на роботу, разом додому.' },
   { id: 'promotion', title: 'Підвищення', text: 'Нова посада — заслужено.' },
   { id: 'sea', title: 'Море', text: 'Одеса: сонце, чайки й Отрада.' },
@@ -196,7 +196,7 @@ export function newLife(seed: number, chapter: Chapter = 'sadok'): LifeState {
       day,
       city: 'vinnytsia',
       home: 'vinnytsia',
-      homeName: 'Гуртожиток ВТЕІ',
+      homeName: 'Гуртожиток ВДПУ',
       money: 700,
       skills: { knowledge: 32, creativity: 18, sport: 15, charm: 16 },
       hearts: { mom: 8, dima: 0, friend: 6 },
@@ -232,7 +232,7 @@ export function education(state: LifeState): Education {
   return 'none';
 }
 
-/** Чи Лєна ще вчиться (садочок, школа, ВТЕІ). */
+/** Чи Лєна ще вчиться (садочок, школа, ВДПУ). */
 export function studying(state: LifeState): boolean {
   return today(state).stage !== 'adult';
 }
@@ -263,7 +263,7 @@ export function dutyToday(state: LifeState): Duty | null {
     const city: CityId = info.level <= 9 ? 'zhylyntsi' : 'pravdivka';
     return { kind: 'school', city, building: 'school', title: `${info.level} клас`, startBy: 8 * 60 + 30, minutes: 5 * 60 + 30 };
   }
-  if (info.stage === 'uni' && !info.weekend) return { kind: 'uni', city: 'vinnytsia', building: 'vtei', title: `${info.level} курс ВТЕІ`, startBy: 9 * 60, minutes: 5 * 60 };
+  if (info.stage === 'uni' && !info.weekend) return { kind: 'uni', city: 'vinnytsia', building: 'vtei', title: `${info.level} курс ВДПУ`, startBy: 9 * 60, minutes: 5 * 60 };
   if (state.job) {
     const job = JOB_BY_ID.get(state.job.id)!;
     const shiftDay = job.partTime && studying(state) ? info.weekend : !info.weekend;
@@ -753,8 +753,8 @@ function newYear(state: LifeState, before: DayInfo, after: DayInfo, events: Life
 
   if (before.stage === 'school' && after.stage === 'uni') {
     next = withMilestone(next, 'graduation', events);
-    next = withMilestone({ ...next, home: 'vinnytsia', homeName: 'Гуртожиток ВТЕІ', city: 'vinnytsia', rent: 0 }, 'student', events);
-    events.push({ kind: 'story', text: 'Випускний позаду. Вінниця, ВТЕІ і гуртожиток — нове життя починається!' });
+    next = withMilestone({ ...next, home: 'vinnytsia', homeName: 'Гуртожиток ВДПУ', city: 'vinnytsia', rent: 0 }, 'student', events);
+    events.push({ kind: 'story', text: 'Випускний позаду. Вінниця, ВДПУ і гуртожиток — нове життя починається!' });
   }
   if (before.stage === 'uni' && after.stage === 'adult') {
     next = withMilestone(next, 'diploma', events);

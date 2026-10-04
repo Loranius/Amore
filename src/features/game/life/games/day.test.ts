@@ -56,7 +56,7 @@ describe('школа', () => {
   });
 });
 
-describe('ВТЕІ і робота', () => {
+describe('ВДПУ і робота', () => {
   it('у середу й п\'ятницю — сесія; у будні — дві пари', () => {
     const uni = newLife(4, 'uni');
     expect(dayPlan(at(uni, firstDayOfWeek(12) + 2))[0]!.id).toBe('exam');

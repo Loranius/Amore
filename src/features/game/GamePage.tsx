@@ -1,5 +1,5 @@
 // ============================================================
-// GamePage — «Життя Лєни» (ADR-0239)
+// GamePage — «Дєвочка в городі» (ADR-0239)
 // ------------------------------------------------------------
 // Гра — окрема сторінка збірки `game.html` (симулятор життя Лєни). У
 // React лінивість досягається природно: iframe монтується лише коли
@@ -11,7 +11,7 @@ const GAME_SRC = `${import.meta.env.BASE_URL}game.html?v=5`;
 export function GamePage() {
   return (
     <section className="game">
-      <iframe className="game-frame" src={GAME_SRC} title="Життя Лєни" />
+      <iframe className="game-frame" src={GAME_SRC} title="Дєвочка в городі" />
     </section>
   );
 }

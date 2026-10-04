@@ -28,7 +28,7 @@ import { rngFor, shuffled } from './rng';
 import { SaveError, parseSave, serialize } from './save';
 
 // ============================================================
-// «Життя Лєни» (ADR-0239): правила симуляції.
+// «Дєвочка в городі» (ADR-0239): правила симуляції.
 // Кожен тест називає правило з ADR-0239 §2–§5, яке тримає.
 // ============================================================
 
@@ -120,7 +120,7 @@ describe('§3 обов\'язок дня й навчання', () => {
 
   it('після 11 класу — переїзд у гуртожиток Вінниці й віхи випускного', () => {
     const s = liveUntil(at(newLife(5, 'school'), firstDayOfWeek(11)), firstDayOfWeek(12));
-    expect([s.home, s.city, s.homeName]).toEqual(['vinnytsia', 'vinnytsia', 'Гуртожиток ВТЕІ']);
+    expect([s.home, s.city, s.homeName]).toEqual(['vinnytsia', 'vinnytsia', 'Гуртожиток ВДПУ']);
     expect(s.milestones).toEqual(expect.arrayContaining(['graduation', 'student']));
   });
 });
