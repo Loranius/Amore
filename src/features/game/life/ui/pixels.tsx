@@ -17,7 +17,7 @@ export function PixelIcon({ name, size = 2, label }: { name: keyof typeof ICONS;
 export function Portrait({ look, scale = 4, crop = true }: { look: Look; scale?: number; crop?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
   const img = sheetFor(look)[0]![0]!;
-  const h = crop ? Math.min(img.height, look.kid ? 13 : 15) : img.height;
+  const h = crop ? Math.min(img.height, look.kid ? 17 : 21) : img.height;
   useEffect(() => {
     const c = ref.current;
     if (!c) return;
