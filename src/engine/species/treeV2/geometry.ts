@@ -402,11 +402,12 @@ export interface TreeV2Geometry {
   leaves: { positions: Float32Array; tone: Float32Array; autumn: Float32Array };
   /** Квіти бажань: крихітні октаедри, канал кольору на вершину (0 червоний, 1 блакитний, 2 зелений). */
   /**
-   * Стрічки бажань (дерево бажань): вузлик і два хвости, що звисають.
-   * `sway` — 0 біля вузлика … 1 на кінчику хвоста, для вітру в шейдері.
-   * Колір — один на форму дерева (`TREE_RIBBON_COLOUR`), а не «хто виконав».
+   * Плоди й квіти бажань — за формою дерева (власник, 2026-10-04): дуб —
+   * яблука, сакура — квітки, ялина — шишки. Колір на вершину (`colour`,
+   * RGB 0..1); `sway` — 0 там, де прикраса тримається, … 1 на кінчику, для
+   * вітру в шейдері. Каналу «хто виконав» немає: це мова кристала.
    */
-  ribbons: { positions: Float32Array; sway: Float32Array };
+  wishes: { positions: Float32Array; colour: Float32Array; sway: Float32Array };
   fruits: Float32Array;
   fireflies: Float32Array;
   flowers: { positions: Float32Array; tint: Float32Array };
@@ -503,6 +504,36 @@ export function treeV2SpruceSkirts(model: TreeV2Model, clusters: readonly TreeV2
   return { tris, tone };
 }
 
+/**
+ * Де висить прикраса кожного бажання (у порядку `model.blossoms`): дуб —
+ * яблуко з-під крони гілки свого року (`treeV2Ornaments`, звіряє двійник);
+ * сакура — квітка на верхньому боці крони, де її видно; ялина — шишка на
+ * кінчику гілки свого року, на краю «спіднички», а не під хвоєю.
+ */
+export function treeV2WishPoints(model: TreeV2Model, form: TreeForm, skeleton?: { branches: readonly TreeV2Branch[]; clusters: readonly TreeV2Cluster[] }): V3[] {
+  const seed = model.startDate;
+  const { branches, clusters } = skeleton ?? treeV2Skeleton(model, form);
+  const orn = treeV2Ornaments(model, clusters);
+  return model.blossoms.map((b, k) => {
+    if (form === 'oak') return orn.blossoms[k]!.position;
+    if (form === 'spruce') {
+      const own = branches.find((x) => x.key === `y${b.year}`);
+      const top = trunkAt(treeTrunkDir(model, form), FORMS[form].top * model.height);
+      return own ? own.end : top;
+    }
+    const own = clusters.filter((c) => c.key === `y${b.year}` || c.key.startsWith(`y${b.year}.`));
+    const pool = own.length > 0 ? own : clusters;
+    const c = pool[Math.min(pool.length - 1, Math.floor(unit(seed, `wish${b.id}:c`) * pool.length))]!;
+    const y = 0.25 + 0.6 * unit(seed, `wish${b.id}:y`);
+    const ring = Math.sqrt(1 - y * y);
+    const a = 2 * Math.PI * unit(seed, `wish${b.id}:a`);
+    const sq = c.squash ?? 0.82;
+    // Крона сакури гранчаста й нерівна (вершини до 1.28 радіуса): квітка
+    // сидить зовні неї, а не тоне в листі.
+    return add(c.centre, [ring * Math.cos(a) * c.radius * 1.32, y * c.radius * sq * 1.32, ring * Math.sin(a) * c.radius * 1.32]);
+  });
+}
+
 export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'): TreeV2Geometry {
   const seed = model.startDate;
   const { branches, clusters } = treeV2Skeleton(model, form);
@@ -559,44 +590,98 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     });
   }
 
-  const ribbon: number[] = [];
-  const ribbonSway: number[] = [];
-  // Стрічку видно з відстані камери, але вона не важча за гілку.
-  const size = Math.max(0.05, model.height * 0.03);
-  const push = (p: V3, sway: number) => { ribbon.push(p[0], p[1], p[2]); ribbonSway.push(sway); };
-  orn.blossoms.forEach((b, k) => {
-    const phi = 2 * Math.PI * unit(seed, `ribbon${k}:phi`);
-    const side: V3 = [Math.cos(phi), 0, Math.sin(phi)];
-    const p = b.position;
-    // Вузлик — маленький ромб.
-    const knot = size * 0.35;
-    const up: V3 = [p[0], p[1] + knot, p[2]];
-    const dn: V3 = [p[0], p[1] - knot, p[2]];
-    const l: V3 = add(p, mul(side, -knot));
-    const r: V3 = add(p, mul(side, knot));
-    push(up, 0); push(l, 0); push(dn, 0);
-    push(up, 0); push(dn, 0); push(r, 0);
-    // Два хвости розходяться й звисають хвилею.
-    for (const dir of [-1, 1]) {
-      const N = 4;
-      const len = size * (2.6 + 0.8 * unit(seed, `ribbon${k}:len${dir}`));
-      const w = size * 0.45;
-      const at = (t: number): V3 => add(p, add(mul(side, dir * (knot * 0.6 + t * size * 0.5) + Math.sin(t * 6 + k) * size * 0.12), [0, -t * len, 0]));
-      for (let q = 0; q < N; q += 1) {
-        const t0 = q / N;
-        const t1 = (q + 1) / N;
-        const a0 = at(t0);
-        const a1 = at(t1);
-        const o: V3 = mul(side, w * 0.5);
-        const a0l = add(a0, mul(o, -1));
-        const a0r = add(a0, o);
-        // Кінчик хвоста — вирізаний «ластівчиним хвостом».
-        const a1l = add(a1, mul(o, -1));
-        const a1r = add(a1, o);
-        const tip = q === N - 1 ? add(a1, [0, size * 0.25, 0]) : null;
-        push(a0l, t0); push(a1l, t1); push(a0r, t0);
-        if (tip) { push(a0r, t0); push(a1l, t1); push(tip, t1); push(a0r, t0); push(tip, t1); push(a1r, t1); }
-        else { push(a0r, t0); push(a1l, t1); push(a1r, t1); }
+  const wishPos: number[] = [];
+  const wishCol: number[] = [];
+  const wishSway: number[] = [];
+  const rgb = (hex: string): V3 => {
+    const n = parseInt(hex.slice(1), 16);
+    return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+  };
+  const tri = (a: V3, b: V3, c: V3, col: V3, sa = 0, sb = 0, sc = 0) => {
+    for (const [p, s] of [[a, sa], [b, sb], [c, sc]] as const) {
+      wishPos.push(p[0], p[1], p[2]);
+      wishCol.push(col[0], col[1], col[2]);
+      wishSway.push(s);
+    }
+  };
+  // Прикрасу видно з відстані камери: яблуко завбільшки з кулачок листя.
+  const size = Math.max(0.08, model.height * 0.045);
+  treeV2WishPoints(model, form, { branches, clusters }).forEach((p, k) => {
+    const phi = 2 * Math.PI * unit(seed, `wish${k}:phi`);
+    const out: V3 = [Math.cos(phi), 0, Math.sin(phi)];
+    if (form === 'oak') {
+      // Яблуко: гранчаста куля з рум'янцем, хвостик і листочок.
+      const r = size * 0.72;
+      const c: V3 = [p[0], p[1] - size * 0.35 - r, p[2]];
+      const red = rgb('#d8323e');
+      const blush = rgb('#f2734a');
+      const dark = rgb('#a8202e');
+      ICO.faces.forEach(([i, j, l], f) => {
+        const v = [ICO.verts[i]!, ICO.verts[j]!, ICO.verts[l]!].map((q): V3 => [c[0] + q[0] * r, c[1] + q[1] * r * 0.9, c[2] + q[2] * r]);
+        const up = (v[0]![1] + v[1]![1] + v[2]![1]) / 3 > c[1];
+        const col = unit(seed, `wish${k}:f${f}`) < 0.25 ? blush : up ? red : dark;
+        tri(v[0]!, v[1]!, v[2]!, col, 0.6, 0.6, 0.6);
+      });
+      const side: V3 = [-out[2], 0, out[0]];
+      const top: V3 = [c[0], c[1] + r * 0.9, c[2]];
+      const brown = rgb('#6e4426');
+      tri(p, add(top, mul(side, size * 0.05)), add(top, mul(side, -size * 0.05)), brown, 0, 0.5, 0.5);
+      const leafTip = add(add(p, mul(out, size * 0.55)), [0, -size * 0.1, 0]);
+      const green = rgb('#4f9e3c');
+      tri(p, add(add(p, mul(out, size * 0.28)), [0, size * 0.12, 0]), leafTip, green, 0, 0.3, 0.5);
+      tri(p, leafTip, add(add(p, mul(out, size * 0.28)), [0, -size * 0.14, 0]), rgb('#3f8a32'), 0, 0.5, 0.3);
+    } else if (form === 'sakura') {
+      // Квітка: п'ять пелюсток і жовта серединка, дивиться назовні й угору.
+      const n = norm([out[0], 0.9, out[2]]);
+      const [u, v] = basis(n);
+      // Крона сакури блідо-рожева: квітка бажання — насичено-рожева зі
+      // світлими кінчиками й жовтою серединкою, інакше її не видно.
+      const R = size * 1.3;
+      const centre: V3 = add(p, mul(n, size * 0.05));
+      const petal = rgb('#ff5d8f');
+      const tip = rgb('#ffc2d6');
+      for (let q = 0; q < 5; q += 1) {
+        const a0 = phi + (q / 5) * Math.PI * 2;
+        const dir = (a: number) => add(mul(u, Math.cos(a)), mul(v, Math.sin(a)));
+        const mid = add(centre, mul(dir(a0), R));
+        const l = add(centre, mul(dir(a0 - 0.5), R * 0.62));
+        const rr = add(centre, mul(dir(a0 + 0.5), R * 0.62));
+        tri(centre, l, mid, petal, 0, 0.6, 1);
+        tri(centre, mid, rr, tip, 0, 1, 0.6);
+      }
+      const yellow = rgb('#f6c14e');
+      for (let q = 0; q < 5; q += 1) {
+        const a0 = (q / 5) * Math.PI * 2;
+        const a1 = ((q + 1) / 5) * Math.PI * 2;
+        const raised = add(centre, mul(n, size * 0.06));
+        tri(raised, add(raised, add(mul(u, Math.cos(a0) * R * 0.22), mul(v, Math.sin(a0) * R * 0.22))), add(raised, add(mul(u, Math.cos(a1) * R * 0.22), mul(v, Math.sin(a1) * R * 0.22))), yellow);
+      }
+    } else {
+      // Шишка: витягнутий лускатий конус, що звисає кінчиком донизу.
+      const len = size * 1.8;
+      const rad = size * 0.5;
+      const top: V3 = [p[0], p[1] - size * 0.12, p[2]];
+      const rings = [0, 0.25, 0.55, 0.82].map((t, li) => {
+        const r = rad * Math.sin(Math.min(1, (t + 0.18)) * Math.PI) * (li === 0 ? 0.55 : 1);
+        return Array.from({ length: 6 }, (_, i): V3 => {
+          const a = phi + ((i + (li % 2) * 0.5) / 6) * Math.PI * 2;
+          return [top[0] + Math.cos(a) * r, top[1] - t * len, top[2] + Math.sin(a) * r];
+        });
+      });
+      const tipPt: V3 = [top[0], top[1] - len, top[2]];
+      const scale = [rgb('#8a5a34'), rgb('#6e4426'), rgb('#a8784a')];
+      for (let li = 0; li + 1 < rings.length; li += 1) {
+        for (let i = 0; i < 6; i += 1) {
+          const j = (i + 1) % 6;
+          const col = scale[(i + li) % 3]!;
+          tri(rings[li]![i]!, rings[li + 1]![i]!, rings[li + 1]![j]!, col, li / 3, (li + 1) / 3, (li + 1) / 3);
+          tri(rings[li]![i]!, rings[li + 1]![j]!, rings[li]![j]!, col, li / 3, (li + 1) / 3, li / 3);
+        }
+      }
+      for (let i = 0; i < 6; i += 1) {
+        const j = (i + 1) % 6;
+        tri(rings[3]![i]!, tipPt, rings[3]![j]!, scale[i % 3]!, 1, 1, 1);
+        tri(top, rings[0]![i]!, rings[0]![j]!, scale[1]!, 0, 0, 0);
       }
     }
   });
@@ -604,7 +689,7 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   return {
     wood: { positions: new Float32Array(wood), tone: new Float32Array(woodTone) },
     leaves: { positions: new Float32Array(leaves), tone: new Float32Array(leafTone), autumn: new Float32Array(leafAutumn) },
-    ribbons: { positions: new Float32Array(ribbon), sway: new Float32Array(ribbonSway) },
+    wishes: { positions: new Float32Array(wishPos), colour: new Float32Array(wishCol), sway: new Float32Array(wishSway) },
     fruits: new Float32Array(orn.fruits.flat()),
     fireflies: new Float32Array(orn.fireflies.flat()),
     flowers: {

@@ -96,7 +96,7 @@ describe('дерево v2: меш', () => {
   const geometry = buildTreeV2Geometry(model);
 
   it('усі числа скінченні, трикутники цілі', () => {
-    for (const array of [geometry.wood.positions, geometry.leaves.positions, geometry.ribbons.positions]) {
+    for (const array of [geometry.wood.positions, geometry.leaves.positions, geometry.wishes.positions]) {
       expect(array.length % 9).toBe(0);
       for (const value of array) expect(Number.isFinite(value)).toBe(true);
     }
@@ -188,11 +188,11 @@ describe('дерево v3: гілка року ярусами (ADR-0237, вла�
     expect(shape(branchOf(rich, 0)).length).toBeCloseTo(shape(branchOf(quiet, 0)).length, 9);
   });
 
-  it('стрічка бажання — на гілці свого року', () => {
+  it('яблуко бажання — на гілці свого року', () => {
     const model = buildTreeV2Model({ ...BASE, asOf: '2030-01-01', wishes: [{ id: 7, date: '2024-06-01', isShared: true }] });
     const { clusters } = treeV2Skeleton(model);
     const own = clusters.filter((c) => c.key === 'y1' || c.key.startsWith('y1.'));
-    const blossom = buildTreeV2Geometry(model).ribbons.positions;
+    const blossom = buildTreeV2Geometry(model).wishes.positions;
     const at = [blossom[0]!, blossom[1]!, blossom[2]!];
     const near = Math.min(...own.map((c) => Math.hypot(at[0]! - c.centre[0], at[1]! - c.centre[1], at[2]! - c.centre[2]) - c.radius));
     expect(near).toBeLessThan(0.1);

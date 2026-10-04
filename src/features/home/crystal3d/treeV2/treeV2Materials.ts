@@ -232,45 +232,39 @@ export function createBlossomMaterial(colours: readonly string[] = BLOSSOM_COLOU
 }
 
 /**
- * Колір стрічок бажань — один на форму дерева (власник, 2026-10-04): дуб
- * носить червоні стрічки, як вишиванка; ялина — золоті, як святкова; на
- * рожевій сакурі — білі. Без каналів «хто виконав»: це мова кристала.
+ * Плоди й квіти бажань (яблука, квітки сакури, шишки): колір на вершину,
+ * пласке освітлення граней і легке гойдання від точки, де прикраса тримається.
  */
-export const TREE_RIBBON_COLOUR: Record<'oak' | 'spruce' | 'sakura', string> = {
-  oak: '#d8323e',
-  spruce: '#f2c14e',
-  sakura: '#fff8f4',
-};
-
-/** Стрічки бажань: двобічні, хвости колишуться на вітрі від вузлика донизу. */
-export function createRibbonMaterial(tint: string): THREE.ShaderMaterial {
+export function createWishMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
-    uniforms: { uColour: { value: colour(tint) }, uTime: { value: 0 }, uWind: { value: 1 } },
+    uniforms: { uTime: { value: 0 }, uWind: { value: 1 } },
     vertexShader: /* glsl */ `
+      attribute vec3 colour;
       attribute float sway;
       uniform float uTime;
       uniform float uWind;
       varying vec3 vWorld;
-      varying float vSway;
+      varying vec3 vColour;
       void main() {
         vec4 w = modelMatrix * vec4(position, 1.0);
-        float s = sway * sway * uWind;
-        w.x += sin(uTime * 1.7 + w.y * 9.0 + w.z * 3.0) * 0.035 * s;
-        w.z += cos(uTime * 1.3 + w.x * 7.0) * 0.025 * s;
+        float s = sway * uWind;
+        w.x += sin(uTime * 1.4 + w.y * 7.0 + w.z * 3.0) * 0.012 * s;
+        w.z += cos(uTime * 1.1 + w.x * 5.0) * 0.01 * s;
         vWorld = w.xyz;
-        vSway = sway;
+        // Кольори вершин записані в sRGB; рендер чекає лінійних — інакше
+        // червоне яблуко вицвітає до рожевого, а рожева квітка до білої.
+        vColour = pow(colour, vec3(2.2));
         gl_Position = projectionMatrix * viewMatrix * w;
       }
     `,
     fragmentShader: /* glsl */ `
-      uniform vec3 uColour;
       varying vec3 vWorld;
-      varying float vSway;
+      varying vec3 vColour;
       void main() {
         vec3 n = normalize(cross(dFdx(vWorld), dFdy(vWorld)));
-        float shade = 0.72 + 0.28 * abs(n.y) + 0.12 * abs(n.x);
-        gl_FragColor = vec4(uColour * shade * (1.08 - 0.12 * vSway), 1.0);
+        float light = 0.7 + 0.3 * max(0.0, dot(n, normalize(vec3(-0.45, 0.8, 0.4)))) + 0.12 * abs(n.y);
+        gl_FragColor = vec4(vColour * light * 1.05, 1.0);
         ${END}
       }
     `,

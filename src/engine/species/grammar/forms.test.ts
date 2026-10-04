@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CRYSTAL_FORMS, buildCrystalV2Geometry } from '../crystalV2/geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from '../crystalV2/model';
-import { TREE_FORMS, buildTreeV2Geometry, treeV2Skeleton } from '../treeV2/geometry';
+import { TREE_FORMS, buildTreeV2Geometry, treeV2Skeleton, treeV2WishPoints } from '../treeV2/geometry';
 import { buildTreeV2Model } from '../treeV2/model';
 
 // ============================================================
@@ -78,6 +78,31 @@ describe('форми дерева: той самий ріст, інший мал
       return w;
     };
     expect(toward(withFirst(1))).toBeGreaterThan(toward(withFirst(0)) * 1.1);
+  });
+
+  it('бажання на дереві — за формою: яблука на дубі, квітки на сакурі, шишки на ялині (власник, 2026-10-04)', () => {
+    expect(model.blossoms.length).toBeGreaterThan(0);
+    const dominant = (form: (typeof TREE_FORMS)[number]) => {
+      const c = buildTreeV2Geometry(model, form).wishes.colour;
+      let r = 0, g = 0, b = 0;
+      for (let i = 0; i < c.length; i += 3) { r += c[i]!; g += c[i + 1]!; b += c[i + 2]!; }
+      return [r, g, b].map((v) => v / (c.length / 3)) as [number, number, number];
+    };
+    const [ar, ag, ab] = dominant('oak');
+    expect(ar).toBeGreaterThan(ag + 0.25); // червоні яблука
+    expect(ar).toBeGreaterThan(ab + 0.25);
+    const [sr, sg] = dominant('sakura');
+    expect(sr).toBeGreaterThan(sg + 0.2); // насичено-рожеві пелюстки на блідій кроні
+    expect(sr).toBeGreaterThan(0.8);
+    const [cr, cg, cb] = dominant('spruce');
+    expect(cr).toBeGreaterThan(cb); // коричневі шишки
+    expect(Math.max(cr, cg, cb)).toBeLessThan(0.7);
+    // Шишка висить на кінчику гілки свого року, а не під хвоєю.
+    const { branches } = treeV2Skeleton(model, 'spruce');
+    treeV2WishPoints(model, 'spruce').forEach((p, k) => {
+      const own = branches.find((x) => x.key === `y${model.blossoms[k]!.year}`);
+      if (own) expect(p).toEqual(own.end);
+    });
   });
 
   it('сакура — розлога: крона ширша, ніж у дуба, а дерево нижче', () => {

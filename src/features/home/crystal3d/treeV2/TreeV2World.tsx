@@ -13,8 +13,7 @@ import {
   TREE_FORM_LEAVES,
   TREE_PALETTES,
   createBlossomMaterial,
-  createRibbonMaterial,
-  TREE_RIBBON_COLOUR,
+  createWishMaterial,
   createGlowPointsMaterial,
   createGrassMaterial,
   createLeafMaterial,
@@ -120,10 +119,11 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     [geometry],
   );
   const blossoms = useMemo(() => {
-    if (geometry.ribbons.positions.length === 0) return null;
+    if (geometry.wishes.positions.length === 0) return null;
     const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(geometry.ribbons.positions, 3));
-    g.setAttribute('sway', new THREE.BufferAttribute(geometry.ribbons.sway, 1));
+    g.setAttribute('position', new THREE.BufferAttribute(geometry.wishes.positions, 3));
+    g.setAttribute('colour', new THREE.BufferAttribute(geometry.wishes.colour, 3));
+    g.setAttribute('sway', new THREE.BufferAttribute(geometry.wishes.sway, 1));
     return g;
   }, [geometry]);
   const flowers = useMemo(
@@ -144,7 +144,7 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     grass: createGrassMaterial(palette),
     wood: createWoodMaterial(palette),
     leaves: createLeafMaterial(palette, PORTAL_GROUND_Y),
-    blossoms: createRibbonMaterial(TREE_RIBBON_COLOUR[form]),
+    blossoms: createWishMaterial(),
     flowers: createBlossomMaterial(FLOWER_COLOURS),
     fruits: createGlowPointsMaterial('#ffc94a', 1.3, 0.3, false),
     fireflies: createGlowPointsMaterial(palette.firefly, palette.fireflyStrength, 0.12, true),
