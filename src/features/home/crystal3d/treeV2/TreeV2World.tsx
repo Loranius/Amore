@@ -188,7 +188,7 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
 
   return (
     <>
-      {!bare && <Diorama species="tree" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />}
+      {!bare && <Diorama species="tree" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} shadowLift={treeIslandBase(island)} />}
       <TreeIsland bare={bare} seed={seed} theme={theme} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         <instancedMesh ref={grassRef} args={[tuft, materials.grass, grass.length]} frustumCulled={false} />

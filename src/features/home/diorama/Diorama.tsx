@@ -98,6 +98,39 @@ function createBaseMaterial(ground: string, cliff: string): THREE.ShaderMaterial
   });
 }
 
+/**
+ * Контактна тінь: м'яка пляма під предметом, зсунута від світла. Без неї
+ * кристал, дерево й вулкан висіли над острівцем; з нею — стоять на ньому.
+ * Тон — та сама земля, притемнена в холодний ліловий, а не чорне.
+ */
+function createShadowMaterial(tint: string): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    uniforms: { uTint: { value: new THREE.Color(tint).multiplyScalar(0.32).lerp(new THREE.Color('#2a2050'), 0.35) }, uStrength: { value: 0.42 } },
+    vertexShader: /* glsl */ `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv * 2.0 - 1.0;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uTint;
+      uniform float uStrength;
+      varying vec2 vUv;
+      void main() {
+        float r = length(vUv);
+        float a = pow(clamp(1.0 - r, 0.0, 1.0), 1.6) * uStrength;
+        gl_FragColor = vec4(uTint, a);
+      }
+    `,
+  });
+}
+
+/** Куди падає тінь: геть від ключового світла, по землі. */
+export const DIORAMA_SHADOW_SHIFT: [number, number] = [-KEY.x, -KEY.z];
+
 /** Частинки світла: повільно пливуть угору й пульсують. */
 function createMoteMaterial(tint: string, strength: number): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
@@ -160,13 +193,19 @@ interface DioramaProps {
    * референсом власника (ADR-0221) і бере з діорами лише тло й частинки.
    */
   base?: boolean;
+  /**
+   * На скільки земля в центрі острова вища за `groundY`. Верх острова
+   * дерева й рифу — купол, і пласка тінь на висоті краю ховалась під
+   * травою: тінь має лягти на справжню землю під предметом.
+   */
+  shadowLift?: number;
 }
 
 /**
  * Спільна діорама трьох видів (ADR-0220): тло з сяйвом, острівець під
  * предметом і частинки світла. Предмет ставить на острівець сама сцена.
  */
-export function Diorama({ species, theme, seed, radius, groundY, reduceMotion, base: showBase = true }: DioramaProps) {
+export function Diorama({ species, theme, seed, radius, groundY, reduceMotion, base: showBase = true, shadowLift = 0 }: DioramaProps) {
   const palette = DIORAMA_PALETTES[species][theme];
   const size = useThree((state) => state.size);
   const base = useMemo(() => {
@@ -197,6 +236,7 @@ export function Diorama({ species, theme, seed, radius, groundY, reduceMotion, b
     backdrop: createBackdropMaterial(palette.top, palette.bottom, palette.glow),
     base: createBaseMaterial(palette.ground, palette.cliff),
     motes: createMoteMaterial(palette.mote, palette.moteStrength),
+    shadow: createShadowMaterial(palette.ground),
   }), [palette]);
 
   useEffect(() => () => { base.dispose(); motes.dispose(); }, [base, motes]);
@@ -215,6 +255,15 @@ export function Diorama({ species, theme, seed, radius, groundY, reduceMotion, b
       </mesh>
       <group position={[0, groundY, 0]}>
         {showBase && <mesh geometry={base} material={materials.base} />}
+        <mesh
+          material={materials.shadow}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[DIORAMA_SHADOW_SHIFT[0] * radius * 0.16, shadowLift + 0.012, DIORAMA_SHADOW_SHIFT[1] * radius * 0.16]}
+          scale={[radius * 0.62, radius * 0.5, 1]}
+          renderOrder={1}
+        >
+          <planeGeometry args={[2, 2]} />
+        </mesh>
         <points geometry={motes} material={materials.motes} frustumCulled={false} />
       </group>
     </>

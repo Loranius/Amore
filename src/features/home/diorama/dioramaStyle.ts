@@ -49,13 +49,27 @@ export const DIORAMA_PALETTES: Record<DioramaSpecies, Record<'light' | 'dark', D
  *   * легкі сходинки тону (35% до трьох рівнів) — грані читаються гранями,
  *     але без різкого контрасту;
  *   * сяйво по силуету — тією ж барвою, трохи до білого.
+ *
+ * Світло й тінь (власник, 2026-10-04: «покращ візуально сцени усіх
+ * об'єктів, додай світло і тіні»):
+ *   * тепле світло, прохолодна тінь — освітлений бік трохи теплішає, тіньовий
+ *     іде в ліловий, а не в сірий, як у мальованих діорамах;
+ *   * зворотний бік глибший (до 0.74), але ніколи не чорний;
+ *   * широкий м'який відблиск лише на освітленому боці: залежить від
+ *     погляду, тож рухається з камерою, а не лежить сталою плямою.
  * Потрібні uniform-и `uKey` (vec3) і `uAmbient` (float).
  */
 export const DIORAMA_SHADE = /* glsl */ `
   vec3 dioramaShade(vec3 base, vec3 n, vec3 view) {
-    float wrap = dot(n, uKey) * 0.5 + 0.5;
+    float ndl = dot(n, uKey);
+    float wrap = ndl * 0.5 + 0.5;
     float band = mix(wrap, floor(wrap * 3.0 + 0.5) / 3.0, 0.35);
-    vec3 c = base * (uAmbient + (1.05 - uAmbient) * band);
+    vec3 c = base * (uAmbient * 0.94 + (1.18 - uAmbient * 0.94) * band);
+    c *= mix(vec3(0.84, 0.88, 1.1), vec3(1.06, 1.0, 0.92), smoothstep(0.25, 0.85, wrap));
+    c *= mix(0.74, 1.0, smoothstep(0.05, 0.5, wrap));
+    vec3 h = normalize(uKey + view);
+    float spec = pow(max(0.0, dot(n, h)), 28.0) * 0.16 * step(0.0, ndl);
+    c += mix(base, vec3(1.0), 0.6) * spec;
     float rim = pow(1.0 - max(0.0, dot(n, view)), 3.0);
     return c + mix(base, vec3(1.0), 0.4) * rim * 0.3;
   }

@@ -214,7 +214,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
 
   return (
     <>
-      {!bare && <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} />}
+      {!bare && <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} shadowLift={reefIslandGround(island, 0)} />}
       <ReefIsland bare={bare} arch={islandArch} lagoon={islandLagoon} stones={islandStones} wildlife={islandWildlife} calmSurround={calmSurround} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         {geometry.seagrass.length > 0 && (
