@@ -112,7 +112,7 @@ class Quiz extends Lesson {
       y += Math.ceil(count / per) * 18 + 8;
     }
     kit.bar(kit.W / 2 - 60, y, 120, 4, this.timer / this.limit, this.timer > 2 ? '#7ed957' : '#e8776a');
-    const answersY = Math.max(y + 14, kit.H - 110);
+    const answersY = Math.min(y + 36, kit.H - 80);
     answerGrid(kit, this.q.answers, answersY, this.picked, this.picked === this.q.correct);
     if (this.picked >= 0 && this.picked !== this.q.correct) kit.text(`Правильно: ${this.q.answers[this.q.correct]}`, kit.W / 2, answersY - 12, { size: 10, color: '#ffe0a0' });
     kit.text(`${Math.min(this.n + 1, this.count)}/${this.count}`, kit.W - 18, 56, { size: 10 });

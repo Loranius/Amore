@@ -268,6 +268,7 @@ export class GameController {
   // Мапи.
   // ------------------------------------------------------------
   private place(spawn: { x: number; y: number }): void {
+    if (this.life) this.player.look = lenaLook(this.life);
     const f = tileFeet(spawn.x, spawn.y);
     this.player.x = f.x;
     this.player.y = f.y;
@@ -574,7 +575,7 @@ export class GameController {
 
   private worldScale(w: number, h: number): number {
     // ~15 клітинок на ширину телефона, ~22 — на широкому екрані.
-    const tilesWide = this.map.interior ? 11 : w > h ? 24 : 14;
+    const tilesWide = this.map.interior ? this.map.w : w > h ? 24 : 14;
     return Math.max(2, Math.round(w / (tilesWide * TILE)));
   }
 
@@ -648,7 +649,7 @@ export class GameController {
     const duty = dutyToday(life);
     const check = canDoDuty(life);
     if (duty && check.ok) {
-      const where = this.map.city === duty.city ? '' : ` · ${CITIES[duty.city].name}`;
+      const where = life.city === duty.city ? '' : ` · ${CITIES[duty.city].name}`;
       const by = `${Math.floor(duty.startBy / 60)}:${String(duty.startBy % 60).padStart(2, '0')}`;
       return `${duty.title} — до ${by}${where}`;
     }
