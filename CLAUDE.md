@@ -66,3 +66,26 @@ For every implementation task:
 ## Completion Standard
 
 A task is not complete until the relevant checklist passes and the implementation report matches `docs/06_TEMPLATES/IMPLEMENTATION_REPORT_TEMPLATE.md`.
+
+## Гра «Дєвочка в городі» (ADR-0239)
+
+Піксельний симулятор життя Лєни, сторінка `game.html` (лише пара 1). Код — `src/features/game/life/`: `sim/` (чиста детермінована логіка й тести), `world/` (мапи), `render/` (Canvas 2D, без Three.js), `ui/`, `games/`, `controller.ts`. Кожна зміна гри — поправкою в кінець `docs/05_ADR/ADR-0239-lena-life-game.md` і словами в рядку «Гра» `docs/MODULE_STATUS.md`. З власником — українською.
+
+**Як власник ставить задачі.** Планів словами він не дає — малює їх у редакторі-артефакті, тисне «Зберегти для Claude» і пише «Готово». Тоді прочитай артефакт (`Artifact` → `read`), візьми `script#plan-data`, перенеси в гру, а тест хай звіряє мапу з планом. Після змін у грі опублікуй редактор знову (той самий файл або `url`) з теперішніми даними, щоб «як зараз у грі» не брехало. Редактори:
+- розміри кімнат хати, у клітинках гри: https://claude.ai/artifact/XXxPExnvq8as2Tf1r1r3eg
+- план хати (сусідство кімнат): https://claude.ai/artifact/HHfawGHnyBYaueGXDSaQjH
+- подвір'я: https://claude.ai/artifact/72SRmBJHU4VguARRwvLUCE
+- літня кухня: https://claude.ai/artifact/WeEks4MG1rex8x5nA2SFYM
+- погріб: https://claude.ai/artifact/9L6DTHYHEFWdP9awKx87MU
+
+**Мапи.** `world/build.ts` `MapBuilder`; ґрунти — `world/types.ts` (`x` порожнеча, `W` стіна зі шпалерами, `f` підлога, `e`/`S` земля й бутова стіна погреба). Кімната всередині: ліва колонка — стіна з сусідом, верхні ряди — задня стіна. Меблі в домі ×1.25 (`INTERIOR_FURNITURE`). Точки появи — цілі клітинки; кожна мапа проходить `assertReachable` у `world/maps.test.ts`. Садиба в Жилинцях: `yard.ts`, `kitchen.ts`, `cellar.ts`, хата — `interior.ts` (`HATA_ROOMS`, `HATA_DOORS`); вхід і вихід — `enter*` / `enterYard(spawn)` у контролері. Облаштування кімнати Лєни зберігається в рамці 16×12 (`ROOM_FLOOR`, `DEFAULT_SPOT`), у хаті його розкладає `hataSpots` — формат сейву не міняй.
+
+**Живі.** Мама — розклад `sim/mom.ts`, рух `updateMom` (ліжко в хаті / подвір'я / кухня). Бася — `sim/dog.ts` (5 с бігає, 3 с за Лєною, 30% перечепитись, 1 с лежить), спрайт `render/assets/basia.png` із PixelLab (персонаж «Бася (мала)»). Випадковість у грі — лише `rngFor(seed, 'причина', …)`.
+
+**Малювання.** `render/pixel.ts`: тіні зсуваються по тону (`shade`), обвідка з рампи (`outline`), близькі кольори зливаються (`mergeNearDuplicates`). Дахи прив'язані до світу, щоб будівля з частин не виглядала порізаною. Референси власника (зокрема тайлсети Stardew) — лише для прийомів; пікселі не копіюй.
+
+**Перевірка наживо.** `node scripts/live/game-shot.mjs wide "village||js:c.life={...c.life,home:'zhylyntsi'}; c.enterCellar(); c.worldFrame=function(){}"` — `c` це `window.__lifeGame`, кадри в `.live/game/`. Подивись кадр через Read, перш ніж казати «готово». GitHub Pages кешує ~10 хв; iframe гри отримує URL збірки (`gameSrc.ts`, `__BUILD_ID__` у `vite.config.ts` і `vitest.config.ts`).
+
+**Доставка.** Після `bash scripts/quality-gate.sh` власник хоче пуш і в робочу гілку, і в `main` (`git push origin HEAD:main`).
+
+**MCP.** `.mcp.json` підключає `threejs-devtools-mcp` (версія закріплена; для 3D-порталу, не для гри). PixelLab підключений на рівні акаунта — ключ ніколи не потрапляє в репозиторій.
