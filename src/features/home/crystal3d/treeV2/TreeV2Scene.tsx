@@ -67,6 +67,10 @@ export default function TreeV2Scene() {
   const noBearings = useMemo<readonly number[]>(() => [], []);
   // Острів того самого розміру, що в кристала й рифу (ADR-0220).
   const island = frame ? dioramaIslandRadius(frame.reach * 0.9) : 0;
+  // Камера тримає в кадрі острів і НАМАЛЬОВАНУ крону: дерево більше в
+  // композиції (TREE_EMPHASIS), але не обрізане краєм екрана: крона
+  // кривобока, а сцена повільно обертається, тож радіус — увесь розмах.
+  const sceneRadius = frame ? Math.max(frame.drawnReach, island * 0.95) : 0;
 
   // Хроніка росту (ADR-0238): дотик по дереву, камера огляду й дерево на
   // дату з повзунка при сьогоднішньому кадрі.
@@ -123,8 +127,8 @@ export default function TreeV2Scene() {
           theme={theme}
           quality={quality}
           reduceMotion={reduceMotion}
-          artifactSceneRadius={Math.max(frame.reach, island * 0.95)}
-          crystalsSceneRadius={Math.max(frame.reach, island * 0.95)}
+          artifactSceneRadius={sceneRadius}
+          crystalsSceneRadius={sceneRadius}
           artifactSceneHeight={dioramaFrameHeight(frame.height)}
           veinBearings={noBearings}
           veinReach={0}

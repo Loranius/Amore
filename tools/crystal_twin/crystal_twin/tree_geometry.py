@@ -179,7 +179,7 @@ def roots(model: dict[str, Any]) -> list[dict[str, Any]]:
         c, s = math.cos(phi), math.sin(phi)
         a = (c * r * 0.3, r * 0.6, s * r * 0.3)
         mid = (c * length * 0.4, length * 0.08, s * length * 0.4)
-        end = (c * length, -length * 0.05, s * length)
+        end = (c * length, -length * 0.14, s * length)
         out.append({"start": a, "end": mid, "r0": r * 0.75, "r1": r * 0.4, "key": f"root{i}a"})
         out.append({"start": mid, "end": end, "r0": r * 0.4, "r1": r * 0.08, "key": f"root{i}b"})
     return out

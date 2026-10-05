@@ -14,7 +14,7 @@ const KEY = new THREE.Vector3(-0.45, 0.8, 0.4).normalize();
 const BUFFER = new THREE.Vector2();
 
 /** Тло: вертикальний градієнт, сяйво за предметом і легка віньєтка. */
-function createBackdropMaterial(top: string, bottom: string, glow: string): THREE.ShaderMaterial {
+function createBackdropMaterial(top: string, bottom: string, glow: string, milk?: string): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
@@ -22,6 +22,10 @@ function createBackdropMaterial(top: string, bottom: string, glow: string): THRE
       uTop: { value: new THREE.Color(top) },
       uBottom: { value: new THREE.Color(bottom) },
       uGlow: { value: new THREE.Color(glow) },
+      // Молочна смуга між синню й низом («небесний сад» дерева); без неї —
+      // двоколірний градієнт, як було.
+      uMilk: { value: new THREE.Color(milk ?? bottom) },
+      uHasMilk: { value: milk ? 1 : 0 },
       uResolution: { value: new THREE.Vector2(1, 1) },
     },
     vertexShader: /* glsl */ `
@@ -36,6 +40,8 @@ function createBackdropMaterial(top: string, bottom: string, glow: string): THRE
       uniform vec3 uTop;
       uniform vec3 uBottom;
       uniform vec3 uGlow;
+      uniform vec3 uMilk;
+      uniform float uHasMilk;
       uniform vec2 uResolution;
       varying vec3 vDir;
       void main() {
@@ -43,6 +49,11 @@ function createBackdropMaterial(top: string, bottom: string, glow: string): THRE
         // вниз, і градієнт за напрямком лишав би видимим лише низ неба.
         vec2 uv = gl_FragCoord.xy / uResolution;
         vec3 c = mix(uBottom, uTop, smoothstep(0.05, 0.95, uv.y));
+        if (uHasMilk > 0.5) {
+          // Синє небо → молочні хмари → світлий золотий серпанок унизу.
+          vec3 low = mix(uBottom, uMilk, smoothstep(0.08, 0.45, uv.y));
+          c = mix(low, uTop, smoothstep(0.45, 0.98, uv.y));
+        }
         vec2 d = (uv - vec2(0.5, 0.5)) * vec2(uResolution.x / uResolution.y, 1.0);
         c += uGlow * exp(-dot(d, d) * 16.0) * 0.3;
         float vignette = smoothstep(0.95, 0.35, length(uv - 0.5));
@@ -233,7 +244,7 @@ export function Diorama({ species, theme, seed, radius, groundY, reduceMotion, b
     return g;
   }, [seed, radius]);
   const materials = useMemo(() => ({
-    backdrop: createBackdropMaterial(palette.top, palette.bottom, palette.glow),
+    backdrop: createBackdropMaterial(palette.top, palette.bottom, palette.glow, palette.milk),
     base: createBaseMaterial(palette.ground, palette.cliff),
     motes: createMoteMaterial(palette.mote, palette.moteStrength),
     shadow: createShadowMaterial(palette.ground),

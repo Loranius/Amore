@@ -301,7 +301,9 @@ export function treeV2Roots(model: TreeV2Model): Omit<TreeV2Branch, 'order'>[] {
     const s = Math.sin(phi);
     const a: V3 = [c * r * 0.3, r * 0.6, s * r * 0.3];
     const mid: V3 = [c * length * 0.4, length * 0.08, s * length * 0.4];
-    const end: V3 = [c * length, -length * 0.05, s * length];
+    // Кінчик пірнає в землю круто (власник, 2026-10-05: «коріння, що
+    // справді йде в землю»), а не лежить на ній.
+    const end: V3 = [c * length, -length * 0.14, s * length];
     out.push({ start: a, end: mid, r0: r * 0.75, r1: r * 0.4, key: `root${i}a` });
     out.push({ start: mid, end, r0: r * 0.4, r1: r * 0.08, key: `root${i}b` });
   }
@@ -309,8 +311,10 @@ export function treeV2Roots(model: TreeV2Model): Omit<TreeV2Branch, 'order'>[] {
 }
 
 export interface TreeV2Ornaments {
-  /** Стрічки бажань: де стрічку зав'язано (низ крони гілки свого року). */
-  /** `cluster` — центр кластера, до якого зав'язано: від нього яблуко виходить з листя. */
+  /**
+   * Бажання: де зав'язано (низ крони гілки свого року) і `cluster` — центр
+   * кластера, від якого плід виходить з листя на поверхню крони.
+   */
   blossoms: { position: V3; cluster: V3 }[];
   fruits: V3[];
   fireflies: V3[];
