@@ -11,6 +11,7 @@ import { townsfolkLook, type Look } from '../render/people';
 import { sfx } from '../sound';
 import {
   EVENTS,
+  UNI_EVENTS,
   PASSAGES,
   SORT_SETS,
   UA_CITIES,
@@ -384,19 +385,20 @@ class MapQuiz extends Lesson {
 // Історія: розстав події від найдавнішої.
 // ------------------------------------------------------------
 class Timeline extends Lesson {
-  title = 'Історія';
+  readonly title: string;
   hint = 'Торкайся подій від найдавнішої до найновішої';
   private events: typeof EVENTS[number][];
   private order: number[] = [];
   private mistakes = 0;
   private round = 0;
-  constructor(private ctx: GameContext) {
+  constructor(private ctx: GameContext, title = 'Історія', private pool: typeof EVENTS = EVENTS, private room: 'classroom' | 'lecture' = 'classroom') {
     super();
+    this.title = title;
     this.events = this.pick();
   }
   private pick() {
     const n = this.ctx.level >= 8 ? 5 : 4;
-    return sample(this.ctx.rng, EVENTS, n);
+    return sample(this.ctx.rng, this.pool, n);
   }
   tap(x: number, y: number, kit: Kit): void {
     if (this.done) return;
@@ -422,7 +424,7 @@ class Timeline extends Lesson {
     }
   }
   render(kit: Kit): void {
-    kit.backdrop('classroom');
+    kit.backdrop(this.room);
     const top = 74;
     // Стрічка часу.
     kit.rect(18, top, 3, kit.H - top - 30, '#8a5a34');
@@ -748,19 +750,19 @@ class LongJump extends Lesson {
 // Реєстр уроків.
 // ------------------------------------------------------------
 export type Subject = 'math' | 'ukr' | 'reading' | 'nature' | 'english' | 'geo' | 'history' | 'art' | 'music' | 'pe' | 'it' | 'physics' | 'chemistry' | 'biology'
-  | 'econ' | 'accounting' | 'marketing' | 'stats' | 'exam';
+  | 'pedagogy' | 'psychology' | 'histUa' | 'histWorld' | 'methods' | 'exam';
 
 export const SUBJECT_NAME: Record<Subject, string> = {
   math: 'Математика', ukr: 'Українська мова', reading: 'Читання', nature: 'Я досліджую світ', english: 'Англійська', geo: 'Географія',
   history: 'Історія', art: 'Малювання', music: 'Музика', pe: 'Фізкультура', it: 'Інформатика', physics: 'Фізика', chemistry: 'Хімія',
-  biology: 'Біологія', econ: 'Економіка', accounting: 'Бухоблік', marketing: 'Маркетинг', stats: 'Статистика', exam: 'Сесія',
+  biology: 'Біологія', pedagogy: 'Педагогіка', psychology: 'Вікова психологія', histUa: 'Історія України', histWorld: 'Всесвітня історія',
+  methods: 'Методика викладання історії', exam: 'Сесія',
 };
 
 export function lessonGame(subject: Subject, ctx: GameContext): MiniGame {
   const L = ctx.level;
   switch (subject) {
     case 'math': return new Quiz(SUBJECT_NAME.math, 'Обери правильну відповідь — швидко!', ctx, () => mathQuestion(ctx.rng, L), 4 + Math.min(3, Math.floor(L / 3)), 'classroom', L <= 2 ? 10 : 8);
-    case 'stats': return new Quiz(SUBJECT_NAME.stats, 'Порахуй і обери відповідь', ctx, () => mathQuestion(ctx.rng, L), 5, 'lecture', 12);
     case 'ukr': return new Sentence(ctx);
     case 'reading': return new Reading(ctx);
     case 'nature': return new Sort(ctx, SUBJECT_NAME.nature, Math.min(L, 4));
@@ -774,11 +776,14 @@ export function lessonGame(subject: Subject, ctx: GameContext): MiniGame {
     case 'music': return new Simon(ctx, true);
     case 'pe': return ctx.rng() < 0.5 ? new Race(ctx) : new LongJump(ctx);
     case 'it': return new Robot(ctx);
-    case 'econ': return new Quiz(SUBJECT_NAME.econ, 'Обери правильну відповідь', ctx, () => (ctx.rng() < 0.5 ? factQuestion(ctx.rng, 'economics', L) : mathQuestion(ctx.rng, L)), 5, 'lecture');
-    case 'accounting': return new Sort(ctx, SUBJECT_NAME.accounting, 12, 12);
-    case 'marketing': return new Quiz(SUBJECT_NAME.marketing, 'Обери правильну відповідь', ctx, () => factQuestion(ctx.rng, 'marketing', L), 4, 'lecture');
+    // ВДПУ, історичний факультет (власник, 2026-10-05: «Лєна саме історик за профілем»).
+    case 'pedagogy': return new Quiz(SUBJECT_NAME.pedagogy, 'Обери правильну відповідь', ctx, () => factQuestion(ctx.rng, 'pedagogy', L), 5, 'lecture');
+    case 'psychology': return new Quiz(SUBJECT_NAME.psychology, 'Обери правильну відповідь', ctx, () => factQuestion(ctx.rng, 'psychology', L), 4, 'lecture');
+    case 'histUa': return new Timeline(ctx, SUBJECT_NAME.histUa, UNI_EVENTS, 'lecture');
+    case 'histWorld': return new Quiz(SUBJECT_NAME.histWorld, 'Обери правильну відповідь', ctx, () => factQuestion(ctx.rng, 'worldHistory', L), 5, 'lecture');
+    case 'methods': return new Sort(ctx, SUBJECT_NAME.methods, 12, 12);
     case 'exam': return new Quiz('Сесія', 'Іспит: усе, що вчила за семестр', ctx, () => pickOne(ctx.rng, [
-      () => factQuestion(ctx.rng, 'economics', L), () => factQuestion(ctx.rng, 'marketing', L), () => mathQuestion(ctx.rng, L), () => englishQuestion(ctx.rng, L),
+      () => factQuestion(ctx.rng, 'pedagogy', L), () => factQuestion(ctx.rng, 'psychology', L), () => factQuestion(ctx.rng, 'worldHistory', L), () => englishQuestion(ctx.rng, L),
     ])(), 6, 'lecture', 10);
   }
 }
@@ -789,6 +794,6 @@ export function subjectsFor(level: number): Subject[] {
   if (level <= 4) return ['math', 'ukr', 'reading', 'nature', 'english', 'art', 'music', 'pe', 'it'];
   if (level <= 6) return ['math', 'ukr', 'english', 'geo', 'history', 'biology', 'art', 'pe', 'it', 'music'];
   if (level <= 11) return ['math', 'ukr', 'english', 'geo', 'history', 'biology', 'physics', 'chemistry', 'pe', 'it'];
-  return ['econ', 'accounting', 'marketing', 'stats', 'english'];
+  return ['pedagogy', 'psychology', 'histUa', 'histWorld', 'methods', 'english'];
 }
 

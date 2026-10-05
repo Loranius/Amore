@@ -57,6 +57,17 @@ describe('школа', () => {
 });
 
 describe('ВДПУ і робота', () => {
+  it('ВДПУ — історичний факультет: педагогіка, психологія, історія, методика; ні економіки, ні бухобліку (власник, 2026-10-05)', () => {
+    const uni = subjectsFor(12);
+    expect(uni).toEqual(expect.arrayContaining(['pedagogy', 'psychology', 'histUa', 'histWorld', 'methods']));
+    for (const gone of ['econ', 'accounting', 'marketing', 'stats']) expect(uni as string[]).not.toContain(gone);
+    // Кожен предмет і сесія збирають гру без помилки.
+    for (const s of [...uni, 'exam' as const]) {
+      const g = lessonGame(s, { rng: rngFor(5), level: 13, lena: LENA_ADULT });
+      expect(g.title.length).toBeGreaterThan(0);
+    }
+  });
+
   it('у середу й п\'ятницю — сесія; у будні — дві пари', () => {
     const uni = newLife(4, 'uni');
     expect(dayPlan(at(uni, firstDayOfWeek(12) + 2))[0]!.id).toBe('exam');

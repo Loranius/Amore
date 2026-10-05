@@ -195,7 +195,7 @@ export const ITEMS: readonly Item[] = [
   { id: 'mathBook', name: 'Цікава математика', kind: 'book', shop: 'books', price: 140, skills: { knowledge: 6 }, minWeek: 3, blurb: '+6 знань' },
   { id: 'artBook', name: 'Альбом для малювання', kind: 'book', shop: 'books', price: 110, skills: { creativity: 6 }, blurb: '+6 творчості' },
   { id: 'english', name: 'English for Everyone', kind: 'book', shop: 'books', price: 260, skills: { knowledge: 8, charm: 2 }, minWeek: 5, blurb: '+8 знань, +2 чарівності' },
-  { id: 'econ', name: 'Економіка для людей', kind: 'book', shop: 'books', price: 320, skills: { knowledge: 10 }, minWeek: 11, blurb: '+10 знань' },
+  { id: 'econ', name: 'Історія України в особах', kind: 'book', shop: 'books', price: 320, skills: { knowledge: 10 }, minWeek: 11, blurb: '+10 знань' },
   { id: 'design', name: 'Основи дизайну', kind: 'book', shop: 'books', price: 380, skills: { creativity: 10 }, minWeek: 11, blurb: '+10 творчості' },
 
   // Техніка.
@@ -270,7 +270,7 @@ export const JOBS: readonly Job[] = [
   { id: 'barista', title: 'Бариста', place: 'Кав\'ярня', city: 'vinnytsia', education: 'none', pay: 320, minutes: 360, game: 'barista', partTime: true, grows: 'charm', ranks: ['Бариста', 'Старша бариста', 'Керівниця кав\'ярні'], blurb: 'Каву за рецептом — і з усмішкою.' },
   { id: 'florist', title: 'Флористка', place: 'Квіти', city: 'vinnytsia', education: 'school', skills: { creativity: 20 }, pay: 420, minutes: 420, game: 'florist', partTime: false, grows: 'creativity', ranks: ['Флористка', 'Старша флористка', 'Власниця салону'], blurb: 'Букет за замовленням: кольори й настрій.' },
   { id: 'accountant', title: 'Бухгалтерка', place: 'Офіс', city: 'vinnytsia', education: 'diploma', skills: { knowledge: 45 }, pay: 780, minutes: 480, game: 'accountant', partTime: false, grows: 'knowledge', ranks: ['Бухгалтерка', 'Головна бухгалтерка', 'Фінансова директорка'], blurb: 'Дебет, кредит і ні копійки мимо.' },
-  { id: 'teacher', title: 'Вчителька економіки', place: 'Школа', city: 'khmelnytskyi', education: 'diploma', skills: { knowledge: 40, charm: 25 }, pay: 650, minutes: 420, game: 'teacher', partTime: false, grows: 'charm', ranks: ['Вчителька', 'Класна керівниця', 'Директорка'], blurb: 'Перевірити зошити й не загубити жодного учня.' },
+  { id: 'teacher', title: 'Вчителька історії', place: 'Школа', city: 'khmelnytskyi', education: 'diploma', skills: { knowledge: 40, charm: 25 }, pay: 650, minutes: 420, game: 'teacher', partTime: false, grows: 'charm', ranks: ['Вчителька', 'Класна керівниця', 'Директорка'], blurb: 'Перевірити зошити й не загубити жодного учня.' },
   { id: 'baker', title: 'Кондитерка', place: 'Пекарня', city: 'lviv', education: 'school', skills: { creativity: 30 }, pay: 560, minutes: 420, game: 'baker', partTime: false, grows: 'creativity', ranks: ['Кондитерка', 'Шеф-кондитерка'], blurb: 'Торт за ескізом — шар за шаром.' },
   { id: 'designer', title: 'Дизайнерка', place: 'Студія', city: 'kyiv', education: 'diploma', skills: { creativity: 50, knowledge: 35 }, pay: 1100, minutes: 480, game: 'designer', partTime: false, grows: 'creativity', ranks: ['Дизайнерка', 'Арт-директорка'], blurb: 'Перемалювати макет піксель у піксель.' },
   { id: 'guide', title: 'Гідеса по Одесі', place: 'Екскурсії', city: 'odesa', education: 'school', skills: { charm: 40 }, pay: 700, minutes: 360, game: 'guide', partTime: false, grows: 'charm', ranks: ['Гідеса', 'Головна гідеса'], blurb: 'Провести групу маршрутом і нікого не загубити.' },
