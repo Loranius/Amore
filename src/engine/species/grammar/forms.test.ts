@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { CRYSTAL_FORMS, buildCrystalV2Geometry } from '../crystalV2/geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from '../crystalV2/model';
-import { TREE_FORMS, buildTreeV2Geometry, treeV2Roots, treeV2Skeleton, treeV2SpruceSkirts, treeV2WishPoints, treeV2WoodFrames, WOOD_SIDES } from '../treeV2/geometry';
+import { BUTTRESS_TRIANGLES, TREE_FORMS, buildTreeV2Geometry, treeV2Buttresses, treeV2Skeleton, treeV2SpruceSkirts, treeV2WishPoints, treeV2WoodFrames, WOOD_SIDES } from '../treeV2/geometry';
 import { buildTreeV2Model } from '../treeV2/model';
 
 // ============================================================
@@ -160,9 +160,10 @@ describe('форми дерева: той самий ріст, інший мал
     // вигин замість заломів»), прямий відрізок — однією призмою; коріння —
     // такими самими 8-гранними дугами. Тож трикутників від однієї до
     // чотирьох призм на відрізок, плюс ковпачки, і завжди ціле число граней.
-    const pieces = branches.length + treeV2Roots(model).length;
-    const caps = tips * WOOD_SIDES + (treeV2Roots(model).length / 2) * WOOD_SIDES;
-    const count = oak.wood.positions.length / 9;
+    // Коріння — контрфорси зі своєю сіткою (2026-10-06): їх рахуємо окремо.
+    const pieces = branches.length;
+    const caps = tips * WOOD_SIDES;
+    const count = oak.wood.positions.length / 9 - treeV2Buttresses(model).length * BUTTRESS_TRIANGLES;
     expect(count % WOOD_SIDES).toBe(0);
     expect(count).toBeGreaterThanOrEqual(pieces * WOOD_SIDES * 2 + caps);
     expect(count).toBeLessThanOrEqual(pieces * WOOD_SIDES * 2 * 4 + caps);

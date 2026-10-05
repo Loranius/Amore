@@ -319,25 +319,28 @@ export interface TreeV2Buttress {
 export function treeV2Buttresses(model: TreeV2Model): TreeV2Buttress[] {
   const seed = model.startDate;
   const r = model.trunkRadius * TREE_GIRTH;
-  const n = 5 + Math.min(2, Math.floor(Math.max(0, model.roots - 3) / 2));
+  // 5–6 основних (власник, 2026-10-06, друга поправка): шостий — від місць.
+  const n = model.roots >= 6 ? 6 : 5;
   const front = Math.PI / 2;
   // Місця пари роблять основу трохи ширшою, але не довгою.
   const places = Math.min(1.15, Math.max(0.9, model.rootReach / Math.max(1e-6, 0.1 * model.height)));
   const out: TreeV2Buttress[] = [];
   const jitter = (k: number, tag: string) => (unit(seed, `buttress${k}:${tag}`) - 0.5);
-  const push = (k: number, a: number, size: number) => out.push({
+  const push = (k: number, a: number, reach: number, height: number, width: number) => out.push({
     azimuth: a + jitter(k, 'a') * 0.25,
-    reach: r * (1.9 + 1.4 * size) * places * (0.92 + 0.16 * (jitter(k, 'l') + 0.5)),
-    height: r * (1.7 + 1.7 * size),
-    width: r * (0.55 + 0.45 * size),
+    reach: r * reach * places * (0.94 + 0.12 * (jitter(k, 'l') + 0.5)),
+    height: r * height,
+    width: r * width,
   });
-  push(0, front, 1);
-  push(1, front - 1.3, 0.7);
-  push(2, front + 1.3, 0.7);
+  // Передній — найбільший, але розпластаний по землі: низький і широкий.
+  push(0, front, 3.3, 1.9, 1.35);
+  push(1, front - 1.3, 2.9, 2.5, 0.9);
+  push(2, front + 1.3, 2.9, 2.5, 0.9);
+  // Задні — коротші; трава росте ближче й частково їх ховає.
   const back = n - 3;
   for (let k = 0; k < back; k += 1) {
     const t = back === 1 ? 0 : k / (back - 1) - 0.5;
-    push(3 + k, front + Math.PI + t * 1.9, 0.35 + 0.15 * (jitter(3 + k, 's') + 0.5));
+    push(3 + k, front + Math.PI + t * 1.8, 1.7 + 0.35 * (jitter(3 + k, 's') + 0.5), 1.9, 0.65);
   }
   return out;
 }
@@ -362,31 +365,64 @@ export function treeV2Roots(model: TreeV2Model): Omit<TreeV2Branch, 'order'>[] {
  * увігнуто — стовбур → потовщення → корінь розходиться → лягає на землю →
  * звужується. Чотири великі пласкі смуги по боках, без «бахроми».
  */
-function buttressMesh(b: TreeV2Buttress): V3[][] {
+/** Трикутників на один контрфорс: 7 смуг × 6 сегментів дуги × 2. */
+export const BUTTRESS_TRIANGLES = 7 * 6 * 2;
+
+function buttressMesh(b: TreeV2Buttress, seed: string, key: string): { tris: V3[][]; normals: V3[][] } {
   const c = Math.cos(b.azimuth);
   const s = Math.sin(b.azimuth);
   const side: V3 = [-s, 0, c];
-  const ts = [0, 0.3, 0.6, 0.85, 1, 1.18];
-  const sections = ts.map((t) => {
-    const along = b.width * 0.4 + (b.reach - b.width * 0.4) * Math.min(t, 1) + (t > 1 ? (t - 1) * b.reach : 0);
-    const ridge = t <= 1 ? b.height * Math.pow(1 - t, 1.35) + b.height * 0.03 : -b.height * 0.2;
-    const half = b.width * (1 - 0.55 * Math.min(t, 1)) * (t > 1 ? 0.6 : 1);
-    const base = -b.height * 0.12;
-    const mid: V3 = [c * along, 0, s * along];
-    const at = (w: number, y: number): V3 => [mid[0] + side[0] * w, y, mid[2] + side[2] * w];
-    // Плече — трохи нижче за середину гребеня: переріз трикутний, з
-    // невеликим заломом, щоб великі площини ловили світло по-різному.
-    return [at(-half, base), at(-half * 0.42, ridge * 0.5 + base * 0.5), at(0, ridge), at(half * 0.42, ridge * 0.5 + base * 0.5), at(half, base)];
+  // Переріз — округлий горб (без гострого гребеня), сім вершин дугою.
+  // Біля стовбура він високий і широкий — продовження напливу; далі
+  // плавно нижчає й тоншає, і за краєм іде під землю.
+  const ts = [0, 0.16, 0.34, 0.54, 0.74, 0.9, 1, 1.18];
+  const ARC = 7;
+  const grid = ts.map((t, k) => {
+    const along = b.width * 0.25 + (b.reach - b.width * 0.25) * Math.min(t, 1) + (t > 1 ? (t - 1) * b.reach : 0);
+    const crest = t <= 1 ? b.height * Math.pow(1 - t, 1.4) + b.height * 0.04 : -b.height * 0.18;
+    const half = b.width * (1 - 0.55 * Math.min(t, 1)) * (t > 1 ? 0.7 : 1);
+    const base = -b.height * 0.1;
+    return Array.from({ length: ARC }, (_, i): V3 => {
+      const th = (i / (ARC - 1)) * Math.PI;
+      // Нерівні low-poly грані: внутрішні вершини трохи зміщені, крайні
+      // (на землі) і переріз біля стовбура — ні, щоб не відкривати щілин.
+      const wobble = i === 0 || i === ARC - 1 || k === 0 ? 0 : unit(seed, `${key}:${k}:${i}`) - 0.5;
+      const x = Math.cos(th) * half * (1 + 0.12 * wobble);
+      const y = base + Math.pow(Math.sin(th), 0.7) * (crest - base) * (1 + 0.1 * wobble);
+      return [c * along + side[0] * x, y, s * along + side[2] * x];
+    });
   });
-  const tris: V3[][] = [];
-  for (let k = 0; k + 1 < sections.length; k += 1) {
-    const lo = sections[k]!;
-    const hi = sections[k + 1]!;
-    for (let i = 0; i + 1 < lo.length; i += 1) {
-      tris.push([lo[i]!, hi[i]!, hi[i + 1]!], [lo[i]!, hi[i + 1]!, lo[i + 1]!]);
+  // Нормаль вершини — середня з сусідніх граней: світло на корені плавне,
+  // як на стовбурі, і межі між ними не видно; силует лишається гранчастим.
+  const acc = grid.map((row) => row.map((): V3 => [0, 0, 0]));
+  const faces: [number, number, number, number, number, number][] = [];
+  for (let k = 0; k + 1 < grid.length; k += 1) {
+    for (let i = 0; i + 1 < ARC; i += 1) {
+      faces.push([k, i, k + 1, i, k + 1, i + 1], [k, i, k + 1, i + 1, k, i + 1]);
     }
   }
-  return tris;
+  const at = (k: number, i: number) => grid[k]![i]!;
+  const oriented = faces.map(([k0, i0, k1, i1, k2, i2]) => {
+    let n = norm(cross(sub3(at(k1, i1), at(k0, i0)), sub3(at(k2, i2), at(k0, i0))));
+    // Назовні — від лінії під коренем.
+    const mid = at(k0, i0);
+    const along = mid[0] * c + mid[2] * s;
+    const out = sub3(mid, [c * along, -b.height, s * along]);
+    const flip = n[0] * out[0] + n[1] * out[1] + n[2] * out[2] < 0;
+    if (flip) n = [-n[0], -n[1], -n[2]];
+    for (const [k, i] of [[k0, i0], [k1, i1], [k2, i2]] as const) {
+      const v = acc[k]![i]!;
+      v[0] += n[0]; v[1] += n[1]; v[2] += n[2];
+    }
+    return { idx: flip ? [[k0, i0], [k2, i2], [k1, i1]] : [[k0, i0], [k1, i1], [k2, i2]] };
+  });
+  const tris: V3[][] = [];
+  const normals: V3[][] = [];
+  for (const f of oriented) {
+    tris.push(f.idx.map(([k, i]) => at(k!, i!)));
+    normals.push(f.idx.map(([k, i]) => norm(acc[k!]![i!]!)));
+  }
+  return { tris, normals };
 }
 
 export interface TreeV2Ornaments {
@@ -908,8 +944,10 @@ export interface TreeV2Geometry {
   height: number;
   crownRadius: number;
   meadowRadius: number;
-  /** Як далеко від осі сягають кореневі контрфорси: трава росте далі. */
+  /** Радіус біля стовбура, де трави немає зовсім. */
   baseReach: number;
+  /** Кореневі контрфорси (одиниці моделі): трава їх оминає (`clearGrassFromRoots`). */
+  buttresses: TreeV2Buttress[];
 }
 
 /**
@@ -1169,23 +1207,9 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   }
   // Кореневі контрфорси: великі пласкі площини (нормаль — грані), кора
   // того ж тону, що й стовбур (власник, 2026-10-06).
-  for (const butt of treeV2Buttresses(model)) {
-    const axis: V3 = [Math.cos(butt.azimuth), 0, Math.sin(butt.azimuth)];
-    const tris: V3[][] = [];
-    const normals: V3[][] = [];
-    for (const t of buttressMesh(butt)) {
-      const n = norm(cross(sub3(t[1]!, t[0]!), sub3(t[2]!, t[0]!)));
-      // Назовні: від лінії під гребенем контрфорсу.
-      const centre: V3 = [(t[0]![0] + t[1]![0] + t[2]![0]) / 3, (t[0]![1] + t[1]![1] + t[2]![1]) / 3, (t[0]![2] + t[1]![2] + t[2]![2]) / 3];
-      const along = centre[0] * axis[0] + centre[2] * axis[2];
-      const out = sub3(centre, [axis[0] * along, -butt.height, axis[2] * along]);
-      const flip = n[0] * out[0] + n[1] * out[1] + n[2] * out[2] < 0;
-      const f: V3 = flip ? [-n[0], -n[1], -n[2]] : n;
-      tris.push(flip ? [t[0]!, t[2]!, t[1]!] : t);
-      normals.push([f, f, f]);
-    }
-    pushTris({ tris, normals }, wood, woodTone, bark);
-  }
+  treeV2Buttresses(model).forEach((butt, i) => {
+    pushTris(buttressMesh(butt, seed, `buttress${i}`), wood, woodTone, bark);
+  });
 
   const leaves: number[] = [];
   const leafTone: number[] = [];
@@ -1403,7 +1427,10 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     },
     height: model.height,
     crownRadius: orn.crownRadius,
-    baseReach: spruce ? 0 : Math.max(0, ...treeV2Buttresses(model).map((b) => b.reach * 1.1)),
+    // Біля самого стовбура трави немає; далі вона оминає корені (див.
+    // `clearGrassFromRoots`), а задні ховає наполовину.
+    baseReach: spruce ? 0 : model.trunkRadius * TREE_GIRTH * 1.7,
+    buttresses: spruce ? [] : treeV2Buttresses(model),
     meadowRadius: orn.meadowRadius,
   };
 }

@@ -6,6 +6,7 @@
 // земля на y = 0 (висоту купола додає `TreeV2World`).
 // ============================================================
 import { unit } from '@/engine/species/crystalV2/hash';
+import type { TreeV2Buttress } from '@/engine/species/treeV2/geometry';
 
 /** Пучок трави: три травинки-трикутники віялом. Висота 1 — масштаб дає інстанс. */
 export function buildGrassTuft(): Float32Array {
@@ -63,5 +64,26 @@ export function tuckGrassUnderCanopy(grass: readonly GrassInstance[], leaves: Fl
   return grass.map((g) => {
     const room = ceiling(Math.hypot(g.x, g.z)) * 0.7;
     return room < g.scale ? { ...g, scale: Math.max(0.005, room) } : g;
+  });
+}
+
+/**
+ * Трава не проростає крізь корені (власник, 2026-10-06: «задні корені
+ * можна зробити коротшими й частково приховати травою»). Над переднім і
+ * боковими коренями трави немає на всю їхню довжину; над задніми — лише на
+ * ближчій до стовбура половині, тож їхні кінці тонуть у траві.
+ * `scale` — одиниці моделі → сцени; дерево стоїть в осі.
+ */
+export function clearGrassFromRoots(grass: readonly GrassInstance[], roots: readonly TreeV2Buttress[], scale: number): GrassInstance[] {
+  return grass.filter((g) => {
+    const x = g.x / scale;
+    const z = g.z / scale;
+    return !roots.some((b, i) => {
+      const along = x * Math.cos(b.azimuth) + z * Math.sin(b.azimuth);
+      const across = Math.abs(-x * Math.sin(b.azimuth) + z * Math.cos(b.azimuth));
+      const extent = i < 3 ? b.reach * 1.08 : b.reach * 0.5;
+      if (along < 0 || along > extent) return false;
+      return across < b.width * (1 - 0.55 * Math.min(1, along / b.reach)) * 1.15;
+    });
   });
 }

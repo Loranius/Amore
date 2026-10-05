@@ -171,7 +171,7 @@ def buttresses(model: dict[str, Any]) -> list[dict[str, float]]:
     """Кореневі контрфорси (2026-10-06): 5–7, найбільший уперед, менші назад."""
     seed = model["startDate"]
     r = model["trunkRadius"] * TREE_GIRTH
-    n = 5 + min(2, max(0, model["roots"] - 3) // 2)
+    n = 6 if model["roots"] >= 6 else 5
     front = math.pi / 2
     places = min(1.15, max(0.9, model["rootReach"] / max(1e-6, 0.1 * model["height"])))
     out: list[dict[str, float]] = []
@@ -179,21 +179,21 @@ def buttresses(model: dict[str, Any]) -> list[dict[str, float]]:
     def jitter(k: int, tag: str) -> float:
         return unit(seed, f"buttress{k}:{tag}") - 0.5
 
-    def push(k: int, a: float, size: float) -> None:
+    def push(k: int, a: float, reach: float, height: float, width: float) -> None:
         out.append({
             "azimuth": a + jitter(k, "a") * 0.25,
-            "reach": r * (1.9 + 1.4 * size) * places * (0.92 + 0.16 * (jitter(k, "l") + 0.5)),
-            "height": r * (1.7 + 1.7 * size),
-            "width": r * (0.55 + 0.45 * size),
+            "reach": r * reach * places * (0.94 + 0.12 * (jitter(k, "l") + 0.5)),
+            "height": r * height,
+            "width": r * width,
         })
 
-    push(0, front, 1.0)
-    push(1, front - 1.3, 0.7)
-    push(2, front + 1.3, 0.7)
+    push(0, front, 3.3, 1.9, 1.35)
+    push(1, front - 1.3, 2.9, 2.5, 0.9)
+    push(2, front + 1.3, 2.9, 2.5, 0.9)
     back = n - 3
     for k in range(back):
         t = 0.0 if back == 1 else k / (back - 1) - 0.5
-        push(3 + k, front + math.pi + t * 1.9, 0.35 + 0.15 * (jitter(3 + k, "s") + 0.5))
+        push(3 + k, front + math.pi + t * 1.8, 1.7 + 0.35 * (jitter(3 + k, "s") + 0.5), 1.9, 0.65)
     return out
 
 

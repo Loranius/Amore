@@ -6,7 +6,7 @@ import { unit } from '@/engine/species/crystalV2/hash';
 import type { TreeForm, TreeV2Geometry } from '@/engine/species/treeV2/geometry';
 import { PORTAL_GROUND_Y } from '../scene/portalScene';
 import { Diorama } from '@/features/home/diorama/Diorama';
-import { buildGrassTuft, grassInstances, tuckGrassUnderCanopy } from './meadow';
+import { buildGrassTuft, clearGrassFromRoots, grassInstances, tuckGrassUnderCanopy } from './meadow';
 import { TreeIsland } from './TreeIsland';
 import { treeIslandBase, treeIslandGround } from './treeIsland';
 import {
@@ -107,11 +107,11 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
   );
 
   // ── Світ (не залежить від дерева) ────────────────────────
-  // Трава — за кореневими контрфорсами: густі пучки під самим стовбуром
-  // читались «бахромою» (власник, 2026-10-06).
+  // Під самим стовбуром трави немає: густі пучки там читались «бахромою»
+  // (власник, 2026-10-06); корені трава оминає (`clearGrassFromRoots`).
   const clear = Math.max(0.25, geometry.height * scale * 0.06, geometry.baseReach * scale);
   const grass = useMemo(
-    () => tuckGrassUnderCanopy(grassInstances(seed, clear, island * 0.85), geometry.leaves.positions, scale),
+    () => clearGrassFromRoots(tuckGrassUnderCanopy(grassInstances(seed, clear, island * 0.85), geometry.leaves.positions, scale), geometry.buttresses, scale),
     [seed, clear, island, geometry, scale],
   );
   const tuft = useMemo(() => {

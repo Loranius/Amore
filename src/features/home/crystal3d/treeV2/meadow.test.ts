@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { CrystalV2Snapshot } from '@/engine/species/crystalV2/model';
 import { buildTreeV2Geometry } from '@/engine/species/treeV2/geometry';
 import { buildTreeV2Model } from '@/engine/species/treeV2/model';
-import { grassInstances, tuckGrassUnderCanopy } from './meadow';
+import { clearGrassFromRoots, grassInstances, tuckGrassUnderCanopy } from './meadow';
 
 // ============================================================
 // Власник, 2026-10-04: «через текстури ялинки проходять зелені смужки,
@@ -38,5 +38,28 @@ describe('трава під кроною', () => {
     const outside = before.map((g, i) => [g, after[i]!] as const).filter(([g]) => Math.hypot(g.x, g.z) > reach + 0.1);
     expect(outside.length).toBeGreaterThan(20);
     for (const [g, a] of outside) expect(a).toBe(g);
+  });
+});
+
+describe('трава й корені (власник, 2026-10-06)', () => {
+  it('над переднім і боковими коренями трави немає; задні наполовину ховаються в траві', () => {
+    const roots = buildTreeV2Geometry(model, 'oak').buttresses;
+    expect(roots.length).toBeGreaterThanOrEqual(5);
+    expect(roots.length).toBeLessThanOrEqual(6);
+    // Травинка рівно над віссю кореня на частці `t` його довжини.
+    const on = (b: (typeof roots)[number], t: number) => {
+      const d = b.reach * t * SCALE;
+      return clearGrassFromRoots([{ x: Math.cos(b.azimuth) * d, z: Math.sin(b.azimuth) * d, y: 0, scale: 0.1, turn: 0 }], roots, SCALE).length === 1;
+    };
+    for (const b of roots.slice(0, 3)) for (const t of [0.3, 0.6, 0.9]) expect(on(b, t)).toBe(false);
+    for (const b of roots.slice(3)) {
+      expect(on(b, 0.3)).toBe(false);
+      expect(on(b, 0.85)).toBe(true);
+    }
+    // Передній — найбільший і найширший, але нижчий за бокові (розпластаний).
+    expect(roots[0]!.width).toBeGreaterThan(roots[1]!.width);
+    expect(roots[0]!.height).toBeLessThan(roots[1]!.height);
+    // Задні коротші за передні.
+    for (const b of roots.slice(3)) expect(b.reach).toBeLessThan(roots[0]!.reach);
   });
 });
