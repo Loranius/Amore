@@ -4,7 +4,7 @@
 // стоїть на своєму місці — кімната росте разом із життям.
 // ============================================================
 import { itemById, type DecorSlot } from '../sim/content';
-import { spotOf } from '../sim/economy';
+import { ROOM_FLOOR, spotOf } from '../sim/economy';
 import type { LifeState } from '../sim/life';
 import { dayInfo, stageOfWeek } from '../sim/calendar';
 import { MapBuilder } from './build';
@@ -19,78 +19,110 @@ export function homeKind(state: LifeState): HomeKind {
 }
 
 /**
- * Хата в Жилинцях — за ескізом, який власник сам пересунув і зберіг
- * (2026-10-05, «План хати Лєни»). У клітинках ескізу:
+ * Хата в Жилинцях — розміри кімнат, які власник сам підігнав і зберіг
+ * (2026-10-05, «Розміри кімнат хати»), уже в клітинках гри. Кімната —
+ * прямокутник [x, x + w) × [y, y + h): ліва колонка — стіна з сусідом,
+ * верхні `wall` рядів — задня стіна, решта — підлога.
  *
- *   мама   x2–7,  y2–10   — над кімнатою Лєни, у лівому верхньому куті
- *   брати  x7–12, y2–6    — праворуч від мами, угорі
- *   коридор x7–12, y6–10  — посередині, зв'язує маму, братів і Лєну
- *   веранда x12–17, y6–10 — праворуч від коридору; вхід у правій стіні
- *   кімната над верандою x12–17, y2–6 (поки — кухня з піччю)
- *   Лєна   x2–12, y10–15  — унизу
- *
- * Межі ескізу переведено в клітинки гри (x: 2→0, 7→7, 12→15, 17→23;
- * y: 2→0, 6→6, 10→12, 15→23), тож пропорції й сусідство ті самі, а
- * кімната Лєни — рівно та рамка 16×12, що й раніше (`ROOM_FLOOR`,
- * `DEFAULT_SPOT`): облаштування й збереження не змінюються.
+ *   мама    5×10 — над кімнатою Лєни, у лівому верхньому куті
+ *   брати   7×5  — праворуч від мами, угорі
+ *   коридор 7×5  — посередині, зв'язує маму, братів і Лєну
+ *   над верандою (кухня) 6×5, веранда 6×5 — праворуч; вхід у правій стіні
+ *   Лєна   12×6  — унизу, задня стіна 3 ряди: підлоги 11×3
  */
-const ROOM_DX = 0;
-const ROOM_DY = 12;
+export const HATA_ROOMS = {
+  mom: { x: 0, y: 0, w: 5, h: 10, wall: 2 },
+  bro: { x: 5, y: 0, w: 7, h: 5, wall: 2 },
+  up: { x: 12, y: 0, w: 6, h: 5, wall: 2 },
+  hall: { x: 5, y: 5, w: 7, h: 5, wall: 2 },
+  ver: { x: 12, y: 5, w: 6, h: 5, wall: 2 },
+  lena: { x: 0, y: 10, w: 12, h: 6, wall: 3 },
+} as const;
+
+/** Прорізи дверей (клітинки підлоги в стіні) — там, де вони на плані. */
+export const HATA_DOORS = {
+  momHall: { x: 5, y: 7, w: 1, h: 2 },
+  broHall: { x: 8, y: 5, w: 1, h: 2 },
+  hallLena: { x: 9, y: 10, w: 1, h: 3 },
+  hallVer: { x: 12, y: 7, w: 1, h: 2 },
+  verUp: { x: 17, y: 5, w: 1, h: 2 },
+  entry: { x: 18, y: 7, w: 1, h: 2 },
+} as const;
 
 /** Мамине ліжко (клітинки) — там вона відпочиває й спить (`sim/mom.ts`). */
 export const HATA_MOM_BED = { x: 1.1, y: 2.3, tint: '#9ab8d9' } as const;
 
+/**
+ * Облаштування кімнати Лєни зберігається в рамці 16×12 (`ROOM_FLOOR`,
+ * `DEFAULT_SPOT`) — спільній із гуртожитком і квартирами. У хаті її
+ * підлога 11×3, тож місце з рамки стискається в цю підлогу: порядок
+ * речей зліва направо той самий, сейв не міняється (`hataSpots`).
+ */
+function hataSpots(state: LifeState): Partial<Record<DecorSlot, [number, number]>> {
+  const r = HATA_ROOMS.lena;
+  const t = (slot: DecorSlot) => (spotOf(state, slot)[0] - ROOM_FLOOR.x0) / (ROOM_FLOOR.x1 - ROOM_FLOOR.x0);
+  const floorY = r.y + r.wall;
+  const out: Partial<Record<DecorSlot, [number, number]>> = {};
+  // Ліжко (2.2 клітинки завдовжки) — біля лівої стіни, на всю глибину.
+  out.bed = [Math.round((1 + t('bed') * 0.8) * 10) / 10, floorY];
+  // Постер — на задній стіні; килим і улюбленець не заважають ходити.
+  out.poster = [Math.round((1 + t('poster') * 6) * 10) / 10, r.y + 0.6];
+  out.rug = [Math.round((3.4 + t('rug') * 3) * 10) / 10, floorY + 0.8];
+  out.pet = [Math.round((3.6 + t('pet') * 4) * 10) / 10, floorY + 1.6];
+  // Решта — у порядку з рамки, впритул одна до одної ліворуч від дверей із
+  // коридорчика: спершу вздовж задньої стіни, що не влізло — другим рядом.
+  // Передній ряд лишається проходом.
+  const from = 3.4;
+  const to = HATA_DOORS.hallLena.x - 0.1;
+  const rows = [floorY, floorY + 1.2];
+  let row = 0;
+  let cursor = from;
+  const solid = (['plant', 'lamp', 'shelf', 'tv', 'desk', 'sofa'] as const).filter((slot) => state.decor[slot]).sort((a, b) => t(a) - t(b));
+  for (const slot of solid) {
+    const span = HATA_SPAN[slot];
+    if (cursor + span > to && row + 1 < rows.length) { row += 1; cursor = from; }
+    out[slot] = [Math.round(Math.min(cursor, to - span) * 10) / 10, rows[row]!];
+    cursor += span + 0.1;
+  }
+  return out;
+}
+
+/** Ширина речі в кімнаті (клітинки, з масштабом меблів 1.25). */
+const HATA_SPAN = { plant: 1, lamp: 1, shelf: 1.25, tv: 1.25, desk: 1.9, sofa: 2.4 } as const;
+
 function hataInterior(state: LifeState): GameMap {
-  const W = 24;
-  const H = 24;
+  const W = 19;
+  const H = 17;
   const stage = stageOfWeek(dayInfo(state.day).week).stage;
   const brothersHome = stage === 'sadok' || stage === 'school';
   const m = new MapBuilder(`home:hata:${brothersHome ? 'b' : ''}:${Object.values(state.decor).join(',')}:${JSON.stringify(state.layout)}:${state.owned.includes('laptop') ? 'pc' : ''}`, null, state.homeName, W, H, 'x', true);
-  // Кімната — прямокутник ескізу [x0, x1) × [y0, y1): ліва колонка — стіна з
-  // сусідом, угорі — задня стіна (W), решта — підлога. Задня стіна нижньої
-  // кімнати — це й перегородка з верхньою, тож кімнати стоять впритул.
-  const room = (x0: number, x1: number, y0: number, y1: number, wallRows = 2) => {
-    m.fill(x0 + 1, y0, x1 - x0 - 1, wallRows, 'W');
-    m.fill(x0 + 1, y0 + wallRows, x1 - x0 - 1, y1 - y0 - wallRows, 'f');
-  };
-  const door = (x: number, y: number, w = 1, h = 1) => m.fill(x, y, w, h, 'f');
-  room(0, 7, 0, 12); // мама
-  room(7, 15, 0, 6); // брати
-  room(15, 23, 0, 6); // кімната над верандою — кухня з піччю
-  room(7, 15, 6, 12); // коридорчик
-  room(15, 23, 6, 12); // веранда
-  room(0, 15, 12, 23, 3); // Лєна
-  // Двері — там, де вони на ескізі.
-  door(7, 8, 1, 2); // мама ↔ коридор
-  door(11, 6, 1, 2); // брати ↔ коридор
-  door(13, 12, 1, 3); // коридор ↔ Лєна
-  door(15, 8, 1, 2); // коридор ↔ веранда
-  door(20, 6, 1, 2); // веранда ↔ кімната над нею
-  // Вихід у двір — у правій стіні веранди.
-  door(23, 8, 1, 2);
-  m.zone('exit', 22, 8, 2, 2, { type: 'exit' }, 'Вийти на подвір\'я');
-  m.spawn('door', 21, 9).spawn('default', 21, 9).spawn('wake', 4 + ROOM_DX, 7 + ROOM_DY);
+  for (const r of Object.values(HATA_ROOMS)) {
+    m.fill(r.x + 1, r.y, r.w - 1, r.wall, 'W');
+    m.fill(r.x + 1, r.y + r.wall, r.w - 1, r.h - r.wall, 'f');
+  }
+  for (const d of Object.values(HATA_DOORS)) m.fill(d.x, d.y, d.w, d.h, 'f');
+  const e = HATA_DOORS.entry;
+  m.zone('exit', e.x - 1, e.y, 2, 2, { type: 'exit' }, 'Вийти на подвір\'я');
+  const L = HATA_ROOMS.lena;
+  m.spawn('door', e.x - 2, e.y + 1).spawn('default', e.x - 2, e.y + 1).spawn('wake', 4, L.y + L.h - 1);
 
   const tint = (slot: keyof LifeState['decor']) => {
     const id = state.decor[slot];
     return id ? itemById(id).tint : undefined;
   };
-  const at = (slot: DecorSlot): [number, number] => {
-    const [x, y] = spotOf(state, slot);
-    return [x + ROOM_DX, y + ROOM_DY];
-  };
+  const spots = hataSpots(state);
+  const at = (slot: DecorSlot): [number, number] => spots[slot]!;
 
   // ── Кімната Лєни ─────────────────────────────────────────
   const [bx, by] = at('bed');
   m.prop('bed', bx, by, { tint: tint('bed') ?? '#e98fb0' });
-  m.zone('bed', Math.round(bx) + 1, Math.round(by) + 2, 2, 2, { type: 'bed' }, 'Лягти спати');
-  m.prop('wardrobe', 5 + ROOM_DX, 3.2 + ROOM_DY);
-  m.zone('wardrobe', 5 + ROOM_DX, 4 + ROOM_DY, 1, 2, { type: 'wardrobe' }, 'Шафа · перевдягнутись');
+  m.zone('bed', Math.round(bx) + 2, L.y + L.h - 1, 2, 1, { type: 'bed' }, 'Лягти спати');
+  m.prop('wardrobe', 10.4, L.y + 2.1);
+  m.zone('wardrobe', 10, L.y + L.wall + 1, 2, 1, { type: 'wardrobe' }, 'Шафа · перевдягнутись');
   // Задня стіна Лєниної кімнати — спільна з коридорчиком і кімнатою мами,
   // тож вікон на ній немає: годинник, сімейне фото, рушник.
-  m.prop('clock', 8 + ROOM_DX, 0.7 + ROOM_DY).prop('photo', 11 + ROOM_DX, 0.6 + ROOM_DY).prop('rushnyk', 2 + ROOM_DX, 0.8 + ROOM_DY);
-  m.prop('table', 9 + ROOM_DX, 6 + ROOM_DY, { tint: '#c49a6c' });
-  let laptopAt: [number, number] = [9 + ROOM_DX, 7 + ROOM_DY];
+  m.prop('clock', 6, L.y + 0.7).prop('photo', 7.6, L.y + 0.6).prop('rushnyk', 4.4, L.y + 0.8);
+  let laptopAt: [number, number] = [6, L.y + L.h - 1];
   const place = (slot: DecorSlot, prop: Parameters<MapBuilder['prop']>[0], extra: { solid?: boolean } = {}) => {
     if (!state.decor[slot]) return;
     const [x, y] = at(slot);
@@ -106,29 +138,28 @@ function hataInterior(state: LifeState): GameMap {
   place('sofa', 'sofa');
   place('pet', 'pet', { solid: false });
   if (state.decor.desk) {
-    const [x, y] = at('desk');
-    laptopAt = [Math.round(x), Math.round(y) + 1];
+    const [x] = at('desk');
+    laptopAt = [Math.round(x), L.y + L.h - 1];
   }
   if (state.owned.includes('laptop')) m.zone('laptop', laptopAt[0], laptopAt[1], 2, 1, { type: 'laptop' }, 'Ноутбук · робота й справи');
-  m.zone('decorate', 2 + ROOM_DX, 9 + ROOM_DY, 2, 1, { type: 'decorate' }, 'Облаштувати кімнату');
+  m.zone('decorate', 9, L.y + L.h - 1, 2, 1, { type: 'decorate' }, 'Облаштувати кімнату');
 
   // ── Брати: Діма й Саша — поки Лєна в садочку й школі ──────
-  m.prop('window', 13, 0.4);
+  m.prop('window', 9.6, 0.4);
   if (brothersHome) {
-    m.prop('bed', 8.1, 2.2, { tint: '#6f9ad8' }).prop('bed', 13.9, 2.2, { tint: '#7fb86a' }).prop('poster', 9.6, 0.5, { tint: '#3a6fd8' });
-    m.prop('rug', 10.4, 3.4, { tint: '#8a9ab8' });
-    m.zone('brothers', 10, 5, 3, 1, { type: 'info', text: 'Кімната братів: тут живуть Діма й Саша. Скрізь їхні машинки, м\'яч під ліжком.' }, 'Кімната братів');
+    m.prop('bed', 6.1, 2.1, { tint: '#6f9ad8' }).prop('bed', 10.3, 2.1, { tint: '#7fb86a' }).prop('poster', 7.4, 0.5, { tint: '#3a6fd8' });
+    m.zone('brothers', 7, 4, 3, 1, { type: 'info', text: 'Кімната братів: тут живуть Діма й Саша. Скрізь їхні машинки, м\'яч під ліжком.' }, 'Кімната братів');
   } else {
-    m.prop('bed', 13.9, 2.2, { tint: '#9a9aa8' }).prop('shelf', 8.2, 2.1);
-    m.zone('brothers', 10, 5, 3, 1, { type: 'info', text: 'Кімната братів: Діма й Саша вже роз\'їхались, а їхні медалі за футбол досі на полиці.' }, 'Кімната братів');
+    m.prop('bed', 10.3, 2.1, { tint: '#9a9aa8' }).prop('shelf', 6.2, 2.1);
+    m.zone('brothers', 7, 4, 3, 1, { type: 'info', text: 'Кімната братів: Діма й Саша вже роз\'їхались, а їхні медалі за футбол досі на полиці.' }, 'Кімната братів');
   }
   // ── Мама ─────────────────────────────────────────────────
-  m.prop('bed', HATA_MOM_BED.x, HATA_MOM_BED.y, { tint: HATA_MOM_BED.tint }).prop('wardrobe', 3.2, 2.1).prop('window', 5, 0.4).prop('rushnyk', 2.4, 0.6).prop('clock', 4.2, 0.5);
-  m.prop('rug', 3, 6, { tint: '#c98aa8' }).prop('plant', 1, 10.6);
+  m.prop('bed', HATA_MOM_BED.x, HATA_MOM_BED.y, { tint: HATA_MOM_BED.tint }).prop('wardrobe', 3.2, 2.1).prop('window', 2.6, 0.4).prop('rushnyk', 1.3, 0.6);
+  m.prop('rug', 2, 6, { tint: '#c98aa8' }).prop('plant', 1, 8.6);
   // ── Коридорчик і веранда ─────────────────────────────────
-  m.prop('rug', 10.4, 9.2, { tint: '#b85a4a' }).prop('shelf', 12, 8.1).prop('plant', 22, 10.6);
+  m.prop('rug', 8, 8.2, { tint: '#b85a4a' }).prop('shelf', 9.8, 7).prop('clock', 7, 5.5).prop('plant', 13.1, 9);
   // ── Кімната над верандою: кухня з піччю ──────────────────
-  m.prop('stove', 16.1, 2.2).prop('table', 18, 3.6, { tint: '#c49a6c' }).prop('fridge', 22, 2.4).prop('window', 18, 0.4).prop('rushnyk', 21, 0.6);
+  m.prop('stove', 13.1, 2.1).prop('table', 14.7, 3.1, { tint: '#c49a6c' }).prop('fridge', 16.6, 2.2).prop('window', 15.2, 0.4).prop('rushnyk', 13.6, 0.6);
   return m.build();
 }
 
