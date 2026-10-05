@@ -13,7 +13,7 @@ from typing import Any
 import numpy as np
 from PIL import Image, ImageDraw
 
-from .geometry import colony, geode
+from .geometry import FACE_TONES, colony, geode
 from .hashing import unit
 
 KEY = np.array([-0.5, 0.75, 0.45])
@@ -65,7 +65,7 @@ def render(model: dict[str, Any], width: int = 480, height: int = 640,
     glow = model["monarch"]["glow"]
     seed = model["startDate"]
 
-    def draw(tri: np.ndarray, base: np.ndarray, face_key: str, is_rock: bool, edges=(True, True, True)) -> None:
+    def draw(tri: np.ndarray, base: np.ndarray, face_key: str, is_rock: bool, edges=(True, True, True), face=None) -> None:
         normal = np.cross(tri[1] - tri[0], tri[2] - tri[0])
         length = np.linalg.norm(normal)
         if length == 0:
@@ -75,7 +75,9 @@ def render(model: dict[str, Any], width: int = 480, height: int = 640,
         if np.dot(normal, eye - centre) < 0:
             normal = -normal
         light = max(0.0, float(np.dot(normal, KEY)))
-        jitter = 0.85 + 0.3 * unit(seed, f"face:{face_key}")
+        # Тон грані — один із трьох (ADR-0244), як у `geometry.ts`.
+        jitter = (FACE_TONES[face % 3] * (0.95 + 0.1 * unit(seed, f"face:{face_key}"))
+                  if face is not None else 0.85 + 0.3 * unit(seed, f"face:{face_key}"))
         if is_rock:
             shade = base * (0.35 + 0.65 * light) * jitter
         else:
@@ -118,7 +120,7 @@ def render(model: dict[str, Any], width: int = 480, height: int = 640,
         draw(tri, np.array([0.20, 0.17, 0.24]), f"rock{fid}", True)
     for b in colony(model):
         for tri, fid, edges in b["faces"]:
-            draw(tri, tint, f"{b['kind']}:{fid}", False, edges)
+            draw(tri, tint, f"{b['kind']}:{fid}", False, edges, fid)
 
     image = Image.fromarray((colour * 255).astype(np.uint8))
     painter = ImageDraw.Draw(image)

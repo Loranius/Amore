@@ -14,7 +14,7 @@ const KEY = new THREE.Vector3(-0.45, 0.8, 0.4).normalize();
 const BUFFER = new THREE.Vector2();
 
 /** Тло: вертикальний градієнт, сяйво за предметом і легка віньєтка. */
-function createBackdropMaterial(top: string, bottom: string, glow: string, milk?: string): THREE.ShaderMaterial {
+function createBackdropMaterial(top: string, bottom: string, glow: string, milk?: string, stars = 0): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.BackSide,
     depthWrite: false,
@@ -27,6 +27,8 @@ function createBackdropMaterial(top: string, bottom: string, glow: string, milk?
       uMilk: { value: new THREE.Color(milk ?? bottom) },
       uHasMilk: { value: milk ? 1 : 0 },
       uResolution: { value: new THREE.Vector2(1, 1) },
+      uStars: { value: stars },
+      uTime: { value: 0 },
     },
     vertexShader: /* glsl */ `
       varying vec3 vDir;
@@ -43,7 +45,14 @@ function createBackdropMaterial(top: string, bottom: string, glow: string, milk?
       uniform vec3 uMilk;
       uniform float uHasMilk;
       uniform vec2 uResolution;
+      uniform float uStars;
+      uniform float uTime;
       varying vec3 vDir;
+      float starHash(vec2 p) {
+        p = fract(p * vec2(123.34, 456.21));
+        p += dot(p, p + 45.32);
+        return fract(p.x * p.y);
+      }
       void main() {
         // Градієнт — по висоті ЕКРАНА, як у AbyssRium: камера дивиться трохи
         // вниз, і градієнт за напрямком лишав би видимим лише низ неба.
@@ -56,6 +65,19 @@ function createBackdropMaterial(top: string, bottom: string, glow: string, milk?
         }
         vec2 d = (uv - vec2(0.5, 0.5)) * vec2(uResolution.x / uResolution.y, 1.0);
         c += uGlow * exp(-dot(d, d) * 16.0) * 0.3;
+        if (uStars > 0.0) {
+          // Далекі зорі (ADR-0242): рідкі цятки на сфері тла, щільніші
+          // вгорі, без зір у сяйві за кристалом — тло не сперечається з ним.
+          vec3 dir = normalize(vDir);
+          vec2 sph = vec2(atan(dir.z, dir.x) * 38.0, dir.y * 30.0);
+          vec2 cell = floor(sph);
+          float h = starHash(cell);
+          vec2 at = vec2(starHash(cell + 7.1), starHash(cell + 3.7)) * 0.6 + 0.2;
+          float dot2 = smoothstep(0.09, 0.0, length(fract(sph) - at)) * step(0.93, h);
+          float twinkle = 0.65 + 0.35 * sin(uTime * (0.6 + h * 1.4) + h * 40.0);
+          float sky = smoothstep(0.3, 0.9, uv.y) * (1.0 - exp(-dot(d, d) * 9.0));
+          c += vec3(1.0, 0.94, 0.98) * dot2 * twinkle * sky * uStars * 0.55;
+        }
         float vignette = smoothstep(0.95, 0.35, length(uv - 0.5));
         c *= mix(0.72, 1.0, vignette);
         gl_FragColor = vec4(c, 1.0);
@@ -244,7 +266,7 @@ export function Diorama({ species, theme, seed, radius, groundY, reduceMotion, b
     return g;
   }, [seed, radius]);
   const materials = useMemo(() => ({
-    backdrop: createBackdropMaterial(palette.top, palette.bottom, palette.glow, palette.milk),
+    backdrop: createBackdropMaterial(palette.top, palette.bottom, palette.glow, palette.milk, palette.stars),
     base: createBaseMaterial(palette.ground, palette.cliff),
     motes: createMoteMaterial(palette.mote, palette.moteStrength),
     shadow: createShadowMaterial(palette.ground),
@@ -256,6 +278,7 @@ export function Diorama({ species, theme, seed, radius, groundY, reduceMotion, b
   useFrame(({ clock, gl }) => {
     materials.backdrop.uniforms.uResolution!.value.copy(gl.getDrawingBufferSize(BUFFER));
     materials.motes.uniforms.uTime!.value = reduceMotion ? 0 : clock.getElapsedTime();
+    materials.backdrop.uniforms.uTime!.value = reduceMotion ? 0 : clock.getElapsedTime();
     materials.motes.uniforms.uScale!.value = size.height;
   });
 

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { PAINT, buildCrystalIsland } from './crystalIsland';
+import { columnAngles } from './sanctuary/columns';
 
 // ============================================================
 // Острів кристала за референсом власника (ADR-0221, гранчастий — ADR-0227).
@@ -18,7 +19,8 @@ function paints(mesh: ReturnType<typeof buildCrystalIsland>['island']) {
 describe('острів кристала', () => {
   it('має всі частини референсу: плити, скелю, колони, плющ, землю — і жодних самоцвітів у скелі (ADR-0227)', () => {
     const used = paints(isle.island);
-    for (const p of [PAINT.paving, PAINT.cliff, PAINT.ruin, PAINT.ivy, PAINT.dirt]) expect(used.has(p)).toBe(true);
+    // Квіти й пласти породи — святилище ADR-0242.
+    for (const p of [PAINT.paving, PAINT.cliff, PAINT.ruin, PAINT.ivy, PAINT.dirt, PAINT.bloom, PAINT.strata]) expect(used.has(p)).toBe(true);
     expect(used.has(PAINT.gem)).toBe(false);
   });
 
@@ -105,5 +107,63 @@ describe('острів кристала', () => {
     const again = buildCrystalIsland('2022-12-26', R);
     expect(Array.from(again.island.positions)).toEqual(Array.from(isle.island.positions));
     expect(Array.from(again.debris.positions)).toEqual(Array.from(isle.debris.positions));
+    expect(Array.from(again.ground.positions)).toEqual(Array.from(isle.ground.positions));
+  });
+
+  // ── Святилище (ADR-0242) ─────────────────────────────────────
+
+  it('кристал прорвав підлогу: плити серця підняті до нього, плити поля лежать', () => {
+    // Найвища точка плит біля кристала (до 0.3 R) вища за найвищу плиту поля.
+    const { positions, paint } = isle.island;
+    let heart = 0;
+    let field = 0;
+    for (let v = 0; v < paint.length; v += 1) {
+      if (paint[v] !== PAINT.paving) continue;
+      const r = Math.hypot(positions[v * 3]!, positions[v * 3 + 2]!);
+      const y = positions[v * 3 + 1]!;
+      if (r < R * 0.3) heart = Math.max(heart, y);
+      else if (r > R * 0.35) field = Math.max(field, y);
+    }
+    expect(heart).toBeGreaterThan(field + R * 0.02);
+  });
+
+  it('земля кристала світиться ЛИШЕ фарбою кристала, і саме вона, а не острів', () => {
+    const { glow, paint } = isle.ground;
+    expect(glow.some((g) => g > 0)).toBe(true);
+    for (let v = 0; v < paint.length; v += 1) expect(paint[v]).toBe(PAINT.gem);
+  });
+
+  it('друзи спільних вихідних — у землі кристала (колір колонії), а не в скелі острова', () => {
+    const none = buildCrystalIsland('2022-12-26', R, 0);
+    const some = buildCrystalIsland('2022-12-26', R, 9);
+    expect(some.ground.positions.length).toBeGreaterThan(none.ground.positions.length);
+    expect(Array.from(some.island.positions)).toEqual(Array.from(none.island.positions));
+  });
+
+  it('бюджет для телефона: острів, земля й уламки разом — до 6 000 трикутників', () => {
+    for (const seed of ['2022-12-26', '1990-03-14', '2019-07-01']) {
+      const built = buildCrystalIsland(seed, R, 24, 'spring');
+      const total = (built.island.positions.length + built.ground.positions.length + built.debris.positions.length) / 9;
+      expect(total).toBeLessThan(6000);
+    }
+  });
+
+  it('колони — не клони: кожна своєї висоти', () => {
+    // Верх колони — найвища точка руїни біля її кута.
+    const { positions, paint } = isle.island;
+    const tops = columnAngles('2022-12-26').map((a) => {
+      let top = 0;
+      for (let v = 0; v < paint.length; v += 1) {
+        if (paint[v] !== PAINT.ruin) continue;
+        const x = positions[v * 3]!;
+        const z = positions[v * 3 + 2]!;
+        const gap = Math.abs(Math.atan2(Math.sin(Math.atan2(z, x) - a), Math.cos(Math.atan2(z, x) - a)));
+        if (Math.hypot(x, z) > R * 0.75 && gap < 0.12) top = Math.max(top, positions[v * 3 + 1]!);
+      }
+      return top;
+    });
+    expect(tops.every((y) => y > R * 0.3)).toBe(true);
+    const sorted = [...tops].sort((x, y) => x - y);
+    for (let k = 1; k < sorted.length; k += 1) expect(sorted[k]! - sorted[k - 1]!).toBeGreaterThan(R * 0.01);
   });
 });

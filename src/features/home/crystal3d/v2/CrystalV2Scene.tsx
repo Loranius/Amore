@@ -2,7 +2,6 @@ import { buildCrystalV2Geometry } from '@/engine/species/crystalV2/geometry';
 import { buildCrystalV2Model } from '@/engine/species/crystalV2/model';
 import { useArtifactForms } from '@/features/world/artifactForms';
 import { useChronicleScene, type ChroniclePlacement } from '@/features/chronicle/useChronicleScene';
-import { seasonOf } from '@/engine/species/grammar/season';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { crystalRenderScale } from '@/engine/renderer';
@@ -25,11 +24,8 @@ import {
 import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from '../evolution/EvolutionRuntimeProbe';
 import { readQuality } from '../evolution/useEvolutionCrystalPipeline';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
-import { Diorama } from '@/features/home/diorama/Diorama';
 import { dioramaFrameHeight, dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
-import { CrystalIsland } from './CrystalIsland';
-import { CrystalV2Object } from './CrystalV2Object';
-import { linearColour } from './crystalV2Material';
+import { CrystalHomeWorld, castsShadows } from './CrystalHomeWorld';
 import { crystalV2Frame, crystalV2GrowthEvents } from './crystalV2Frame';
 import { useCrystalV2 } from './useCrystalV2';
 import '../evolution/evolutionPreview.css';
@@ -129,6 +125,8 @@ export default function CrystalV2Scene() {
         dpr={[1, crystalRenderScale(quality, typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
         camera={{ position: [0, 0.685, 7.1], fov: 42 }}
         gl={{ alpha: false, antialias: quality !== 'fallback' }}
+        // Тіні святилища (ADR-0243) — не на слабкому профілі пристрою.
+        shadows={castsShadows(quality) ? 'soft' : false}
       >
         <PortalStage
           seed={hash32(model.startDate)}
@@ -149,35 +147,16 @@ export default function CrystalV2Scene() {
           // Діорама замість летючого острова (ADR-0220, стиль AbyssRium).
           world="none"
         >
-          <Diorama
-            species="crystal"
+          <CrystalHomeWorld
+            model={model}
+            geometry={shown.geometry}
+            frame={frame}
+            island={island}
             theme={theme}
-            seed={model.startDate}
-            radius={island}
-            groundY={CRYSTAL_GROUND_BASELINE}
             reduceMotion={reduceMotion}
-            base={false}
+            shadows={castsShadows(quality)}
+            tap={chronicle.tap}
           />
-          <CrystalIsland
-            seed={model.startDate}
-            theme={theme}
-            radius={island}
-            groundY={CRYSTAL_GROUND_BASELINE}
-            glowColour={linearColour(model.colour.rgb)}
-            crystalHeight={frame.height}
-            reduceMotion={reduceMotion}
-            druses={model.druses}
-            season={seasonOf(model.asOf)}
-          />
-          <group {...chronicle.tap}>
-            <CrystalV2Object
-              model={model}
-              geometry={shown.geometry}
-              scale={frame.scale}
-              theme={theme}
-              reduceMotion={reduceMotion}
-            />
-          </group>
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />
       </Canvas>

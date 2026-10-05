@@ -166,6 +166,42 @@ function crown(
   });
 }
 
+/**
+ * Кільце профілю тіла: `at` — частка шляху від основи (0) до плеча (1),
+ * `scale` — множник кільця плеча, `shift` — зсув осі в частках радіуса.
+ * Кільце — те саме кільце плеча, стиснуте й зсунуте, тож ребра сусідніх
+ * кілець паралельні і кожна грань між ними ПЛАСКА за побудовою.
+ */
+export interface ProfileRing {
+  at: number;
+  scale: number;
+  shift: readonly [number, number];
+}
+
+/** Звичайне тіло року: основа — `FOOT` плеча, плече — саме кільце. */
+const SPINDLE: readonly ProfileRing[] = [
+  { at: 0, scale: FOOT, shift: [0, 0] },
+  { at: 1, scale: 1, shift: [0, 0] },
+];
+
+/**
+ * Монарх — монументальний кристал, що виріс, а не видавлений багатокутник
+ * (власник, 2026-10-05: «природно вирослий монумент … нижня частина має
+ * вагу … легка асиметрія»). Три кільця замість двох: важка основа (0.86
+ * плеча, а не 0.72), ледь ширший пояс на третині висоти, де кристал
+ * набирав масу, і плече, зсунуте від осі. Кожна грань стовбура ділиться на
+ * дві великі пласкі грані з різним нахилом — більше читаних граней без
+ * дрібних трикутників. Зсуви — з хешу дати, тож кожна пара має свій монарх.
+ */
+export function monarchProfile(seed: string): ProfileRing[] {
+  const jitter = (key: string, span: number) => (unit(seed, `monarch:profile:${key}`) - 0.5) * span;
+  return [
+    { at: 0, scale: 0.86, shift: [0, 0] },
+    { at: 0.32 + jitter('belly:at', 0.08), scale: 1.05, shift: [jitter('belly:x', 0.06), jitter('belly:z', 0.06)] },
+    { at: 1, scale: 0.97, shift: [jitter('shoulder:x', 0.14), jitter('shoulder:z', 0.14)] },
+  ];
+}
+
 function body(
   seed: string,
   tag: string,
@@ -175,29 +211,154 @@ function body(
   apex: readonly [number, number],
   ridge: number,
   bury: number,
+  profile: readonly ProfileRing[] = SPINDLE,
 ): Tri[] {
   const base = ring(sides);
   const n = base.length;
   const y0 = -bury;
   const y1 = height - tip;
-  const lift = (p: V3, y: number): V3 => [p[0], y, p[2]];
-  const bottom = base.map((p) => lift([p[0] * FOOT, 0, p[2] * FOOT], y0));
-  const top = base.map((p) => lift(p, y1));
+  const radius = Math.max(...base.map((p) => Math.hypot(p[0], p[2])));
+  const rings = profile.map((r) => {
+    const y = y0 + (y1 - y0) * r.at;
+    return base.map((p): V3 => [p[0] * r.scale + r.shift[0] * radius, y, p[2] * r.scale + r.shift[1] * radius]);
+  });
   const tris: Tri[] = [];
   let face = 0;
-  for (let i = 0; i < n; i += 1) {
-    const j = (i + 1) % n;
-    tris.push(outward(bottom[i]!, bottom[j]!, top[j]!, face, QUAD_A));
-    tris.push(outward(bottom[i]!, top[j]!, top[i]!, face, QUAD_B));
-    face += 1;
+  for (let k = 0; k + 1 < rings.length; k += 1) {
+    const lower = rings[k]!;
+    const upper = rings[k + 1]!;
+    for (let i = 0; i < n; i += 1) {
+      const j = (i + 1) % n;
+      tris.push(outward(lower[i]!, lower[j]!, upper[j]!, face, QUAD_A));
+      tris.push(outward(lower[i]!, upper[j]!, upper[i]!, face, QUAD_B));
+      face += 1;
+    }
   }
-  const radius = Math.max(...base.map((p) => Math.hypot(p[0], p[2])));
-  for (const points of crown(seed, tag, top, y1, tip, apex, ridge, radius)) {
+  const top = rings[rings.length - 1]!;
+  const shoulder = profile[profile.length - 1]!;
+  // Кінчик іде за плечем: зсунуте плече з кінчиком на осі читалось би зламом.
+  const tipAt: [number, number] = [apex[0] + shoulder.shift[0] * radius, apex[1] + shoulder.shift[1] * radius];
+  for (const points of crown(seed, tag, top, y1, tip, tipAt, ridge, radius * shoulder.scale)) {
     tris.push({ points, face, edges: TRI });
     face += 1;
   }
   return tris;
 }
+
+/**
+ * Монарх як великий гранчастий кристал (ADR-0244), а не призма з пірамідою.
+ *
+ * Власник, 2026-10-05: «оригінальний монарх Amore, змодельований
+ * професійно»: багато поздовжніх граней різної ширини, нерівна вершина з
+ * кількох великих граней, що перетинаються, і пласкі грані без шуму.
+ *
+ *   * Стовбур — 12 поздовжніх граней із 6 сторін моделі: кожну сторону
+ *     ділить неглибоке ребро в нерівному місці (0.35…0.65), трохи винесене
+ *     назовні. Ширина граней різна, силует — кристал, а не шестигранник.
+ *     Кільця профілю — масштабовані копії того самого 12-кутника, тож кожна
+ *     грань пласка за побудовою.
+ *   * Вершина — два яруси. Перший: пояс із 18 граней від плеча до кільця з
+ *     6 точок над ребрами сторін (зсунутого на пів кроку — грані ярусів
+ *     перетинаються, а не стоять одна над одною). Другий: кінчик із тих
+ *     самих `ridge` точок, що й раніше (плани → грані вершини, ADR-0217).
+ *     Обидва яруси під ~48° — кут кварцу, а не шпиль.
+ *   * Кант лише на поздовжніх ребрах, ребрі плеча й вершині: горизонтальний
+ *     злам поясу без канта, бо смуги поперек призми власник відкинув.
+ */
+function monarchBody(
+  seed: string,
+  sides: readonly (readonly [number, number])[],
+  height: number,
+  tip: number,
+  apex: readonly [number, number],
+  ridge: number,
+  bury: number,
+  profile: readonly ProfileRing[],
+): Tri[] {
+  const corners = ring(sides);
+  const n = corners.length;
+  const ring12: V3[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const a = corners[i]!;
+    const b = corners[(i + 1) % n]!;
+    const t = 0.35 + 0.3 * unit(seed, `monarch:split${i}:t`);
+    const bulge = 1.06 + 0.08 * unit(seed, `monarch:split${i}:b`);
+    ring12.push(a, [(a[0] + (b[0] - a[0]) * t) * bulge, 0, (a[2] + (b[2] - a[2]) * t) * bulge]);
+  }
+  const m = ring12.length;
+  const y0 = -bury;
+  const y1 = height - tip;
+  const radius = Math.max(...corners.map((p) => Math.hypot(p[0], p[2])));
+  const rings = profile.map((r) => {
+    const y = y0 + (y1 - y0) * r.at;
+    return ring12.map((p): V3 => [p[0] * r.scale + r.shift[0] * radius, y, p[2] * r.scale + r.shift[1] * radius]);
+  });
+  const tris: Tri[] = [];
+  let face = 0;
+  for (let k = 0; k + 1 < rings.length; k += 1) {
+    const lower = rings[k]!;
+    const upper = rings[k + 1]!;
+    const topIsShoulder = k + 2 === rings.length;
+    for (let i = 0; i < m; i += 1) {
+      const j = (i + 1) % m;
+      // [поздовжнє ребро j, діагональ, низ] і [верх, поздовжнє ребро i, діагональ].
+      tris.push(outward(lower[i]!, lower[j]!, upper[j]!, face, [true, false, false]));
+      tris.push(outward(lower[i]!, upper[j]!, upper[i]!, face, [topIsShoulder, true, false]));
+      face += 1;
+    }
+  }
+  const shoulder = rings[rings.length - 1]!;
+  const last = profile[profile.length - 1]!;
+  const sx = last.shift[0] * radius;
+  const sz = last.shift[1] * radius;
+  // ── Ярус 1: пояс граней від плеча до кільця над ребрами сторін ──
+  const midHeight = tip * 0.42;
+  const mid: V3[] = [];
+  for (let i = 0; i < n; i += 1) {
+    const s = shoulder[2 * i + 1]!;
+    const a = Math.atan2(s[2] - sz, s[0] - sx);
+    const r = radius * last.scale * 0.5 * (0.85 + 0.3 * unit(seed, `monarch:mid${i}:r`));
+    // Висоти поясу різні (±30 %): грані ярусу різного розміру й нахилу.
+    const y = y1 + midHeight * (0.7 + 0.6 * unit(seed, `monarch:mid${i}:y`));
+    mid.push([sx + Math.cos(a) * r, y, sz + Math.sin(a) * r]);
+  }
+  const inside: V3 = [sx, y1 - tip * 0.2, sz];
+  const facing = (a: V3, b: V3, c: V3): [V3, V3, V3] => {
+    const e1: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const e2: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const nrm: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const d: V3 = [(a[0] + b[0] + c[0]) / 3 - inside[0], (a[1] + b[1] + c[1]) / 3 - inside[1], (a[2] + b[2] + c[2]) / 3 - inside[2]];
+    return nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2] >= 0 ? [a, b, c] : [a, c, b];
+  };
+  for (let i = 0; i < n; i += 1) {
+    const c0 = shoulder[2 * i]!;
+    const s = shoulder[2 * i + 1]!;
+    const c1 = shoulder[(2 * i + 2) % m]!;
+    const m0 = mid[i]!;
+    const m1 = mid[(i + 1) % n]!;
+    for (const points of [facing(c0, s, m0), facing(s, c1, m0), facing(c1, m1, m0)]) {
+      tris.push({ points, face, edges: TRI });
+      face += 1;
+    }
+  }
+  // ── Ярус 2: кінчик із точок планів ───────────────────────────
+  const tipAt: [number, number] = [apex[0] + sx, apex[1] + sz];
+  const midTop = Math.max(...mid.map((p) => p[1]));
+  // Точки планів тісніше, ніж у дітей: кінчик гострий, а не плаский купол.
+  for (const points of crown(seed, 'monarch', mid, midTop, height - midTop, tipAt, ridge, radius * last.scale * 0.3)) {
+    tris.push({ points, face, edges: TRI });
+    face += 1;
+  }
+  return tris;
+}
+
+/**
+ * Тон грані — з трьох (навичка `amore-crystal-look`, ADR-0176): на
+ * 3-циклі сусідні грані й грані через одну завжди різні, тож жодна пара,
+ * яку бачить око, не зливається в одну площину. Легкий розкид у межах
+ * тону лишає кожну грань своєю.
+ */
+const FACE_TONES = [0.74, 1.0, 1.3] as const;
 
 /**
  * Форма кристала (ADR-0237 §4.3): ТОЙ САМИЙ ріст — монарх, кристал на рік,
@@ -281,8 +442,8 @@ export function buildCrystalV2Geometry(model: CrystalV2Model, form: CrystalForm 
     // Плани — у друзи точки кінчика, у сталагміта кільця натеку (ADR-0237).
     tris: form === 'stalagmite'
       ? stalagmite(seed, 'monarch', m.radius, m.height, 3 + m.tiers, 0.12 * m.height)
-      : body(seed, 'monarch', m.sides, m.height, m.tierHeights.reduce((sum, h) => sum + h, 0),
-        [m.apex[0] * 4, m.apex[1] * 4], m.tiers, 0.12 * m.height),
+      : monarchBody(seed, m.sides, m.height, m.tierHeights.reduce((sum, h) => sum + h, 0),
+        [m.apex[0] * 4, m.apex[1] * 4], m.tiers, 0.12 * m.height, monarchProfile(seed)),
     height: m.height,
   }];
   const sparks: number[] = [];
@@ -329,7 +490,7 @@ export function buildCrystalV2Geometry(model: CrystalV2Model, form: CrystalForm 
   let at = 0;
   for (const b of bodies) {
     for (const tri of b.tris) {
-      const tone = 0.85 + 0.3 * unit(seed, `face:${b.key}:${tri.face}`);
+      const tone = FACE_TONES[tri.face % 3]! * (0.95 + 0.1 * unit(seed, `face:${b.key}:${tri.face}`));
       tri.points.forEach((p, corner) => {
         const v = at * 3 + corner;
         positions.set(p, v * 3);

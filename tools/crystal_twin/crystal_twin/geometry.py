@@ -81,29 +81,120 @@ def crown(seed, tag, top, y1, tip, apex, ridge, radius):
     return out
 
 
-def body(seed, tag, sides, height, tip, apex, ridge, bury) -> list[tuple[np.ndarray, int, tuple]]:
+# Звичайне тіло року: основа — FOOT плеча, плече — саме кільце.
+# Кільце профілю: (частка шляху від основи до плеча, множник, зсув осі в радіусах).
+SPINDLE = ((0.0, FOOT, (0.0, 0.0)), (1.0, 1.0, (0.0, 0.0)))
+
+
+def monarch_profile(seed):
+    """Монарх — три кільця, як `monarchProfile` у `geometry.ts`: важка
+    основа, ледь ширший пояс на третині висоти й плече, зсунуте від осі."""
+    def jitter(key, span):
+        return (unit(seed, f"monarch:profile:{key}") - 0.5) * span
+    return (
+        (0.0, 0.86, (0.0, 0.0)),
+        (0.32 + jitter("belly:at", 0.08), 1.05, (jitter("belly:x", 0.06), jitter("belly:z", 0.06))),
+        (1.0, 0.97, (jitter("shoulder:x", 0.14), jitter("shoulder:z", 0.14))),
+    )
+
+
+def body(seed, tag, sides, height, tip, apex, ridge, bury, profile=SPINDLE) -> list[tuple[np.ndarray, int, tuple]]:
     """Трикутники тіла як (3×3 вершини, номер грані, які ребра справжні).
 
     Ребро k — навпроти вершини k. Діагональ, що ділить пласку грань на два
-    трикутники, ребром не є, і кант на ній малював би неіснуючу грань."""
+    трикутники, ребром не є, і кант на ній малював би неіснуючу грань.
+    Кожне кільце профілю — кільце плеча, стиснуте й зсунуте, тож грані між
+    кільцями пласкі за побудовою."""
     ring0 = _ring(sides)
     y0 = -bury
     y1 = height - tip
+    radius = max(math.hypot(p[0], p[2]) for p in ring0)
+    rings = []
+    for at, scale, (sx, sz) in profile:
+        y = y0 + (y1 - y0) * at
+        rings.append(ring0 * scale + np.array([sx * radius, y, sz * radius]))
     faces: list[tuple[np.ndarray, int]] = []
     face = 0
     n = len(ring0)
-    bottom = ring0 * FOOT + np.array([0, y0, 0])
-    top = ring0 + np.array([0, y1, 0])
-    for i in range(n):
-        j = (i + 1) % n
-        faces.append((np.array([bottom[i], bottom[j], top[j]]), face, QUAD_A))
-        faces.append((np.array([bottom[i], top[j], top[i]]), face, QUAD_B))
-        face += 1
-    radius = max(math.hypot(p[0], p[2]) for p in ring0)
-    for tri in crown(seed, tag, list(top), y1, tip, apex, ridge, radius):
+    for lower, upper in zip(rings, rings[1:]):
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append((np.array([lower[i], lower[j], upper[j]]), face, QUAD_A))
+            faces.append((np.array([lower[i], upper[j], upper[i]]), face, QUAD_B))
+            face += 1
+    top = rings[-1]
+    _, shoulder_scale, (sx, sz) = profile[-1]
+    tip_at = (apex[0] + sx * radius, apex[1] + sz * radius)
+    for tri in crown(seed, tag, list(top), y1, tip, tip_at, ridge, radius * shoulder_scale):
         faces.append((np.array(tri), face, TRI))
         face += 1
     return faces
+
+
+def monarch_body(seed, sides, height, tip, apex, ridge, bury, profile):
+    """Монарх як великий гранчастий кристал — те саме, що `monarchBody` у
+    `geometry.ts` (ADR-0244): 12 поздовжніх граней із 6 сторін, вершина у
+    два яруси (пояс над ребрами сторін і кінчик із точок планів)."""
+    corners = _ring(sides)
+    n = len(corners)
+    ring12 = []
+    for i in range(n):
+        a, b = corners[i], corners[(i + 1) % n]
+        t = 0.35 + 0.3 * unit(seed, f"monarch:split{i}:t")
+        bulge = 1.06 + 0.08 * unit(seed, f"monarch:split{i}:b")
+        ring12.append(a)
+        ring12.append((a + (b - a) * t) * bulge)
+    ring12 = np.array(ring12)
+    m = len(ring12)
+    y0 = -bury
+    y1 = height - tip
+    radius = max(math.hypot(p[0], p[2]) for p in corners)
+    rings = []
+    for at, scale, (sx, sz) in profile:
+        y = y0 + (y1 - y0) * at
+        rings.append(ring12 * scale + np.array([sx * radius, y, sz * radius]))
+    faces = []
+    face = 0
+    for k in range(len(rings) - 1):
+        lower, upper = rings[k], rings[k + 1]
+        for i in range(m):
+            j = (i + 1) % m
+            faces.append((np.array([lower[i], lower[j], upper[j]]), face, (True, False, False)))
+            faces.append((np.array([lower[i], upper[j], upper[i]]), face, (k + 2 == len(rings), True, False)))
+            face += 1
+    shoulder = rings[-1]
+    _, last_scale, (lx, lz) = profile[-1]
+    sx, sz = lx * radius, lz * radius
+    mid_height = tip * 0.42
+    mid = []
+    for i in range(n):
+        s = shoulder[2 * i + 1]
+        a = math.atan2(s[2] - sz, s[0] - sx)
+        r = radius * last_scale * 0.5 * (0.85 + 0.3 * unit(seed, f"monarch:mid{i}:r"))
+        y = y1 + mid_height * (0.7 + 0.6 * unit(seed, f"monarch:mid{i}:y"))
+        mid.append(np.array([sx + math.cos(a) * r, y, sz + math.sin(a) * r]))
+    inside = np.array([sx, y1 - tip * 0.2, sz])
+
+    def facing(a, b, c):
+        nrm = np.cross(b - a, c - a)
+        return (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
+
+    for i in range(n):
+        c0, s, c1 = shoulder[2 * i], shoulder[2 * i + 1], shoulder[(2 * i + 2) % m]
+        m0, m1 = mid[i], mid[(i + 1) % n]
+        for tri in (facing(c0, s, m0), facing(s, c1, m0), facing(c1, m1, m0)):
+            faces.append((np.array(tri), face, TRI))
+            face += 1
+    tip_at = (apex[0] + sx, apex[1] + sz)
+    mid_top = max(p[1] for p in mid)
+    for tri in crown(seed, "monarch", mid, mid_top, height - mid_top, tip_at, ridge, radius * last_scale * 0.3):
+        faces.append((np.array(tri), face, TRI))
+        face += 1
+    return faces
+
+
+# Тон грані — з трьох (ADR-0244), як `FACE_TONES` у `geometry.ts`.
+FACE_TONES = (0.74, 1.0, 1.3)
 
 
 def _rotate(points: np.ndarray, lean_deg: float, azimuth_deg: float) -> np.ndarray:
@@ -126,8 +217,9 @@ def colony(model: dict[str, Any]) -> list[dict[str, Any]]:
     m = model["monarch"]
     bodies = [{
         "kind": "monarch",
-        "faces": body(model["startDate"], "monarch", m["sides"], m["height"], sum(m["tierHeights"]),
-                      (m["apex"][0] * 4, m["apex"][1] * 4), m["tiers"], bury=0.12 * m["height"]),
+        "faces": monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
+                              (m["apex"][0] * 4, m["apex"][1] * 4), m["tiers"], 0.12 * m["height"],
+                              monarch_profile(model["startDate"])),
         "sparks": [],
     }]
     seed = model["startDate"]
