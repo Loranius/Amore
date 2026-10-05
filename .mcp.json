@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "threejs-devtools-mcp": {
+      "command": "npx",
+      "args": ["-y", "threejs-devtools-mcp@0.4.1"]
+    }
+  }
+}
