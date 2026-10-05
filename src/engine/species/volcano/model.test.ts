@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CrystalV2Snapshot } from '../crystalV2/model';
-import { buildVolcanoGeometry, volcanoCrater, volcanoLedges, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinIndices, volcanoVeinPaths } from './geometry';
+import { buildVolcanoGeometry, volcanoConeRadiusAt, volcanoCrater, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinIndices, volcanoVeinPaths } from './geometry';
 import { buildVolcanoModel, volcanoLayerThickness, volcanoSlopeRadius } from './model';
 
 // ============================================================
@@ -91,18 +91,18 @@ describe('вулкан: сліди модулів (ADR-0237)', () => {
     expect(bodies(rich, 3)).toBe(1);
   });
 
-  it('насичений рік лишає уступ на схилі; тихий — ні', () => {
-    const quiet = buildVolcanoModel(at('2020-10-15'));
-    expect(volcanoLedges(quiet).tris.length).toBe(0);
+  it('нічого не стирчить зі схилу: уся скеля нижче вінця — усередині конуса (власник, 2026-10-05)', () => {
     const rich = buildVolcanoModel(at('2020-10-15', { memories: Array.from({ length: 40 }, (_, i) => ({ id: i, date: '2014-05-05' })) }));
     expect(rich.layers.find((l) => l.year === 1)!.fertility).toBeGreaterThanOrEqual(0.4);
-    expect(volcanoLedges(rich).tris.length).toBeGreaterThan(0);
-    // Уступ року лишається й пізніше, на тій самій висоті (переривається
-    // лише там, де з роками проляже нова ріка лави).
-    const later = buildVolcanoModel(at('2026-10-15', { memories: Array.from({ length: 40 }, (_, i) => ({ id: i, date: '2014-05-05' })) }));
-    const shelf = (m: typeof rich) => m.layers.find((l) => l.year === 1)!.to;
-    expect(shelf(later)).toBe(shelf(rich));
-    expect(volcanoLedges(later).tris.some((tri) => Math.abs(tri[0][1] - shelf(later)) < 1e-9)).toBe(true);
+    const rings = volcanoRings(rich);
+    const rock = buildVolcanoGeometry(rich).rock.positions;
+    for (let i = 0; i < rock.length; i += 3) {
+      const [x, y, z] = [rock[i]!, rock[i + 1]!, rock[i + 2]!];
+      if (y < 0.05 || y > rich.height * 0.85) continue;
+      // Центр грані конуса може випнутися до ~3% — це гранчастість, а не
+      // стирчання; прибрані уступи виходили назовні на 4–12%.
+      expect(Math.hypot(x, z)).toBeLessThanOrEqual(volcanoConeRadiusAt(rings, Math.atan2(z, x), y) * 1.035 + 1e-6);
+    }
   });
 });
 

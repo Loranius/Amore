@@ -272,10 +272,10 @@ export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: 
   // Вал і губа теплі; внутрішня стінка жерла підсвічена лавою знизу.
   for (let k = (innerFrom - SIDES * 4) * 3; k < innerFrom * 3; k += 1) heat[k] = Math.max(heat[k]!, 0.35);
   for (let k = innerFrom * 3; k < heat.length; k += 1) heat[k] = Math.max(heat[k]!, 0.75);
-  const ledges = volcanoLedges(model);
-  for (const tri of ledges.tris) for (const v of tri) heat.push(volcanoRockHeat(model, veins, v));
-  tris.push(...ledges.tris);
-  tone.push(...ledges.tone);
+  // Уступів насичених років на схилі більше немає (власник, 2026-10-05:
+  // «щось протикає текстури вулкана»): тераса виходила зі схилу назовні й
+  // під плавним світлом читалась дошкою, встромленою в конус. Насичений рік
+  // і далі дає товщий шар (`volcanoLayerThickness`).
   return { tris, tone, heat };
 }
 
