@@ -212,7 +212,7 @@ class Geometry(unittest.TestCase):
         faces = monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
                              m["tiers"], 0.3, monarch_profile(model["startDate"]))
         by_face: dict[int, list[np.ndarray]] = {}
-        for tri, face, _ in faces:
+        for tri, face, *_ in faces:
             by_face.setdefault(face, []).extend(tri)
         for face, points in by_face.items():
             pts = np.array(points)

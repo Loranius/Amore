@@ -37,27 +37,44 @@ describe('кристал v2: геометрія', () => {
     }
   });
 
-  it('кожна грань ПЛАСКА: трикутники однієї грані лежать в одній площині', () => {
+  it('грані пласкі (ADR-0245): трикутник — пласкі за побудовою; пара одного тону зламана менше ніж на 10°', () => {
+    // Стовбур ламається на площини, але грань не стає кривою: два трикутники
+    // з одним тоном — одна грань із легким зламом, решта — окремі грані.
     const { positions, faceTone, triangles } = geometry.crystals;
-    // Сусідні трикутники з тим самим тоном — дві половини однієї грані-чотирикутника.
     let pairs = 0;
     for (let t = 0; t + 1 < triangles; t += 1) {
       if (faceTone[t * 3] !== faceTone[(t + 1) * 3]) continue;
-      const a = point(positions, t * 3);
-      const b = point(positions, t * 3 + 1);
-      const c = point(positions, t * 3 + 2);
-      const n = cross(sub(b, a), sub(c, a));
-      const length = norm(n);
-      if (length < 1e-9) continue;
-      for (let corner = 0; corner < 3; corner += 1) {
-        const q = point(positions, (t + 1) * 3 + corner);
-        const d = sub(q, a);
-        const distance = Math.abs(n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / length;
-        expect(distance).toBeLessThan(1e-4);
-      }
+      const tri = (k: number): [V3, V3, V3] => [point(positions, k * 3), point(positions, k * 3 + 1), point(positions, k * 3 + 2)];
+      const na = cross(sub(tri(t)[1], tri(t)[0]), sub(tri(t)[2], tri(t)[0]));
+      const nb = cross(sub(tri(t + 1)[1], tri(t + 1)[0]), sub(tri(t + 1)[2], tri(t + 1)[0]));
+      const cos = Math.abs(na[0] * nb[0] + na[1] * nb[1] + na[2] * nb[2]) / (norm(na) * norm(nb));
+      expect((Math.acos(Math.min(1, cos)) * 180) / Math.PI).toBeLessThan(10);
       pairs += 1;
     }
-    expect(pairs).toBeGreaterThan(20);
+    expect(pairs).toBeGreaterThan(5);
+  });
+
+  it('бічні грані не тягнуться рівною смугою від основи до плеча (ADR-0245, еталон low_poly_dirt_crystals)', () => {
+    // Еталон: у кристала з 32–48 трикутників 26–39 різних площин і 9–17
+    // висот вершин. Рівна смуга дала б 6 бічних площин і 2 висоти.
+    for (const name of ['busy', 'empty']) {
+      const model = buildCrystalV2Model(fixture(name));
+      const { positions, triangles } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const shoulder = model.monarch.height - model.monarch.tierHeights.reduce((sum, h) => sum + h, 0);
+      const heights = new Set<string>();
+      const planes: V3[] = [];
+      for (let t = 0; t < triangles; t += 1) {
+        const [a, b, c] = [point(positions, t * 3), point(positions, t * 3 + 1), point(positions, t * 3 + 2)];
+        if (Math.max(a[1], b[1], c[1]) > shoulder || Math.min(a[1], b[1], c[1]) < 0) continue;
+        for (const q of [a, b, c]) heights.add(q[1].toFixed(4));
+        const n = cross(sub(b, a), sub(c, a));
+        const l = norm(n);
+        const u: V3 = [n[0] / l, n[1] / l, n[2] / l];
+        if (!planes.some((v) => Math.abs(v[0] * u[0] + v[1] * u[1] + v[2] * u[2]) > 0.9995)) planes.push(u);
+      }
+      expect(heights.size).toBeGreaterThanOrEqual(12);
+      expect(planes.length).toBeGreaterThanOrEqual(30);
+    }
   });
 
   it('кожна грань дивиться НАЗОВНІ (регресія: закрут усередину ховав передні грані монарха)', () => {
@@ -158,9 +175,11 @@ describe('кристал v2: геометрія', () => {
     for (const value of empty.crystals.positions) expect(Number.isFinite(value)).toBe(true);
   });
 
-  it('монарх — три кільця (ADR-0242): важка основа, ширший пояс, плече зсунуте від осі', () => {
+  it('монарх — профіль (ADR-0242, ADR-0245): важка основа, ширший пояс, плече зсунуте від осі', () => {
     const profile = monarchProfile(busy.startDate);
-    expect(profile.map((r) => r.at)).toEqual([0, profile[1]!.at, 1]);
+    // Чотири кільця (ADR-0245): основа, пояс, верхній злам, плече.
+    expect(profile.map((r) => r.at)).toEqual([0, profile[1]!.at, profile[2]!.at, 1]);
+    expect(profile[2]!.at).toBeGreaterThan(profile[1]!.at);
     expect(profile[0]!.scale).toBeGreaterThan(0.8);
     expect(profile[1]!.scale).toBeGreaterThan(profile[0]!.scale);
     expect(profile[1]!.at).toBeGreaterThan(0.2);
@@ -177,26 +196,28 @@ describe('кристал v2: геометрія', () => {
     expect(tones.size).toBeGreaterThan(sides);
   });
 
-  it('монарх — гранчастий кристал (ADR-0244): 12 поздовжніх граней у два пояси й вершина у два яруси', () => {
-    // Лише монарх: колонія без тіл років.
+  it('монарх — гранчастий кристал (ADR-0244, ADR-0245): 12 граней у три пояси, вершина у два яруси', () => {
     const alone = buildCrystalV2Geometry({ ...busy, children: [] });
     const { positions, triangles } = alone.crystals;
-    const shoulder = busy.monarch.height - busy.monarch.tierHeights.reduce((sum, h) => sum + h, 0);
+    const tip = busy.monarch.tierHeights.reduce((sum, h) => sum + h, 0);
+    // Плече ламається на різній висоті (±6 % проміжку), пояс вершини — над ним
+    // щонайменше на 0.4 кінчика: поріг посередині їх розділяє.
+    const threshold = busy.monarch.height - tip * 0.75;
     let shaft = 0;
     let belt = 0;
-    let tip = 0;
+    let crown = 0;
     let top = -Infinity;
     for (let t = 0; t < triangles; t += 1) {
       const ys = [0, 1, 2].map((c) => positions[(t * 3 + c) * 3 + 1]!);
       top = Math.max(top, ...ys);
-      if (Math.max(...ys) <= shoulder + 1e-6) shaft += 1;
-      else if (Math.min(...ys) <= shoulder + 1e-6) belt += 1;
-      else tip += 1;
+      if (Math.max(...ys) < threshold) shaft += 1;
+      else if (Math.min(...ys) < threshold) belt += 1;
+      else crown += 1;
     }
     const sides = busy.monarch.sides.length;
-    expect(shaft).toBe(2 * (2 * sides) * 2); // 2 пояси × 12 граней × 2 трикутники
+    expect(shaft).toBe(3 * (2 * sides) * 2); // 3 пояси × 12 граней × 2 трикутники
     expect(belt).toBe(3 * sides); // 18 граней поясу вершини
-    expect(tip).toBeGreaterThanOrEqual(sides); // кінчик сходиться з 6 точок
+    expect(crown).toBeGreaterThanOrEqual(sides);
     expect(top).toBeCloseTo(busy.monarch.height, 5);
   });
 
