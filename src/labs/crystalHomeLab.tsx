@@ -30,12 +30,15 @@ import '@/index.css';
 
 const NO_BEARINGS: readonly number[] = [];
 
+// Тема сторінки — раз, до рендера: у тілі компонента це був би побічний ефект.
+const THEME: 'light' | 'dark' = new URLSearchParams(window.location.search).get('theme') === 'light' ? 'light' : 'dark';
+document.documentElement.dataset.theme = THEME;
+
 function Lab() {
   const params = new URLSearchParams(window.location.search);
   const years = Math.max(0, Number(params.get('years') ?? 8));
   const fill = Math.max(0, Number(params.get('fill') ?? 8));
-  const theme = params.get('theme') === 'light' ? 'light' : 'dark';
-  document.documentElement.dataset.theme = theme;
+  const theme = THEME;
   const built = useMemo(() => {
     // Колір колонії — від того, хто виконує бажання. Синтетичні бажання
     // спільні, а це зелений канал; власна колонія власника рожева — її дає

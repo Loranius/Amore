@@ -461,7 +461,8 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
     // (виміряно в DevTools: 22.9 % пікселів у «тіні» проти 6.9 % справжньої).
     light.shadow.bias = -0.004;
     light.shadow.normalBias = 0;
-    light.shadow.radius = 3;
+    // Розмиття краю дає сам `PCFSoftShadowMap` (полотно з `shadows="soft"`);
+    // `shadow.radius` він ігнорує, тож його тут немає.
     const cam = light.shadow.camera;
     const span = radius * 1.7;
     cam.left = -span;

@@ -177,21 +177,27 @@ describe('кристал v2: геометрія', () => {
     expect(tones.size).toBeGreaterThan(sides);
   });
 
-  it('монарх — гранчастий кристал (ADR-0244): 12 поздовжніх граней і вершина у два яруси', () => {
-    // Монарх — перше тіло: його трикутники йдуть до першого тіла року.
-    const { positions, triangles } = geometry.crystals;
-    const sides = busy.monarch.sides.length;
-    const tops: number[] = [];
-    let monarchTris = 0;
+  it('монарх — гранчастий кристал (ADR-0244): 12 поздовжніх граней у два пояси й вершина у два яруси', () => {
+    // Лише монарх: колонія без тіл років.
+    const alone = buildCrystalV2Geometry({ ...busy, children: [] });
+    const { positions, triangles } = alone.crystals;
+    const shoulder = busy.monarch.height - busy.monarch.tierHeights.reduce((sum, h) => sum + h, 0);
+    let shaft = 0;
+    let belt = 0;
+    let tip = 0;
+    let top = -Infinity;
     for (let t = 0; t < triangles; t += 1) {
       const ys = [0, 1, 2].map((c) => positions[(t * 3 + c) * 3 + 1]!);
-      if (t > 0 && Math.max(...ys) > busy.monarch.height * 1.01) break;
-      tops.push(Math.max(...ys));
-      monarchTris += 1;
+      top = Math.max(top, ...ys);
+      if (Math.max(...ys) <= shoulder + 1e-6) shaft += 1;
+      else if (Math.min(...ys) <= shoulder + 1e-6) belt += 1;
+      else tip += 1;
     }
-    // 2 пояси × 12 граней × 2 трикутники + 18 граней поясу вершини + кінчик.
-    expect(monarchTris).toBeGreaterThanOrEqual(2 * 2 * sides * 2 + 3 * sides);
-    expect(Math.max(...tops)).toBeCloseTo(busy.monarch.height, 5);
+    const sides = busy.monarch.sides.length;
+    expect(shaft).toBe(2 * (2 * sides) * 2); // 2 пояси × 12 граней × 2 трикутники
+    expect(belt).toBe(3 * sides); // 18 граней поясу вершини
+    expect(tip).toBeGreaterThanOrEqual(sides); // кінчик сходиться з 6 точок
+    expect(top).toBeCloseTo(busy.monarch.height, 5);
   });
 
   it('тон грані — один із трьох, тож сусідні грані ніколи не зливаються', () => {
