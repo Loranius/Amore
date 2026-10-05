@@ -23,11 +23,16 @@ import { cellHash } from './hash';
 export const YARD_ID = 'zhylyntsi:yard';
 
 /** Тайли садиби, на які посилаються контролер і тести. */
+/** Хата: Г-подібна, двері в правому крилі. */
+const HOUSE = { x: 5, y: 16, w: 11, h: 8, doorX: 13 } as const;
+/** Літня кухня з прибудовою ліворуч (прибудова — нижче, у ній вхід). */
+const KITCHEN = { x: 23, y: 19, w: 7, h: 4, annexW: 2 } as const;
+
 export const YARD = {
-  /** Де стоїть мама: біля дверей літньої кухні. */
-  mom: [25, 24] as [number, number],
-  /** Вхід у хату — ґанок праворуч від коридору. */
-  porch: { x: 14, y: 21, w: 4, h: 3 },
+  /** Де стоїть мама: біля входу в літню кухню. */
+  mom: [21, 21] as [number, number],
+  /** Вхід у хату — ґанок під дверима правого крила. */
+  porch: { x: HOUSE.doorX - 1, y: HOUSE.y + HOUSE.h, w: 4, h: 2 },
   gate: { x: 20, y: 32 },
 } as const;
 
@@ -62,31 +67,42 @@ export function yardMap(): GameMap {
   // Стежка вздовж господарських будівель.
   m.fill(2, 14, 29, 1, 'd');
 
-  // ── Головний будинок: Г-подібний, з кількох об'ємів ──────────
-  // Спільний вигляд — одна хата: біла стіна, один дах; двері лише одні.
-  const hata = { style: 'cottage' as const, wall: '#f4eee0', roof: '#b8954e' };
-  m.building({ id: 'house-right', x: 13, y: 15, w: 5, h: 6, ...hata, label: 'Хата', doorX: 15 });
-  m.building({ id: 'house-top', x: 9, y: 17, w: 4, h: 4, ...hata, label: 'Хата', door: false });
-  m.building({ id: 'house-left', x: 4, y: 18, w: 5, h: 6, ...hata, label: 'Хата', door: false });
-  m.building({ id: 'house-hall', x: 9, y: 21, w: 5, h: 3, ...hata, label: 'Хата', door: false });
-  m.building({ id: 'house-bottom', x: 4, y: 24, w: 10, h: 3, ...hata, label: 'Хата', door: false });
-  // Ґанок-вхід праворуч від коридору, у двір.
-  // Ґанок — кам'яний приступок під дверима, далі витоптаний ґрунт.
+  // ── Головний будинок: одна Г-подібна споруда ─────────────
+  // Власник: «будинок має бути суцільним, це одна локація; можна зменшити
+  // візуально». Ліве крило довше вглиб, праве нижче; фасад і звис — одна
+  // лінія; двері одні — у праве крило, у двір. Кімнати — всередині.
+  m.building({
+    id: 'house', x: HOUSE.x, y: HOUSE.y, w: HOUSE.w, h: HOUSE.h, style: 'cottage', wall: '#f4eee0', roof: '#b8954e',
+    label: 'Хата', doorX: HOUSE.doorX, notch: { w: 6, h: 3, side: 'right' },
+  });
+  // Ґанок — кам'яний приступок під дверима, далі витоптаний ґрунт до стежки.
   m.fill(YARD.porch.x, YARD.porch.y, YARD.porch.w, YARD.porch.h, 'd');
-  m.fill(YARD.porch.x, YARD.porch.y, YARD.porch.w - 1, 2, 'c');
-  m.prop('bench', 16.2, 22.6).prop('pot', 14.1, 23.2, { solid: false });
+  m.fill(YARD.porch.x, YARD.porch.y, YARD.porch.w - 1, 1, 'c');
+  m.prop('bench', 7.2, HOUSE.y + HOUSE.h + 0.5).prop('pot', HOUSE.doorX + 1.3, HOUSE.y + HOUSE.h + 0.1, { solid: false });
   m.zone('home', YARD.porch.x, YARD.porch.y, YARD.porch.w, YARD.porch.h, { type: 'home' }, 'У хату');
+  // За правим крилом, у кутку «Г», — квітник і кущ.
+  m.fill(HOUSE.x + HOUSE.w - 6, HOUSE.y, 6, 2, 'G');
+  m.prop('flowerBed', HOUSE.x + HOUSE.w - 4, HOUSE.y + 0.6).prop('bush', HOUSE.x + HOUSE.w - 1.2, HOUSE.y + 0.3);
 
-  // ── Майстерня + літня кухня: одна будівля, праворуч ─────────
+  // ── Літня кухня з прибудовою, над нею майстерня ─────────────
+  // Прибудова ліворуч — частина літньої кухні й вхід до неї: двері з
+  // верхнього боку прибудови. Тому кухня й прибудова — одна Г-подібна
+  // будівля, а вхід — зона над прибудовою.
   m.building({ id: 'workshop', x: 25, y: 16, w: 5, h: 3, style: 'shed', label: 'Майстерня', door: false });
-  m.building({ id: 'summerKitchen', x: 25, y: 19, w: 5, h: 4, style: 'house', label: 'Літня кухня', doorX: 27, wall: '#efe4c8', roof: '#8a5a44', action: { type: 'activity', id: 'summerKitchen' }, zoneLabel: 'Літня кухня · з мамою' });
-  m.building({ id: 'annex', x: 23, y: 20, w: 2, h: 2, style: 'shed', label: 'Прибудова', door: false });
+  m.building({
+    id: 'summerKitchen', x: KITCHEN.x, y: KITCHEN.y, w: KITCHEN.w, h: KITCHEN.h, style: 'house', label: 'Літня кухня',
+    wall: '#efe4c8', roof: '#8a5a44', door: false, notch: { w: KITCHEN.annexW, h: 1, side: 'left' },
+  });
+  // Вхід: стежка обходить прибудову зверху, біля дверей — приступок.
+  m.fill(KITCHEN.x - 1, KITCHEN.y - 1, KITCHEN.annexW + 1, 1, 'd').fill(KITCHEN.x - 1, KITCHEN.y, 1, KITCHEN.h, 'd');
+  m.fill(KITCHEN.x, KITCHEN.y, KITCHEN.annexW, 1, 'c');
+  m.zone('summerKitchen', KITCHEN.x, KITCHEN.y, KITCHEN.annexW, 1, { type: 'activity', id: 'summerKitchen' }, 'Літня кухня · з мамою');
   m.prop('cellar', 27.6, 24.2);
   m.zone('cellar', 28, 24, 2, 1, { type: 'info', text: 'Погріб: картопля, банки з огірками й мамине вишневе варення' }, 'Погріб');
   // Біля майстерні — робоче: верстак, дошки, дрова.
   m.prop('workbench', 30.2, 16.6).prop('planks', 30.1, 18.8);
   m.zone('workshop', 30, 18, 2, 1, { type: 'activity', id: 'workshop' }, 'Майстерня · змайструвати');
-  m.prop('woodpile', 21, 17.6);
+  m.prop('woodpile', 17, 16);
   m.zone('mom', YARD.mom[0] - 1, YARD.mom[1], 2, 2, { type: 'mom' }, 'Поговорити з мамою');
 
   // ── Фруктовий сад за літньою кухнею ────────────────────────
@@ -102,9 +118,9 @@ export function yardMap(): GameMap {
   // ── Двір: ґрунтові стежки, трава, криниця, нерівності ───────
   // Від хвіртки — пунктир плану: угору до кухні, гілка до ґанку.
   m.fill(20, 24, 2, H - 26, 'd');
-  m.fill(18, 22, 2, 3, 'd').fill(22, 23, 5, 2, 'd');
+  m.fill(HOUSE.doorX + 3, 24, 4, 2, 'd').fill(22, 23, 5, 2, 'd');
   // Між будинком і майстернею — прохід до хлівів.
-  m.fill(19, 15, 2, 7, 'd');
+  m.fill(19, 15, 2, 9, 'd');
   // Витоптані плями ґрунту й трава з квітами.
   for (const [x, y, w, h] of [[16, 27, 3, 2], [23, 27, 3, 1], [9, 28, 4, 2]] as const) m.fill(x, y, w, h, 'd');
   for (const [x, y, w, h] of [[1, 28, 6, 3], [30, 26, 3, 3], [12, 29, 4, 2]] as const) m.fill(x, y, w, h, 'G');
@@ -114,6 +130,6 @@ export function yardMap(): GameMap {
   m.tree(36, 31, 'oak').tree(2, 31, 'willow');
 
   m.spawn('gate', YARD.gate.x, H - 3).spawn('default', YARD.gate.x, H - 3);
-  m.spawn('house', 16, 24);
+  m.spawn('house', HOUSE.doorX, YARD.porch.y + 1);
   return m.build();
 }

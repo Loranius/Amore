@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
 import { newLife } from '../sim/life';
-import { reachableTiles, zoneTiles } from './collide';
+import { colliderFor, reachableTiles, zoneTiles } from './collide';
 import { homeInterior } from './interior';
 import { ALL_CITY_IDS, cityMap, homeYard } from './maps';
-import type { GameMap } from './types';
+import { TILE, buildingParts, type GameMap } from './types';
 
 // ============================================================
 // Мапи «Дєвочка в городі» (ADR-0239 §3): усе, що можна зробити в місті,
@@ -79,22 +79,34 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     // Зліва направо: хлів → хлів → курник.
     expect(back.map((x) => x.style)).toEqual(['barn', 'barn', 'coop']);
     for (let i = 1; i < back.length; i += 1) expect(back[i]!.x).toBeGreaterThan(back[i - 1]!.x);
-    // Хата — Г-подібна з кількох об'ємів, двері — одні; позаду неї господарські будівлі.
-    const house = yard.buildings.filter((x) => x.id.startsWith('house-'));
-    expect(house.length).toBeGreaterThanOrEqual(4);
-    expect(house.filter((x) => x.door !== false)).toHaveLength(1);
-    const houseTop = Math.min(...house.map((x) => x.y));
+    // Хата — одна суцільна Г-подібна споруда (власник: «одна локація»), двері одні.
+    const house = yard.buildings.filter((x) => x.label === 'Хата');
+    expect(house).toHaveLength(1);
+    expect(house[0]!.notch).toBeDefined();
+    expect(house[0]!.door).not.toBe(false);
+    const houseTop = house[0]!.y;
     for (const x of back) expect(x.y + x.h).toBeLessThanOrEqual(houseTop);
+    // У кутку «Г» можна стати — це двір, а не стіна.
+    const n = house[0]!.notch!;
+    const nx = n.side === 'right' ? house[0]!.x + house[0]!.w - Math.ceil(n.w / 2) : house[0]!.x + Math.floor(n.w / 2);
+    expect(colliderFor(yard).canStand(nx * TILE + 8, (house[0]!.y + 1) * TILE + 8)).toBe(true);
     // Город — над господарськими будівлями (грядки 'v').
     const gardenRows = yard.ground.map((row, j) => (row.includes('v') ? j : -1)).filter((j) => j >= 0);
     expect(Math.max(...gardenRows)).toBeLessThan(Math.min(...back.map((x) => x.y)));
-    // Майстерня над літньою кухнею, одна будівля; праворуч від хати; вхід кухні знизу.
+    // Майстерня над літньою кухнею; кухня праворуч від хати; прибудова ліворуч —
+    // частина кухні, вхід у кухню з верхнього боку прибудови.
     const shop = b('workshop');
     const kitchen = b('summerKitchen');
-    expect(shop.x).toBe(kitchen.x);
-    expect(shop.y + shop.h).toBe(kitchen.y);
-    expect(kitchen.x).toBeGreaterThan(Math.max(...house.map((x) => x.x + x.w)));
-    expect(yard.zones.some((z) => z.y === kitchen.y + kitchen.h && z.action.type === 'activity')).toBe(true);
+    const [kTall, kAnnex] = buildingParts(kitchen);
+    expect(kitchen.notch?.side).toBe('left');
+    expect(shop.x).toBe(kTall!.x);
+    expect(shop.y + shop.h).toBe(kTall!.y);
+    expect(kitchen.x).toBeGreaterThan(house[0]!.x + house[0]!.w);
+    expect(kAnnex!.x).toBeLessThan(kTall!.x);
+    const entry = yard.zones.find((z) => z.id === 'summerKitchen')!;
+    expect(entry.y).toBe(kAnnex!.y - 1);
+    expect(entry.x).toBeGreaterThanOrEqual(kAnnex!.x);
+    expect(entry.x + entry.w).toBeLessThanOrEqual(kAnnex!.x + kAnnex!.w);
     // Сад — праворуч за літньою кухнею.
     const orchard = yard.trees.filter((t) => t.x > kitchen.x + kitchen.w && t.y <= 30);
     expect(orchard.length).toBeGreaterThanOrEqual(8);
@@ -104,17 +116,29 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(gate.y).toBeGreaterThanOrEqual(yard.h - 3);
   });
 
-  it('хата всередині: кімнати за планом, зʼєднані дверима; кухня з піччю внизу ліворуч', () => {
+  it('хата всередині: сіни → кухня вгорі, коридор ліворуч; з коридору — брати вгорі, мама ліворуч, Лєна внизу', () => {
     const s = newLife(1, 'sadok');
     const hata = homeInterior({ ...s, home: 'zhylyntsi' });
     assertReachable(hata);
-    // Від ліжка Лєни досяжні всі кімнати: їхні точки підлоги.
-    const reach = reachableTiles(hata, hata.spawns.wake!);
-    for (const [name, x, y] of [['ліве крило', 3, 10], ['над коридором', 10, 6], ['коридор', 11, 13], ['сіни', 20, 13], ['кухня', 6, 19], ['Лєнина кімната', 22, 8]] as const) {
-      expect(reach.has(`${x},${y}`), name).toBe(true);
-    }
+    const reach = reachableTiles(hata, hata.spawns.door!);
+    const rooms = { сіни: [25, 11], кухня: [27, 5], коридор: [17, 11], брати: [13, 4], мама: [3, 10], Лєна: [12, 20] } as const;
+    for (const [name, [x, y]] of Object.entries(rooms)) expect(reach.has(`${x},${y}`), name).toBe(true);
+    // Взаємне розташування — як описав власник, дивлячись із коридору.
+    expect(rooms.кухня[1]).toBeLessThan(rooms.сіни[1]);
+    expect(rooms.коридор[0]).toBeLessThan(rooms.сіни[0]);
+    expect(rooms.брати[1]).toBeLessThan(rooms.коридор[1]);
+    expect(rooms.мама[0]).toBeLessThan(rooms.коридор[0]);
+    expect(rooms.Лєна[1]).toBeGreaterThan(rooms.коридор[1]);
+    // Вихід — із сіней; прокидається Лєна у своїй кімнаті; піч — на кухні.
+    const exit = hata.zones.find((z) => z.action.type === 'exit')!;
+    expect(Math.abs(exit.x - rooms.сіни[0])).toBeLessThanOrEqual(2);
+    expect(hata.spawns.wake!.y).toBeGreaterThan(rooms.коридор[1]);
     const stove = hata.props.find((p) => p.type === 'stove')!;
-    expect(stove.x).toBeLessThan(4);
-    expect(stove.y).toBeGreaterThan(15);
+    expect(stove.x).toBeGreaterThan(22);
+    expect(stove.y).toBeLessThan(8);
+    // Брати живуть удома, поки Лєна в садочку й школі; у ВДПУ — роз'їхались.
+    expect(hata.props.filter((p) => p.type === 'bed' && p.x > 10 && p.x < 17 && p.y < 7)).toHaveLength(2);
+    const uni = homeInterior({ ...newLife(1, 'uni'), home: 'zhylyntsi' });
+    expect(uni.props.filter((p) => p.type === 'bed' && p.x > 10 && p.x < 17 && p.y < 7)).toHaveLength(1);
   });
 });

@@ -5,7 +5,7 @@
 // Узимку на дахах сніг і бурульки; вночі вікна світяться (`windows`).
 // ============================================================
 import type { Season } from '../sim/calendar';
-import { TILE, type Building, type BuildingStyle, type Rect } from '../world/types';
+import { TILE, buildingParts, type Building, type BuildingStyle, type Rect } from '../world/types';
 import { bitmapSize, drawBitmap } from './icons';
 import { canvas, cellHash, ctx2d, disc, ellipse, mix, px, rect, shade, type Ctx } from './pixel';
 
@@ -22,6 +22,7 @@ export interface BuildingSprite {
 
 type Material = 'plaster' | 'brick' | 'wood' | 'panel' | 'glass' | 'stone';
 type RoofKind = 'thatch' | 'tile' | 'flat' | 'metal' | 'none';
+type Flush = 'left' | 'right' | null;
 
 interface StyleRule {
   rise: number;
@@ -63,7 +64,7 @@ const STYLES: Record<BuildingStyle, StyleRule> = {
 // ------------------------------------------------------------
 // Дах.
 // ------------------------------------------------------------
-function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, color: string, season: Season, seed: number): void {
+function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, color: string, season: Season, seed: number, flush: Flush = null): void {
   const H = bottom - top;
   if (rule.roof === 'none') return;
   if (rule.roof === 'flat') {
@@ -74,6 +75,10 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
     return;
   }
   const inset = rule.roof === 'thatch' ? 10 : 8;
+  // Бік, яким дах прилягає до іншого крила тієї ж хати, — без скосу:
+  // скати сходяться, і двох окремих дахів не видно.
+  const kl = (k: number) => (flush === 'left' ? 0 : k);
+  const kr = (k: number) => (flush === 'right' ? 0 : k);
   for (let r = 0; r < H; r += 1) {
     const k = Math.round((1 - r / H) * inset);
     const band = Math.floor(r / 4);
@@ -82,24 +87,24 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
       c = r % 3 === 0 ? shade(color, -0.12) : color;
     } else if (r % 4 === 3) c = shade(color, -0.28);
     else if (r % 4 === 0) c = shade(color, 0.14);
-    rect(g, k, top + r, W - 2 * k, 1, c);
+    rect(g, kl(k), top + r, W - kl(k) - kr(k), 1, c);
     // Шви черепиці / стебла соломи.
     if (rule.roof === 'tile' && r % 4 !== 3) {
       const off = band % 2 === 0 ? 0 : 3;
-      for (let x = k + off; x < W - k; x += 6) px(g, x, top + r, shade(color, -0.2));
+      for (let x = kl(k) + off; x < W - kr(k); x += 6) px(g, x, top + r, shade(color, -0.2));
     }
     if (rule.roof === 'metal' && r % 4 !== 3) {
-      for (let x = k + 2; x < W - k; x += 5) px(g, x, top + r, shade(color, -0.12));
+      for (let x = kl(k) + 2; x < W - kr(k); x += 5) px(g, x, top + r, shade(color, -0.12));
     }
     if (rule.roof === 'thatch') {
-      for (let x = k; x < W - k; x += 1) if (cellHash(x, r, seed) % 5 === 0) px(g, x, top + r, shade(color, 0.18));
+      for (let x = kl(k); x < W - kr(k); x += 1) if (cellHash(x, r, seed) % 5 === 0) px(g, x, top + r, shade(color, 0.18));
     }
     // Темні краї даху.
-    px(g, k, top + r, shade(color, -0.35));
-    px(g, W - k - 1, top + r, shade(color, -0.35));
+    if (flush !== 'left') px(g, k, top + r, shade(color, -0.35));
+    if (flush !== 'right') px(g, W - k - 1, top + r, shade(color, -0.35));
   }
   // Гребінь.
-  rect(g, inset, top, W - 2 * inset, 2, shade(color, rule.roof === 'thatch' ? -0.2 : 0.3));
+  rect(g, kl(inset), top, W - kl(inset) - kr(inset), 2, shade(color, rule.roof === 'thatch' ? -0.2 : 0.3));
   // Звис: темна смуга знизу.
   rect(g, 0, bottom - 2, W, 2, shade(color, -0.42));
   if (season === 'winter') {
@@ -107,7 +112,7 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
     const snowH = Math.round(H * 0.55);
     for (let r = 0; r < snowH; r += 1) {
       const k = Math.round((1 - r / H) * inset);
-      rect(g, k, top + r, W - 2 * k, 1, r > snowH - 3 ? '#dfe9f6' : '#ffffff');
+      rect(g, kl(k), top + r, W - kl(k) - kr(k), 1, r > snowH - 3 ? '#dfe9f6' : '#ffffff');
     }
     for (let x = inset; x < W - inset; x += 1) {
       const drip = cellHash(x, seed) % 4;
@@ -289,9 +294,56 @@ function columns(g: Ctx, x0: number, x1: number, top: number, bottom: number): v
 const cache = new Map<string, BuildingSprite>();
 
 export function buildingSprite(b: Building, season: Season): BuildingSprite {
-  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}`;
+  const n = b.notch;
+  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
+  const sprite = n ? ellSprite(b, season) : partSprite(b, season, {});
+  cache.set(key, sprite);
+  return sprite;
+}
+
+/**
+ * Г-подібна споруда — одна будівля з двох крил. Обидва крила мають
+ * однакову висоту стіни, тож фасад і звис даху — одна лінія; дах нижчого
+ * крила прилягає до вищого без скосу; димар один, двері одні.
+ */
+function ellSprite(b: Building, season: Season): BuildingSprite {
+  const rule = STYLES[b.style];
+  const [tall, low] = buildingParts(b) as [Rect, Rect];
+  const wallPx = Math.round(low.h * TILE * (1 - rule.roofFrac));
+  const side = b.notch!.side;
+  const hasDoor = (r: Rect) => b.door !== false && b.doorX >= r.x && b.doorX < r.x + r.w;
+  const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall) }, season, { wallPx, flush: null, chimney: true });
+  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low) }, season, { wallPx, flush: side === 'right' ? 'left' : 'right', chimney: false });
+  const W = b.w * TILE + 6;
+  const Ht = b.h * TILE + rule.rise;
+  const img = canvas(W, Ht);
+  const g = ctx2d(img);
+  const ax = (tall.x - b.x) * TILE;
+  const bx = (low.x - b.x) * TILE;
+  const by = (low.y - b.y) * TILE;
+  g.drawImage(A.img, ax, 0);
+  g.drawImage(B.img, bx, by);
+  // Стик крил: кожне крило світле зліва й темне справа, тож на стику
+  // фасаду лягала б смуга, наче це дві хати. Зафарбувати стіною й цоколем.
+  const joint = side === 'right' ? bx : ax;
+  const wallColor = b.wall ?? rule.wall;
+  rect(g, joint - 1, Ht - wallPx + 2, 7, wallPx - 5, wallColor);
+  rect(g, joint - 1, Ht - 3, 7, 3, shade(wallColor, -0.32));
+  rect(g, joint - 1, Ht - 3, 7, 1, shade(wallColor, -0.2));
+  const windows = [...A.windows.map((w) => ({ ...w, x: w.x + ax })), ...B.windows.map((w) => ({ ...w, x: w.x + bx, y: w.y + by }))];
+  return { img, ox: -3, oy: -rule.rise, windows, smoke: A.smoke ? { x: A.smoke.x + ax, y: A.smoke.y } : null };
+}
+
+interface PartOpts {
+  /** Висота стіни фасаду (px) — спільна для крил Г-подібної хати. */
+  wallPx?: number;
+  flush?: Flush;
+  chimney?: boolean;
+}
+
+function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite {
   const rule = STYLES[b.style];
   const seed = cellHash(b.x, b.y, b.w * 31 + b.h);
   const W = b.w * TILE + 6;
@@ -300,7 +352,7 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
   const g = ctx2d(img);
   const wallColor = b.wall ?? rule.wall;
   const roofColor = b.roof ?? rule.roofColor;
-  const roofBottom = rule.rise + Math.round(b.h * TILE * rule.roofFrac);
+  const roofBottom = opts.wallPx !== undefined ? Ht - opts.wallPx : rule.rise + Math.round(b.h * TILE * rule.roofFrac);
   const windows: Rect[] = [];
   const doorCx = (b.doorX - b.x) * TILE + 8 + 3;
 
@@ -356,12 +408,12 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
   }
 
   // Дах і все, що над ним.
-  roof(g, W, rule.rise - (rule.roof === 'flat' ? 0 : 0), roofBottom, rule, roofColor, season, seed);
+  roof(g, W, rule.rise, roofBottom, rule, roofColor, season, seed, opts.flush ?? null);
   // Тінь від даху на стіну.
   rect(g, 3, roofBottom, W - 6, 2, 'rgba(30,20,30,0.28)');
 
   let smoke: BuildingSprite['smoke'] = null;
-  if (rule.chimney) {
+  if (rule.chimney && opts.chimney !== false) {
     const cx = W - 16;
     const top = rule.rise + 2;
     rect(g, cx, top - 8, 6, 12, '#9a5a44');
@@ -422,13 +474,15 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
     drawBitmap(g, 'bus', 7, rule.rise + 3);
   }
 
-  const sprite: BuildingSprite = { img, ox: -3, oy: -rule.rise, windows, smoke };
-  cache.set(key, sprite);
-  return sprite;
+  return { img, ox: -3, oy: -rule.rise, windows, smoke };
 }
 
 /** Тінь будинку на землі: зсунута вправо-вниз, як від сонця зліва вгорі. */
 export function drawBuildingShadow(g: Ctx, b: Building): void {
+  if (b.notch) {
+    for (const r of buildingParts(b)) drawBuildingShadow(g, { ...b, ...r, notch: undefined });
+    return;
+  }
   const x = b.x * TILE;
   const y = b.y * TILE;
   g.fillStyle = 'rgba(28,20,40,0.22)';

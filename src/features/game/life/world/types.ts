@@ -66,7 +66,27 @@ export interface Building {
   sign?: SignIcon | undefined;
   /** `false` — без дверей: глуха частина складного будинку (Г-подібна хата). */
   door?: boolean | undefined;
+  /**
+   * Вирізаний верхній кут (у клітинках): будинок стає Г-подібним, але
+   * лишається однією спорудою — один фасад, одна лінія звису, одні двері.
+   */
+  notch?: Notch | undefined;
   action?: ZoneAction | undefined;
+}
+
+export interface Notch {
+  w: number;
+  h: number;
+  side: 'left' | 'right';
+}
+
+/** Прямокутники, які будинок займає на землі (Г-подібний — два). */
+export function buildingParts(b: Pick<Building, 'x' | 'y' | 'w' | 'h' | 'notch'>): { x: number; y: number; w: number; h: number }[] {
+  const n = b.notch;
+  if (!n) return [{ x: b.x, y: b.y, w: b.w, h: b.h }];
+  const tall = n.side === 'right' ? { x: b.x, y: b.y, w: b.w - n.w, h: b.h } : { x: b.x + n.w, y: b.y, w: b.w - n.w, h: b.h };
+  const low = n.side === 'right' ? { x: b.x + b.w - n.w, y: b.y + n.h, w: n.w, h: b.h - n.h } : { x: b.x, y: b.y + n.h, w: n.w, h: b.h - n.h };
+  return [tall, low];
 }
 
 export type SignIcon = 'bread' | 'shirt' | 'book' | 'cup' | 'flower' | 'tv' | 'sofa' | 'gift' | 'letter' | 'briefcase' | 'key' | 'bus' | 'train' | 'cake' | 'pencil' | 'star';

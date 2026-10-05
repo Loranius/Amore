@@ -3,7 +3,7 @@
 // тверді пропи. Чисте — тестується без браузера.
 // ============================================================
 import { propSolid } from '../render/props';
-import { SOLID_GROUND, TILE, type GameMap, type Rect, type Zone } from './types';
+import { SOLID_GROUND, TILE, buildingParts, type GameMap, type Rect, type Zone } from './types';
 
 export interface Collider {
   blocked(px: number, py: number): boolean;
@@ -17,7 +17,7 @@ export function colliderFor(map: GameMap): Collider {
   const hit = colliders.get(map);
   if (hit) return hit;
   const rects: Rect[] = [];
-  for (const b of map.buildings) rects.push({ x: b.x * TILE, y: b.y * TILE + 4, w: b.w * TILE, h: b.h * TILE - 4 });
+  for (const b of map.buildings) for (const r of buildingParts(b)) rects.push({ x: r.x * TILE, y: r.y * TILE + 4, w: r.w * TILE, h: r.h * TILE - 4 });
   for (const t of map.trees) rects.push({ x: t.x * TILE + 4, y: t.y * TILE + 9, w: 9, h: 6 });
   for (const p of map.props) {
     const r = propSolid(p);

@@ -48,7 +48,7 @@ import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
 import { colliderFor, tileFeet, zoneAt } from './world/collide';
-import { homeInterior } from './world/interior';
+import { HATA_MOM, homeInterior } from './world/interior';
 import { cityMap, homeYard } from './world/maps';
 import { YARD, YARD_ID } from './world/yard';
 
@@ -451,7 +451,7 @@ export class GameController {
       }
     }
     if (this.map.interior && life.home === 'zhylyntsi') {
-      const m = tileFeet(12, 6);
+      const m = tileFeet(HATA_MOM[0], HATA_MOM[1]);
       this.extras.push({ id: 'mom', x: m.x, y: m.y, dir: 1, moving: false, t: 0, look: MOM });
     }
     // Діма йде разом із Лєною лише тоді, коли вона його покликала.

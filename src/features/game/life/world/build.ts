@@ -5,7 +5,7 @@
 // ============================================================
 import type { CityId } from '../sim/content';
 import { cellHash } from './hash';
-import type { Building, BuildingStyle, GameMap, Ground, Prop, PropType, SignIcon, Tree, TreeKind, Zone, ZoneAction } from './types';
+import { buildingParts, type Building, type BuildingStyle, type GameMap, type Ground, type Notch, type Prop, type PropType, type SignIcon, type Tree, type TreeKind, type Zone, type ZoneAction } from './types';
 
 export interface BuildingSpec {
   id: string;
@@ -25,6 +25,8 @@ export interface BuildingSpec {
   zoneLabel?: string;
   /** `false` — без дверей (глуха частина складного будинку). */
   door?: boolean;
+  /** Вирізаний верхній кут — Г-подібна споруда (див. `Notch`). */
+  notch?: Notch;
 }
 
 export class MapBuilder {
@@ -52,7 +54,7 @@ export class MapBuilder {
 
   building(spec: BuildingSpec): this {
     const doorX = spec.doorX ?? spec.x + Math.floor(spec.w / 2);
-    this.buildings.push({ id: spec.id, x: spec.x, y: spec.y, w: spec.w, h: spec.h, style: spec.style, label: spec.label, doorX, sign: spec.sign, wall: spec.wall, roof: spec.roof, action: spec.action, door: spec.door });
+    this.buildings.push({ id: spec.id, x: spec.x, y: spec.y, w: spec.w, h: spec.h, style: spec.style, label: spec.label, doorX, sign: spec.sign, wall: spec.wall, roof: spec.roof, action: spec.action, door: spec.door, notch: spec.notch });
     if (spec.door === false) return this;
     // Ґанок під дверима — завжди прохідний.
     const below = this.at(doorX, spec.y + spec.h);
@@ -83,7 +85,7 @@ export class MapBuilder {
 
   /** Чи клітинка зайнята будинком. */
   private built(i: number, j: number): boolean {
-    return this.buildings.some((b) => i >= b.x - 1 && i < b.x + b.w + 1 && j >= b.y - 1 && j < b.y + b.h + 1);
+    return this.buildings.some((b) => buildingParts(b).some((r) => i >= r.x - 1 && i < r.x + r.w + 1 && j >= r.y - 1 && j < r.y + r.h + 1));
   }
 
   /** Розсипати дерева на траві в прямокутнику — детерміновано, оминаючи все зайняте. */
