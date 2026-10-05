@@ -129,9 +129,9 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
 
   return (
     <group position={[0, CRYSTAL_GROUND_BASELINE, 0]} scale={scale}>
-      <mesh geometry={rocks} material={rockMaterial} />
+      <mesh geometry={rocks} material={rockMaterial} castShadow />
       {/* Суцільний гранчастий кристал (ADR-0227); іскри віх — після нього. */}
-      <mesh geometry={crystals} material={crystalMaterial} />
+      <mesh geometry={crystals} material={crystalMaterial} castShadow />
       {sparks && <points geometry={sparks} material={sparkMaterial} renderOrder={2} />}
     </group>
   );

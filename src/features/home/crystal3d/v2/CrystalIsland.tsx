@@ -1,10 +1,11 @@
 import { SOFT_NORMAL_GLSL, softNormals, softScalar } from '@/features/home/diorama/softNormals';
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { DIORAMA_PALETTES, DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 import { buildCrystalSurround } from '@/features/home/diorama/surround';
+import { rockGrainTexture } from '../scene/rockGrainTexture';
 import type { Season } from '@/engine/species/grammar/season';
 import { EMPTY_MESH, PAINT, buildCrystalIsland, type IslandMesh } from './crystalIsland';
 
@@ -88,26 +89,73 @@ export interface IslandHaze {
  * Матеріал острова: фарба з палітри, м'яке світло діорами. Палітра — 8
  * кольорів або більше (риф має дев'ятий — пісок дна, ADR-0224).
  */
-export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze): THREE.ShaderMaterial {
+/**
+ * Поверхня каменю святилища (ADR-0243): лише острів і храм кристала. Дерево
+ * й риф ділять цей матеріал і нічого з цього не отримують — їхній шейдер
+ * той самий, що й до цього.
+ */
+export interface IslandSurface {
+  /**
+   * Зерно каменю (`rockGrainTexture`): сіра безшовна карта, накладена з
+   * трьох боків (triplanar), тож на колоні не тягнеться й не має шва.
+   * Лягає лише на камінь — не на плющ, квіти, самоцвіти й хмари.
+   */
+  grain?: THREE.Texture | null;
+  /** Висота землі святилища у сцені: від неї темніє й зеленіє низ колон. */
+  ground?: number;
+  /**
+   * Тіні від справжньої карти тіней three.js (напрямлене світло з
+   * `castShadow`). Шейдер бере маску тіні тим самим `getShadowMask()`, що й
+   * `ShadowMaterial`, і темнить нею лише освітлений бік.
+   */
+  shadows?: boolean;
+  /**
+   * Світло кристала на далекому храмі: грані, повернуті до острова,
+   * ловлять його колір, а верх колон — світло з розлому згори.
+   */
+  crystalLight?: { colour: THREE.Color; strength: number };
+}
+
+/** Холодна тінь, а не сіра: тінь у діорамі лілова (`DIORAMA_SHADE`). */
+const SHADOW_TINT = new THREE.Color(0.56, 0.54, 0.74);
+
+export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze, surface?: IslandSurface): THREE.ShaderMaterial {
   const count = paints.length;
+  const grain = surface?.grain ?? null;
+  const shadows = surface?.shadows === true;
+  const light = surface?.crystalLight;
+  const own = {
+    uPaint: { value: paints.map((hex) => new THREE.Color(hex)) },
+    uKey: { value: KEY.clone() },
+    uAmbient: { value: 0.52 },
+    uTime: { value: 0 },
+    uHaze: { value: new THREE.Color(haze?.colour ?? '#000000') },
+    uHazeRange: { value: new THREE.Vector4(haze?.from ?? 1, haze?.to ?? 2, haze?.strength ?? 0, haze?.near ?? 0) },
+    uSkyTop: { value: new THREE.Color(haze?.sky?.top ?? '#000000') },
+    uSkyBottom: { value: new THREE.Color(haze?.sky?.bottom ?? '#000000') },
+    uSkyGlow: { value: new THREE.Color(haze?.sky?.glow ?? '#000000') },
+    uSkyOn: { value: haze?.sky ? 1 : 0 },
+    uResolution: { value: new THREE.Vector2(1, 1) },
+    uGrain: { value: grain },
+    uGround: { value: surface?.ground ?? 0 },
+    uShadowTint: { value: SHADOW_TINT.clone() },
+    uCrystalLight: { value: light?.colour.clone() ?? new THREE.Color(0, 0, 0) },
+    uCrystalStrength: { value: light?.strength ?? 0 },
+  };
+  const defines: Record<string, string> = {};
+  if (grain) defines.USE_STONE_GRAIN = '';
+  if (light) defines.USE_CRYSTAL_LIGHT = '';
+  if (shadows) defines.USE_ISLAND_SHADOWS = '';
   return new THREE.ShaderMaterial({
     // Обидва боки: віяла кришок плит і кавалків закручені як прийдеться, а
     // нормаль шейдер однаково повертає до камери. Перший кадр показав
     // бруківку білою сіткою — кришки відсікались, лишались самі стінки.
     side: THREE.DoubleSide,
-    uniforms: {
-      uPaint: { value: paints.map((hex) => new THREE.Color(hex)) },
-      uKey: { value: KEY.clone() },
-      uAmbient: { value: 0.52 },
-      uTime: { value: 0 },
-      uHaze: { value: new THREE.Color(haze?.colour ?? '#000000') },
-      uHazeRange: { value: new THREE.Vector4(haze?.from ?? 1, haze?.to ?? 2, haze?.strength ?? 0, haze?.near ?? 0) },
-      uSkyTop: { value: new THREE.Color(haze?.sky?.top ?? '#000000') },
-      uSkyBottom: { value: new THREE.Color(haze?.sky?.bottom ?? '#000000') },
-      uSkyGlow: { value: new THREE.Color(haze?.sky?.glow ?? '#000000') },
-      uSkyOn: { value: haze?.sky ? 1 : 0 },
-      uResolution: { value: new THREE.Vector2(1, 1) },
-    },
+    defines,
+    // Маска тіні three приходить лише в матеріал зі світлом: тоді рендерер
+    // кладе в нього карти тіней і їхні матриці.
+    lights: shadows,
+    uniforms: shadows ? { ...THREE.UniformsUtils.clone(THREE.UniformsLib.lights), ...own } : own,
     vertexShader: /* glsl */ `
       attribute float paint;
       attribute float tone;
@@ -117,6 +165,10 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       varying float vTone;
       varying float vGlow;
       varying vec3 vNormal;
+      #ifdef USE_ISLAND_SHADOWS
+        #include <common>
+        #include <shadowmap_pars_vertex>
+      #endif
       void main() {
         vec4 w = modelMatrix * vec4(position, 1.0);
         vWorld = w.xyz;
@@ -124,6 +176,11 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
         vPaint = paint;
         vTone = tone;
         vGlow = glow;
+        #ifdef USE_ISLAND_SHADOWS
+          vec3 transformedNormal = normalMatrix * normal;
+          vec4 worldPosition = w;
+          #include <shadowmap_vertex>
+        #endif
         gl_Position = projectionMatrix * viewMatrix * w;
       }
     `,
@@ -139,13 +196,37 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       uniform vec3 uSkyGlow;
       uniform float uSkyOn;
       uniform vec2 uResolution;
+      uniform sampler2D uGrain;
+      uniform float uGround;
+      uniform vec3 uShadowTint;
+      uniform vec3 uCrystalLight;
+      uniform float uCrystalStrength;
       varying vec3 vWorld;
       varying float vPaint;
       varying float vTone;
       varying float vGlow;
       varying vec3 vNormal;
+      #ifdef USE_ISLAND_SHADOWS
+        #include <common>
+        #include <packing>
+        #include <lights_pars_begin>
+        #include <shadowmap_pars_fragment>
+        #include <shadowmask_pars_fragment>
+      #endif
       ${DIORAMA_SHADE}
       ${SOFT_NORMAL_GLSL}
+      #ifdef USE_STONE_GRAIN
+        // Зерно з трьох проєкцій, змішаних за нормаллю: без розгортки й без
+        // шва; середина карти 0.86 — ділимо, щоб зерно не пригасило камінь.
+        float stoneGrain(vec3 p, vec3 n) {
+          vec3 w = pow(abs(n), vec3(4.0));
+          w /= (w.x + w.y + w.z);
+          float g = texture2D(uGrain, p.zy * 1.7).r * w.x
+                  + texture2D(uGrain, p.xz * 1.7).r * w.y
+                  + texture2D(uGrain, p.xy * 1.7).r * w.z;
+          return g / 0.86;
+        }
+      #endif
       void main() {
         // Обтічне світло на гранчастому острові (власник, 2026-10-04).
         vec3 n = softNormal(vNormal, vWorld);
@@ -153,7 +234,41 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
         int i = int(vPaint + 0.5);
         vec3 base = uPaint[0];
         for (int k = 1; k < ${count}; k++) if (k == i) base = uPaint[k];
-        vec3 c = dioramaShade(base * vTone, n, view);
+        vec3 albedo = base * vTone;
+        // Камінь — усе, крім плюща (3), самоцвітів (4), хмар (6) і квітів (8).
+        bool stone = i != 3 && i != 4 && i != 6 && i != 8;
+        #ifdef USE_STONE_GRAIN
+          if (stone) {
+            albedo *= mix(1.0, stoneGrain(vWorld, n), 0.85);
+            // Руїни (2): низ темніший і зеленіє — колона століттями стоїть
+            // у вологій землі; на прямовисних гранях — темні патьоки згори.
+            if (i == 2) {
+              float h = vWorld.y - uGround;
+              float foot = 1.0 - smoothstep(0.0, 0.32, h);
+              albedo *= mix(1.0, 0.72, foot);
+              albedo = mix(albedo, uPaint[3] * 0.55, foot * 0.28);
+              float side = 1.0 - abs(n.y);
+              float streak = texture2D(uGrain, vec2(dot(vWorld.xz, vec2(3.1, 2.3)), vWorld.y * 0.35)).r;
+              albedo *= mix(1.0, smoothstep(0.55, 1.0, streak) * 0.25 + 0.78, side * 0.7);
+            }
+          }
+        #endif
+        vec3 c = dioramaShade(albedo, n, view);
+        #ifdef USE_ISLAND_SHADOWS
+          // Тінь лише там, куди світло й так падає: тіньовий бік уже темний,
+          // і подвійна тінь пробивала б у ньому чорну діру.
+          float lit = smoothstep(0.0, 0.3, dot(n, uKey));
+          c *= mix(vec3(1.0), uShadowTint, (1.0 - getShadowMask()) * lit);
+        #endif
+        #ifdef USE_CRYSTAL_LIGHT
+          // Далекий храм: грані до острова ловлять колір кристала, верх
+          // колон — світло з розлому, низ тоне в тіні підземелля.
+          vec3 toIsland = normalize(vec3(-vWorld.x, 0.0, -vWorld.z));
+          float facingIsland = max(0.0, dot(n, toIsland));
+          float rise = smoothstep(-4.0, 14.0, vWorld.y);
+          c *= mix(0.62, 1.12, rise);
+          c += albedo * uCrystalLight * pow(facingIsland, 2.0) * uCrystalStrength * (1.0 - 0.5 * rise);
+        #endif
         // Самоцвіти в скелі світяться самі й повільно дихають.
         c = mix(c, base * (1.25 + 0.2 * sin(uTime * 1.3 + vWorld.x * 3.0)), vGlow * 0.85);
         float haze = smoothstep(uHazeRange.x, uHazeRange.y, length(vWorld)) * uHazeRange.z;
@@ -277,9 +392,14 @@ interface CrystalIslandProps {
   druses?: number;
   /** Пора року (ADR-0237): іній узимку, квіти навесні. */
   season?: Season;
+  /**
+   * Справжні тіні (ADR-0243): напрямлене світло з картою тіней. Лише там,
+   * де полотно створене з `shadows`, і не на слабкому профілі пристрою.
+   */
+  shadows?: boolean;
 }
 
-export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crystalHeight, reduceMotion, bare = false, druses = 0, season = 'summer' }: CrystalIslandProps) {
+export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crystalHeight, reduceMotion, bare = false, druses = 0, season = 'summer', shadows = false }: CrystalIslandProps) {
   const built = useMemo(() => buildCrystalIsland(seed, radius, druses, season), [seed, radius, druses, season]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
@@ -287,12 +407,16 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
   // Давній храм у підземеллі навколо острова, на всі 360° (ADR-0224).
   const temple = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildCrystalSurround(seed)), [seed, bare]);
   const glowHex = `#${glowColour.getHexString()}`;
+  // Зерно каменю — одна сіра карта 256² на всю сцену (ADR-0243).
+  const grain = useMemo(() => rockGrainTexture(), []);
+  useEffect(() => () => grain?.dispose(), [grain]);
   const materials = useMemo(() => {
     // Земля кристала світиться його кольором, а не сталим рожевим самоцвітів.
     const groundPaints = ISLAND_PAINTS[theme].map((hex, i) => (i === PAINT.gem ? glowHex : hex));
+    const stone: IslandSurface = { grain, ground: groundY, shadows };
     return {
-      island: createIslandMaterial(ISLAND_PAINTS[theme]),
-      ground: createIslandMaterial(groundPaints),
+      island: createIslandMaterial(ISLAND_PAINTS[theme], undefined, stone),
+      ground: createIslandMaterial(groundPaints, undefined, { shadows }),
       // Далекий храм тоне в небі, а не в сталому кольорі (ADR-0242): ближні
       // колони печери стояли яскравими смугами через увесь кадр і
       // сперечались із кристалом. Тепер ближче за 5 — повністю, далі — небо.
@@ -303,14 +427,60 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
         strength: 0.82,
         near: 30,
         sky: DIORAMA_PALETTES.crystal[theme],
+      }, {
+        // Без зерна: карта 256² на велетенських далеких колонах малювала
+        // горизонтальну смугу поперек кадру, а не фактуру (A/B у DevTools).
+        crystalLight: { colour: new THREE.Color(glowHex).lerp(new THREE.Color(1, 0.92, 0.97), 0.3), strength: theme === 'dark' ? 0.9 : 0.5 },
       }),
       ray: createRayMaterial(CAVE[theme].ray),
       // Сяйво в основі — м'яке, ледь помітне: магія всередині кристала
       // (шейдер), а не хмарою навколо (власник, 2026-10-06).
       core: createGlowMaterial(glowHex, theme === 'dark' ? 0.12 : 0.08),
     };
-  }, [theme, glowHex]);
+  }, [theme, glowHex, grain, groundY, shadows]);
   const debrisRef = useRef<THREE.Group>(null);
+
+  /*
+   * Світло, що кидає тінь (ADR-0243). Сили в нього нуль: острів
+   * намальований, а не освітлений (`DIORAMA_SHADE` має власний ключ), і
+   * друге світло лише пересвітило б вбудовані матеріали. Від нього потрібна
+   * тільки карта тіней — уздовж ТОГО САМОГО ключа, що в шейдері, тож тінь
+   * лягає туди, куди її чекає око.
+   *
+   * Острів і колонія не рухаються (обертається камера), тож карта
+   * малюється один раз і після кожної зміни геометрії, а не щокадру:
+   * на телефоні тіні коштують вибірку в шейдері, а не другий прохід сцени.
+   */
+  const sun = useMemo(() => {
+    const light = new THREE.DirectionalLight(0xffffff, 0);
+    light.castShadow = true;
+    light.shadow.mapSize.set(1024, 1024);
+    // Зсув лише вздовж променя, без `normalBias`: нормалі частини плит
+    // дивляться всередину (кришки закручені як прийдеться), і зсув уздовж
+    // нормалі заганяв точку під поверхню — уся підлога ставала тінню
+    // (виміряно в DevTools: 22.9 % пікселів у «тіні» проти 6.9 % справжньої).
+    light.shadow.bias = -0.004;
+    light.shadow.normalBias = 0;
+    light.shadow.radius = 3;
+    const cam = light.shadow.camera;
+    const span = radius * 1.7;
+    cam.left = -span;
+    cam.right = span;
+    cam.top = span;
+    cam.bottom = -span;
+    cam.near = 0.1;
+    cam.far = radius * 12;
+    light.position.set(KEY.x * radius * 5, groundY + KEY.y * radius * 5, KEY.z * radius * 5);
+    light.target.position.set(0, groundY, 0);
+    return light;
+  }, [radius, groundY]);
+  useEffect(() => () => sun.dispose(), [sun]);
+  const gl = useThree((state) => state.gl);
+  useEffect(() => {
+    if (!shadows) return;
+    gl.shadowMap.autoUpdate = false;
+    gl.shadowMap.needsUpdate = true;
+  }, [gl, shadows, sun, built, crystalHeight]);
 
   useEffect(() => () => { island.dispose(); debris.dispose(); ground.dispose(); temple.dispose(); }, [island, debris, ground, temple]);
   useEffect(() => () => { for (const m of Object.values(materials)) m.dispose(); }, [materials]);
@@ -347,9 +517,11 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
           </mesh>
         </Billboard>
       ))}
+      {shadows && <primitive object={sun} />}
+      {shadows && <primitive object={sun.target} />}
       <group position={[0, groundY, 0]}>
-        <mesh geometry={island} material={materials.island} />
-        <mesh geometry={ground} material={materials.ground} />
+        <mesh geometry={island} material={materials.island} castShadow receiveShadow />
+        <mesh geometry={ground} material={materials.ground} receiveShadow />
         <group ref={debrisRef}>
           <mesh geometry={debris} material={materials.island} />
         </group>

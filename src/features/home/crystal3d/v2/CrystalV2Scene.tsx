@@ -25,7 +25,7 @@ import { EvolutionRuntimeProbe, type EvolutionRuntimeMetrics } from '../evolutio
 import { readQuality } from '../evolution/useEvolutionCrystalPipeline';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import { dioramaFrameHeight, dioramaIslandRadius } from '@/features/home/diorama/dioramaStyle';
-import { CrystalHomeWorld } from './CrystalHomeWorld';
+import { CrystalHomeWorld, castsShadows } from './CrystalHomeWorld';
 import { crystalV2Frame, crystalV2GrowthEvents } from './crystalV2Frame';
 import { useCrystalV2 } from './useCrystalV2';
 import '../evolution/evolutionPreview.css';
@@ -125,6 +125,8 @@ export default function CrystalV2Scene() {
         dpr={[1, crystalRenderScale(quality, typeof window === 'undefined' ? 2 : window.devicePixelRatio)]}
         camera={{ position: [0, 0.685, 7.1], fov: 42 }}
         gl={{ alpha: false, antialias: quality !== 'fallback' }}
+        // Тіні святилища (ADR-0243) — не на слабкому профілі пристрою.
+        shadows={castsShadows(quality) ? 'soft' : false}
       >
         <PortalStage
           seed={hash32(model.startDate)}
@@ -152,6 +154,7 @@ export default function CrystalV2Scene() {
             island={island}
             theme={theme}
             reduceMotion={reduceMotion}
+            shadows={castsShadows(quality)}
             tap={chronicle.tap}
           />
         </PortalStage>

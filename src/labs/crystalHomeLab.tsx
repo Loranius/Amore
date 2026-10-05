@@ -10,6 +10,7 @@
 //   /crystal-home-lab.html                    — 8 років, темна тема
 //   /crystal-home-lab.html?years=2&theme=light
 //   /crystal-home-lab.html?fill=12            — подій на рік
+//   /crystal-home-lab.html?noshadows          — без тіней (A/B, слабкий профіль)
 //   /crystal-home-lab.html?gift=shared        — колір колонії: red (типово) | blue | shared
 //
 // Сторінка не входить у збірку продукту: лише dev-сервер.
@@ -60,6 +61,7 @@ function Lab() {
         dpr={[1, 2]}
         camera={{ position: [0, 0.685, 7.1], fov: 42 }}
         gl={{ alpha: false, antialias: true }}
+        shadows={params.has('noshadows') ? false : 'soft'}
       >
         <PortalStage
           seed={hash32(model.startDate)}
@@ -81,6 +83,7 @@ function Lab() {
             island={island}
             theme={theme}
             reduceMotion={params.has('still')}
+            shadows={!params.has('noshadows')}
           />
         </PortalStage>
       </Canvas>
