@@ -135,7 +135,9 @@ describe('форми дерева: той самий ріст, інший мал
     for (const form of TREE_FORMS) {
       const { branches } = treeV2Skeleton(model, form);
       const trunk = branches.filter((b) => b.order === 0);
-      for (const b of branches.filter((x) => /^y\d+$/.test(x.key))) {
+      // Біля стовбура лежить вихід гілки (`y12~`), якщо він є; інакше сама гілка.
+      const keys = new Set(branches.map((x) => x.key));
+      for (const b of branches.filter((x) => /^y\d+~$/.test(x.key) || (/^y\d+$/.test(x.key) && !keys.has(`${x.key}~`)))) {
         const seg = trunk.reduce((best, t) => (Math.abs(t.end[1] - b.start[1]) < Math.abs(best.end[1] - b.start[1]) ? t : best));
         expect(b.r0).toBeLessThanOrEqual(seg.r1 * 0.45);
       }
@@ -147,6 +149,8 @@ describe('форми дерева: той самий ріст, інший мал
     // Ковпачок — лише на кінчиках, де гілка не продовжується (на лікті він
     // стирчав тупим кінцем-брусочком); стовбур закритий лише згори.
     const parents = new Set(branches.filter((b) => b.order > 0 && b.key.includes('.')).map((b) => b.key.slice(0, b.key.lastIndexOf('.'))));
+    // Вихід гілки зі стовбура (`y12~`) продовжується самою гілкою — не кінчик.
+    for (const b of branches) if (b.key.endsWith('~')) parents.add(b.key);
     const trunk = branches.filter((b) => b.order === 0).length;
     const tips = branches.filter((b) => b.order > 0 && !parents.has(b.key)).length + 1;
     expect(oak.wood.positions.length / 9).toBe(branches.length * WOOD_SIDES * 2 + tips * WOOD_SIDES + treeV2Roots(model).length * 10);

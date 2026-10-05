@@ -91,16 +91,16 @@
   "years": 3.753671
  },
  "summary": {
-  "branches": 17,
+  "branches": 28,
   "clusters": 14,
-  "crownRadius": 1.2625,
+  "crownRadius": 1.1171,
   "firstBlossom": [
-   0.8099,
-   0.8538,
-   0.0312
+   0.7142,
+   0.9717,
+   0.0666
   ],
-  "meadowRadius": 3.16,
-  "reach": 1.0594,
+  "meadowRadius": 3.0437,
+  "reach": 0.9238,
   "top": 2.4069
  }
 }

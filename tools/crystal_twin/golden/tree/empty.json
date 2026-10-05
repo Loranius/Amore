@@ -70,12 +70,12 @@
   "years": 3.753671
  },
  "summary": {
-  "branches": 17,
+  "branches": 28,
   "clusters": 14,
-  "crownRadius": 0.934,
+  "crownRadius": 0.9302,
   "firstBlossom": null,
-  "meadowRadius": 2.8972,
-  "reach": 0.675,
+  "meadowRadius": 2.8942,
+  "reach": 0.6384,
   "top": 2.4069
  }
 }

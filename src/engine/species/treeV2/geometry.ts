@@ -132,6 +132,30 @@ function trunkAt(dir: V3, y: number): V3 {
   return mul(dir, y / dir[1]);
 }
 
+/**
+ * Живий стовбур (власник, 2026-10-05: «стовбур занадто прямий… легка
+ * природна кривизна»): до нахилу додано м'який S-вигин — дуга в один бік
+ * унизу й ледь назад угорі. Ялина лишається прямою: так росте хвойне.
+ */
+export function treeV2TrunkPoint(model: TreeV2Model, form: TreeForm, y: number): V3 {
+  const base = trunkAt(treeTrunkDir(model, form), y);
+  if (form === 'spruce') return base;
+  const H = model.height;
+  const t = Math.max(0, Math.min(1, y / (FORMS[form].top * H)));
+  const az = 2 * Math.PI * unit(model.startDate, 'bend:a');
+  const amp = 0.045 * H;
+  const bow = Math.sin(Math.PI * t) * amp;
+  const back = Math.sin(2 * Math.PI * t) * amp * 0.35;
+  return [base[0] + Math.cos(az) * bow - Math.sin(az) * back, base[1], base[2] + Math.sin(az) * bow + Math.cos(az) * back];
+}
+
+/** Напрям стовбура на висоті `y` (дотична до вигину). */
+function trunkTangent(model: TreeV2Model, form: TreeForm, y: number): V3 {
+  const a = treeV2TrunkPoint(model, form, Math.max(0, y - 0.02));
+  const b = treeV2TrunkPoint(model, form, y + 0.02);
+  return norm([b[0] - a[0], b[1] - a[1], b[2] - a[2]]);
+}
+
 export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { branches: TreeV2Branch[]; clusters: TreeV2Cluster[] } {
   const rules = FORMS[form];
   const seed = model.startDate;
@@ -141,7 +165,11 @@ export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { br
   const branches: TreeV2Branch[] = [];
   const clusters: TreeV2Cluster[] = [];
   // Радіуси — у частках стовбура біля землі; у кінці множаться на товщину.
-  const trunkRel = (y: number) => 1 - 0.55 * Math.min(1, y / H);
+  // Біля землі стовбур розширюється напливом (власник, 2026-10-05: «стовбур
+  // трохи товстіший біля основи»); у ялини — скромніше.
+  const flare = form === 'spruce' ? 0.2 : 0.5;
+  const trunkRel = (y: number) => (1 - 0.55 * Math.min(1, y / H)) * (1 + flare * Math.exp(-y / (0.06 * H)));
+  const trunkPos = (y: number) => treeV2TrunkPoint(model, form, y);
 
   const grow = (start: V3, direction: V3, length: number, order: number, last: number, key: string, radius: number, thinning: number): void => {
     const end = add(start, mul(direction, length));
@@ -167,10 +195,18 @@ export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { br
   const stops = Array.from({ length: model.tiers }, (_, t) => treeV2TierHeight(model, t, form));
   const topY = rules.top * H;
   const heights = [...stops.filter((y) => y < topY - 1e-9), topY];
+  // Вузли стовбура: яруси, верх, а також проміжні — щоб вигин і наплив біля
+  // землі були плавні, а не ламаною з двох прямих.
+  const nodes: number[] = [...heights];
+  if (form !== 'spruce') {
+    const extras = [0.03 * H, 0.08 * H, ...Array.from({ length: 6 }, (_, k) => ((k + 1) / 7) * topY)];
+    for (const e of extras) if (e < topY && nodes.every((n) => Math.abs(n - e) > 0.01 * H)) nodes.push(e);
+    nodes.sort((a, b) => a - b);
+  }
   let from: V3 = [0, 0, 0];
   let fromY = 0;
-  heights.forEach((y, i) => {
-    const to = trunkAt(trunkDir, y);
+  nodes.forEach((y, i) => {
+    const to = form === 'spruce' ? trunkAt(trunkDir, y) : trunkPos(y);
     branches.push({ start: from, end: to, r0: trunkRel(fromY), r1: trunkRel(y), order: 0, key: `t${i}` });
     from = to;
     fromY = y;
@@ -189,11 +225,24 @@ export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { br
     const length = reach * (0.35 + 0.65 * grown) * yearBoost(yb.activity) * (0.9 + 0.2 * unit(seed, `${key}:len`));
     // Молода гілка — один пагін; з роками розгалужується, до трьох порядків.
     const last = rules.depth(yb.age);
-    const start = trunkAt(trunkDir, y);
+    const start = form === 'spruce' ? trunkAt(trunkDir, y) : trunkPos(y);
     // Гілка біля стовбура — 0.42 його товщини, не 0.55: товща читалась
     // прямою балкою-«брусочком» там, де її не прикриває листя (власник,
-    // 2026-10-04: «прибери і ці брусочки біля основи гілок»).
-    grow(start, d, length, 1, last, key, trunkRel(y) * 0.42 * (0.6 + 0.4 * grown), 0.6);
+    // 2026-10-04: «прибери і ці брусочки біля основи гілок»). Різна
+    // товщина й довжина (2026-10-05): гілки не однакові, як прикручені.
+    const r0 = trunkRel(y) * 0.34 * (0.6 + 0.4 * grown) * (0.75 + 0.45 * unit(seed, `${key}:girth`));
+    if (form === 'spruce') {
+      grow(start, d, length, 1, last, key, r0, 0.6);
+    } else {
+      // Гілка виходить зі стовбура плавно: спершу майже вздовж нього, далі
+      // відхиляється назовні (власник: «гілки виглядають як прикручені»).
+      const along = trunkTangent(model, form, y);
+      const exit = norm(add(mul(d, 0.5), mul(along, 0.5)));
+      const first = length * 0.24;
+      const mid = add(start, mul(exit, first));
+      branches.push({ start, end: mid, r0: r0 * 1.06, r1: r0, order: 1, key: `${key}~` });
+      grow(mid, d, length * 0.86, 1, last, key, r0, 0.6);
+    }
     // Ялина: лапа хвої вздовж усієї гілки, а не лише на кінчику.
     if (form === 'spruce') clusters.push({ centre: add(start, mul(d, length * 0.55)), radius: length * 0.42 * leafiness, key: `${key}:paw`, squash: rules.squash });
   }
@@ -220,7 +269,7 @@ export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { br
   }
 
   // Верхівка: гілки планів розходяться від провідника вгору й убік.
-  const top = trunkAt(trunkDir, topY);
+  const top = form === 'spruce' ? trunkAt(trunkDir, topY) : trunkPos(topY);
   // Ялина закінчується шпилем: гостра верхівка над гілками планів.
   if (form === 'spruce') clusters.push({ centre: top, radius: 0.1 * H * leafiness, key: 'spire', squash: 1.7 });
   for (let i = 0; i < model.crownLimbs; i += 1) {
@@ -503,9 +552,12 @@ function prism(start: V3, end: V3, r0: number, r1: number, sides: number, frame?
 export function treeV2WoodFrames(branches: readonly TreeV2Branch[]): Map<string, V3> {
   const frames = new Map<string, V3>();
   const trunk = branches.filter((b) => b.order === 0);
+  const keys = new Set(branches.map((b) => b.key));
   const parentOf = (b: TreeV2Branch): string | null => {
     const dot = b.key.lastIndexOf('.');
     if (dot > 0) return b.key.slice(0, dot);
+    // Гілка, що виходить зі стовбура плавним вигином: її батько — вигин.
+    if (keys.has(`${b.key}~`)) return `${b.key}~`;
     if (b.order === 0) {
       const i = trunk.indexOf(b);
       return i > 0 ? trunk[i - 1]!.key : null;
@@ -717,6 +769,7 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   // кутом, він стирчав тупим кінцем, і сегмент читався окремим брусочком.
   const continued = new Set(branches.filter((x) => x.order > 0).map((x) => x.key.slice(0, Math.max(0, x.key.lastIndexOf('.')))).filter((k) => k !== ''));
   branches.forEach((x, i) => { if (x.order === 0 && branches[i + 1]?.order === 0) continued.add(x.key); });
+  for (const x of branches) if (x.key.endsWith('~')) continued.add(x.key);
   for (const b of spruce ? branches.filter((x) => x.order === 0 && x.start[1] < spruceTop) : branches) {
     const seg = treeV2WoodSegment(b);
     if (spruce) {

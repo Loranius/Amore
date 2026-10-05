@@ -66,6 +66,20 @@ def _trunk_at(d, y):
     return _mul(d, y / d[1])
 
 
+def trunk_point(model: dict[str, Any], trunk_dir, y: float):
+    """Живий стовбур: нахил + м'який S-вигин (власник, 2026-10-05) — дзеркало
+    `treeV2TrunkPoint` у TS (форма дуба; ялину двійник не будує)."""
+    base = _trunk_at(trunk_dir, y)
+    H = model["height"]
+    t = max(0.0, min(1.0, y / (0.86 * H)))
+    az = 2.0 * math.pi * unit(model["startDate"], "bend:a")
+    amp = 0.045 * H
+    bow = math.sin(math.pi * t) * amp
+    back = math.sin(2.0 * math.pi * t) * amp * 0.35
+    return (base[0] + math.cos(az) * bow - math.sin(az) * back, base[1],
+            base[2] + math.sin(az) * bow + math.cos(az) * back)
+
+
 def skeleton(model: dict[str, Any]) -> dict[str, Any]:
     """Стовбур сегментами до ярусів, гілки років, гілки верхівки — в одиницях сцени."""
     seed = model["startDate"]
@@ -100,10 +114,16 @@ def skeleton(model: dict[str, Any]) -> dict[str, Any]:
     stops = [tier_height(model, t) for t in range(model["tiers"])]
     top_y = 0.86 * H
     heights = [y for y in stops if y < top_y - 1e-9] + [top_y]
+    # Проміжні вузли: плавний вигин і наплив біля землі.
+    nodes = list(heights)
+    for e in [0.03 * H, 0.08 * H] + [(k + 1) / 7.0 * top_y for k in range(6)]:
+        if e < top_y and all(abs(n - e) > 0.01 * H for n in nodes):
+            nodes.append(e)
+    nodes.sort()
     start = (0.0, 0.0, 0.0)
     start_y = 0.0
-    for i, y in enumerate(heights):
-        to = _trunk_at(trunk_dir, y)
+    for i, y in enumerate(nodes):
+        to = trunk_point(model, trunk_dir, y)
         branches.append({"start": start, "end": to, "r0": trunk_rel(start_y), "r1": trunk_rel(y), "order": 0, "key": f"t{i}"})
         start, start_y = to, y
 
@@ -119,9 +139,18 @@ def skeleton(model: dict[str, Any]) -> dict[str, Any]:
         reach = 0.4 * H / (1.0 + 0.18 * yb["tier"])
         length = reach * (0.35 + 0.65 * grown) * year_boost(yb["activity"]) * (0.9 + 0.2 * unit(seed, f"{key}:len"))
         last = 1 + min(2, int(yb["age"] // 2))
-        grow(_trunk_at(trunk_dir, y), d, length, 1, last, key, trunk_rel(y) * 0.55 * (0.6 + 0.4 * grown), 0.6)
+        # Плавний вихід зі стовбура: спершу вздовж нього, потім назовні.
+        start = trunk_point(model, trunk_dir, y)
+        a = trunk_point(model, trunk_dir, max(0.0, y - 0.02))
+        b = trunk_point(model, trunk_dir, y + 0.02)
+        along = _norm((b[0] - a[0], b[1] - a[1], b[2] - a[2]))
+        exit_dir = _norm(_add(_mul(d, 0.5), _mul(along, 0.5)))
+        mid = _add(start, _mul(exit_dir, length * 0.24))
+        r0 = trunk_rel(y) * 0.34 * (0.6 + 0.4 * grown) * (0.75 + 0.45 * unit(seed, f"{key}:girth"))
+        branches.append({"start": start, "end": mid, "r0": r0 * 1.06, "r1": r0, "order": 1, "key": f"{key}~"})
+        grow(mid, d, length * 0.86, 1, last, key, r0, 0.6)
 
-    top = _trunk_at(trunk_dir, top_y)
+    top = trunk_point(model, trunk_dir, top_y)
     n = model["crownLimbs"]
     for i in range(n):
         key = f"c{i}"
