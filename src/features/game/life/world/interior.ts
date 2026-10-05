@@ -19,59 +19,61 @@ export function homeKind(state: LifeState): HomeKind {
 }
 
 /**
- * Хата в Жилинцях — одна суцільна споруда, а всередині кімнати так, як
- * описав власник (2026-10-06): заходиш — маленькі сіни; угору з них —
- * кухня з піччю; ліворуч — коридор. З коридору три шляхи: угору —
- * маленька кімната братів (Діма й Саша, поки Лєна вчиться в школі),
- * ліворуч — кімната мами, вниз — кімната Лєни.
+ * Хата в Жилинцях — одна суцільна споруда, кімнати впритул, стіна до стіни
+ * (власник, 2026-10-06). Вхід — справа, з подвір'я, у маленьку веранду
+ * (сіни); угору з неї — кухня з піччю; ліворуч — короткий коридорчик, що
+ * зв'язує три кімнати: угору — братів (Діма й Саша, поки Лєна вчиться в
+ * школі), ліворуч — мами, вниз — Лєни. Кімната мами — одразу за лівою
+ * стіною Лєниної.
  *
- *              ┌────────┐       ┌──────────┐
- *              │ брати  │       │  кухня   │
- *   ┌───────┐  └───┬────┘       │  з піччю │
- *   │ мама  │      │            └────┬─────┘
- *   │       ├── коридор ───────┬─ сіни ┐
- *   └───────┘ └───┬────────────┘└──┬───┘
- *          ┌──────┴─────────┐      вихід у двір
- *          │  кімната Лєни  │
- *          └────────────────┘
+ *          ┌──────┬──────┐
+ *          │брати │кухня │
+ *   ┌────┬─┴─┬────┼─┬────┤
+ *   │мама│ коридор│ сіни ◄── вхід із двору
+ *   │    ├───┴────┴─┴────┘
+ *   │    │  кімната Лєни │
+ *   └────┤               │
+ *        └───────────────┘
  *
  * Лєнина кімната — та сама рамка 16×12, що й раніше (`ROOM_FLOOR`,
  * `DEFAULT_SPOT`), лише зсунута на (`ROOM_DX`, `ROOM_DY`), тож облаштування
  * й збереження не змінюються.
  */
 const ROOM_DX = 7;
-const ROOM_DY = 14;
+const ROOM_DY = 10;
 
 /** Де в хаті стоїть мама — у своїй кімнаті. */
-export const HATA_MOM: [number, number] = [4, 9];
+export const HATA_MOM: [number, number] = [3, 12];
 
 function hataInterior(state: LifeState): GameMap {
-  const W = 33;
-  const H = 26;
-  const brothersHome = stageOfWeek(dayInfo(state.day).week).stage !== 'uni' && stageOfWeek(dayInfo(state.day).week).stage !== 'adult';
+  const W = 23;
+  const H = 22;
+  const stage = stageOfWeek(dayInfo(state.day).week).stage;
+  const brothersHome = stage === 'sadok' || stage === 'school';
   const m = new MapBuilder(`home:hata:${brothersHome ? 'b' : ''}:${Object.values(state.decor).join(',')}:${JSON.stringify(state.layout)}:${state.owned.includes('laptop') ? 'pc' : ''}`, null, state.homeName, W, H, 'x', true);
-  // Кімната: задня стіна (W) над підлогою (f), решта — товщина стін (x).
+  // Кімната: задня стіна (W) над підлогою (f). Задня стіна нижньої кімнати —
+  // це й перегородка з верхньою, тож кімнати стоять впритул.
   const room = (x0: number, x1: number, wallTop: number, floorTop: number, floorBottom: number) => {
     m.fill(x0, wallTop, x1 - x0 + 1, floorTop - wallTop, 'W');
     m.fill(x0, floorTop, x1 - x0 + 1, floorBottom - floorTop + 1, 'f');
   };
   const door = (x: number, y: number, w = 1, h = 1) => m.fill(x, y, w, h, 'f');
-  room(23, 31, 0, 2, 7); // кухня з піччю — угору із сіней
-  room(11, 16, 0, 2, 6); // брати — угору з коридору
-  room(1, 7, 3, 5, 12); // мама — ліворуч від коридору
-  room(9, 21, 8, 10, 12); // коридор
-  room(23, 27, 8, 10, 13); // сіни — сюди заходиш із двору
+  room(8, 13, 0, 2, 5); // брати — угору з коридору
+  room(15, 21, 0, 2, 5); // кухня з піччю — угору з веранди
+  room(1, 6, 6, 8, 17); // мама — ліворуч від коридору й Лєниної кімнати
+  room(8, 13, 6, 8, 9); // коридорчик
+  room(15, 20, 6, 8, 9); // веранда (сіни) — сюди заходиш із двору
   room(ROOM_DX + 1, ROOM_DX + 14, ROOM_DY, ROOM_DY + 3, ROOM_DY + 10); // Лєна — вниз із коридору
   // Двері — проходи в стінах.
-  door(25, 8, 1, 2); // сіни ↔ кухня
-  door(22, 11, 1, 2); // сіни ↔ коридор
-  door(13, 7, 1, 3); // коридор ↔ брати
-  door(8, 11, 1, 2); // коридор ↔ мама
-  door(15, 13, 1, 4); // коридор ↔ Лєна
-  // Вихід у двір — унизу сіней.
-  door(24, 14, 2, 1);
-  m.zone('exit', 24, 13, 2, 2, { type: 'exit' }, 'Вийти на подвір\'я');
-  m.spawn('door', 25, 12).spawn('default', 25, 12).spawn('wake', 4 + ROOM_DX, 7 + ROOM_DY);
+  door(14, 8, 1, 2); // веранда ↔ коридор
+  door(17, 6, 1, 2); // веранда ↔ кухня
+  door(10, 6, 1, 2); // коридор ↔ брати
+  door(7, 8, 1, 2); // коридор ↔ мама
+  door(11, 10, 1, 3); // коридор ↔ Лєна
+  // Вихід у двір — у правій стіні веранди.
+  door(21, 8, 2, 2);
+  m.zone('exit', 20, 8, 3, 2, { type: 'exit' }, 'Вийти на подвір\'я');
+  m.spawn('door', 19, 9).spawn('default', 19, 9).spawn('wake', 4 + ROOM_DX, 7 + ROOM_DY);
 
   const tint = (slot: keyof LifeState['decor']) => {
     const id = state.decor[slot];
@@ -88,7 +90,7 @@ function hataInterior(state: LifeState): GameMap {
   m.zone('bed', Math.round(bx) + 1, Math.round(by) + 2, 2, 2, { type: 'bed' }, 'Лягти спати');
   m.prop('wardrobe', 5 + ROOM_DX, 3.2 + ROOM_DY);
   m.zone('wardrobe', 5 + ROOM_DX, 4 + ROOM_DY, 1, 2, { type: 'wardrobe' }, 'Шафа · перевдягнутись');
-  m.prop('window', 9 + ROOM_DX, 0.6 + ROOM_DY).prop('window', 12 + ROOM_DX, 0.6 + ROOM_DY).prop('rushnyk', 3 + ROOM_DX, 0.8 + ROOM_DY);
+  m.prop('window', 9 + ROOM_DX, 0.6 + ROOM_DY).prop('window', 12 + ROOM_DX, 0.6 + ROOM_DY).prop('rushnyk', 2 + ROOM_DX, 0.8 + ROOM_DY);
   m.prop('table', 9 + ROOM_DX, 6 + ROOM_DY, { tint: '#c49a6c' });
   let laptopAt: [number, number] = [9 + ROOM_DX, 7 + ROOM_DY];
   const place = (slot: DecorSlot, prop: Parameters<MapBuilder['prop']>[0], extra: { solid?: boolean } = {}) => {
@@ -113,22 +115,22 @@ function hataInterior(state: LifeState): GameMap {
   m.zone('decorate', 2 + ROOM_DX, 9 + ROOM_DY, 2, 1, { type: 'decorate' }, 'Облаштувати кімнату');
 
   // ── Брати: Діма й Саша — поки Лєна в садочку й школі ──────
-  m.prop('window', 13.5, 0.4);
+  m.prop('window', 11.6, 0.4);
   if (brothersHome) {
-    m.prop('bed', 11.1, 2.3, { tint: '#6f9ad8' }).prop('bed', 15.9, 2.3, { tint: '#7fb86a' }).prop('poster', 12.6, 0.5, { tint: '#3a6fd8' });
-    m.prop('rug', 12.6, 4.6, { tint: '#8a9ab8' });
-    m.zone('brothers', 12, 5, 3, 1, { type: 'info', text: 'Кімната братів: тут живуть Діма й Саша. Скрізь їхні машинки, м\'яч під ліжком.' }, 'Кімната братів');
+    m.prop('bed', 8.1, 2.2, { tint: '#6f9ad8' }).prop('bed', 12.9, 2.2, { tint: '#7fb86a' }).prop('poster', 9.4, 0.5, { tint: '#3a6fd8' });
+    m.prop('rug', 9.6, 3.6, { tint: '#8a9ab8' });
+    m.zone('brothers', 9, 5, 3, 1, { type: 'info', text: 'Кімната братів: тут живуть Діма й Саша. Скрізь їхні машинки, м\'яч під ліжком.' }, 'Кімната братів');
   } else {
-    m.prop('bed', 15.9, 2.3, { tint: '#9a9aa8' }).prop('shelf', 11.2, 2.2);
-    m.zone('brothers', 12, 5, 3, 1, { type: 'info', text: 'Кімната братів: Діма й Саша вже роз\'їхались, а їхні медалі за футбол досі на полиці.' }, 'Кімната братів');
+    m.prop('bed', 12.9, 2.2, { tint: '#9a9aa8' }).prop('shelf', 8.2, 2.1);
+    m.zone('brothers', 9, 5, 3, 1, { type: 'info', text: 'Кімната братів: Діма й Саша вже роз\'їхались, а їхні медалі за футбол досі на полиці.' }, 'Кімната братів');
   }
   // ── Мама ─────────────────────────────────────────────────
-  m.prop('bed', 1.2, 5.3, { tint: '#9ab8d9' }).prop('window', 3.5, 3.4).prop('rushnyk', 5.5, 3.6).prop('wardrobe', 6.2, 5.2).prop('clock', 2, 3.5);
-  m.prop('rug', 3.5, 9, { tint: '#c98aa8' }).prop('plant', 1, 11.6);
-  // ── Коридор і сіни ───────────────────────────────────────
-  m.prop('rug', 16.5, 10.6, { tint: '#b85a4a' }).prop('shelf', 19.5, 10.1).prop('plant', 26.6, 10.2);
+  m.prop('bed', 1.1, 8.3, { tint: '#9ab8d9' }).prop('wardrobe', 3.2, 8.1).prop('window', 5, 6.4).prop('rushnyk', 2.4, 6.6).prop('clock', 4.2, 6.5);
+  m.prop('rug', 3, 12, { tint: '#c98aa8' }).prop('plant', 1, 16.6);
+  // ── Коридорчик і веранда ─────────────────────────────────
+  m.prop('rug', 10.4, 8.6, { tint: '#b85a4a' }).prop('plant', 16.1, 8);
   // ── Кухня з піччю ────────────────────────────────────────
-  m.prop('stove', 23.1, 2.2).prop('table', 27, 3.6, { tint: '#c49a6c' }).prop('fridge', 30.8, 2.4).prop('window', 27, 0.4).prop('rushnyk', 29.2, 0.6);
+  m.prop('stove', 15.1, 2.2).prop('table', 18, 3.6, { tint: '#c49a6c' }).prop('fridge', 20.8, 2.4).prop('window', 18, 0.4).prop('rushnyk', 20, 0.6);
   return m.build();
 }
 

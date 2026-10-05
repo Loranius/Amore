@@ -27,6 +27,8 @@ export interface BuildingSpec {
   door?: boolean;
   /** Вирізаний верхній кут — Г-подібна споруда (див. `Notch`). */
   notch?: Notch;
+  /** Двері в правій стіні, а не у фасаді. */
+  sideDoor?: boolean;
 }
 
 export class MapBuilder {
@@ -54,7 +56,7 @@ export class MapBuilder {
 
   building(spec: BuildingSpec): this {
     const doorX = spec.doorX ?? spec.x + Math.floor(spec.w / 2);
-    this.buildings.push({ id: spec.id, x: spec.x, y: spec.y, w: spec.w, h: spec.h, style: spec.style, label: spec.label, doorX, sign: spec.sign, wall: spec.wall, roof: spec.roof, action: spec.action, door: spec.door, notch: spec.notch });
+    this.buildings.push({ id: spec.id, x: spec.x, y: spec.y, w: spec.w, h: spec.h, style: spec.style, label: spec.label, doorX, sign: spec.sign, wall: spec.wall, roof: spec.roof, action: spec.action, door: spec.door, notch: spec.notch, sideDoor: spec.sideDoor });
     if (spec.door === false) return this;
     // Ґанок під дверима — завжди прохідний.
     const below = this.at(doorX, spec.y + spec.h);

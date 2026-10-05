@@ -24,15 +24,15 @@ export const YARD_ID = 'zhylyntsi:yard';
 
 /** Тайли садиби, на які посилаються контролер і тести. */
 /** Хата: Г-подібна, двері в правому крилі. */
-const HOUSE = { x: 5, y: 16, w: 11, h: 8, doorX: 13 } as const;
+const HOUSE = { x: 5, y: 17, w: 10, h: 7, notchW: 5, notchH: 3 } as const;
 /** Літня кухня з прибудовою ліворуч (прибудова — нижче, у ній вхід). */
 const KITCHEN = { x: 23, y: 19, w: 7, h: 4, annexW: 2 } as const;
 
 export const YARD = {
   /** Де стоїть мама: біля входу в літню кухню. */
   mom: [21, 21] as [number, number],
-  /** Вхід у хату — ґанок під дверима правого крила. */
-  porch: { x: HOUSE.doorX - 1, y: HOUSE.y + HOUSE.h, w: 4, h: 2 },
+  /** Вхід у хату — збоку, біля правої стіни (де власник показав на знімку). */
+  porch: { x: HOUSE.x + HOUSE.w, y: HOUSE.y + HOUSE.h - 3, w: 2, h: 3 },
   gate: { x: 20, y: 32 },
 } as const;
 
@@ -70,18 +70,18 @@ export function yardMap(): GameMap {
   // ── Головний будинок: одна Г-подібна споруда ─────────────
   // Власник: «будинок має бути суцільним, це одна локація; можна зменшити
   // візуально». Ліве крило довше вглиб, праве нижче; фасад і звис — одна
-  // лінія; двері одні — у праве крило, у двір. Кімнати — всередині.
+  // лінія. Вхід — один, збоку, у правій стіні: всередині він веде у веранду.
   m.building({
     id: 'house', x: HOUSE.x, y: HOUSE.y, w: HOUSE.w, h: HOUSE.h, style: 'cottage', wall: '#f4eee0', roof: '#b8954e',
-    label: 'Хата', doorX: HOUSE.doorX, notch: { w: 6, h: 3, side: 'right' },
+    label: 'Хата', door: false, sideDoor: true, notch: { w: HOUSE.notchW, h: HOUSE.notchH, side: 'right' },
   });
-  // Ґанок — кам'яний приступок під дверима, далі витоптаний ґрунт до стежки.
-  m.fill(YARD.porch.x, YARD.porch.y, YARD.porch.w, YARD.porch.h, 'd');
-  m.fill(YARD.porch.x, YARD.porch.y, YARD.porch.w - 1, 1, 'c');
-  m.prop('bench', 7.2, HOUSE.y + HOUSE.h + 0.5).prop('pot', HOUSE.doorX + 1.3, HOUSE.y + HOUSE.h + 0.1, { solid: false });
+  // Біля входу — кам'яний приступок і витоптана стежка до двору.
+  m.fill(YARD.porch.x, YARD.porch.y, 4, YARD.porch.h, 'd');
+  m.fill(YARD.porch.x, YARD.porch.y + 1, 1, 2, 'c');
+  m.prop('bench', 6.6, HOUSE.y + HOUSE.h + 0.4).prop('pot', YARD.porch.x + 0.7, YARD.porch.y - 0.2, { solid: false });
   m.zone('home', YARD.porch.x, YARD.porch.y, YARD.porch.w, YARD.porch.h, { type: 'home' }, 'У хату');
   // За правим крилом, у кутку «Г», — квітник і кущ.
-  m.fill(HOUSE.x + HOUSE.w - 6, HOUSE.y, 6, 2, 'G');
+  m.fill(HOUSE.x + HOUSE.w - HOUSE.notchW, HOUSE.y, HOUSE.notchW, 2, 'G');
   m.prop('flowerBed', HOUSE.x + HOUSE.w - 4, HOUSE.y + 0.6).prop('bush', HOUSE.x + HOUSE.w - 1.2, HOUSE.y + 0.3);
 
   // ── Літня кухня з прибудовою, над нею майстерня ─────────────
@@ -118,7 +118,7 @@ export function yardMap(): GameMap {
   // ── Двір: ґрунтові стежки, трава, криниця, нерівності ───────
   // Від хвіртки — пунктир плану: угору до кухні, гілка до ґанку.
   m.fill(20, 24, 2, H - 26, 'd');
-  m.fill(HOUSE.doorX + 3, 24, 4, 2, 'd').fill(22, 23, 5, 2, 'd');
+  m.fill(22, 23, 5, 2, 'd');
   // Між будинком і майстернею — прохід до хлівів.
   m.fill(19, 15, 2, 9, 'd');
   // Витоптані плями ґрунту й трава з квітами.
@@ -130,6 +130,6 @@ export function yardMap(): GameMap {
   m.tree(36, 31, 'oak').tree(2, 31, 'willow');
 
   m.spawn('gate', YARD.gate.x, H - 3).spawn('default', YARD.gate.x, H - 3);
-  m.spawn('house', HOUSE.doorX, YARD.porch.y + 1);
+  m.spawn('house', YARD.porch.x + 1, YARD.porch.y + 2);
   return m.build();
 }

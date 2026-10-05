@@ -71,6 +71,8 @@ export interface Building {
    * лишається однією спорудою — один фасад, одна лінія звису, одні двері.
    */
   notch?: Notch | undefined;
+  /** Вхід збоку — у правій стіні (хата Лєни: «вхід там, де стоїть дівчинка»). */
+  sideDoor?: boolean | undefined;
   action?: ZoneAction | undefined;
 }
 

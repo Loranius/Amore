@@ -83,7 +83,11 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     const house = yard.buildings.filter((x) => x.label === 'Хата');
     expect(house).toHaveLength(1);
     expect(house[0]!.notch).toBeDefined();
-    expect(house[0]!.door).not.toBe(false);
+    // Вхід — збоку, у правій стіні; зона «У хату» — одразу праворуч від хати.
+    expect(house[0]!.sideDoor).toBe(true);
+    const homeZone = yard.zones.find((z) => z.action.type === 'home')!;
+    expect(homeZone.x).toBe(house[0]!.x + house[0]!.w);
+    expect(homeZone.y + homeZone.h).toBe(house[0]!.y + house[0]!.h);
     const houseTop = house[0]!.y;
     for (const x of back) expect(x.y + x.h).toBeLessThanOrEqual(houseTop);
     // У кутку «Г» можна стати — це двір, а не стіна.
@@ -116,29 +120,34 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(gate.y).toBeGreaterThanOrEqual(yard.h - 3);
   });
 
-  it('хата всередині: сіни → кухня вгорі, коридор ліворуч; з коридору — брати вгорі, мама ліворуч, Лєна внизу', () => {
+  it('хата всередині: вхід справа у веранду, кухня над нею; коридорчик зв\'язує братів (угорі), маму (ліворуч), Лєну (внизу); кімнати впритул', () => {
     const s = newLife(1, 'sadok');
     const hata = homeInterior({ ...s, home: 'zhylyntsi' });
     assertReachable(hata);
     const reach = reachableTiles(hata, hata.spawns.door!);
-    const rooms = { сіни: [25, 11], кухня: [27, 5], коридор: [17, 11], брати: [13, 4], мама: [3, 10], Лєна: [12, 20] } as const;
+    const rooms = { веранда: [19, 9], кухня: [16, 4], коридор: [9, 9], брати: [9, 4], мама: [3, 12], Лєна: [12, 17] } as const;
     for (const [name, [x, y]] of Object.entries(rooms)) expect(reach.has(`${x},${y}`), name).toBe(true);
-    // Взаємне розташування — як описав власник, дивлячись із коридору.
-    expect(rooms.кухня[1]).toBeLessThan(rooms.сіни[1]);
-    expect(rooms.коридор[0]).toBeLessThan(rooms.сіни[0]);
+    expect(rooms.кухня[1]).toBeLessThan(rooms.веранда[1]);
+    expect(rooms.коридор[0]).toBeLessThan(rooms.веранда[0]);
     expect(rooms.брати[1]).toBeLessThan(rooms.коридор[1]);
     expect(rooms.мама[0]).toBeLessThan(rooms.коридор[0]);
     expect(rooms.Лєна[1]).toBeGreaterThan(rooms.коридор[1]);
-    // Вихід — із сіней; прокидається Лєна у своїй кімнаті; піч — на кухні.
+    // Вихід — у правій стіні веранди, а не знизу.
     const exit = hata.zones.find((z) => z.action.type === 'exit')!;
-    expect(Math.abs(exit.x - rooms.сіни[0])).toBeLessThanOrEqual(2);
-    expect(hata.spawns.wake!.y).toBeGreaterThan(rooms.коридор[1]);
+    expect(exit.x + exit.w).toBe(hata.w);
+    expect(exit.y).toBeLessThan(rooms.Лєна[1]);
+    // Кімната мами — одразу за лівою стіною Лєниної: між ними одна стіна.
+    const g = (x: number, y: number) => hata.ground[y]![x];
+    expect([g(6, 15), g(7, 15), g(8, 15)]).toEqual(['f', 'x', 'f']);
+    // Коридорчик короткий.
+    expect(hata.ground[9]!.slice(8, 14).every((t) => t === 'f')).toBe(true);
+    expect(hata.ground[10]![7]).toBe('x');
     const stove = hata.props.find((p) => p.type === 'stove')!;
-    expect(stove.x).toBeGreaterThan(22);
-    expect(stove.y).toBeLessThan(8);
+    expect(stove.x).toBeGreaterThan(14);
+    expect(stove.y).toBeLessThan(6);
     // Брати живуть удома, поки Лєна в садочку й школі; у ВДПУ — роз'їхались.
-    expect(hata.props.filter((p) => p.type === 'bed' && p.x > 10 && p.x < 17 && p.y < 7)).toHaveLength(2);
-    const uni = homeInterior({ ...newLife(1, 'uni'), home: 'zhylyntsi' });
-    expect(uni.props.filter((p) => p.type === 'bed' && p.x > 10 && p.x < 17 && p.y < 7)).toHaveLength(1);
+    const brotherBeds = (m: typeof hata) => m.props.filter((p) => p.type === 'bed' && p.x > 7 && p.x < 14 && p.y < 6);
+    expect(brotherBeds(hata)).toHaveLength(2);
+    expect(brotherBeds(homeInterior({ ...newLife(1, 'uni'), home: 'zhylyntsi' }))).toHaveLength(1);
   });
 });

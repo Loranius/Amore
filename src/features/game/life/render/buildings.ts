@@ -295,7 +295,7 @@ const cache = new Map<string, BuildingSprite>();
 
 export function buildingSprite(b: Building, season: Season): BuildingSprite {
   const n = b.notch;
-  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}`;
+  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const sprite = n ? ellSprite(b, season) : partSprite(b, season, {});
@@ -314,8 +314,9 @@ function ellSprite(b: Building, season: Season): BuildingSprite {
   const wallPx = Math.round(low.h * TILE * (1 - rule.roofFrac));
   const side = b.notch!.side;
   const hasDoor = (r: Rect) => b.door !== false && b.doorX >= r.x && b.doorX < r.x + r.w;
-  const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall) }, season, { wallPx, flush: null, chimney: true });
-  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low) }, season, { wallPx, flush: side === 'right' ? 'left' : 'right', chimney: false });
+  const rightEdge = (r: Rect) => !!b.sideDoor && r.x + r.w === b.x + b.w;
+  const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall), sideDoor: rightEdge(tall) }, season, { wallPx, flush: null, chimney: true });
+  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low), sideDoor: rightEdge(low) }, season, { wallPx, flush: side === 'right' ? 'left' : 'right', chimney: false });
   const W = b.w * TILE + 6;
   const Ht = b.h * TILE + rule.rise;
   const img = canvas(W, Ht);
@@ -405,6 +406,17 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
     const dw = doorKind === 'double' || b.style === 'barn' ? 12 : 8;
     door(g, doorCx - dw / 2, Ht - 2, dw, rule.window === 'grid' ? 11 : 12, b.style === 'barn' ? 'wood' : doorKind);
     if (b.style === 'barn') rect(g, doorCx - 1, Ht - 13, 1, 11, '#5a3a24');
+  }
+
+  // Вхід збоку: у ракурсі «три чверті» бічна стіна не видна, тож двері —
+  // вузькі, на самому краю, з козирком і приступком праворуч.
+  if (b.sideDoor) {
+    const dh = Math.min(16, Ht - roofBottom - 4);
+    rect(g, W - 8, Ht - dh - 3, 5, dh + 1, '#5a3a24');
+    rect(g, W - 7, Ht - dh - 2, 3, dh - 1, '#8a5a34');
+    rect(g, W - 7, Ht - dh - 2, 3, 1, '#a8784a');
+    px(g, W - 7, Ht - Math.round(dh / 2) - 2, '#f6c14e');
+    rect(g, W - 10, Ht - dh - 5, 10, 2, shade(roofColor, -0.35));
   }
 
   // Дах і все, що над ним.
