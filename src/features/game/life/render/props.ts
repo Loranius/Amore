@@ -14,7 +14,7 @@ import { cellHash, disc, ellipse, px, rect, shade, type Ctx } from './pixel';
 export function propBase(p: Prop): number {
   const y = p.y * TILE;
   switch (p.type) {
-    case 'rug': case 'sandbox': case 'flowerBed': case 'pier': case 'stairs': case 'poster': case 'window': case 'rushnyk': case 'clock':
+    case 'rug': case 'sandbox': case 'flowerBed': case 'pier': case 'stairs': case 'poster': case 'window': case 'rushnyk': case 'clock': case 'photo':
       return y - 100; // лежить на землі чи висить на стіні — під усім
     case 'bigFountain': return y + 40;
     case 'lighthouse': return y + 30;
@@ -470,6 +470,18 @@ export function drawProp(g: Ctx, p: Prop, season: Season, t: number): void {
       rect(g, fx, fy, 2, 1, '#f8f4ec');
       rect(g, fx - 3, fy - flap, 3, 1, '#c9ced8');
       rect(g, fx + 2, fy - flap, 3, 1, '#c9ced8');
+      break;
+    }
+    case 'photo': {
+      // Сімейне фото в рамці — на внутрішній стіні, де вікна бути не може.
+      rect(g, x + 2, y + 1, 12, 11, '#8a5a34');
+      rect(g, x + 3, y + 2, 10, 9, '#f4ead2');
+      rect(g, x + 4, y + 3, 8, 7, '#bcd6e8');
+      rect(g, x + 4, y + 8, 8, 2, '#8fbf6a');
+      disc(g, x + 6, y + 6, 1, '#7a4a2a');
+      disc(g, x + 10, y + 6, 1, '#3a2f28');
+      rect(g, x + 5, y + 7, 2, 2, '#e98fb0');
+      rect(g, x + 9, y + 7, 2, 2, '#3a6fd8');
       break;
     }
     case 'clock': {

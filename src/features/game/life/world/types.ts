@@ -105,7 +105,7 @@ export type PropType =
   | 'bench' | 'lamp' | 'well' | 'mailbox' | 'busStop' | 'fountain' | 'bigFountain' | 'stall' | 'car' | 'bike'
   | 'bin' | 'planter' | 'pot' | 'sunflowers' | 'haystack' | 'swing' | 'slide' | 'sandbox' | 'goal' | 'flagpole'
   | 'umbrella' | 'lounger' | 'yellowStone' | 'boat' | 'lighthouse' | 'cafeTable' | 'signpost' | 'board' | 'bush'
-  | 'flowerBed' | 'rock' | 'chicken' | 'cat' | 'duck' | 'gull' | 'pier' | 'stairs' | 'statue' | 'tram' | 'clock'
+  | 'flowerBed' | 'rock' | 'chicken' | 'cat' | 'duck' | 'gull' | 'pier' | 'stairs' | 'statue' | 'tram' | 'clock' | 'photo'
   // кімната
   | 'bed' | 'rug' | 'plant' | 'floorLamp' | 'poster' | 'shelf' | 'tv' | 'pet' | 'table' | 'stove' | 'window' | 'wardrobe'
   | 'desk' | 'sofa' | 'fridge' | 'rushnyk' | 'door'

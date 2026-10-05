@@ -86,7 +86,9 @@ function hataInterior(state: LifeState): GameMap {
   m.zone('bed', Math.round(bx) + 1, Math.round(by) + 2, 2, 2, { type: 'bed' }, 'Лягти спати');
   m.prop('wardrobe', 5 + ROOM_DX, 3.2 + ROOM_DY);
   m.zone('wardrobe', 5 + ROOM_DX, 4 + ROOM_DY, 1, 2, { type: 'wardrobe' }, 'Шафа · перевдягнутись');
-  m.prop('window', 8 + ROOM_DX, 0.6 + ROOM_DY).prop('window', 11 + ROOM_DX, 0.6 + ROOM_DY).prop('rushnyk', 2 + ROOM_DX, 0.8 + ROOM_DY);
+  // Задня стіна Лєниної кімнати — спільна з коридорчиком і кімнатою мами,
+  // тож вікон на ній немає: годинник, сімейне фото, рушник.
+  m.prop('clock', 8 + ROOM_DX, 0.7 + ROOM_DY).prop('photo', 11 + ROOM_DX, 0.6 + ROOM_DY).prop('rushnyk', 2 + ROOM_DX, 0.8 + ROOM_DY);
   m.prop('table', 9 + ROOM_DX, 6 + ROOM_DY, { tint: '#c49a6c' });
   let laptopAt: [number, number] = [9 + ROOM_DX, 7 + ROOM_DY];
   const place = (slot: DecorSlot, prop: Parameters<MapBuilder['prop']>[0], extra: { solid?: boolean } = {}) => {

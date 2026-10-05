@@ -173,6 +173,9 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(exit.y).toBeLessThan(12);
     // Кімната Лєни — та сама рамка 16×12: облаштування переноситься без змін.
     expect(hata.spawns.wake!.y).toBeGreaterThan(14);
+    // Вікна — лише на зовнішніх стінах: задня стіна Лєниної кімнати внутрішня.
+    const lenaWall = hata.props.filter((p) => p.type === 'window' && p.y >= 12 && p.y < 15);
+    expect(lenaWall).toHaveLength(0);
     const stove = hata.props.find((p) => p.type === 'stove')!;
     expect(stove.x).toBeGreaterThan(15);
     expect(stove.y).toBeLessThan(6);

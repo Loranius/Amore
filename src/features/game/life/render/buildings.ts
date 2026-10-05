@@ -61,6 +61,26 @@ const STYLES: Record<BuildingStyle, StyleRule> = {
   shed: { rise: 10, roof: 'metal', roofFrac: 0.45, material: 'wood', wall: '#9c7a52', roofColor: '#6e7a82', frame: '#5a4030', window: 'small' },
 };
 
+/**
+ * Найменша висота стіни фасаду (px). Лєна-доросла — 31 px, тож поверх має
+ * бути помітно вищим за неї, а двері — з її зріст (власник, 2026-10-05:
+ * «будинки набагато менші, ніж вона, двері менші за персонажів»). Раніше
+ * стіна бралася лише з глибини сліду, і низька хата мала стіну ~25 px з
+ * дверима 12 px — нижчими за голову з тулубом.
+ */
+function storeyOf(style: BuildingStyle): number {
+  switch (style) {
+    case 'coop': return 32;
+    case 'kiosk': return 34;
+    case 'shed': return 36;
+    case 'barn': return 42;
+    default: return 46;
+  }
+}
+
+/** Двері — на зріст людини. */
+const DOOR_H = 25;
+
 // ------------------------------------------------------------
 // Дах.
 // ------------------------------------------------------------
@@ -103,10 +123,29 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
     if (flush !== 'left') px(g, k, top + r, shade(color, -0.35));
     if (flush !== 'right') px(g, W - k - 1, top + r, shade(color, -0.35));
   }
+  // Латки: стріху перекривали частинами, стара солома темніша й сіріша.
+  if (rule.roof === 'thatch') {
+    for (let n = 0; n < Math.floor((W * H) / 900); n += 1) {
+      const hh = cellHash(n, seed, 21);
+      const ry = 3 + (hh % Math.max(1, H - 9));
+      const pw = 10 + ((hh >>> 6) % 14);
+      const k = Math.round((1 - ry / H) * inset);
+      const x0 = kl(k) + 2 + ((hh >>> 10) % Math.max(1, W - kl(k) - kr(k) - pw - 4));
+      rect(g, x0, top + ry, pw, 3 + ((hh >>> 16) % 3), mix(color, '#8a7a5a', 0.3));
+      rect(g, x0, top + ry, pw, 1, mix(color, '#8a7a5a', 0.45));
+    }
+  }
   // Гребінь.
   rect(g, kl(inset), top, W - kl(inset) - kr(inset), 2, shade(color, rule.roof === 'thatch' ? -0.2 : 0.3));
   // Звис: темна смуга знизу.
   rect(g, 0, bottom - 2, W, 2, shade(color, -0.42));
+  if (rule.roof === 'thatch' && season !== 'winter') {
+    // Солом'яна стріха звисає нерівною бахромою.
+    for (let x = 1; x < W - 1; x += 1) {
+      const len = cellHash(x, seed, 5) % 3;
+      if (len) rect(g, x, bottom, 1, len, shade(color, x % 2 ? -0.18 : -0.05));
+    }
+  }
   if (season === 'winter') {
     // Сніг: шапка до половини даху з рваним краєм і бурульки.
     const snowH = Math.round(H * 0.55);
@@ -204,6 +243,48 @@ function flowerBox(g: Ctx, x: number, y: number, w: number, season: Season): voi
   if (season === 'winter') { rect(g, x - 1, y - 1, w + 2, 1, '#ffffff'); return; }
   for (let k = 0; k < w; k += 2) px(g, x + k, y - 1, ['#ff7aa8', '#f6d55c', '#e8576c'][k % 3]!);
   rect(g, x, y - 2, w, 1, '#4f9a3e');
+}
+
+/** Наличник над вікном хати: різьблена дошка з «дашком», фарбована як віконниці. */
+function lintel(g: Ctx, x: number, y: number, w: number, color: string): void {
+  rect(g, x - 4, y - 4, w + 8, 2, color);
+  rect(g, x - 2, y - 5, w + 4, 1, color);
+  rect(g, x + Math.floor(w / 2) - 1, y - 7, 2, 2, color);
+  rect(g, x - 4, y - 4, w + 8, 1, shade(color, 0.3));
+  for (let k = x - 3; k < x + w + 4; k += 3) px(g, k, y - 2, shade(color, -0.2));
+}
+
+/** Розпис під стріхою: тонка смуга ромбиків, червоне з чорним. */
+function ornament(g: Ctx, W: number, y: number): void {
+  for (let x = 6; x < W - 6; x += 6) {
+    px(g, x, y, '#b8323a'); px(g, x - 1, y + 1, '#b8323a'); px(g, x + 1, y + 1, '#b8323a'); px(g, x, y + 2, '#b8323a');
+    px(g, x, y + 1, '#2b2b33');
+    px(g, x + 3, y + 1, '#3f6fb0');
+  }
+}
+
+/**
+ * Мальви під стіною — ознака сільської хати. Стебла між вікнами й не біля
+ * дверей; восени квітів менше, узимку їх немає.
+ */
+function mallows(g: Ctx, W: number, Ht: number, avoid: { x0: number; x1: number }[], season: Season, seed: number): void {
+  if (season === 'winter') return;
+  const tones = ['#e8577c', '#f29ab6', '#fbf2f5', '#b8323a'];
+  for (let x = 7; x < W - 8; x += 7 + (cellHash(x, seed, 9) % 5)) {
+    if (avoid.some((a) => x > a.x0 - 3 && x < a.x1 + 3)) continue;
+    if (cellHash(x, seed, 3) % 3 === 0) continue;
+    const h = 16 + (cellHash(x, seed, 4) % 8);
+    const base = Ht - 3;
+    rect(g, x, base - h, 1, h, '#4f8a3a');
+    for (let k = 4; k < h; k += 4) { px(g, x - 1, base - k, '#5fa04a'); px(g, x + 1, base - k - 2, '#5fa04a'); }
+    const blooms = season === 'autumn' ? 1 : 3;
+    for (let k = 0; k < blooms; k += 1) {
+      const c = tones[(cellHash(x, k, seed) % tones.length)]!;
+      const fy = base - h + 2 + k * 5;
+      rect(g, x - 1, fy, 3, 3, c);
+      px(g, x, fy + 1, '#f6d55c');
+    }
+  }
 }
 
 function door(g: Ctx, x: number, bottom: number, w: number, h: number, kind: 'wood' | 'glass' | 'double'): void {
@@ -311,19 +392,20 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
 function ellSprite(b: Building, season: Season): BuildingSprite {
   const rule = STYLES[b.style];
   const [tall, low] = buildingParts(b) as [Rect, Rect];
-  const wallPx = Math.round(low.h * TILE * (1 - rule.roofFrac));
+  const wallPx = Math.max(storeyOf(b.style), Math.round(low.h * TILE * (1 - rule.roofFrac)));
   const side = b.notch!.side;
   const hasDoor = (r: Rect) => b.door !== false && b.doorX >= r.x && b.doorX < r.x + r.w;
   const rightEdge = (r: Rect) => !!b.sideDoor && r.x + r.w === b.x + b.w;
   const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall), sideDoor: rightEdge(tall) }, season, { wallPx, flush: null, chimney: true });
   const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low), sideDoor: rightEdge(low) }, season, { wallPx, flush: side === 'right' ? 'left' : 'right', chimney: false });
   const W = b.w * TILE + 6;
-  const Ht = b.h * TILE + rule.rise;
+  // Обидва крила стоять на одній лінії фасаду: низи спрайтів збігаються.
+  const Ht = A.img.height;
   const img = canvas(W, Ht);
   const g = ctx2d(img);
   const ax = (tall.x - b.x) * TILE;
   const bx = (low.x - b.x) * TILE;
-  const by = (low.y - b.y) * TILE;
+  const by = Ht - B.img.height;
   g.drawImage(A.img, ax, 0);
   g.drawImage(B.img, bx, by);
   // Стик крил: кожне крило світле зліва й темне справа, тож на стику
@@ -334,7 +416,7 @@ function ellSprite(b: Building, season: Season): BuildingSprite {
   rect(g, joint - 1, Ht - 3, 7, 3, shade(wallColor, -0.32));
   rect(g, joint - 1, Ht - 3, 7, 1, shade(wallColor, -0.2));
   const windows = [...A.windows.map((w) => ({ ...w, x: w.x + ax })), ...B.windows.map((w) => ({ ...w, x: w.x + bx, y: w.y + by }))];
-  return { img, ox: -3, oy: -rule.rise, windows, smoke: A.smoke ? { x: A.smoke.x + ax, y: A.smoke.y } : null };
+  return { img, ox: -3, oy: -(Ht - b.h * TILE), windows, smoke: A.smoke ? { x: A.smoke.x + ax, y: A.smoke.y } : null };
 }
 
 interface PartOpts {
@@ -348,12 +430,15 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
   const rule = STYLES[b.style];
   const seed = cellHash(b.x, b.y, b.w * 31 + b.h);
   const W = b.w * TILE + 6;
-  const Ht = b.h * TILE + rule.rise;
+  // Дах — як і раніше, частка глибини сліду; стіна — щонайменше поверх.
+  // Зайва висота росте вгору: низ спрайта завжди на нижньому краї сліду.
+  const roofBottom = rule.rise + Math.round(b.h * TILE * rule.roofFrac);
+  const wallPx = opts.wallPx ?? Math.max(storeyOf(b.style), Math.round(b.h * TILE * (1 - rule.roofFrac)));
+  const Ht = roofBottom + wallPx;
   const img = canvas(W, Ht);
   const g = ctx2d(img);
   const wallColor = b.wall ?? rule.wall;
   const roofColor = b.roof ?? rule.roofColor;
-  const roofBottom = opts.wallPx !== undefined ? Ht - opts.wallPx : rule.rise + Math.round(b.h * TILE * rule.roofFrac);
   const windows: Rect[] = [];
   const doorCx = (b.doorX - b.x) * TILE + 8 + 3;
 
@@ -362,7 +447,11 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
   // Вікна рядами по фасаду, оминаючи двері.
   const wallTop = roofBottom + 3;
   const wallH = Ht - wallTop - 3;
-  const doorHalf = rule.window === 'shop' ? 9 : 7;
+  const doorKind = rule.window === 'shop' || rule.material === 'glass' ? 'glass' : rule.material === 'stone' ? 'double' : 'wood';
+  const dw = b.style === 'barn' ? 18 : doorKind === 'wood' ? 12 : 16;
+  const dh = Math.min(DOOR_H, wallH - 4);
+  const doorHalf = dw / 2 + 3;
+  const cottage = b.style === 'cottage';
   const place = (ww: number, wh: number, gap: number, rows: number, shutters: boolean, box: boolean) => {
     const rowH = Math.floor(wallH / rows);
     for (let r = 0; r < rows; r += 1) {
@@ -370,6 +459,7 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
       for (let x = 8; x + ww <= W - 8; x += ww + gap) {
         if (r === rows - 1 && x + ww > doorCx - doorHalf - 2 && x < doorCx + doorHalf + 2) continue;
         windowAt(g, x, y, ww, wh, rule.frame, seed + x * 7 + r, shutters, windows);
+        if (cottage) lintel(g, x, y, ww, rule.frame);
         if (box && season !== 'winter') flowerBox(g, x, y + wh + 2, ww, season);
       }
     }
@@ -377,12 +467,13 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
   switch (rule.window) {
     case 'small':
       // Господарські будівлі — одне маленьке віконце, без квітів.
-      if (b.style === 'barn' || b.style === 'coop' || b.style === 'shed') windowAt(g, 6, wallTop + 3, 6, 5, rule.frame, seed, false, windows);
-      else place(8, 8, 10, 1, b.style === 'cottage', b.style === 'cottage' || b.style === 'house');
+      if (b.style === 'barn' || b.style === 'coop' || b.style === 'shed') windowAt(g, 7, wallTop + 4, 8, 7, rule.frame, seed, false, windows);
+      // Хата — вікна парами, по кімнатах, а не суцільним рядом.
+      else place(10, 12, cottage ? 18 : 12, 1, cottage, cottage || b.style === 'house');
       break;
-    case 'tall': place(7, 11, 6, Math.max(1, Math.floor(wallH / 18)), false, false); break;
-    case 'grid': place(6, 7, 6, Math.max(2, Math.floor(wallH / 13)), false, false); break;
-    case 'arch': place(7, 12, 8, Math.max(1, Math.floor(wallH / 20)), false, false); break;
+    case 'tall': place(8, 14, 8, Math.max(1, Math.floor(wallH / 22)), false, false); break;
+    case 'grid': place(7, 9, 7, Math.max(2, Math.floor(wallH / 15)), false, false); break;
+    case 'arch': place(8, 14, 9, Math.max(1, Math.floor(wallH / 24)), false, false); break;
     case 'curtain': {
       for (let x = 6; x < W - 8; x += 9) for (let y = wallTop; y < Ht - 18; y += 10) {
         rect(g, x, y, 7, 8, '#a9cfe6');
@@ -393,30 +484,43 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
     }
     case 'shop': {
       // Вітрини по боках дверей.
-      const wy = Ht - 20;
-      if (doorCx - doorHalf - 6 > 8) windowAt(g, 7, wy, doorCx - doorHalf - 12, 12, rule.frame, seed, false, windows);
-      if (W - 7 - (doorCx + doorHalf + 6) > 6) windowAt(g, doorCx + doorHalf + 5, wy, W - 12 - (doorCx + doorHalf + 5), 12, rule.frame, seed + 3, false, windows);
+      const wy = Ht - 24;
+      if (doorCx - doorHalf - 6 > 8) windowAt(g, 7, wy, doorCx - doorHalf - 12, 15, rule.frame, seed, false, windows);
+      if (W - 7 - (doorCx + doorHalf + 6) > 6) windowAt(g, doorCx + doorHalf + 5, wy, W - 12 - (doorCx + doorHalf + 5), 15, rule.frame, seed + 3, false, windows);
       break;
     }
   }
 
+  // Хата: призьба — низький глиняний виступ уздовж стіни, підведений синім.
+  if (cottage) {
+    rect(g, 3, Ht - 6, W - 6, 6, '#6f86ad');
+    rect(g, 3, Ht - 6, W - 6, 1, '#9fb3d3');
+    rect(g, 3, Ht - 1, W - 6, 1, '#4f6488');
+    ornament(g, W, roofBottom + 3);
+    const avoid = windows.map((w) => ({ x0: w.x - 4, x1: w.x + w.w + 4 }));
+    if (b.door !== false) avoid.push({ x0: doorCx - dw / 2 - 3, x1: doorCx + dw / 2 + 3 });
+    if (b.sideDoor) avoid.push({ x0: W - 16, x1: W });
+    mallows(g, W, Ht, avoid, season, seed);
+  }
+
   // Двері. Хлів — широкі дощані ворота; глуха частина хати — без дверей.
   if (b.door !== false) {
-    const doorKind = rule.window === 'shop' || rule.material === 'glass' ? 'glass' : rule.material === 'stone' ? 'double' : 'wood';
-    const dw = doorKind === 'double' || b.style === 'barn' ? 12 : 8;
-    door(g, doorCx - dw / 2, Ht - 2, dw, rule.window === 'grid' ? 11 : 12, b.style === 'barn' ? 'wood' : doorKind);
-    if (b.style === 'barn') rect(g, doorCx - 1, Ht - 13, 1, 11, '#5a3a24');
+    door(g, doorCx - dw / 2, Ht - 2, dw, dh, b.style === 'barn' ? 'wood' : doorKind);
+    if (b.style === 'barn') rect(g, doorCx - 1, Ht - dh - 2, 1, dh, '#5a3a24');
   }
 
   // Вхід збоку: у ракурсі «три чверті» бічна стіна не видна, тож двері —
   // вузькі, на самому краю, з козирком і приступком праворуч.
   if (b.sideDoor) {
-    const dh = Math.min(16, Ht - roofBottom - 4);
-    rect(g, W - 8, Ht - dh - 3, 5, dh + 1, '#5a3a24');
-    rect(g, W - 7, Ht - dh - 2, 3, dh - 1, '#8a5a34');
-    rect(g, W - 7, Ht - dh - 2, 3, 1, '#a8784a');
-    px(g, W - 7, Ht - Math.round(dh / 2) - 2, '#f6c14e');
-    rect(g, W - 10, Ht - dh - 5, 10, 2, shade(roofColor, -0.35));
+    const sh = Math.min(DOOR_H, wallH - 4);
+    rect(g, W - 9, Ht - sh - 3, 6, sh + 1, '#5a3a24');
+    rect(g, W - 8, Ht - sh - 2, 4, sh - 1, '#8a5a34');
+    rect(g, W - 8, Ht - sh - 2, 4, 1, '#a8784a');
+    px(g, W - 7, Ht - Math.round(sh / 2) - 2, '#f6c14e');
+    // Ґанок: козирок на стовпчику над дверима.
+    rect(g, W - 13, Ht - sh - 7, 13, 3, shade(roofColor, -0.25));
+    rect(g, W - 13, Ht - sh - 7, 13, 1, shade(roofColor, 0.15));
+    rect(g, W - 2, Ht - sh - 4, 1, sh + 2, '#6e4a2a');
   }
 
   // Дах і все, що над ним.
@@ -486,7 +590,7 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
     drawBitmap(g, 'bus', 7, rule.rise + 3);
   }
 
-  return { img, ox: -3, oy: -rule.rise, windows, smoke };
+  return { img, ox: -3, oy: -(Ht - b.h * TILE), windows, smoke };
 }
 
 /** Тінь будинку на землі: зсунута вправо-вниз, як від сонця зліва вгорі. */
