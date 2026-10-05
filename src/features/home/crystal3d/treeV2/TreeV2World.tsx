@@ -107,7 +107,9 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
   );
 
   // ── Світ (не залежить від дерева) ────────────────────────
-  const clear = Math.max(0.25, geometry.height * scale * 0.06);
+  // Трава — за кореневими контрфорсами: густі пучки під самим стовбуром
+  // читались «бахромою» (власник, 2026-10-06).
+  const clear = Math.max(0.25, geometry.height * scale * 0.06, geometry.baseReach * scale);
   const grass = useMemo(
     () => tuckGrassUnderCanopy(grassInstances(seed, clear, island * 0.85), geometry.leaves.positions, scale),
     [seed, clear, island, geometry, scale],

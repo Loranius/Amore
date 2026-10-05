@@ -167,22 +167,46 @@ def skeleton(model: dict[str, Any]) -> dict[str, Any]:
     return {"branches": branches, "clusters": clusters}
 
 
-def roots(model: dict[str, Any]) -> list[dict[str, Any]]:
-    """Коріння по землі: дві ланки на корінь, що вигинаються дугою."""
+def buttresses(model: dict[str, Any]) -> list[dict[str, float]]:
+    """Кореневі контрфорси (2026-10-06): 5–7, найбільший уперед, менші назад."""
     seed = model["startDate"]
-    n = model["roots"]
-    out = []
     r = model["trunkRadius"] * TREE_GIRTH
-    for i in range(n):
-        phi = math.radians(i * 360.0 / n + (unit(seed, f"root{i}:az") - 0.5) * 40.0)
-        length = model["rootReach"] * (0.7 + 0.5 * unit(seed, f"root{i}:len"))
-        c, s = math.cos(phi), math.sin(phi)
-        a = (c * r * 0.12, r * 1.5, s * r * 0.12)
-        out_r = max(r * 1.75, length * 0.4)
-        mid = (c * out_r, r * 0.12, s * out_r)
-        end = (c * length, -length * 0.14, s * length)
-        out.append({"start": a, "end": mid, "r0": r * 0.5, "r1": r * 0.32, "key": f"root{i}a"})
-        out.append({"start": mid, "end": end, "r0": r * 0.32, "r1": r * 0.06, "key": f"root{i}b"})
+    n = 5 + min(2, max(0, model["roots"] - 3) // 2)
+    front = math.pi / 2
+    places = min(1.15, max(0.9, model["rootReach"] / max(1e-6, 0.1 * model["height"])))
+    out: list[dict[str, float]] = []
+
+    def jitter(k: int, tag: str) -> float:
+        return unit(seed, f"buttress{k}:{tag}") - 0.5
+
+    def push(k: int, a: float, size: float) -> None:
+        out.append({
+            "azimuth": a + jitter(k, "a") * 0.25,
+            "reach": r * (1.9 + 1.4 * size) * places * (0.92 + 0.16 * (jitter(k, "l") + 0.5)),
+            "height": r * (1.7 + 1.7 * size),
+            "width": r * (0.55 + 0.45 * size),
+        })
+
+    push(0, front, 1.0)
+    push(1, front - 1.3, 0.7)
+    push(2, front + 1.3, 0.7)
+    back = n - 3
+    for k in range(back):
+        t = 0.0 if back == 1 else k / (back - 1) - 0.5
+        push(3 + k, front + math.pi + t * 1.9, 0.35 + 0.15 * (jitter(3 + k, "s") + 0.5))
+    return out
+
+
+def roots(model: dict[str, Any]) -> list[dict[str, Any]]:
+    """Дві ланки на контрфорс: від стовбура до землі й далі під землю."""
+    out = []
+    for i, b in enumerate(buttresses(model)):
+        c, s = math.cos(b["azimuth"]), math.sin(b["azimuth"])
+        start = (c * b["width"], b["height"], s * b["width"])
+        ground = (c * b["reach"], b["height"] * 0.04, s * b["reach"])
+        below = (c * b["reach"] * 1.15, -b["height"] * 0.25, s * b["reach"] * 1.15)
+        out.append({"start": start, "end": ground, "r0": b["width"], "r1": b["width"] * 0.45, "key": f"root{i}a"})
+        out.append({"start": ground, "end": below, "r0": b["width"] * 0.45, "r1": b["width"] * 0.2, "key": f"root{i}b"})
     return out
 
 
