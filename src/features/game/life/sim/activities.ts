@@ -35,6 +35,10 @@ export interface Activity {
 
 export const ACTIVITIES: readonly Activity[] = [
   { id: 'garden', city: 'zhylyntsi', title: 'Город із мамою', minutes: 90, energy: 12, mood: 5, skill: 'sport', mom: 0.5, seasons: ['spring', 'summer', 'autumn'], blurb: 'Полоти, поливати, збирати — мама радіє' },
+  // Садиба Лєни (власник, 2026-10-06): літня кухня, майстерня й сад.
+  { id: 'summerKitchen', city: 'zhylyntsi', title: 'Літня кухня з мамою', minutes: 60, energy: 4, mood: 7, skill: 'creativity', mom: 0.4, seasons: ['spring', 'summer', 'autumn'], blurb: 'Вареники, компот і мамині історії' },
+  { id: 'workshop', city: 'zhylyntsi', title: 'Майстерня', minutes: 90, energy: 8, mood: 5, skill: 'creativity', minWeek: 6, blurb: 'Полагодити стілець і змайструвати шпаківню' },
+  { id: 'orchard', city: 'zhylyntsi', title: 'Збирати фрукти в саду', minutes: 60, energy: 8, mood: 8, earn: 80, seasons: ['summer', 'autumn'], blurb: 'Вишні, яблука, груші — частину на продаж' },
   { id: 'fishing', city: 'zhylyntsi', title: 'Рибалка на ставку', minutes: 60, energy: 4, mood: 9, minWeek: 3, blurb: 'Тиша, поплавок і качки поруч' },
   { id: 'mushrooms', city: 'pravdivka', title: 'По гриби в лісосмугу', minutes: 120, energy: 14, mood: 6, earn: 120, seasons: ['summer', 'autumn'], blurb: 'Повний кошик — частину можна продати' },
   { id: 'concert', city: 'khmelnytskyi', title: 'Вуличний концерт на Проскурівській', minutes: 60, energy: 3, mood: 12, skill: 'creativity', fromHour: 17, minWeek: 4, blurb: 'Марко грає до темряви' },

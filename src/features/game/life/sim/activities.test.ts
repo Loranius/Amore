@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { cityMap } from '../world/maps';
+import { mapsOf } from '../world/maps';
 import { firstDayOfWeek, dayInfo } from './calendar';
 import { ACTIVITIES, activityCheck, doActivity } from './activities';
 import { newLife, type LifeState } from './life';
@@ -14,7 +14,7 @@ const s = (patch: Partial<LifeState>): LifeState => ({ ...newLife(21, 'adult'), 
 describe('заняття в містах', () => {
   it('кожне заняття має зону на мапі свого міста, і кожне місто має хоч одне', () => {
     for (const a of ACTIVITIES) {
-      const zones = cityMap(a.city).zones.filter((z) => z.action.type === 'activity' && z.action.id === a.id);
+      const zones = mapsOf(a.city).flatMap((m) => m.zones).filter((z) => z.action.type === 'activity' && z.action.id === a.id);
       expect(zones.length, a.id).toBe(1);
     }
     expect(new Set(ACTIVITIES.map((a) => a.city)).size).toBe(7);

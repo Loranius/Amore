@@ -54,6 +54,10 @@ const STYLES: Record<BuildingStyle, StyleRule> = {
   lavra: { rise: 40, roof: 'metal', roofFrac: 0.2, material: 'plaster', wall: '#f8f6f0', roofColor: '#3f8a6a', frame: '#c9a24a', window: 'arch' },
   church: { rise: 34, roof: 'metal', roofFrac: 0.22, material: 'plaster', wall: '#f8f6f0', roofColor: '#3f6fb0', frame: '#c9a24a', window: 'arch' },
   ratusha: { rise: 46, roof: 'metal', roofFrac: 0.24, material: 'stone', wall: '#e8d8b8', roofColor: '#4a8f7a', frame: '#f4f4f7', window: 'arch' },
+  // Садиба (2026-10-06): старі сільські господарські будівлі — дошка, шифер.
+  barn: { rise: 12, roof: 'tile', roofFrac: 0.52, material: 'wood', wall: '#8f6e4a', roofColor: '#7d7a72', frame: '#5a4030', window: 'small' },
+  coop: { rise: 8, roof: 'tile', roofFrac: 0.5, material: 'wood', wall: '#a8845a', roofColor: '#9a5a3c', frame: '#5a4030', window: 'small' },
+  shed: { rise: 10, roof: 'metal', roofFrac: 0.45, material: 'wood', wall: '#9c7a52', roofColor: '#6e7a82', frame: '#5a4030', window: 'small' },
 };
 
 // ------------------------------------------------------------
@@ -285,7 +289,7 @@ function columns(g: Ctx, x0: number, x1: number, top: number, bottom: number): v
 const cache = new Map<string, BuildingSprite>();
 
 export function buildingSprite(b: Building, season: Season): BuildingSprite {
-  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}`;
+  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const rule = STYLES[b.style];
@@ -318,7 +322,11 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
     }
   };
   switch (rule.window) {
-    case 'small': place(8, 8, 10, 1, b.style === 'cottage', b.style === 'cottage' || b.style === 'house'); break;
+    case 'small':
+      // Господарські будівлі — одне маленьке віконце, без квітів.
+      if (b.style === 'barn' || b.style === 'coop' || b.style === 'shed') windowAt(g, 6, wallTop + 3, 6, 5, rule.frame, seed, false, windows);
+      else place(8, 8, 10, 1, b.style === 'cottage', b.style === 'cottage' || b.style === 'house');
+      break;
     case 'tall': place(7, 11, 6, Math.max(1, Math.floor(wallH / 18)), false, false); break;
     case 'grid': place(6, 7, 6, Math.max(2, Math.floor(wallH / 13)), false, false); break;
     case 'arch': place(7, 12, 8, Math.max(1, Math.floor(wallH / 20)), false, false); break;
@@ -339,10 +347,13 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
     }
   }
 
-  // Двері.
-  const doorKind = rule.window === 'shop' || rule.material === 'glass' ? 'glass' : rule.material === 'stone' ? 'double' : 'wood';
-  const dw = doorKind === 'double' ? 12 : 8;
-  door(g, doorCx - dw / 2, Ht - 2, dw, rule.window === 'grid' ? 11 : 12, doorKind);
+  // Двері. Хлів — широкі дощані ворота; глуха частина хати — без дверей.
+  if (b.door !== false) {
+    const doorKind = rule.window === 'shop' || rule.material === 'glass' ? 'glass' : rule.material === 'stone' ? 'double' : 'wood';
+    const dw = doorKind === 'double' || b.style === 'barn' ? 12 : 8;
+    door(g, doorCx - dw / 2, Ht - 2, dw, rule.window === 'grid' ? 11 : 12, b.style === 'barn' ? 'wood' : doorKind);
+    if (b.style === 'barn') rect(g, doorCx - 1, Ht - 13, 1, 11, '#5a3a24');
+  }
 
   // Дах і все, що над ним.
   roof(g, W, rule.rise - (rule.roof === 'flat' ? 0 : 0), roofBottom, rule, roofColor, season, seed);

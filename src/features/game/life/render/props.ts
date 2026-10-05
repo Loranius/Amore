@@ -29,6 +29,7 @@ const SOLID: ReadonlySet<PropType> = new Set<PropType>([
   'bench', 'lamp', 'well', 'mailbox', 'busStop', 'fountain', 'bigFountain', 'stall', 'car', 'bin', 'planter', 'pot', 'haystack',
   'swing', 'slide', 'goal', 'flagpole', 'yellowStone', 'boat', 'lighthouse', 'cafeTable', 'signpost', 'board', 'bush', 'rock', 'statue', 'tram',
   'bed', 'plant', 'floorLamp', 'shelf', 'tv', 'table', 'stove', 'wardrobe', 'desk', 'sofa', 'fridge',
+  'woodpile', 'workbench',
 ]);
 
 /** Тверда частина пропа (пікселі світу) або `null`, якщо крізь нього можна пройти. */
@@ -50,6 +51,8 @@ export function propSolid(p: Prop): Rect | null {
     case 'sofa': return { x, y: y + 2, w: 30, h: 12 };
     case 'table': case 'desk': return { x, y: y + 2, w: 24, h: 12 };
     case 'shelf': case 'wardrobe': case 'fridge': case 'stove': return { x, y, w: 16, h: 14 };
+    case 'woodpile': return { x, y: y + 6, w: 28, h: 9 };
+    case 'workbench': return { x, y: y + 6, w: 22, h: 9 };
     case 'swing': return { x, y: y + 10, w: 26, h: 6 };
     case 'goal': return { x, y: y + 12, w: 4, h: 4 };
     case 'lamp': case 'flagpole': case 'signpost': return { x: x + 6, y: y + 12, w: 4, h: 4 };
@@ -477,15 +480,17 @@ export function drawProp(g: Ctx, p: Prop, season: Season, t: number): void {
       break;
     }
     default:
-      drawFurniture(g, p, x, y, t);
+      drawFurniture(g, p, x, y, t, season);
   }
 }
 
 // ------------------------------------------------------------
 // Меблі кімнати.
 // ------------------------------------------------------------
-function drawFurniture(g: Ctx, p: Prop, x: number, y: number, t: number): void {
+function drawFurniture(g: Ctx, p: Prop, x: number, y: number, t: number, season: Season): void {
   const tint = p.tint;
+  const P = PALETTES[season];
+  const snow = P.snow;
   switch (p.type) {
     case 'bed': {
       shadow(g, x + 9, y + 29, 10);
@@ -604,6 +609,50 @@ function drawFurniture(g: Ctx, p: Prop, x: number, y: number, t: number): void {
       rect(g, x + 1, y - 4, 14, 1, '#b9c4d0');
       rect(g, x + 12, y - 10, 1, 4, '#9aa4b0');
       for (let k = 0; k < 3; k += 1) rect(g, x + 3 + k * 4, y - 12, 3, 3, ['#f6c14e', '#5aa7e0', '#ff7aa8'][k]!);
+      break;
+    }
+    case 'woodpile': {
+      // Дрова в повітці: торці полін рядами під дашком.
+      shadow(g, x + 14, y + 15, 14);
+      rect(g, x, y - 2, 28, 16, '#6e4a2a');
+      for (let r = 0; r < 4; r += 1) {
+        for (let k = 0; k < 7; k += 1) {
+          const cx = x + 2 + k * 4 + (r % 2) * 2;
+          const cy = y + 1 + r * 3;
+          if (cx > x + 25) continue;
+          disc(g, cx, cy, 1.6, '#c99a62');
+          px(g, cx, cy, '#a87a48');
+        }
+      }
+      rect(g, x - 1, y - 5, 30, 3, snow ? '#ffffff' : '#7d7a72');
+      break;
+    }
+    case 'workbench': {
+      // Верстак із лещатами й інструментом.
+      shadow(g, x + 11, y + 15, 11);
+      rect(g, x, y + 3, 22, 4, '#a8784a');
+      rect(g, x, y + 3, 22, 1, '#c99a62');
+      rect(g, x + 1, y + 7, 2, 8, '#7a5230');
+      rect(g, x + 19, y + 7, 2, 8, '#7a5230');
+      rect(g, x + 3, y + 1, 4, 2, '#5a6068');
+      rect(g, x + 10, y + 1, 8, 1, '#8a8f96');
+      rect(g, x + 15, y, 2, 2, '#b04a3a');
+      if (snow) rect(g, x, y + 2, 22, 1, '#ffffff');
+      break;
+    }
+    case 'planks': {
+      // Дошки, складені біля стіни.
+      for (let k = 0; k < 4; k += 1) rect(g, x, y + 4 + k * 2, 26, 2, k % 2 ? '#c99a62' : '#b0844e');
+      rect(g, x + 3, y + 12, 3, 2, '#7a5230');
+      rect(g, x + 20, y + 12, 3, 2, '#7a5230');
+      break;
+    }
+    case 'cellar': {
+      // Погріб: дерев'яна лядка в горбику, порослому травою.
+      ellipse(g, x + 10, y + 10, 11, 6, snow ? '#ffffff' : P.grassDark);
+      rect(g, x + 4, y + 6, 12, 8, '#7a5230');
+      for (let k = 0; k < 12; k += 4) rect(g, x + 4 + k, y + 6, 1, 8, '#5a3a24');
+      rect(g, x + 9, y + 9, 3, 2, '#3a3a40');
       break;
     }
     case 'door': {

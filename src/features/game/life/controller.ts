@@ -49,7 +49,8 @@ import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
 import { colliderFor, tileFeet, zoneAt } from './world/collide';
 import { homeInterior } from './world/interior';
-import { cityMap } from './world/maps';
+import { cityMap, homeYard } from './world/maps';
+import { YARD, YARD_ID } from './world/yard';
 
 /** Стеля щільності пікселів полотна гри (власник: «оптимізуй під айфони»). */
 export const GAME_MAX_DPR = 2;
@@ -374,7 +375,8 @@ export class GameController {
   private spawnResidents(): void {
     const life = this.life;
     this.residents = [];
-    if (!life || this.map.interior || !this.map.city) return;
+    // Мешканці стоять на мапі самого міста, не на подвір'ї садиби.
+    if (!life || this.map.interior || !this.map.city || this.map.id !== this.map.city) return;
     const c = colliderFor(this.map);
     for (const r of residentsIn(life, this.map.city)) {
       const look = RESIDENT_LOOKS[r.id];
@@ -391,6 +393,17 @@ export class GameController {
       if (!spot) continue;
       this.residents.push({ id: `res:${r.id}`, x: spot.x, y: spot.y, dir: 0, moving: false, t: 0, look, target: null, wait: 1, speed: 18, home: spot });
     }
+  }
+
+  /** Подвір'я садиби в Жилинцях (власник, 2026-10-06): хата, хліви, город, кухня, сад. */
+  enterYard(spawnName: 'gate' | 'house'): void {
+    this.map = homeYard();
+    this.place(this.map.spawns[spawnName] ?? this.map.spawns.default!);
+    this.folk = [];
+    this.residents = [];
+    this.setupCompanions();
+    this.ui = { ...this.ui, near: null };
+    this.emit();
   }
 
   enterHome(spawnName: 'wake' | 'door'): void {
@@ -426,9 +439,12 @@ export class GameController {
     this.dima = null;
     if (!life) return;
     const info = today(life);
-    if (!this.map.interior && this.map.city === 'zhylyntsi') {
-      const mom = tileFeet(9, 12);
-      this.extras.push({ id: 'mom', x: mom.x + 6, y: mom.y - 2, dir: 0, moving: false, t: 0, look: MOM });
+    if (this.map.id === YARD_ID) {
+      // Мама — біля літньої кухні на подвір'ї.
+      const mom = tileFeet(YARD.mom[0], YARD.mom[1]);
+      this.extras.push({ id: 'mom', x: mom.x, y: mom.y, dir: 0, moving: false, t: 0, look: MOM });
+    }
+    if (this.map.id === 'zhylyntsi') {
       if (info.week < 12) {
         const o = tileFeet(36, 10);
         this.extras.push({ id: 'olya', x: o.x, y: o.y, dir: 1, moving: false, t: 0, look: { ...OLYA, kid: info.week <= 6 } });
@@ -873,9 +889,13 @@ export class GameController {
         this.enterHome('door');
         return;
       case 'exit':
-        this.enterCity(life.home, 'home');
+        // З хати в Жилинцях — на своє подвір'я, а не одразу на сільську вулицю.
+        if (life.home === 'zhylyntsi') this.enterYard('house');
+        else this.enterCity(life.home, 'home');
         await this.checkStory();
         return;
+      case 'yard': this.enterYard('gate'); return;
+      case 'village': this.enterCity('zhylyntsi', 'home'); return;
       case 'bed': this.openPanel({ kind: 'sleep' }); return;
       case 'wardrobe': this.openPanel({ kind: 'wardrobe' }); return;
       case 'station': this.openPanel({ kind: 'travel' }); return;

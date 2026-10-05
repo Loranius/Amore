@@ -11,6 +11,7 @@
 import type { CityId } from '../sim/content';
 import { MapBuilder } from './build';
 import type { GameMap } from './types';
+import { yardMap } from './yard';
 
 const homeZone = { type: 'home' } as const;
 
@@ -21,13 +22,14 @@ function zhylyntsi(): GameMap {
   m.fill(0, 14, 42, 2, 'd').fill(20, 0, 2, 30, 'd').fill(0, 24, 42, 2, 'd');
   // Город за хатою.
   m.fill(1, 1, 11, 4, 'G');
-  m.building({ id: 'home', x: 4, y: 7, w: 6, h: 4, style: 'cottage', label: 'Рідна хата', doorX: 7, action: homeZone, zoneLabel: 'Додому' });
+  // Рідна хата — хвіртка на подвір'я садиби (`yard.ts`, власник 2026-10-06):
+  // там Г-подібна хата, хліви, курник, город, майстерня з літньою кухнею й сад.
+  m.building({ id: 'home', x: 4, y: 7, w: 6, h: 4, style: 'cottage', label: 'Рідна хата', doorX: 7, action: { type: 'yard' }, zoneLabel: 'Додому · на подвір\'я' });
   m.fill(7, 11, 1, 3, 'd');
   for (let x = 2; x <= 12; x += 1) if (x !== 7) m.fill(x, 13, 1, 1, 'F');
   m.fill(2, 6, 1, 7, 'F').fill(12, 6, 1, 7, 'F');
   m.prop('well', 10, 9).prop('chicken', 3.2, 11.2).prop('chicken', 9.5, 11.6, { solid: false }).prop('cat', 4.6, 10.6);
   m.prop('sunflowers', 2, 3).prop('sunflowers', 4, 3).prop('sunflowers', 6, 2).prop('haystack', 9, 2);
-  m.zone('mom', 8, 11, 3, 2, { type: 'mom' }, 'Поговорити з мамою');
   m.spawn('home', 7, 12).spawn('default', 7, 12);
 
   m.building({ id: 'neighbour', x: 14, y: 7, w: 5, h: 4, style: 'house', label: 'Сусіди' });
@@ -53,7 +55,6 @@ function zhylyntsi(): GameMap {
   m.prop('duck', 3, 27).prop('duck', 5.5, 28.2).prop('bench', 9.3, 26.4);
   m.zone('pond', 9, 26, 3, 2, { type: 'sight', sight: 'pond' }, 'Ставок за хатою');
   m.zone('fishing', 1, 25, 5, 1, { type: 'activity', id: 'fishing' }, 'Рибалка на ставку');
-  m.zone('garden', 2, 5, 9, 1, { type: 'activity', id: 'garden' }, 'Город · допомогти мамі');
   m.prop('bike', 11.2, 12.4, { solid: false }).prop('flowerBed', 15, 12.2).prop('bench', 29, 13).prop('cat', 37.5, 4.6, { tint: '#e0a43c' });
   m.tree(11, 28, 'willow');
 
@@ -318,3 +319,15 @@ export function cityMap(city: CityId): GameMap {
 }
 
 export const ALL_CITY_IDS = Object.keys(BUILDERS) as CityId[];
+
+let yard: GameMap | null = null;
+/** Подвір'я Лєниної садиби в Жилинцях. */
+export function homeYard(): GameMap {
+  yard ??= yardMap();
+  return yard;
+}
+
+/** Усі мапи міста: саме місто й, для Жилинців, подвір'я садиби. */
+export function mapsOf(city: CityId): GameMap[] {
+  return city === 'zhylyntsi' ? [cityMap(city), homeYard()] : [cityMap(city)];
+}

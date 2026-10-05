@@ -11,7 +11,7 @@ import { TILE, type GameMap, type Ground } from '../world/types';
 import { PALETTES, type SeasonPalette } from './palette';
 import { canvas, cellHash, ctx2d, mix, px, rect, shade, type Ctx } from './pixel';
 
-const SOFT: ReadonlySet<Ground> = new Set<Ground>(['d', 'c', 'p', 's', 'b', 'a', 'm', 'z']);
+const SOFT: ReadonlySet<Ground> = new Set<Ground>(['d', 'c', 'p', 's', 'b', 'a', 'm', 'z', 'v']);
 const GRASSY: ReadonlySet<Ground> = new Set<Ground>(['g', 'G', 'h', 'F']);
 
 function grassTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette, flowers: boolean): void {
@@ -67,6 +67,33 @@ function dirtTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonP
     const hh = cellHash(i, j, 10);
     rect(g, x + (hh % 11) + 1, y + ((hh >> 3) % 11) + 2, 3, 2, shade(base, -0.25));
     px(g, x + (hh % 11) + 1, y + ((hh >> 3) % 11) + 2, shade(base, 0.2));
+  }
+}
+
+/** Грядки городу: темний ґрунт борознами й рядки рослин за порою року. */
+function bedTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
+  const soil = P.snow ? '#e9eef6' : '#7a5236';
+  rect(g, x, y, TILE, TILE, soil);
+  if (P.snow) {
+    for (let r = 2; r < TILE; r += 5) rect(g, x, y + r, TILE, 1, '#cfd9e6');
+    return;
+  }
+  // Борозни через рядок і пагорбки між ними.
+  for (let r = 0; r < TILE; r += 8) {
+    rect(g, x, y + r + 5, TILE, 2, shade(soil, -0.22));
+    rect(g, x, y + r + 1, TILE, 1, shade(soil, 0.12));
+  }
+  // Рослини на пагорбках: навесні — сходи, влітку — кущі, восени — жовті.
+  const plant = P.leaf;
+  for (let r = 0; r < TILE; r += 8) {
+    for (let c = 1 + ((j + r / 8) % 2) * 3; c < TILE; c += 6) {
+      const hh = cellHash(i * 3 + c, j * 2 + r);
+      if (hh % 5 === 0) continue;
+      const big = P === PALETTES.summer;
+      rect(g, x + c, y + r + 1, big ? 3 : 2, big ? 3 : 2, plant);
+      px(g, x + c + 1, y + r, shade(plant, 0.2));
+      if (big && hh % 3 === 0) px(g, x + c + 1, y + r + 1, '#e8576c');
+    }
   }
 }
 
@@ -243,6 +270,7 @@ export function groundCanvas(map: GameMap, season: Season): HTMLCanvasElement {
         case 'g': grassTile(g, x, y, i, j, P, cellHash(i, j, 77) % 11 === 0); break;
         case 'G': grassTile(g, x, y, i, j, P, true); break;
         case 'd': dirtTile(g, x, y, i, j, P); break;
+        case 'v': bedTile(g, x, y, i, j, P); break;
         case 'c': cobbleTile(g, x, y, i, j, P); break;
         case 'p': paveTile(g, x, y, i, j, P); break;
         case 'a': case 'm': case 'z': asphaltTile(g, x, y, i, j, P, t); break;

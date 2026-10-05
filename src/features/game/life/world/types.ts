@@ -10,15 +10,18 @@ export const TILE = 16;
  *   g трава · G трава з квітами · d стежка · c бруківка · p плитка ·
  *   a асфальт · m асфальт із розміткою · z зебра · s пісок · b мокрий пісок ·
  *   w вода · r колія · h живопліт · F паркан · f дерев'яна підлога ·
- *   t кахель · k килимова підлога · W стіна кімнати · x порожнеча
+ *   t кахель · k килимова підлога · W стіна кімнати · x порожнеча ·
+ *   v грядки городу
  */
-export type Ground = 'g' | 'G' | 'd' | 'c' | 'p' | 'a' | 'm' | 'z' | 's' | 'b' | 'w' | 'r' | 'h' | 'F' | 'f' | 't' | 'k' | 'W' | 'x';
+export type Ground = 'g' | 'G' | 'd' | 'c' | 'p' | 'a' | 'm' | 'z' | 's' | 'b' | 'w' | 'r' | 'h' | 'F' | 'f' | 't' | 'k' | 'W' | 'x' | 'v';
 
 export const SOLID_GROUND: ReadonlySet<Ground> = new Set<Ground>(['w', 'h', 'F', 'W', 'x', 'r']);
 
 export type BuildingStyle =
   | 'cottage' | 'house' | 'sadok' | 'school' | 'shop' | 'cafe' | 'block' | 'office'
-  | 'station' | 'busStation' | 'uni' | 'lavra' | 'ratusha' | 'post' | 'lyceum' | 'kiosk' | 'church';
+  | 'station' | 'busStation' | 'uni' | 'lavra' | 'ratusha' | 'post' | 'lyceum' | 'kiosk' | 'church'
+  // Садиба Лєни (2026-10-06): хлів, курник, дерев'яна майстерня/прибудова.
+  | 'barn' | 'coop' | 'shed';
 
 export type ZoneAction =
   | { type: 'duty'; building: string }
@@ -37,6 +40,9 @@ export type ZoneAction =
   | { type: 'stone' }
   | { type: 'mom' }
   | { type: 'walk'; to: CityId }
+  /** Із села — на подвір'я Лєниної садиби; з подвір'я — назад у село. */
+  | { type: 'yard' }
+  | { type: 'village' }
   | { type: 'wardrobe' }
   | { type: 'talk'; who?: string }
   | { type: 'laptop' }
@@ -58,6 +64,8 @@ export interface Building {
   roof?: string | undefined;
   /** Піктограма на вивісці. */
   sign?: SignIcon | undefined;
+  /** `false` — без дверей: глуха частина складного будинку (Г-подібна хата). */
+  door?: boolean | undefined;
   action?: ZoneAction | undefined;
 }
 
@@ -78,7 +86,9 @@ export type PropType =
   | 'flowerBed' | 'rock' | 'chicken' | 'cat' | 'duck' | 'gull' | 'pier' | 'stairs' | 'statue' | 'tram' | 'clock'
   // кімната
   | 'bed' | 'rug' | 'plant' | 'floorLamp' | 'poster' | 'shelf' | 'tv' | 'pet' | 'table' | 'stove' | 'window' | 'wardrobe'
-  | 'desk' | 'sofa' | 'fridge' | 'rushnyk' | 'door';
+  | 'desk' | 'sofa' | 'fridge' | 'rushnyk' | 'door'
+  // садиба
+  | 'woodpile' | 'workbench' | 'cellar' | 'planks';
 
 export interface Prop {
   type: PropType;
