@@ -79,22 +79,26 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     // Зліва направо: хлів → хлів → курник.
     expect(back.map((x) => x.style)).toEqual(['barn', 'barn', 'coop']);
     for (let i = 1; i < back.length; i += 1) expect(back[i]!.x).toBeGreaterThan(back[i - 1]!.x);
-    // Хата — одна суцільна Г-подібна споруда (власник: «одна локація»), двері одні.
-    const house = yard.buildings.filter((x) => x.label === 'Хата');
-    expect(house).toHaveLength(1);
-    expect(house[0]!.notch).toBeDefined();
-    // Вхід — збоку, у правій стіні; зона «У хату» — одразу праворуч від хати.
-    expect(house[0]!.sideDoor).toBe(true);
+    // Хата — два крила впритул (план власника, 16:44): ліве виступає вперед,
+    // праве з котельнею — позаду. Частини прилягають без краю (`join`), димар один.
+    const house = yard.buildings.filter((x) => x.label === 'Хата').sort((a, b) => a.x - b.x);
+    expect(house).toHaveLength(2);
+    const [left, right] = house as [(typeof house)[number], (typeof house)[number]];
+    expect(left.x + left.w).toBe(right.x);
+    expect([left.join, right.join]).toEqual(['right', 'left']);
+    expect(house.filter((x) => x.chimney !== false)).toHaveLength(1);
+    expect(left.y + left.h).toBeGreaterThan(right.y + right.h);
+    // Вхід — збоку, у правій стіні правого крила; дверей у фасаді немає.
+    expect(right.sideDoor).toBe(true);
+    expect(house.every((x) => x.door === false)).toBe(true);
     const homeZone = yard.zones.find((z) => z.action.type === 'home')!;
-    expect(homeZone.x).toBe(house[0]!.x + house[0]!.w);
-    expect(homeZone.y).toBeGreaterThanOrEqual(house[0]!.y);
-    expect(homeZone.y + homeZone.h).toBeLessThanOrEqual(house[0]!.y + house[0]!.h);
-    const houseTop = house[0]!.y;
+    expect(homeZone.x).toBe(right.x + right.w);
+    expect(homeZone.y).toBeGreaterThanOrEqual(right.y);
+    expect(homeZone.y + homeZone.h).toBeLessThanOrEqual(right.y + right.h);
+    const houseTop = Math.min(left.y, right.y);
     for (const x of back) expect(x.y + x.h).toBeLessThanOrEqual(houseTop);
-    // У кутку «Г» можна стати — це двір, а не стіна.
-    const n = house[0]!.notch!;
-    const nx = n.side === 'right' ? house[0]!.x + house[0]!.w - Math.ceil(n.w / 2) : house[0]!.x + Math.floor(n.w / 2);
-    expect(colliderFor(yard).canStand(nx * TILE + 8, (house[0]!.y + 1) * TILE + 8)).toBe(true);
+    // Перед заглибленим правим крилом — двір, а не стіна.
+    expect(colliderFor(yard).canStand((right.x + 3) * TILE + 8, (right.y + right.h) * TILE + 8)).toBe(true);
     // Город — над господарськими будівлями (грядки 'v').
     const gardenRows = yard.ground.map((row, j) => (row.includes('v') ? j : -1)).filter((j) => j >= 0);
     expect(Math.max(...gardenRows)).toBeLessThan(Math.min(...back.map((x) => x.y)));
@@ -106,7 +110,7 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(kitchen.notch?.side).toBe('left');
     expect(shop.x).toBe(kTall!.x);
     expect(shop.y + shop.h).toBe(kTall!.y);
-    expect(kitchen.x).toBeGreaterThan(house[0]!.x + house[0]!.w);
+    expect(kitchen.x).toBeGreaterThan(right.x + right.w);
     expect(kAnnex!.x).toBeLessThan(kTall!.x);
     const entry = yard.zones.find((z) => z.id === 'summerKitchen')!;
     expect(entry.y).toBe(kAnnex!.y - 1);
@@ -134,7 +138,7 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(b('coop').sideDoor).toBe(true);
     expect(b('coop').door).toBe(false);
     // Котельня — окремий вхід праворуч від хати, вище за головний.
-    const house = b('house');
+    const house = b('house-right');
     const boiler = yard.zones.find((z) => z.id === 'boiler')!;
     const home = yard.zones.find((z) => z.action.type === 'home')!;
     expect(boiler.x).toBe(house.x + house.w);

@@ -164,7 +164,7 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
 // ------------------------------------------------------------
 // Стіна.
 // ------------------------------------------------------------
-function wall(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, color: string, seed: number): void {
+function wall(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, color: string, seed: number, flush: Flush = null): void {
   const H = bottom - top;
   rect(g, 3, top, W - 6, H, color);
   if (rule.material === 'brick') {
@@ -201,8 +201,11 @@ function wall(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
     }
   }
   // Освітлення: лівий край світліший, правий у тіні.
-  rect(g, 3, top, 2, H, shade(color, 0.12));
-  rect(g, W - 6, top, 3, H, shade(color, -0.2));
+  // На стику з іншою частиною тієї ж будівлі краю немає — стіна йде далі.
+  if (flush !== 'left') rect(g, 3, top, 2, H, shade(color, 0.12));
+  else rect(g, 0, top, 3, H, color);
+  if (flush !== 'right') rect(g, W - 6, top, 3, H, shade(color, -0.2));
+  else rect(g, W - 3, top, 3, H, color);
   // Цоколь.
   rect(g, 3, bottom - 3, W - 6, 3, shade(color, -0.32));
   rect(g, 3, bottom - 3, W - 6, 1, shade(color, -0.2));
@@ -376,10 +379,10 @@ const cache = new Map<string, BuildingSprite>();
 
 export function buildingSprite(b: Building, season: Season): BuildingSprite {
   const n = b.notch;
-  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}`;
+  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}|${b.join ?? ''}|${b.chimney === false ? 'nochim' : ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const sprite = n ? ellSprite(b, season) : partSprite(b, season, {});
+  const sprite = n ? ellSprite(b, season) : partSprite(b, season, { flush: b.join ?? null, chimney: b.chimney !== false });
   cache.set(key, sprite);
   return sprite;
 }
@@ -442,7 +445,7 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
   const windows: Rect[] = [];
   const doorCx = (b.doorX - b.x) * TILE + 8 + 3;
 
-  wall(g, W, roofBottom - 2, Ht, rule, wallColor, seed);
+  wall(g, W, roofBottom - 2, Ht, rule, wallColor, seed, opts.flush ?? null);
 
   // Вікна рядами по фасаду, оминаючи двері.
   const wallTop = roofBottom + 3;
