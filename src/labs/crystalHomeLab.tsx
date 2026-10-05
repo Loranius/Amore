@@ -11,7 +11,7 @@
 //   /crystal-home-lab.html?years=2&theme=light
 //   /crystal-home-lab.html?fill=12            — подій на рік
 //   /crystal-home-lab.html?noshadows          — без тіней (A/B, слабкий профіль)
-//   /crystal-home-lab.html?gift=shared        — колір колонії: red (типово) | blue | shared
+//   /crystal-home-lab.html?gift=shared        — колір колонії: red (типово) | blue | shared | none (власний тон пари)
 //
 // Сторінка не входить у збірку продукту: лише dev-сервер.
 // ============================================================
@@ -43,7 +43,7 @@ function Lab() {
     // як у `labSnapshot`.
     const base = labSnapshot(years, fill);
     const gift = params.get('gift') ?? 'red';
-    const wishes = gift === 'shared' ? base.wishes : base.wishes?.map((wish) => ({
+    const wishes = gift === 'shared' ? base.wishes : gift === 'none' ? [] : base.wishes?.map((wish) => ({
       ...wish,
       isShared: false,
       ownerId: (gift === 'red' ? base.partners.blue : base.partners.red) ?? null,
