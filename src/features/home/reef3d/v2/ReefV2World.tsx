@@ -8,6 +8,7 @@ import type { ReefV2Geometry } from '@/engine/species/reefV2/geometry';
 import type { Season } from '@/engine/species/grammar/season';
 import { Diorama } from '@/features/home/diorama/Diorama';
 import { PORTAL_GROUND_Y } from '../../crystal3d/scene/portalScene';
+import { FISH_SHAPE, buildFishMesh } from '../fishMesh';
 import { ReefIsland } from './ReefIsland';
 import { buildReefIsland, inReefWater, reefIslandGround } from './reefIsland';
 import {
@@ -21,15 +22,15 @@ import {
   createSeagrassMaterial,
 } from './reefV2Materials';
 
-/** Риба: ромб тіла й трикутник хвоста; голова вздовж +x. */
+/**
+ * Риба зграї: лофт-тіло з плавцями й очима (`fishMesh`, власник 2026-10-05:
+ * «додай трикутників і полігонів»); голова вздовж +x.
+ */
 function buildFishGeometry(fish: ReefV2Geometry['fish'], seed: string, kinds: number) {
-  const body = new Float32Array([
-    1, 0, 0, -0.3, 0.45, 0, -0.3, -0.45, 0,
-    -0.3, 0.45, 0, -0.3, -0.45, 0, -0.35, 0, 0.12,
-    -0.3, 0, 0, -0.95, 0.35, 0, -0.95, -0.35, 0,
-  ]);
+  const mesh = buildFishMesh(FISH_SHAPE);
   const g = new THREE.InstancedBufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(body, 3));
+  g.setAttribute('position', new THREE.BufferAttribute(mesh.positions, 3));
+  g.setAttribute('part', new THREE.BufferAttribute(mesh.part, 1));
   const attr = (name: string, values: number[]) => g.setAttribute(name, new THREE.InstancedBufferAttribute(new Float32Array(values), 1));
   attr('aOrbit', fish.map((f) => f.orbit));
   attr('aHeight', fish.map((f) => f.height));

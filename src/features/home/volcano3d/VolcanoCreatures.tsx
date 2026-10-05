@@ -14,6 +14,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { VolcanoCreature, VolcanoCreatureKind } from '@/engine/species/volcano/model';
+import { DOLPHIN_SHAPE, FISH_SHAPE, PART, WHALE_SHAPE, buildFishMesh, type FishShape } from '../reef3d/fishMesh';
 
 type V3 = [number, number, number];
 
@@ -43,47 +44,28 @@ class Body {
   }
 }
 
-/** Риба носом уздовж +x: ромбове тіло, хвіст і плавець. */
-function fishBody(len: number, colour: THREE.Color, belly: THREE.Color, opts: { flukes?: boolean; dorsal?: boolean; beak?: boolean } = {}): THREE.BufferGeometry {
+/**
+ * Риба з `fishMesh` (лофт, плавці, очі — власник 2026-10-05: «додай
+ * трикутників і полігонів»), пофарбована за частинами тіла; `stripes` —
+ * темніші поперечні смуги на спині великої риби.
+ */
+function fishBody(len: number, shape: FishShape, colour: THREE.Color, belly: THREE.Color, stripes = false): THREE.BufferGeometry {
+  const mesh = buildFishMesh(shape);
   const b = new Body();
-  // Кит — товстий, риби — пласкіші з боків.
-  const h = len * (opts.flukes ? 0.22 : 0.26);
-  const w = len * (opts.flukes ? 0.22 : 0.16);
-  const nose: V3 = [len * (opts.beak ? 0.62 : 0.5), opts.beak ? -h * 0.15 : 0, 0];
-  const top: V3 = [len * 0.05, h, 0];
-  const bottom: V3 = [len * 0.05, -h * 0.8, 0];
-  const left: V3 = [len * 0.08, 0, -w];
-  const right: V3 = [len * 0.08, 0, w];
-  const tail: V3 = [-len * 0.36, 0, 0];
-  const ring: V3[] = [top, right, bottom, left];
-  for (let i = 0; i < 4; i += 1) {
-    const a = ring[i]!;
-    const c = ring[(i + 1) % 4]!;
-    const lower = a === bottom || c === bottom;
-    b.tri(nose, c, a, lower ? belly : colour);
-    b.tri(tail, a, c, lower ? belly : colour);
-  }
-  if (opts.flukes) {
-    // Кит: хвіст горизонтальний.
-    b.tri(tail, [-len * 0.56, 0, -h * 1.1], [-len * 0.48, 0, 0], colour);
-    b.tri(tail, [-len * 0.48, 0, 0], [-len * 0.56, 0, h * 1.1], colour);
-    b.tri(tail, [-len * 0.48, 0, 0], [-len * 0.56, 0, -h * 1.1], colour);
-    b.tri(tail, [-len * 0.56, 0, h * 1.1], [-len * 0.48, 0, 0], colour);
-  } else {
-    b.tri(tail, [-len * 0.56, h * 0.9, 0], [-len * 0.5, 0, 0], colour);
-    b.tri(tail, [-len * 0.5, 0, 0], [-len * 0.56, -h * 0.9, 0], colour);
-    b.tri(tail, [-len * 0.5, 0, 0], [-len * 0.56, h * 0.9, 0], colour);
-    b.tri(tail, [-len * 0.56, -h * 0.9, 0], [-len * 0.5, 0, 0], colour);
-  }
-  if (opts.dorsal) {
-    b.tri(top, [-len * 0.12, h * 0.4, 0], [-len * 0.04, h * 1.7, 0], colour);
-    b.tri(top, [-len * 0.04, h * 1.7, 0], [-len * 0.12, h * 0.4, 0], colour);
-  }
-  // Очі — білі цятки з боків біля носа.
-  const eye = new THREE.Color('#ffffff');
-  for (const s of [-1, 1]) {
-    const e: V3 = [len * 0.3, h * 0.25, s * w * 0.62];
-    b.tri(e, [e[0] + len * 0.05, e[1], e[2] + s * 0.001], [e[0], e[1] + len * 0.05, e[2] + s * 0.001], eye);
+  const k = len / 2;
+  const fin = colour.clone().multiplyScalar(0.78);
+  const eye = new THREE.Color('#15121e');
+  const dark = colour.clone().multiplyScalar(0.7);
+  const p = mesh.positions;
+  for (let t = 0; t < p.length; t += 9) {
+    const v = (i: number): V3 => [p[t + i * 3]! * k, p[t + i * 3 + 1]! * k, p[t + i * 3 + 2]! * k];
+    const part = mesh.part[t / 3]!;
+    let c = part === PART.eye ? eye : part === PART.fin ? fin : part === PART.belly ? belly : colour;
+    if (stripes && part === PART.back) {
+      const x = (p[t]! + p[t + 3]! + p[t + 6]!) / 3;
+      if (Math.floor((x + 1) * 5) % 2 === 0) c = dark;
+    }
+    b.tri(v(0), v(1), v(2), c);
   }
   return b.geometry();
 }
@@ -141,12 +123,12 @@ function bodyFor(c: VolcanoCreature): THREE.BufferGeometry[] {
   const size = KIND_SIZE[c.kind];
   switch (c.kind) {
     case 'fish': {
-      const colour = new THREE.Color().setHSL(c.hue, 0.85, 0.58);
-      return [fishBody(size, colour, colour.clone().offsetHSL(0, -0.2, 0.18))];
+      const colour = new THREE.Color().setHSL(c.hue, 0.95, 0.5);
+      return [fishBody(size, FISH_SHAPE, colour, colour.clone().offsetHSL(0, -0.2, 0.2))];
     }
-    case 'bigFish': return [fishBody(size, new THREE.Color('#3a7fd8'), new THREE.Color('#f2e6b8'), { dorsal: true })];
-    case 'whale': return [fishBody(size, new THREE.Color('#46628f'), new THREE.Color('#c8d6e8'), { flukes: true, dorsal: false })];
-    case 'dolphin': return [fishBody(size, new THREE.Color('#7d9ab8'), new THREE.Color('#e8eef4'), { dorsal: true, beak: true })];
+    case 'bigFish': return [fishBody(size, FISH_SHAPE, new THREE.Color('#3a7fd8'), new THREE.Color('#f2e6b8'), true)];
+    case 'whale': return [fishBody(size, WHALE_SHAPE, new THREE.Color('#46628f'), new THREE.Color('#c8d6e8'))];
+    case 'dolphin': return [fishBody(size, DOLPHIN_SHAPE, new THREE.Color('#7d9ab8'), new THREE.Color('#e8eef4'))];
     case 'jellyfish': return [jellyBody(size)];
     case 'oyster': {
       const shell = new THREE.Color('#c8b8a8');

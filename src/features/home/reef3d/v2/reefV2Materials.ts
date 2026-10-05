@@ -380,22 +380,25 @@ export function createFishMaterial(p: ReefPalette, ground: number): THREE.Shader
       attribute float aPhase;
       attribute float aSpeed;
       attribute float aKind;
+      attribute float part;
       uniform float uTime;
       uniform float uScale;
       varying vec3 vWorld;
       varying float vKind;
+      varying float vPart;
       void main() {
         float ang = radians(aPhase) + uTime * aSpeed * 0.35 / max(0.3, aOrbit);
         vec3 centre = vec3(cos(ang) * aOrbit, aHeight + sin(uTime * 0.8 + aPhase) * 0.05, sin(ang) * aOrbit);
         vec3 forward = vec3(-sin(ang), 0.0, cos(ang));
         vec3 side = vec3(cos(ang), 0.0, sin(ang));
         vec3 p = position;
-        // Хвіст (x < 0) б'є вбік; тіло нерухоме.
-        p.z += step(p.x, -0.3) * sin(uTime * 8.0 + aPhase) * 0.18;
+        // Тіло хвилюється від голови до хвоста: що далі назад, то ширше.
+        p.z += smoothstep(0.25, -1.0, p.x) * sin(uTime * 8.0 + aPhase - p.x * 2.5) * 0.22;
         vec3 local = forward * p.x + vec3(0.0, p.y, 0.0) + side * p.z;
         vec4 w = modelMatrix * vec4(centre + local * 0.09 * uScale * (aKind > 2.5 ? 1.7 : 1.0), 1.0);
         vWorld = w.xyz;
         vKind = aKind;
+        vPart = part;
         gl_Position = projectionMatrix * viewMatrix * w;
       }
     `,
@@ -404,9 +407,14 @@ export function createFishMaterial(p: ReefPalette, ground: number): THREE.Shader
       uniform float uGlow;
       varying vec3 vWorld;
       varying float vKind;
+      varying float vPart;
       ${WATER}
       void main() {
         vec3 base = vKind < 0.5 ? uColours[0] : (vKind < 1.5 ? uColours[1] : (vKind < 2.5 ? uColours[2] : uColours[3]));
+        // Черевце світліше, плавці темніші, око темне (\`fishMesh\` PART).
+        if (vPart > 2.5) base = vec3(0.08, 0.07, 0.12);
+        else if (vPart > 1.5) base *= 0.78;
+        else if (vPart > 0.5) base = mix(base, vec3(1.0), 0.45);
         vec3 c = underwater(base, flatNormal(vWorld), vWorld) + base * uGlow * 0.3;
         gl_FragColor = vec4(c, 1.0);
         ${END}
