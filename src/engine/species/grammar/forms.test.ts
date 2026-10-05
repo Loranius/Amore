@@ -152,7 +152,10 @@ describe('форми дерева: той самий ріст, інший мал
     // Вихід гілки зі стовбура (`y12~`) продовжується самою гілкою — не кінчик.
     for (const b of branches) if (b.key.endsWith('~')) parents.add(b.key);
     const trunk = branches.filter((b) => b.order === 0).length;
-    const tips = branches.filter((b) => b.order > 0 && !parents.has(b.key)).length + 1;
+    // Верх стовбура закритий ковпачком, лише коли гілок верхівки немає: інакше
+    // найвертикальніша з них продовжує стовбур (2026-10-06, без «браслета»).
+    const limbs = branches.some((b) => /^c\d+$/.test(b.key));
+    const tips = branches.filter((b) => b.order > 0 && !parents.has(b.key)).length + (limbs ? 0 : 1);
     expect(oak.wood.positions.length / 9).toBe(branches.length * WOOD_SIDES * 2 + tips * WOOD_SIDES + treeV2Roots(model).length * 10);
     expect(trunk).toBeGreaterThan(1);
   });

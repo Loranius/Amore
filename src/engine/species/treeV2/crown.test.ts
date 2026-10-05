@@ -116,3 +116,29 @@ describe('романтика дозовано і ріст складніший �
     expect(width).toBeGreaterThan((top - bottom) * 0.4);
   });
 });
+
+describe('стовбур без щілин (власник, 2026-10-06: «тріщини, які просвітлюють дерево зсередини»)', () => {
+  it.each(['oak', 'sakura', 'spruce'] as const)('%s: бічна поверхня стовбура — суцільна труба, відкриті лише низ і верх', async (form) => {
+    const { WOOD_SIDES } = await import('./geometry');
+    const g = buildTreeV2Geometry(OLD, form);
+    const trunk = treeV2Skeleton(OLD, form).branches.filter((b) => b.order === 0);
+    // Стовбур у буфері перший: по 2·WOOD_SIDES бічних трикутників на сегмент,
+    // а за непродовженим (верхнім) сегментом — ковпачок.
+    const edges = new Map<string, number>();
+    const key = (i: number) => [0, 1, 2].map((c) => g.wood.positions[i * 3 + c]!.toFixed(5)).join(',');
+    let tri = 0;
+    for (let s = 0; s < trunk.length; s += 1) {
+      for (let k = 0; k < 2 * WOOD_SIDES; k += 1, tri += 1) {
+        const v = [key(tri * 3), key(tri * 3 + 1), key(tri * 3 + 2)];
+        for (const [a, b] of [[v[0], v[1]], [v[1], v[2]], [v[2], v[0]]] as const) {
+          const e = a! < b! ? `${a}|${b}` : `${b}|${a}`;
+          edges.set(e, (edges.get(e) ?? 0) + 1);
+        }
+      }
+      if (s === trunk.length - 1) break;
+    }
+    // Відкриті ребра (належать одному трикутнику) — лише нижнє й верхнє кільце.
+    const open = [...edges.values()].filter((n) => n === 1).length;
+    expect(open).toBe(2 * WOOD_SIDES);
+  });
+});

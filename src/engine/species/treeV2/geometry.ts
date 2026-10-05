@@ -237,11 +237,14 @@ export function treeV2Skeleton(model: TreeV2Model, form: TreeForm = 'oak'): { br
       // Гілка виходить зі стовбура плавно: спершу майже вздовж нього, далі
       // відхиляється назовні (власник: «гілки виглядають як прикручені»).
       const along = trunkTangent(model, form, y);
-      const exit = norm(add(mul(d, 0.5), mul(along, 0.5)));
-      const first = length * 0.24;
+      // Вихід ближчий до напрямку гілки й довший (2026-10-06): гілка покидає
+      // стовбур одразу, а м'який згин лежить уже зовні. Майже вертикальний
+      // вихід повз усередині стовбура, і лікоть на самій корі читався обрубком.
+      const exit = norm(add(mul(d, 0.65), mul(along, 0.35)));
+      const first = length * 0.3;
       const mid = add(start, mul(exit, first));
       branches.push({ start, end: mid, r0: r0 * 1.06, r1: r0, order: 1, key: `${key}~` });
-      grow(mid, d, length * 0.86, 1, last, key, r0, 0.6);
+      grow(mid, d, length * 0.8, 1, last, key, r0, 0.6);
     }
     // Ялина: лапа хвої вздовж усієї гілки, а не лише на кінчику.
     if (form === 'spruce') clusters.push({ centre: add(start, mul(d, length * 0.55)), radius: length * 0.42 * leafiness, key: `${key}:paw`, squash: rules.squash });
@@ -538,6 +541,9 @@ export function treeV2CrownMasses(model: TreeV2Model, clusters: readonly TreeV2C
         squash * (1.1 + 0.25 * unit(seed, `${key}:sy`)),
         (0.85 + 0.25 * unit(seed, `${key}:sz`)) * wide,
       ];
+      // Вертикальна структура — гарантія, а не випадок: маса дуба не нижча
+      // за 0.86 своєї ширини. Сакура (пласкіша форма виду) — ярусна.
+      if (squash >= 0.8) shape[1] = Math.max(shape[1], 0.86 * Math.min(shape[0], shape[2]));
       const mass: TreeV2CrownMass = { centre, scale: shape, turn: 2 * Math.PI * unit(seed, `${key}:turn`), key, group: g };
       // Розмір: не менший за свій, і такий, щоб кожен свій кінчик гілки
       // лежав не мілкіше 0.8 поверхні — гілка не стирчить голою.
@@ -692,7 +698,16 @@ export function treeV2WoodSegment(b: TreeV2Branch): { start: V3; end: V3 } {
  * темним низом більше не читається балкою-«брусочком» (власник, 2026-10-04).
  * Силует лишається гранчастим, як у всього світу.
  */
-function prism(start: V3, end: V3, r0: number, r1: number, sides: number, frame?: V3, cap = false): { tris: V3[][]; normals: V3[][] } {
+/**
+ * `joint` — кільце, яким закінчився попередній відрізок того самого
+ * стовбура чи гілки: продовження починається РІВНО з нього (ті самі вершини
+ * й нормалі). Без цього на вигині стовбура між двома призмами відкривалась
+ * клиноподібна щілина, і крізь неї світило — світлі «тріщини» кільцями
+ * (власник, 2026-10-06).
+ */
+interface WoodRing { points: V3[]; normals: V3[] }
+
+function prism(start: V3, end: V3, r0: number, r1: number, sides: number, frame?: V3, cap = false, joint?: WoodRing, next?: V3): { tris: V3[][]; normals: V3[][]; end: WoodRing } {
   const d = norm([end[0] - start[0], end[1] - start[1], end[2] - start[2]]);
   const [a, b] = frame ? [frame, cross(d, frame)] : basis(d);
   const ring0: V3[] = [];
@@ -706,12 +721,31 @@ function prism(start: V3, end: V3, r0: number, r1: number, sides: number, frame?
     ring1.push(add(end, mul(o, r1)));
     radial.push(norm(add(o, mul(d, (r0 - r1) / length))));
   }
+  // Митра: кінцеве кільце лягає в площину посередині між цим відрізком і
+  // наступним (`next`), як стик труби під кутом. Кільце, перпендикулярне
+  // лише цьому відрізку, на різкому згині давало «рубаний» лікоть.
+  if (next) {
+    const m = norm(add(d, next));
+    const dm = d[0] * m[0] + d[1] * m[1] + d[2] * m[2];
+    if (dm > 0.2) {
+      for (let i = 0; i < sides; i += 1) {
+        const q = ring1[i]!;
+        const k = ((q[0] - end[0]) * m[0] + (q[1] - end[1]) * m[1] + (q[2] - end[2]) * m[2]) / dm;
+        ring1[i] = [q[0] - d[0] * k, q[1] - d[1] * k, q[2] - d[2] * k];
+      }
+    }
+  }
+  const welded = joint && joint.points.length === sides;
+  const start0 = welded ? joint.points : ring0;
+  // На стику нормаль — середня між попереднім відрізком і цим: світло не
+  // ламається на шві.
+  const n0 = welded ? joint.normals.map((n, i) => norm(add(n, radial[i]!))) : radial;
   const tris: V3[][] = [];
   const normals: V3[][] = [];
   for (let i = 0; i < sides; i += 1) {
     const j = (i + 1) % sides;
-    tris.push([ring0[i]!, ring0[j]!, ring1[j]!], [ring0[i]!, ring1[j]!, ring1[i]!]);
-    normals.push([radial[i]!, radial[j]!, radial[j]!], [radial[i]!, radial[j]!, radial[i]!]);
+    tris.push([start0[i]!, start0[j]!, ring1[j]!], [start0[i]!, ring1[j]!, ring1[i]!]);
+    normals.push([n0[i]!, n0[j]!, radial[j]!], [n0[i]!, radial[j]!, radial[i]!]);
   }
   // Кінчик закритий низьким конусом: відкрита труба знизу читається як
   // зрізаний короб (власник, 2026-10-04: «проблема у верхній частині дерева»).
@@ -723,7 +757,7 @@ function prism(start: V3, end: V3, r0: number, r1: number, sides: number, frame?
       normals.push([norm(add(radial[i]!, d)), norm(add(radial[j]!, d)), d]);
     }
   }
-  return { tris, normals };
+  return { tris, normals, end: { points: ring1, normals: radial } };
 }
 
 /**
@@ -934,7 +968,7 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   const wood: number[] = [];
   const woodTone: number[] = [];
   const woodNormal: number[] = [];
-  const pushTris = ({ tris, normals }: { tris: V3[][]; normals: V3[][] }, out: number[], tones: number[], tone: (face: number) => number) => {
+  const pushTris = ({ tris, normals }: { tris: V3[][]; normals: V3[][] }, out: number[], tones: number[], tone: (face: number) => number): void => {
     for (const tri of normals) for (const n of tri) woodNormal.push(n[0], n[1], n[2]);
     tris.forEach((tri, k) => {
       // Дві трикутники на грань призми, далі — по одному на грань ковпачка;
@@ -959,17 +993,61 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
   const continued = new Set(branches.filter((x) => x.order > 0).map((x) => x.key.slice(0, Math.max(0, x.key.lastIndexOf('.')))).filter((k) => k !== ''));
   branches.forEach((x, i) => { if (x.order === 0 && branches[i + 1]?.order === 0) continued.add(x.key); });
   for (const x of branches) if (x.key.endsWith('~')) continued.add(x.key);
+  // Кінцеве кільце кожного відрізка: продовження (сегмент стовбура, гілка
+  // після плавного виходу `~`, продовження `.c`) починається з нього.
+  const ends = new Map<string, WoodRing>();
+  const trunkKeys = branches.filter((x) => x.order === 0).map((x) => x.key);
+  // Провідник верхівки: найвертикальніша гілка планів продовжує стовбур тим
+  // самим кільцем, і стовбур не закривається ковпачком. Ковпачок під
+  // гілками, що входили в нього під кутом, читався світлим «браслетом» на
+  // розвилці (власник, 2026-10-06: «обдивись текстуру»).
+  const limbs = spruce ? [] : branches.filter((x) => /^c\d+$/.test(x.key));
+  const rise = (x: TreeV2Branch) => (x.end[1] - x.start[1]) / Math.max(1e-9, Math.hypot(x.end[0] - x.start[0], x.end[1] - x.start[1], x.end[2] - x.start[2]));
+  const leader = limbs.length > 0 ? limbs.reduce((best, x) => (rise(x) > rise(best) ? x : best)).key : null;
+  if (leader && topTrunk) continued.add(topTrunk.key);
+  const byKey = new Map(branches.map((x) => [x.key, x] as const));
+  const successor = (b: TreeV2Branch): TreeV2Branch | undefined => {
+    if (b === topTrunk) return leader ? byKey.get(leader) : undefined;
+    if (b.order === 0) {
+      const i = trunkKeys.indexOf(b.key);
+      return byKey.get(trunkKeys[i + 1] ?? '');
+    }
+    if (b.key.endsWith('~')) return byKey.get(b.key.slice(0, -1));
+    return byKey.get(`${b.key}.c`);
+  };
+  const dirOf = (x: TreeV2Branch | undefined): V3 | undefined => (x ? norm([x.end[0] - x.start[0], x.end[1] - x.start[1], x.end[2] - x.start[2]]) : undefined);
+  const predecessor = (b: TreeV2Branch): string | null => {
+    if (b.key === leader && topTrunk) return topTrunk.key;
+    if (b.order === 0) {
+      const i = trunkKeys.indexOf(b.key);
+      return i > 0 ? trunkKeys[i - 1]! : null;
+    }
+    if (b.key.endsWith('.c')) return b.key.slice(0, -2);
+    if (ends.has(`${b.key}~`)) return `${b.key}~`;
+    return null;
+  };
   for (const b of spruce ? branches.filter((x) => x.order === 0 && x.start[1] < spruceTop) : branches) {
-    const seg = treeV2WoodSegment(b);
+    const prev = predecessor(b);
+    const joint = prev === null ? undefined : ends.get(prev);
+    // Зварене продовження не відступає назад усередину попереднього. Плавний
+    // вихід гілки (`~`) починається на осі стовбура — він уже весь у
+    // стовбурі; відступ назад виводив його низ назовні тупим кутом.
+    const seg = joint || b.key.endsWith('~') ? { start: b.start, end: b.end } : treeV2WoodSegment(b);
     if (spruce) {
       const end: V3 = b.end[1] > spruceTop ? trunkAt(norm([b.end[0] - b.start[0], b.end[1] - b.start[1], b.end[2] - b.start[2]]), spruceTop) : b.end;
-      pushTris(prism(seg.start, end, b.r0 * taper(b.start[1]), b.r1 * taper(end[1]), WOOD_SIDES, frames.get(b.key), !continued.has(b.key)), wood, woodTone, (face) => 0.94 + 0.12 * unit(seed, `bark:${face}`));
+      const built = prism(seg.start, end, b.r0 * taper(b.start[1]), b.r1 * taper(end[1]), WOOD_SIDES, frames.get(b.key), !continued.has(b.key), joint, b.end[1] > spruceTop ? undefined : dirOf(successor(b)));
+      ends.set(b.key, built.end);
+      pushTris(built, wood, woodTone, (face) => 0.94 + 0.12 * unit(seed, `bark:${face}`));
       continue;
     }
     // Верхній сегмент стовбура звужується до товщини гілок верхівки (0.6):
     // інакше над розвилкою стирчало широке «плече» стовбура.
-    const r1 = b === topTrunk ? b.r1 * 0.6 : b.r1;
-    pushTris(prism(seg.start, seg.end, b.r0, r1, WOOD_SIDES, frames.get(b.key), !continued.has(b.key)), wood, woodTone, (face) => 0.94 + 0.12 * unit(seed, `bark:${face}`));
+    // З провідником верхівки звужується вже він сам, плавно по своїй довжині:
+    // різке звуження тут світилось смугою на розвилці.
+    const r1 = b === topTrunk && !leader ? b.r1 * 0.6 : b.r1;
+    const built = prism(seg.start, seg.end, b.r0, r1, WOOD_SIDES, frames.get(b.key), !continued.has(b.key), joint, dirOf(successor(b)));
+    ends.set(b.key, built.end);
+    pushTris(built, wood, woodTone, (face) => 0.94 + 0.12 * unit(seed, `bark:${face}`));
   }
   for (const r of treeV2Roots(model)) {
     pushTris(prism(r.start, r.end, r.r0, r.r1, 5), wood, woodTone, (face) => 0.75 + 0.3 * unit(seed, `${r.key}:w${face}`));

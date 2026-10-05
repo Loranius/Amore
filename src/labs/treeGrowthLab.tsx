@@ -56,13 +56,17 @@ function Lab() {
   const asked = params.get('form');
   const form: TreeForm = TREE_FORMS.includes(asked as TreeForm) ? (asked as TreeForm) : 'oak';
   const gap = 2.1;
+  const close = params.get('close') === '1' || params.get('close') === 'top';
+  const top = params.get('close') === 'top';
   const sky = theme === 'light' ? '#bfe3f2' : '#1b2a4a';
   return (
     <>
       <Canvas
         dpr={[1, 2]}
-        camera={{ position: [0, 1.2, 3.6 + ages.length * 1.3], fov: 34 }}
-        onCreated={({ camera }) => camera.lookAt(0, 0.45, 0)}
+        // `?close=1` — камера впритул до стовбура: подивитись кору й стики.
+        // `?close=top` — розвилка на верхівці стовбура.
+        camera={{ position: top ? [0.22, 0.48, 0.62] : close ? [0.35, 0.55, 1.5] : [0, 1.2, 3.6 + ages.length * 1.3], fov: 34 }}
+        onCreated={({ camera }) => camera.lookAt(0, top ? 0.45 : close ? 0.4 : 0.45, 0)}
         gl={{ alpha: false }}
         style={{ position: 'fixed', inset: 0, background: sky }}
       >

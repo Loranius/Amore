@@ -144,11 +144,11 @@ def skeleton(model: dict[str, Any]) -> dict[str, Any]:
         a = trunk_point(model, trunk_dir, max(0.0, y - 0.02))
         b = trunk_point(model, trunk_dir, y + 0.02)
         along = _norm((b[0] - a[0], b[1] - a[1], b[2] - a[2]))
-        exit_dir = _norm(_add(_mul(d, 0.5), _mul(along, 0.5)))
-        mid = _add(start, _mul(exit_dir, length * 0.24))
+        exit_dir = _norm(_add(_mul(d, 0.65), _mul(along, 0.35)))
+        mid = _add(start, _mul(exit_dir, length * 0.3))
         r0 = trunk_rel(y) * 0.34 * (0.6 + 0.4 * grown) * (0.75 + 0.45 * unit(seed, f"{key}:girth"))
         branches.append({"start": start, "end": mid, "r0": r0 * 1.06, "r1": r0, "order": 1, "key": f"{key}~"})
-        grow(mid, d, length * 0.86, 1, last, key, r0, 0.6)
+        grow(mid, d, length * 0.8, 1, last, key, r0, 0.6)
 
     top = trunk_point(model, trunk_dir, top_y)
     n = model["crownLimbs"]

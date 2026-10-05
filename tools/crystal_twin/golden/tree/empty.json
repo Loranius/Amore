@@ -72,10 +72,10 @@
  "summary": {
   "branches": 28,
   "clusters": 14,
-  "crownRadius": 0.9302,
+  "crownRadius": 0.9068,
   "firstBlossom": null,
-  "meadowRadius": 2.8942,
-  "reach": 0.6384,
+  "meadowRadius": 2.8754,
+  "reach": 0.6237,
   "top": 2.4069
  }
 }
