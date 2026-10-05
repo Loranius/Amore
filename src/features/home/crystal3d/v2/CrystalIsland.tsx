@@ -88,21 +88,7 @@ export interface IslandHaze {
  * Матеріал острова: фарба з палітри, м'яке світло діорами. Палітра — 8
  * кольорів або більше (риф має дев'ятий — пісок дна, ADR-0224).
  */
-/**
- * Світло кристала на святилищі (ADR-0242): кристал — головне джерело
- * світла сцени, тож підлога біля нього й внутрішні боки колон теплішають
- * його кольором, а далі світло гасне. Лише для острова кристала: дерево й
- * риф ділять цей матеріал і світла не отримують (сила 0).
- */
-export interface IslandSpill {
-  colour: THREE.Color;
-  /** Звідки світить — точка в серці колонії, у сцені. */
-  centre: THREE.Vector3;
-  radius: number;
-  strength: number;
-}
-
-export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze, spill?: IslandSpill): THREE.ShaderMaterial {
+export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze): THREE.ShaderMaterial {
   const count = paints.length;
   return new THREE.ShaderMaterial({
     // Обидва боки: віяла кришок плит і кавалків закручені як прийдеться, а
@@ -121,9 +107,6 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       uSkyGlow: { value: new THREE.Color(haze?.sky?.glow ?? '#000000') },
       uSkyOn: { value: haze?.sky ? 1 : 0 },
       uResolution: { value: new THREE.Vector2(1, 1) },
-      uSpill: { value: spill?.colour.clone() ?? new THREE.Color(0, 0, 0) },
-      uSpillCentre: { value: spill?.centre.clone() ?? new THREE.Vector3() },
-      uSpillRange: { value: new THREE.Vector2(spill?.radius ?? 1, spill?.strength ?? 0) },
     },
     vertexShader: /* glsl */ `
       attribute float paint;
@@ -156,9 +139,6 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       uniform vec3 uSkyGlow;
       uniform float uSkyOn;
       uniform vec2 uResolution;
-      uniform vec3 uSpill;
-      uniform vec3 uSpillCentre;
-      uniform vec2 uSpillRange;
       varying vec3 vWorld;
       varying float vPaint;
       varying float vTone;
@@ -176,13 +156,6 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
         vec3 c = dioramaShade(base * vTone, n, view);
         // Самоцвіти в скелі світяться самі й повільно дихають.
         c = mix(c, base * (1.25 + 0.2 * sin(uTime * 1.3 + vWorld.x * 3.0)), vGlow * 0.85);
-        if (uSpillRange.y > 0.0) {
-          // Світло кристала: гасне з відстанню, сильніше на гранях до нього.
-          vec3 toward = uSpillCentre - vWorld;
-          float fall = 1.0 - smoothstep(0.0, uSpillRange.x, length(toward));
-          float facingCrystal = 0.35 + 0.65 * max(0.0, dot(n, normalize(toward)));
-          c += (base * 0.9 + 0.1) * uSpill * fall * fall * facingCrystal * uSpillRange.y;
-        }
         float haze = smoothstep(uHazeRange.x, uHazeRange.y, length(vWorld)) * uHazeRange.z;
         if (uHazeRange.w > 0.0) {
           float near = 1.0 - smoothstep(uHazeRange.w * 0.35, uHazeRange.w, distance(cameraPosition, vWorld));
@@ -315,18 +288,11 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
   const temple = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildCrystalSurround(seed)), [seed, bare]);
   const glowHex = `#${glowColour.getHexString()}`;
   const materials = useMemo(() => {
-    // Світло кристала: з серця колонії, на третині висоти монарха.
-    const spill: IslandSpill = {
-      colour: glowColour.clone().lerp(new THREE.Color(1, 0.9, 0.96), 0.25),
-      centre: new THREE.Vector3(0, groundY + crystalHeight * 0.3, 0),
-      radius: radius * 1.25,
-      strength: theme === 'dark' ? 0.55 : 0.32,
-    };
     // Земля кристала світиться його кольором, а не сталим рожевим самоцвітів.
     const groundPaints = ISLAND_PAINTS[theme].map((hex, i) => (i === PAINT.gem ? glowHex : hex));
     return {
-      island: createIslandMaterial(ISLAND_PAINTS[theme], undefined, spill),
-      ground: createIslandMaterial(groundPaints, undefined, spill),
+      island: createIslandMaterial(ISLAND_PAINTS[theme]),
+      ground: createIslandMaterial(groundPaints),
       // Далекий храм тоне в небі, а не в сталому кольорі (ADR-0242): ближні
       // колони печери стояли яскравими смугами через увесь кадр і
       // сперечались із кристалом. Тепер ближче за 5 — повністю, далі — небо.
@@ -343,7 +309,7 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
       // (шейдер), а не хмарою навколо (власник, 2026-10-06).
       core: createGlowMaterial(glowHex, theme === 'dark' ? 0.12 : 0.08),
     };
-  }, [theme, glowHex, glowColour, groundY, crystalHeight, radius]);
+  }, [theme, glowHex]);
   const debrisRef = useRef<THREE.Group>(null);
 
   useEffect(() => () => { island.dispose(); debris.dispose(); ground.dispose(); temple.dispose(); }, [island, debris, ground, temple]);
