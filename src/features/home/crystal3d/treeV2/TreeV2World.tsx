@@ -165,7 +165,8 @@ export function TreeV2World({ seed, geometry, scale, theme, reduceMotion, island
     leaves: createLeafMaterial(palette, PORTAL_GROUND_Y),
     blossoms: createWishMaterial(PORTAL_GROUND_Y),
     flowers: createBlossomMaterial(FLOWER_COLOURS),
-    fruits: createGlowPointsMaterial('#ffc94a', 1.3, 0.3, false),
+    // Плоди віх — ягоди, що світяться рожевим (власник, 2026-10-05).
+    fruits: createGlowPointsMaterial('#ff8fc0', 1.3, 0.3, false),
     fireflies: createGlowPointsMaterial(palette.firefly, palette.fireflyStrength, 0.12, true),
   }), [palette]);
 

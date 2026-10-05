@@ -82,3 +82,37 @@ describe('крона з купок', () => {
     expect(share).toBeLessThan(AUTUMN.autumn);
   });
 });
+
+describe('романтика дозовано і ріст складніший з роками', () => {
+  it('квіток між листям дуба до шести років немає, у зрілого — кілька (до 14)', async () => {
+    const { treeV2CrownFlowerCount } = await import('./geometry');
+    expect(treeV2CrownFlowerCount({ ...OLD, years: 5.9 })).toBe(0);
+    expect(treeV2CrownFlowerCount({ ...OLD, years: 6 })).toBe(3);
+    expect(treeV2CrownFlowerCount({ ...OLD, years: 40 })).toBe(14);
+    // Квітки додають трикутники до шару бажань: зрілий дуб має їх більше,
+    // ніж сам по собі дав би лише плід-серце на кожне бажання.
+    const g = buildTreeV2Geometry(OLD, 'oak');
+    const young = buildTreeV2Geometry({ ...OLD, years: 5 }, 'oak');
+    expect(g.wishes.positions.length - young.wishes.positions.length).toBe(treeV2CrownFlowerCount(OLD) * 15 * 9);
+  });
+
+  it('плід бажання на дубі — серце: западинка вгорі, вістря внизу', () => {
+    const model = buildTreeV2Model({ ...BUSY, asOf: '2030-01-01', wishes: [{ id: 7, date: '2024-06-01', isShared: true }] });
+    const g = buildTreeV2Geometry(model, 'oak');
+    const p = treeV2WishPoints(model, 'oak')[0]!;
+    // Перші 80·3 вершини — тіло серця.
+    const ys: number[] = [];
+    const xs: number[] = [];
+    for (let i = 0; i < 240; i += 1) {
+      ys.push(g.wishes.positions[i * 3 + 1]!);
+      xs.push(Math.hypot(g.wishes.positions[i * 3]! - p[0], g.wishes.positions[i * 3 + 2]! - p[2]));
+    }
+    const top = Math.max(...ys);
+    const bottom = Math.min(...ys);
+    // Вістря — одна точка внизу; угорі — дві лопаті, між ними западинка.
+    const nearBottom = xs.filter((_, i) => ys[i]! < bottom + (top - bottom) * 0.05);
+    expect(Math.max(...nearBottom)).toBeLessThan((top - bottom) * 0.15);
+    const width = Math.max(...xs);
+    expect(width).toBeGreaterThan((top - bottom) * 0.4);
+  });
+});

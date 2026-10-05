@@ -611,6 +611,11 @@ export function treeV2OnCrown(masses: readonly TreeV2CrownMass[], p: V3, depth =
  * найвищої), тож квітки розходяться по всій кроні, а не купчаться на гілці
  * свого року.
  */
+/** Скільки квіток-прикрас між листям дуба: від шести років (етап «6+»). */
+export function treeV2CrownFlowerCount(model: TreeV2Model): number {
+  return model.years < 6 ? 0 : Math.min(14, 3 + Math.floor((model.years - 6) * 1.5));
+}
+
 export function treeV2SakuraFlowerSpots(model: TreeV2Model, clusters: readonly TreeV2Cluster[], count: number): { point: V3; normal: V3 }[] {
   if (count <= 0) return [];
   const seed = model.startDate;
@@ -1030,30 +1035,44 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     const phi = 2 * Math.PI * unit(seed, `wish${k}:phi`);
     const out: V3 = [Math.cos(phi), 0, Math.sin(phi)];
     if (form === 'oak') {
-      // Яблуко: гранчаста куля з рум'янцем, хвостик і листочок.
-      const r = size * 0.72;
-      const c: V3 = [p[0], p[1] - size * 0.35 - r, p[2]];
-      const red = rgb('#d8323e');
-      const blush = rgb('#f2734a');
-      const dark = rgb('#a8202e');
-      // Колір — на вершину, плавно: темніше донизу, рум'янець на боці до
-      // світла. Раніше рум'янець падав на випадкові грані, і яблуко було
-      // плямистим (власник, 2026-10-04: «без гострих кутів на текстурах»).
-      const shade = (q: V3): V3 => {
-        const lit = Math.max(0, q[0] * -0.55 + q[1] * 0.6 + q[2] * 0.58);
-        return mix(mix(dark, red, (q[1] + 1) / 2), blush, lit * lit * 0.8);
-      };
-      for (const [i, j, l] of ICO.faces) {
-        for (const q of [ICO.verts[i]!, ICO.verts[j]!, ICO.verts[l]!]) vert([c[0] + q[0] * r, c[1] + q[1] * r * 0.9, c[2] + q[2] * r], shade(q), 0.6);
-      }
+      // Плід-серце (власник, 2026-10-05: «маленькі червоні/рожеві
+      // плоди-серця … замість випадкових червоних куль»). Пухке серце з
+      // гранчастої кулі: кожна вершина лягає на криву серця за своїм кутом
+      // у площині, що дивиться від стовбура, і сплющена в глибину. Колір —
+      // на вершину, плавно: темніше донизу, рожевий відблиск до світла.
+      const r = size * 0.62;
       const side: V3 = [-out[2], 0, out[0]];
-      const top: V3 = [c[0], c[1] + r * 0.9, c[2]];
+      const c: V3 = [p[0], p[1] - size * 0.3 - r * 0.35, p[2]];
+      const red = rgb('#e0344f');
+      const pink = rgb('#ff8fb3');
+      const dark = rgb('#a81e3c');
+      const heart = (q: V3): V3 => {
+        // q — одинична вершина: x — убік, y — угору, z — у глибину.
+        const t = Math.atan2(q[0], q[1]);
+        const rho = Math.hypot(q[0], q[1]);
+        const hx = (16 * Math.sin(t) ** 3) / 17;
+        const hy = (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t)) / 17;
+        return [hx * rho, hy * rho, q[2] * 0.7 * Math.sqrt(Math.max(0, 1 - 0.3 * hy * hy))];
+      };
+      const shade = (h: V3): V3 => {
+        const lit = Math.max(0, h[0] * -0.5 + h[1] * 0.55 + h[2] * 0.9);
+        return mix(mix(dark, red, Math.min(1, (h[1] + 1) / 1.4)), pink, Math.min(1, lit * lit * 0.9));
+      };
+      const place = (h: V3): V3 => add(add(add(c, mul(side, h[0] * r)), [0, h[1] * r, 0]), mul(out, h[2] * r));
+      for (const [i, j, l] of ICO.faces) {
+        for (const q of [ICO.verts[i]!, ICO.verts[j]!, ICO.verts[l]!]) {
+          const h = heart(q);
+          vert(place(h), shade(h), 0.6);
+        }
+      }
+      // Хвостик — до западинки серця; листочок біля гілки.
+      const notch = place([0, 5 / 17, 0]);
       const brown = rgb('#6e4426');
-      tri(p, add(top, mul(side, size * 0.05)), add(top, mul(side, -size * 0.05)), brown, 0, 0.5, 0.5);
-      const leafTip = add(add(p, mul(out, size * 0.55)), [0, -size * 0.1, 0]);
+      tri(p, add(notch, mul(side, size * 0.04)), add(notch, mul(side, -size * 0.04)), brown, 0, 0.5, 0.5);
+      const leafTip = add(add(p, mul(out, size * 0.5)), [0, -size * 0.08, 0]);
       const green = rgb('#4f9e3c');
-      tri(p, add(add(p, mul(out, size * 0.28)), [0, size * 0.12, 0]), leafTip, green, 0, 0.3, 0.5);
-      tri(p, leafTip, add(add(p, mul(out, size * 0.28)), [0, -size * 0.14, 0]), rgb('#3f8a32'), 0, 0.5, 0.3);
+      tri(p, add(add(p, mul(out, size * 0.26)), [0, size * 0.11, 0]), leafTip, green, 0, 0.3, 0.5);
+      tri(p, leafTip, add(add(p, mul(out, size * 0.26)), [0, -size * 0.13, 0]), rgb('#3f8a32'), 0, 0.5, 0.3);
     } else if (form === 'sakura') {
       // Квітка сакури (власник, 2026-10-04: «перемалювати на ніжніші й
       // кругліші, як квіти сакури»): п'ять круглих пелюсток із виїмкою на
@@ -1126,6 +1145,34 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
       }
     }
   });
+
+  // Кілька квіток між листям дорослого дуба (власник, 2026-10-05: «кілька
+  // квітів між листям», «6+ років — велике дерево … з квітами й плодами»).
+  // Це не бажання — прикраса віку: від шести років по 3, і по півтори
+  // за кожен рік далі, не більше 14. Сидять на гранях мас крони, що
+  // дивляться вгору, і хитаються з листям (той самий матеріал, що й бажання).
+  for (const spot of form === 'oak' ? treeV2SakuraFlowerSpots(model, clusters, treeV2CrownFlowerCount(model)) : []) {
+    anchor = spot.point;
+    const n = spot.normal;
+    const [u, v] = basis(n);
+    const R = size * 0.75;
+    const centre = add(spot.point, mul(n, size * 0.03));
+    const turn = 2 * Math.PI * unit(seed, `bloom:${spot.point.map((x) => x.toFixed(3)).join(',')}`);
+    const dir = (a: number) => add(mul(u, Math.cos(a)), mul(v, Math.sin(a)));
+    const petal = rgb('#fff4ee');
+    const tip = rgb('#ffb6cf');
+    for (let q = 0; q < 5; q += 1) {
+      const a0 = turn + (q / 5) * Math.PI * 2;
+      const lift = mul(n, R * 0.15);
+      tri(centre, add(add(centre, mul(dir(a0 - 0.42), R * 0.75)), lift), add(add(centre, mul(dir(a0), R)), lift), petal, 0, 0, 0);
+      tri(centre, add(add(centre, mul(dir(a0), R)), lift), add(add(centre, mul(dir(a0 + 0.42), R * 0.75)), lift), tip, 0, 0, 0);
+    }
+    const yolk = rgb('#ffd24a');
+    const raised = add(centre, mul(n, R * 0.1));
+    for (let q = 0; q < 5; q += 1) {
+      tri(raised, add(raised, mul(dir(turn + (q / 5) * Math.PI * 2), R * 0.22)), add(raised, mul(dir(turn + ((q + 1) / 5) * Math.PI * 2), R * 0.22)), yolk, 0, 0, 0);
+    }
+  }
 
   return {
     wood: { positions: new Float32Array(wood), tone: new Float32Array(woodTone), normal: new Float32Array(woodNormal) },
