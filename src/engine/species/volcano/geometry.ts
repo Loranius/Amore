@@ -27,13 +27,17 @@ import { volcanoSlopeRadius, type VolcanoModel } from './model';
 
 type V3 = [number, number, number];
 
-const SIDES = 12;
+/**
+ * Граней довкола — 10: «8–12 великих фасетів замість майже гладкої
+ * поверхні» (власник, 2026-10-05).
+ */
+const SIDES = 10;
 
 
 interface Ring { y: number; key: string; points: V3[] }
 
 /** Кільця конуса: підніжжя, верх пагорба, межі шарів і губа кратера. */
-const MAX_RING_LAYERS = 5;
+const MAX_RING_LAYERS = 2;
 
 function ringLayers<T>(layers: readonly T[]): T[] {
   if (layers.length <= MAX_RING_LAYERS + 1) return [...layers];
@@ -53,15 +57,24 @@ export function volcanoRings(model: VolcanoModel): Ring[] {
     // посмугованим і м'яким; роки й далі в шарах моделі — тут лише меш.
     ...ringLayers(model.layers).map((l) => ({ y: l.to, key: `year${l.year}` })),
   ];
+  // Асиметрія — з дати пари й однакова на всіх кільцях: один бік ширший і
+  // пологіший, як у справжнього вулкана, що його лава роками текла на один
+  // бік. Кільце вершин на кожній висоті — та сама вісь азимутів, тож ребра
+  // від кратера до підніжжя йдуть суцільно — скелясті хребти.
+  const lobeA = unit(seed, 'cone:lobe') * Math.PI * 2;
+  const lobeB = unit(seed, 'cone:lobe2') * Math.PI * 2;
+  const lobe = (a: number) => 1 + 0.12 * Math.cos(a - lobeA) + 0.05 * Math.cos(2 * a - lobeB);
   return heights.map(({ y, key }, index) => {
     const last = index === heights.length - 1;
     const points: V3[] = [];
     for (let i = 0; i < SIDES; i += 1) {
       const tag = `${key}:${i}`;
-      const a = ((i + 0.35 * (unit(seed, `${tag}:a`) - 0.5)) / SIDES) * Math.PI * 2;
+      const a = ((i + 0.3 * (unit(seed, `cone:${i}:a`) - 0.5)) / SIDES) * Math.PI * 2;
       const base = key === 'foot' ? model.baseRadius * 1.04 : volcanoSlopeRadius(model, y);
-      const r = base * (1 + 0.12 * (unit(seed, `${tag}:r`) - 0.5)) * (last ? 1.07 : 1);
-      const dy = last || key === 'foot' ? 0 : 0.035 * (unit(seed, `${tag}:y`) - 0.5);
+      // Хребти й западини: вершина ребра виступає, сусідня — западає.
+      const ridge = 1 + (i % 2 === 0 ? 0.07 : -0.05) * (key === 'foot' ? 0.5 : 1);
+      const r = base * lobe(a) * ridge * (1 + 0.14 * (unit(seed, `${tag}:r`) - 0.5)) * (last ? 1.05 : 1);
+      const dy = last || key === 'foot' ? 0 : 0.06 * (unit(seed, `${tag}:y`) - 0.5) * Math.max(0.3, y);
       points.push([Math.cos(a) * r, y + dy, Math.sin(a) * r]);
     }
     return { y, key, points };
@@ -70,7 +83,8 @@ export function volcanoRings(model: VolcanoModel): Ring[] {
 
 /** Глибина озера лави під губою кратера. */
 export function volcanoMagmaY(model: VolcanoModel): number {
-  return model.height - 0.1 - 0.05 * model.height;
+  // Глибокий кратер (власник: «глибокий кратер; темна внутрішня порожнина»).
+  return model.height - model.craterRadius * 1.15;
 }
 
 /**
@@ -137,7 +151,7 @@ export function volcanoVeinPaths(model: VolcanoModel): VeinPoint[][] {
     path.push({
       at: [notch[0] * 0.8, notch[1] - R * 0.05, notch[2] * 0.8],
       side: [-Math.sin(a0), 0, Math.cos(a0)],
-      wl: R * 0.22, wr: R * 0.22, heat: 1, flow: 0,
+      wl: R * 0.1, wr: R * 0.1, heat: 1, flow: 0,
     });
     samples.forEach((sample, k) => {
       const t = k / n;
@@ -149,7 +163,8 @@ export function volcanoVeinPaths(model: VolcanoModel): VeinPoint[][] {
       const y = lo.y + (hi.y - lo.y) * sample.s;
       const lift = 1.03 + 0.01 * t;
       // Малі хвилі берегів — кожен берег свої — і ширшання донизу.
-      const base = R * (0.26 + 0.24 * t);
+      // Тонкі потоки, а не ріки (власник: «кілька тонких потоків лави»).
+      const base = R * (0.08 + 0.06 * t);
       const waveL = 1 + 0.18 * Math.sin(phase + t * 23) + 0.1 * Math.sin(phase * 2 + t * 41);
       const waveR = 1 + 0.18 * Math.sin(phase + 1.7 + t * 19) + 0.1 * Math.sin(phase * 3 + t * 37);
       // Язик заокруглюється: береги сходяться в останні 6% довжини.
@@ -174,11 +189,14 @@ export function volcanoVeinPaths(model: VolcanoModel): VeinPoint[][] {
  */
 export function volcanoRockHeat(model: VolcanoModel, veins: readonly VeinPoint[][], p: V3): number {
   const f = p[1] / model.height;
-  let heat = 0.5 * Math.min(1, Math.max(0, (f - 0.6) / 0.4)) ** 1.5;
+  // Біля губи камінь лише теплий; пізня стадія — світиться зсередини
+  // (власник: «вулкан світиться зсередини») — тепло піднімається схилом.
+  let heat = (0.25 + 0.2 * model.innerGlow) * Math.min(1, Math.max(0, (f - 0.75) / 0.25)) ** 1.5;
+  heat = Math.max(heat, 0.32 * model.innerGlow * Math.min(1, Math.max(0, (f - 0.25) / 0.75)) ** 2);
   for (const path of veins) {
     for (const v of path) {
       const d = Math.hypot(p[0] - v.at[0], p[1] - v.at[1], p[2] - v.at[2]);
-      heat = Math.max(heat, 0.4 * v.heat * Math.exp(-((d / 0.14) ** 2)));
+      heat = Math.max(heat, 0.3 * v.heat * Math.exp(-((d / 0.07) ** 2)));
     }
   }
   return Math.min(1, heat);
@@ -203,15 +221,20 @@ export function volcanoCrater(model: VolcanoModel) {
   // Губа кам'яна, трошки зубчаста (власник: «зроби жерло трошки зубчастим,
   // з виямки якої витікає лава»): зубці через один, а над кожною рікою —
   // виїмка майже до коміра, звідки лава й переливається.
-  const lift = collar.map((_, i) => (notches.has(i)
-    ? R * 0.05
-    : R * ((i % 2 === 0 ? 0.46 : 0.3) + 0.1 * unit(seed, `rim:${i}:y`))));
-  const bulge = collar.map(([x, y, z], i): V3 => [x * 1.1, y + lift[i]! * 0.4, z * 1.1]);
-  const rim = collar.map(([x, y, z], i): V3 => [x * 0.95, y + lift[i]!, z * 0.95]);
+  // Губа нахилена: один бік вищий — кратер асиметричний, як і конус.
+  const tilt = unit(seed, 'rim:tilt') * Math.PI * 2;
+  const lift = collar.map(([x, , z], i) => {
+    const lean = 0.5 + 0.5 * Math.cos(Math.atan2(z, x) - tilt);
+    return notches.has(i) ? R * 0.04 : R * ((i % 2 === 0 ? 0.36 : 0.22) + 0.1 * unit(seed, `rim:${i}:y`) + 0.2 * lean);
+  });
+  const bulge = collar.map(([x, y, z], i): V3 => [x * 1.08, y + lift[i]! * 0.4, z * 1.08]);
+  const rim = collar.map(([x, y, z], i): V3 => [x * 0.97, y + lift[i]!, z * 0.97]);
   const magma = volcanoMagmaY(model);
-  const ledge = collar.map(([x, y, z], i): V3 => [x * 0.76, y - R * (0.08 + 0.08 * unit(seed, `ledge:${i}`)), z * 0.76]);
-  const inner = collar.map(([x, , z]): V3 => [x * 0.6, magma, z * 0.6]);
-  return { collar, bulge, rim, ledge, inner };
+  // Глибока чаша: уступ під губою, далі крута темна стінка до озера жару.
+  const ledge = collar.map(([x, y, z], i): V3 => [x * 0.8, y - R * (0.25 + 0.1 * unit(seed, `ledge:${i}`)), z * 0.8]);
+  const deep = collar.map(([x, , z], i): V3 => [x * 0.62, magma + R * (0.3 + 0.08 * unit(seed, `deep:${i}`)), z * 0.62]);
+  const inner = collar.map(([x, , z]): V3 => [x * 0.5, magma, z * 0.5]);
+  return { collar, bulge, rim, ledge, deep, inner };
 }
 
 export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: number[]; heat: number[] } {
@@ -229,24 +252,23 @@ export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: 
     const y = (tri[0][1] + tri[1][1] + tri[2][1]) / 3;
     return 0.74 + 0.26 * Math.min(1, Math.max(0, y / Math.max(1e-6, model.height)));
   };
+  // Великі фасети (власник, 2026-10-05): чотирикутник між кільцями — два
+  // трикутники, діагональ чергується, тон — на всю грань. Кожен тон різний:
+  // скеля читається гранями, а не гладким конусом.
   for (let k = 0; k < rings.length - 1; k += 1) {
     const lo = rings[k]!;
     const hi = rings[k + 1]!;
     for (let i = 0; i < SIDES; i += 1) {
       const j = (i + 1) % SIDES;
-      const corners = [lo.points[i]!, hi.points[i]!, hi.points[j]!, lo.points[j]!];
-      const mid: V3 = [0, 0, 0];
-      for (const c of corners) { mid[0] += c[0] / 4; mid[1] += c[1] / 4; mid[2] += c[2] / 4; }
-      const dent = 1 - 0.045 * unit(seed, `${hi.key}:dent${i}`);
-      const lift = (unit(seed, `${hi.key}:lift${i}`) - 0.5) * 0.25 * (hi.y - lo.y);
-      const c: V3 = [mid[0] * dent, mid[1] + lift, mid[2] * dent];
-      // Сильніша різниця між гранями, без горизонтальних смуг: low-poly
-      // референсу читається гранями, а не поясами.
-      const t = 0.72 + 0.4 * unit(seed, `${hi.key}:f${i}`);
-      for (let q = 0; q < 4; q += 1) {
-        const tri: Tri = [corners[q]!, corners[(q + 1) % 4]!, c];
+      const a = lo.points[i]!;
+      const b = hi.points[i]!;
+      const c = hi.points[j]!;
+      const d = lo.points[j]!;
+      const t = 0.7 + 0.45 * unit(seed, `${hi.key}:f${i}`);
+      const pair: Tri[] = (i + k) % 2 === 0 ? [[a, b, c], [a, c, d]] : [[a, b, d], [b, c, d]];
+      for (const [q, tri] of pair.entries()) {
         tris.push(tri);
-        tone.push(t * (0.86 + 0.24 * unit(seed, `${hi.key}:f${i}:${q}`)) * shadeAt(tri));
+        tone.push(t * (q === 0 ? 1 : 0.9 + 0.12 * unit(seed, `${hi.key}:f${i}:b`)) * shadeAt(tri));
       }
     }
   }
@@ -263,15 +285,25 @@ export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: 
     }
   };
   band(crater.collar, crater.bulge, 'bulge', 0.8);
-  band(crater.bulge, crater.rim, 'rim', 0.8);
+  const rimFrom = tris.length;
+  band(crater.bulge, crater.rim, 'rim', 0.85);
   const innerFrom = tris.length;
-  band(crater.rim, crater.ledge, 'wall', 0.5);
+  // Темна порожнина: стінки темні, лише низ підсвічений жаром.
+  band(crater.rim, crater.ledge, 'wall', 0.32);
+  const deepFrom = tris.length;
+  band(crater.ledge, crater.deep, 'deep', 0.24);
   // Жар — на кожну вершину, у тому ж порядку, що й трикутники.
   const heat: number[] = [];
   for (const tri of tris) for (const v of tri) heat.push(volcanoRockHeat(model, veins, v));
-  // Вал і губа теплі; внутрішня стінка жерла підсвічена лавою знизу.
-  for (let k = (innerFrom - SIDES * 4) * 3; k < innerFrom * 3; k += 1) heat[k] = Math.max(heat[k]!, 0.35);
-  for (let k = innerFrom * 3; k < heat.length; k += 1) heat[k] = Math.max(heat[k]!, 0.75);
+  // Легке світіння країв губи — зі стадією; стінка темна вгорі, тепла внизу.
+  const edge = 0.15 + 0.3 * model.awakening.glow;
+  for (let k = rimFrom * 3; k < innerFrom * 3; k += 1) heat[k] = Math.max(heat[k]!, edge);
+  const magma = volcanoMagmaY(model);
+  for (let k = innerFrom * 3; k < heat.length; k += 1) {
+    const y = tris[Math.floor(k / 3)]![k % 3]![1];
+    const depth = Math.min(1, Math.max(0, (model.height + model.craterRadius * 0.3 - y) / Math.max(1e-6, model.height + model.craterRadius * 0.3 - magma)));
+    heat[k] = k >= deepFrom * 3 ? 0.15 + 0.75 * model.awakening.glow * depth ** 2 : 0.05 + 0.2 * model.awakening.glow * depth ** 2;
+  }
   // Уступів насичених років на схилі більше немає (власник, 2026-10-05:
   // «щось протикає текстури вулкана»): тераса виходила зі схилу назовні й
   // під плавним світлом читалась дошкою, встромленою в конус. Насичений рік
@@ -362,8 +394,8 @@ export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
   const push = (v: V3, heat: number, flow = -1) => { p.push(...v); h.push(heat); f.push(flow); };
   // Озеро: віяло трикутників, що здувається посередині — лава випирає.
   const y = volcanoMagmaY(model) + 0.005;
-  const r = volcanoSlopeRadius(model, model.height) * 0.64;
-  const dome = model.craterRadius * 0.28;
+  const r = volcanoSlopeRadius(model, model.height) * 0.54;
+  const dome = model.craterRadius * 0.18;
   for (let i = 0; i < SIDES; i += 1) {
     const a0 = (i / SIDES) * Math.PI * 2;
     const a1 = ((i + 1) / SIDES) * Math.PI * 2;
@@ -380,7 +412,7 @@ export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
       push(a[i]!, ha); push(b[i]!, hb); push(b[j]!, hb);
     }
   };
-  band(crater.ledge, crater.inner, 0.85, 0.92);
+  band(crater.deep, crater.inner, 0.55, 0.85);
   // Ріки: ті самі шляхи, від яких тепліє камінь.
   for (const path of volcanoVeinPaths(model)) {
     let prev: VeinPoint | null = null;
@@ -414,7 +446,7 @@ export function volcanoPlacements(model: VolcanoModel): ReefV2Placement[] {
   const years = Math.max(1, model.life.colonies.length);
   for (const [index, c] of model.life.colonies.entries()) {
     const a0 = (c.azimuth * Math.PI) / 180;
-    const r0 = model.baseRadius * (1.04 + 0.1 * (index / years));
+    const r0 = volcanoFootRadius(model, a0) * (1.04 + 0.1 * (index / years));
     // Скільки коралів у колонії — спогади цього року (ADR-0237): 1 на тихий
     // рік, до чотирьох на рік, повний спогадів. Небагато — власник: «прибери
     // … коралів в дві третини».
@@ -428,7 +460,7 @@ export function volcanoPlacements(model: VolcanoModel): ReefV2Placement[] {
       let scale = 0.6;
       if (j > 0) {
         a = a0 + ((j % 2 ? 1 : -1) * Math.ceil(j / 2) * c.size * (0.5 + 0.25 * unit(seed, `${key}:d`))) / r0;
-        r = r0 * (0.98 + 0.08 * unit(seed, `${key}:r`));
+        r = volcanoFootRadius(model, a) * (1.04 + 0.1 * (index / years)) * (1 + 0.06 * unit(seed, `${key}:r`));
         scale = 0.36 + 0.2 * unit(seed, `${key}:s`);
       }
       out.push({ colony: c, body: j, key, size: c.size * scale, base: [Math.cos(a) * r, 0, Math.sin(a) * r], axis: [0, 1, 0] });
@@ -437,9 +469,19 @@ export function volcanoPlacements(model: VolcanoModel): ReefV2Placement[] {
   return out;
 }
 
+/**
+ * Радіус підніжжя під азимутом `a`: конус асиметричний, тож кільце життя
+ * довкола нього йде за справжнім краєм, а не за колом `baseRadius` —
+ * інакше на широкому боці корал стояв би в камені.
+ */
+export function volcanoFootRadius(model: VolcanoModel, a: number): number {
+  const rings = volcanoRings(model);
+  return Math.max(model.baseRadius, volcanoRingHit(rings[0]!.points, a).r, volcanoRingHit(rings[1]!.points, a).r);
+}
+
 const UNDERGROWTH_FORMS: readonly ReefForm[] = ['finger', 'brain', 'branch', 'tube', 'finger', 'fan'];
 /** Підросту — пояс біля підніжжя, не шуба на конусі: небагато й дрібно. */
-const UNDERGROWTH_MAX = 12;
+const UNDERGROWTH_MAX = 6;
 
 export function volcanoUndergrowth(model: VolcanoModel): ReefV2Placement[] {
   const seed = model.startDate;
@@ -448,7 +490,7 @@ export function volcanoUndergrowth(model: VolcanoModel): ReefV2Placement[] {
   for (let k = 0; k < count; k += 1) {
     const key = `under${k}`;
     const a = 2 * Math.PI * unit(seed, `${key}:a`);
-    const r = model.baseRadius * (0.99 + 0.12 * unit(seed, `${key}:r`));
+    const r = volcanoFootRadius(model, a) * (1.02 + 0.1 * unit(seed, `${key}:r`));
     const size = 0.055 + 0.075 * unit(seed, `${key}:s`);
     const form = UNDERGROWTH_FORMS[Math.min(5, Math.floor(unit(seed, `${key}:f`) * 6))]!;
     const colony: ReefV2Colony = { year: -1, age: 0, activity: 0, form, size, bodies: 1, azimuth: 0, reach: 0, hue: unit(seed, `${key}:h`) };
@@ -466,17 +508,19 @@ export function volcanoOrnaments(model: VolcanoModel): ReefV2Ornaments {
     anemones: [],
     clams: Array.from({ length: life.clams }, (_, k): V3 => {
       const a = 2 * Math.PI * unit(seed, `clam${k}:a`);
-      const r = model.baseRadius * (1.02 + 0.12 * unit(seed, `clam${k}:r`));
+      const r = volcanoFootRadius(model, a) * (1.04 + 0.1 * unit(seed, `clam${k}:r`));
       return [Math.cos(a) * r, 0, Math.sin(a) * r];
     }),
     starfish: Array.from({ length: life.starfish }, (_, k) => {
       const a = 2 * Math.PI * unit(seed, `star${k}:a`);
-      const d = model.baseRadius * (1.1 + 0.35 * unit(seed, `star${k}:d`));
+      const d = volcanoFootRadius(model, a) * (1.1 + 0.3 * unit(seed, `star${k}:d`));
       return { position: [Math.cos(a) * d, 0, Math.sin(a) * d] as V3, turn: 360 * unit(seed, `star${k}:t`) };
     }),
     // Риби кружляють довкола вулкана на всю його висоту.
     // Третина риб і трави рифу: вулкан не акваріум (власник, ADR-0235).
-    fish: Array.from({ length: Math.round(life.fish / 3) }, (_, k) => ({
+    // Біля вулкана — менше (власник, 2026-10-05: «увага розмазується»):
+    // п'ята частина риб рифу.
+    fish: Array.from({ length: Math.round(life.fish / 5) }, (_, k) => ({
       orbit: model.baseRadius * (1.15 + 0.6 * unit(seed, `fish${k}:r`)),
       height: 0.15 + (model.height + 0.25) * unit(seed, `fish${k}:y`),
       phase: 360 * unit(seed, `fish${k}:p`),
@@ -484,7 +528,7 @@ export function volcanoOrnaments(model: VolcanoModel): ReefV2Ornaments {
     })),
     seagrass: Array.from({ length: Math.round(life.seagrass / 3) }, (_, k): V3 => {
       const a = 2 * Math.PI * unit(seed, `grass${k}:a`);
-      const d = model.baseRadius * 1.04 + 2.2 * unit(seed, `grass${k}:d`) ** 1.5;
+      const d = volcanoFootRadius(model, a) * 1.06 + 2.2 * unit(seed, `grass${k}:d`) ** 1.5;
       return [Math.cos(a) * d, 0, Math.sin(a) * d];
     }),
   };
@@ -503,7 +547,8 @@ export function buildVolcanoGeometry(model: VolcanoModel): VolcanoGeometry {
   // Губа жерла здіймається над останнім шаром.
   const top = Math.max(model.height + model.craterRadius * 0.7, ...placements.map((p) => p.base[1] + p.axis[1] * REEF_FORM_HEIGHT[p.colony.form] * p.size));
   // Корал на плато сягає вбік на ~0.35 свого розміру (форми рифу вужчі за висоту).
-  const reach = Math.max(model.baseRadius * 1.1, ...placements.map((p) => Math.hypot(p.base[0], p.base[2]) + p.size * 0.35));
+  const foot = Math.max(...volcanoRings(model)[0]!.points.map((p) => Math.hypot(p[0], p[2])));
+  const reach = Math.max(foot * 1.05, ...placements.map((p) => Math.hypot(p.base[0], p.base[2]) + p.size * 0.35));
   const life = assembleReefLife(model.life, {
     rock: cone.tris,
     rockTone: (face) => cone.tone[face]!,

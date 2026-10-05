@@ -80,6 +80,10 @@ interface ReefV2WorldProps {
    */
   rockMaterial?: THREE.ShaderMaterial;
   rockHeat?: Float32Array;
+  /** Кут складки згладжування каменю; вулкан тримає грані гострішими. */
+  rockCreaseDeg?: number;
+  /** Острів із вулканічного каменю (вулкан). */
+  volcanicIsland?: boolean;
   /** Частка дикої живності острова (вулкан — третина, ADR-0235). */
   islandWildlife?: number;
   /** Спокійне далеке тло (вулкан, ADR-0235). */
@@ -99,16 +103,16 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false, fishKinds = 3, season }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, rockCreaseDeg = ISLAND_CREASE_DEG, volcanicIsland = false, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false, fishKinds = 3, season }: ReefV2WorldProps) {
   const palette = useMemo(() => (season ? seasonalReefPalette(REEF_PALETTES[theme], season, theme) : REEF_PALETTES[theme]), [season, theme]);
 
   const rock = useMemo(() => {
-    const tone = softScalar(geometry.rock.positions, geometry.rock.tone, ISLAND_CREASE_DEG);
+    const tone = softScalar(geometry.rock.positions, geometry.rock.tone, rockCreaseDeg);
     const g = tonedGeometry(geometry.rock.positions, rockHeat ? { tone, heat: rockHeat } : { tone });
     // Плавне світло на скелі рифу й конусі вулкана; злами за 55° лишаються.
-    g.setAttribute('normal', new THREE.BufferAttribute(softNormals(geometry.rock.positions, ISLAND_CREASE_DEG), 3));
+    g.setAttribute('normal', new THREE.BufferAttribute(softNormals(geometry.rock.positions, rockCreaseDeg), 3));
     return g;
-  }, [geometry, rockHeat]);
+  }, [geometry, rockHeat, rockCreaseDeg]);
   const corals = useMemo(() => tonedGeometry(geometry.corals.positions, {
     tone: geometry.corals.tone, form: geometry.corals.form, hue: geometry.corals.hue, rise: geometry.corals.rise,
   }), [geometry]);
@@ -221,7 +225,7 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
   return (
     <>
       {!bare && <Diorama species="reef" theme={theme} seed={seed} radius={island} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} base={false} shadowLift={reefIslandGround(island, 0)} />}
-      <ReefIsland bare={bare} arch={islandArch} lagoon={islandLagoon} stones={islandStones} wildlife={islandWildlife} calmSurround={calmSurround} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
+      <ReefIsland bare={bare} arch={islandArch} lagoon={islandLagoon} stones={islandStones} wildlife={islandWildlife} calmSurround={calmSurround} volcanic={volcanicIsland} seed={seed} theme={theme} radius={island} rock={rockRadius} groundY={PORTAL_GROUND_Y} reduceMotion={reduceMotion} />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         {geometry.seagrass.length > 0 && (
           <instancedMesh ref={grassRef} args={[tuft, materials.grass, geometry.seagrass.length]} frustumCulled={false} />

@@ -117,7 +117,8 @@ function shellBody(r: number, colour: THREE.Color): THREE.BufferGeometry {
   return b.geometry();
 }
 
-const KIND_SIZE: Record<VolcanoCreatureKind, number> = { fish: 0.26, jellyfish: 0.16, oyster: 0.3, bigFish: 0.46, whale: 1.6, dolphin: 0.5 };
+// Кит — 45% колишнього розміру (власник, 2026-10-05: «40–50% нинішнього»).
+const KIND_SIZE: Record<VolcanoCreatureKind, number> = { fish: 0.26, jellyfish: 0.16, oyster: 0.3, bigFish: 0.46, whale: 0.72, dolphin: 0.5 };
 
 function bodyFor(c: VolcanoCreature): THREE.BufferGeometry[] {
   const size = KIND_SIZE[c.kind];
@@ -143,11 +144,13 @@ export function VolcanoCreatures({ creatures, reduceMotion }: { creatures: reado
   const materials = useMemo(() => ({
     body: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide }),
     jelly: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.78, depthWrite: false }),
+    // Кит тоне в синій глибині: напівпрозорий силует кольору води.
+    whale: new THREE.MeshBasicMaterial({ vertexColors: true, side: THREE.DoubleSide, transparent: true, opacity: 0.45, depthWrite: false, color: new THREE.Color('#6f9bd6') }),
     // Перлина світиться сама.
     pearl: new THREE.MeshBasicMaterial({ color: new THREE.Color('#fff6fb').multiplyScalar(1.3), toneMapped: false }),
   }), []);
   useEffect(() => () => { for (const list of bodies) for (const g of list) g.dispose(); }, [bodies]);
-  useEffect(() => () => { materials.body.dispose(); materials.jelly.dispose(); materials.pearl.dispose(); }, [materials]);
+  useEffect(() => () => { materials.body.dispose(); materials.jelly.dispose(); materials.whale.dispose(); materials.pearl.dispose(); }, [materials]);
   const refs = useRef<(THREE.Group | null)[]>([]);
   const lids = useRef<(THREE.Mesh | null)[]>([]);
 
@@ -157,11 +160,17 @@ export function VolcanoCreatures({ creatures, reduceMotion }: { creatures: reado
       const g = refs.current[i];
       if (!g) return;
       const a = (c.phase * Math.PI) / 180 + t * c.speed;
-      const x = Math.cos(a) * c.orbit;
-      const z = Math.sin(a) * c.orbit;
+      let x = Math.cos(a) * c.orbit;
+      let z = Math.sin(a) * c.orbit;
       let y = c.height;
       // Напрям руху — дотична до кола (проти годинникової стрілки).
       g.rotation.set(0, Math.atan2(-Math.cos(a), -Math.sin(a)), 0);
+      if (c.kind === 'whale') {
+        // Кит пропливає ПОЗАДУ: еліпс, увесь за вулканом (камера — на +z).
+        x = Math.cos(a) * c.orbit;
+        z = -c.orbit * 0.75 + Math.sin(a) * c.orbit * 0.25;
+        g.rotation.set(0, Math.atan2(-Math.cos(a) * 0.25, -Math.sin(a)), 0);
+      }
       if (c.kind === 'jellyfish') {
         y += 0.12 * Math.sin(t * 0.7 + c.phase);
         const pulse = 1 + 0.12 * Math.sin(t * 2.2 + c.phase);
@@ -198,7 +207,7 @@ export function VolcanoCreatures({ creatures, reduceMotion }: { creatures: reado
                 <mesh geometry={parts[2]!} material={materials.pearl} position={[KIND_SIZE.oyster * 0.42, KIND_SIZE.oyster * 0.22, 0]} />
               </>
             ) : (
-              <mesh geometry={parts[0]!} material={c.kind === 'jellyfish' ? materials.jelly : materials.body} />
+              <mesh geometry={parts[0]!} material={c.kind === 'jellyfish' ? materials.jelly : c.kind === 'whale' ? materials.whale : materials.body} renderOrder={c.kind === 'whale' ? -1 : 0} />
             )}
           </group>
         );

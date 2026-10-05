@@ -25,6 +25,16 @@ const REEF_ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
   dark: ['#9d95d6', '#40358f', '#5a4cb8', '#48b84c', '#45cfe6', '#ff6f33', '#ff5596', '#123f78', '#5f6480', '#35bcd6', '#f5b820'],
 };
 
+/**
+ * Острів вулкана — вулканічна скеля, а не уламок острова кристала (власник,
+ * 2026-10-05): темний базальт плато, чорно-фіолетова скеля, темні брили й
+ * дванадцятий слот — рожево-червоний жар у тріщинах. Живність — та сама.
+ */
+const VOLCANIC_ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
+  light: ['#5a4f70', '#2c2240', '#3d3156', '#5fd35a', '#62dcef', '#ff7a36', '#ff5f9e', '#58a2cc', '#ecdcb0', '#3fcfe6', '#ffc629', '#ff5a6e'],
+  dark: ['#463d5e', '#221a34', '#30264a', '#48b84c', '#45cfe6', '#ff6f33', '#ff5596', '#123f78', '#5f6480', '#35bcd6', '#f5b820', '#ff4f66'],
+};
+
 const RAY: Record<'light' | 'dark', string> = { light: '#eafcff', dark: '#7fe8ff' };
 /** Товща води: далекі скелі й водорості тонуть у ній. */
 const WATER: Record<'light' | 'dark', string> = { light: '#4aa6cc', dark: '#0a2a5a' };
@@ -48,12 +58,14 @@ interface ReefIslandProps {
   wildlife?: number;
   /** Спокійне далеке тло: стовпи нижчі, водорості коротші (вулкан). */
   calmSurround?: boolean;
+  /** Вулканічна скеля: темний камінь і тріщини жару (вулкан). */
+  volcanic?: boolean;
 }
 
-export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false, arch = true, lagoon = true, stones = true, wildlife = 1, calmSurround = false }: ReefIslandProps) {
+export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, bare = false, arch = true, lagoon = true, stones = true, wildlife = 1, calmSurround = false, volcanic = false }: ReefIslandProps) {
   const built = useMemo(
-    () => buildReefIsland(seed, radius, rock, { arch, lagoon, stones, wildlife }),
-    [seed, radius, rock, arch, lagoon, stones, wildlife],
+    () => buildReefIsland(seed, radius, rock, { arch, lagoon, stones, wildlife, cracks: volcanic }),
+    [seed, radius, rock, arch, lagoon, stones, wildlife, volcanic],
   );
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
@@ -61,10 +73,10 @@ export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, b
   // водоростей, дно внизу.
   const far = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildReefSurround(seed, calmSurround)), [seed, bare, calmSurround]);
   const materials = useMemo(() => ({
-    island: createIslandMaterial(REEF_ISLAND_PAINTS[theme]),
+    island: createIslandMaterial((volcanic ? VOLCANIC_ISLAND_PAINTS : REEF_ISLAND_PAINTS)[theme]),
     ray: createRayMaterial(RAY[theme]),
     deep: createIslandMaterial(REEF_ISLAND_PAINTS[theme], { colour: WATER[theme], from: 12, to: 120, strength: 0.88, near: 30 }),
-  }), [theme]);
+  }), [theme, volcanic]);
   const debrisRef = useRef<THREE.Group>(null);
 
   useEffect(() => () => { island.dispose(); debris.dispose(); far.dispose(); }, [island, debris, far]);

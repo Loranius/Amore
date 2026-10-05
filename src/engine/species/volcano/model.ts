@@ -35,7 +35,7 @@ import { ACTIVITY_WEIGHTS, datedItems, r6, type CrystalV2Snapshot } from '../cry
 import { buildReefV2Model, type ReefV2Model } from '../reefV2/model';
 import { yearFertility } from '../grammar/grammar';
 
-export const VOLCANO_VERSION = 'volcano/2026-10-05';
+export const VOLCANO_VERSION = 'volcano/2026-10-06';
 
 /** Висота конуса до першого шару: пагорб, з якого все почалось. */
 export const VOLCANO_BASE_HEIGHT = 0.35;
@@ -91,6 +91,38 @@ export interface VolcanoCreature {
   speed: number;
 }
 
+/**
+ * Вулкан прокидається з роками, а не лише росте (власник, 2026-10-05):
+ * «маленький сплячий вулкан → світіння в кратері → маленькі лавові тріщини →
+ * більший кратер і більше життя → світиться зсередини». Пороги — роки разом.
+ */
+export const VOLCANO_STAGES = { glow: 1.5, streams: 3, crater: 7, inner: 10 } as const;
+
+const smooth = (a: number, b: number, x: number) => {
+  const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
+  return t * t * (3 - 2 * t);
+};
+
+/** Стадія пробудження 0…1 за роками разом (неперервна, без стрибків). */
+export function volcanoAwakening(years: number): { glow: number; streams: number; crater: number; inner: number } {
+  return {
+    glow: smooth(0.5, VOLCANO_STAGES.glow + 1, years),
+    streams: smooth(VOLCANO_STAGES.streams - 0.5, VOLCANO_STAGES.streams + 3, years),
+    crater: smooth(VOLCANO_STAGES.crater - 2, VOLCANO_STAGES.crater + 3, years),
+    inner: smooth(VOLCANO_STAGES.inner - 1, VOLCANO_STAGES.inner + 4, years),
+  };
+}
+
+/**
+ * Скільки тонких потоків лави: жодного у сплячого, далі 1–3. «Не робити
+ * багато лави — вулкан має бути романтичним, а не пекельним» (власник).
+ */
+export function volcanoStreamCount(years: number, recent: number): number {
+  if (years < VOLCANO_STAGES.streams) return 0;
+  const byAge = 1 + Math.floor((years - VOLCANO_STAGES.streams) / 4);
+  return Math.min(3, byAge + (recent >= 12 ? 1 : 0));
+}
+
 /** Роки разом, на яких у зграї з'являється новий вид риб (ADR-0237, власник). */
 export const VOLCANO_FISH_YEARS: readonly number[] = [5, 10, 20];
 
@@ -113,9 +145,16 @@ export interface VolcanoModel {
   height: number;
   baseRadius: number;
   craterRadius: number;
-  /** Жар кратера 0.35…1: свіжа лава останніх двох років. */
+  /** Жар кратера 0…1: стадія пробудження × свіжа лава останніх двох років. */
   glow: number;
+  /** Тонкі потоки лави на схилі: 0 у сплячого, до 3. */
   veins: number;
+  /** Скільки схилу потоки проходять у спокої (0…1); дотик — до підніжжя. */
+  streamReach: number;
+  /** Світіння зсередини каменю 0…1 (пізня стадія). */
+  innerGlow: number;
+  /** Стадії пробудження (див. `volcanoAwakening`). */
+  awakening: ReturnType<typeof volcanoAwakening>;
   /** Бічні конуси — виконані плани (ADR-0237). */
   vents: VolcanoVent[];
   /** Скільки видів риб у зграї: 1 + віхи 5 / 10 / 20 років разом. */
@@ -149,7 +188,9 @@ export function volcanoCreatures(
       case 'bigFish':
         return { ...base, orbit: r6(baseRadius * (1.8 + 0.25 * u('r'))), height: r6(height * (0.4 + 0.25 * u('y'))), speed: 0.16 };
       case 'whale':
-        return { ...base, orbit: r6(baseRadius * 3.6 + 1.2), height: r6(height * 0.85 + 0.4), speed: 0.035 };
+        // Кит — пасхалка, а не другий герой (власник, 2026-10-05): далеко
+        // позаду, у синій глибині; сцена веде його еліпсом за вулканом.
+        return { ...base, orbit: r6(baseRadius * 5 + 2.2), height: r6(height * 0.9 + 0.6), speed: 0.03 };
       case 'dolphin':
         return { ...base, orbit: r6(craterRadius + 0.45 + 0.15 * u('r')), height: r6(height + 0.5), speed: 0.45 };
       default:
@@ -200,7 +241,16 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
     .map(([, id]) => id);
 
   const recent = (activityByYear.get(lastYear) ?? 0) + (activityByYear.get(lastYear - 1) ?? 0);
-  const glow = 0.35 + 0.65 * Math.min(1, Math.log1p(recent) / Math.log1p(30));
+  const awake = volcanoAwakening(life.years);
+  // Сплячий вулкан ледь тліє; прокинутий — світить, і свіжі роки додають.
+  const fresh = Math.min(1, Math.log1p(recent) / Math.log1p(30));
+  const glow = 0.08 + 0.92 * awake.glow * (0.7 + 0.3 * fresh);
+  // Ширший конус (власник: «зробити ширшим»): підніжжя 0.78 висоти, плюс
+  // асиметрія кілець (до +17% на широкому боці). Ширше не можна: острів
+  // має лишатися того ж розміру, що в кристала й дерева (ADR-0235).
+  const baseRadius = 0.78 * top;
+  // Кратер — головний акцент і росте зі стадією «більший кратер».
+  const craterRadius = (0.17 + 0.06 * top) * (0.85 + 0.35 * awake.crater);
 
   return {
     version: VOLCANO_VERSION,
@@ -213,11 +263,13 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
     // діаметра підніжжя, на кожному віці. Вузьке підніжжя (0.5 + 0.22·висоти)
     // на 15–30 роках робило з вулкана вежу. На острів того ж розміру, що в
     // кристала й дерева, його вміщує масштаб кадру (`volcanoFrame`).
-    baseRadius: r6(0.72 * top),
-    craterRadius: r6(0.16 + 0.05 * top),
+    baseRadius: r6(baseRadius),
+    craterRadius: r6(craterRadius),
     glow: r6(glow),
-    // 3…5 рік лави, як у референсі: більше — від активності останніх років.
-    veins: 3 + Math.min(2, Math.floor(Math.log2(1 + recent / 3))),
+    veins: volcanoStreamCount(life.years, recent),
+    streamReach: r6(0.3 + 0.45 * awake.streams),
+    innerGlow: r6(awake.inner),
+    awakening: { glow: r6(awake.glow), streams: r6(awake.streams), crater: r6(awake.crater), inner: r6(awake.inner) },
     vents: Array.from({ length: volcanoVentCount(plans) }, (_, i) => ({
       index: i,
       azimuth: r6(((unit(life.startDate, `vent${i}:a`) * 360) + i * 137.5) % 360),
@@ -225,7 +277,7 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
       size: r6((0.34 + 0.1 * unit(life.startDate, `vent${i}:s`)) * (0.55 + 0.45 * Math.min(1, life.years / 8))),
     })),
     fishKinds: 1 + VOLCANO_FISH_YEARS.filter((year) => life.years >= year).length,
-    creatures: volcanoCreatures(wishIds, life.startDate, { height: r6(top), baseRadius: r6(0.72 * top), craterRadius: r6(0.16 + 0.05 * top) }),
+    creatures: volcanoCreatures(wishIds, life.startDate, { height: r6(top), baseRadius: r6(baseRadius), craterRadius: r6(craterRadius) }),
     life,
   };
 }

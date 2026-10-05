@@ -24,6 +24,8 @@ import { Painter, box, chunk, polar, type IslandMesh, type V3 } from '../../crys
  */
 export const REEF_PAINT = {
   top: 0, cliff: 1, boulder: 2, algae: 3, lagoon: 4, orange: 5, pink: 6, far: 7, sand: 8, cyan: 9, yellow: 10,
+  /** Жар у тріщинах вулканічної скелі (лише з `cracks`, дванадцятий слот). */
+  ember: 11,
 } as const;
 
 /** Фарби дикої живності — ті, що не можна плутати з коралами пари. */
@@ -180,7 +182,7 @@ export function buildReefIsland(
   seed: string,
   radius: number,
   rock = radius * 0.65,
-  options: { arch?: boolean; lagoon?: boolean; stones?: boolean; wildlife?: number } = {},
+  options: { arch?: boolean; lagoon?: boolean; stones?: boolean; wildlife?: number; cracks?: boolean } = {},
 ): ReefIsland {
   const withArch = options.arch ?? true;
   // Вулкан (ADR-0235, референс власника): суцільне біле плато — без лагуни
@@ -248,6 +250,41 @@ export function buildReefIsland(
   const tip: V3 = [R * 0.06, -R * 1.42, -R * 0.04];
   const last = shells[shells.length - 1]!;
   for (let j = 0; j < UNDER; j += 1) p.tri(last[(j + 1) % UNDER]!, last[j]!, tip, REEF_PAINT.cliff, 0.55 + 0.12 * unit(seed, `reef-isle:tip${j}`));
+
+  // ── Тріщини жару у вулканічній скелі (власник, 2026-10-05: «темний
+  // вулканічний камінь … трохи червонуватих тріщин») ─────────
+  // Кілька тонких зигзагів уздовж ребер скелі, від краю плато вниз: ребро
+  // лежить на самій скелі, тож тріщина не висить і не пірнає; відступ 1.5%
+  // назовні — щоб грані її не перекрили.
+  if (options.cracks) {
+    const edges = [first, shells[1]!, shells[2]!];
+    for (let k = 0; k < 5; k += 1) {
+      const key = `reef-isle:crack${k}`;
+      const j = (Math.floor(unit(seed, `${key}:j`) * UNDER) + k * 5) % UNDER;
+      const pts: V3[] = [];
+      const depth = 1 + Math.floor(unit(seed, `${key}:d`) * 2);
+      for (let li = 0; li < depth; li += 1) {
+        const a = edges[li]![j]!;
+        const b = edges[li + 1]![j]!;
+        for (let q = 0; q < 3; q += 1) {
+          const t = q / 3;
+          const at: V3 = [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+          const zig = (unit(seed, `${key}:${li}:${q}`) - 0.5) * R * 0.05;
+          const len = Math.hypot(at[0], at[2]);
+          pts.push([at[0] * 1.015 + (-at[2] / len) * zig, at[1], at[2] * 1.015 + (at[0] / len) * zig]);
+        }
+      }
+      const w = R * 0.011;
+      for (let q = 0; q + 1 < pts.length; q += 1) {
+        const a = pts[q]!;
+        const b = pts[q + 1]!;
+        const len = Math.hypot(a[0], a[2]);
+        const side: V3 = [(-a[2] / len) * w * (1 - q / pts.length), 0, (a[0] / len) * w * (1 - q / pts.length)];
+        p.tri([a[0] - side[0], a[1], a[2] - side[2]], [b[0] - side[0], b[1], b[2] - side[2]], [a[0] + side[0], a[1], a[2] + side[2]], REEF_PAINT.ember, 1, 0.75);
+        p.tri([a[0] + side[0], a[1], a[2] + side[2]], [b[0] - side[0], b[1], b[2] - side[2]], [b[0] + side[0], b[1], b[2] + side[2]], REEF_PAINT.ember, 1, 0.75);
+      }
+    }
+  }
 
   // ── Канал: бірюзова вода півмісяцем ЗА каменем рифу ───────
   // Вода й арка стоять за каменем, на якому ростуть колонії пари: голова

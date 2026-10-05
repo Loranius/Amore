@@ -199,7 +199,8 @@ export function createVolcanoRockMaterial(p: ReefPalette, base: string, ground: 
         // Легка тінь біля дна: камінь «сидить» на плато, а не висить.
         c *= mix(0.72, 1.0, smoothstep(uGround - 0.05, uGround + 0.9, vWorld.y));
         float h = vHeat * (0.6 + 0.4 * uGlow);
-        vec3 ember = vec3(1.0, 0.33, 0.28);
+        // Жар рожево-помаранчевий, як і лава (власник, 2026-10-05).
+        vec3 ember = vec3(1.0, 0.42, 0.42);
         c = mix(c, c * 0.55 + ember * 0.75, h * 0.6) + ember * h * uBeat * 0.28;
         gl_FragColor = vec4(c, 1.0);
         ${END}

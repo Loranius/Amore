@@ -16,7 +16,23 @@ describe('острів рифу', () => {
   it('має всі частини референсу: плато, скелю, арку й камені, водорості, воду, корали, губки, пластини', () => {
     const used = new Set(Array.from(isle.island.paint));
     // Далечінь і пісок — в оточенні (ADR-0224), не на острові.
-    for (const p of Object.values(REEF_PAINT)) if (p !== REEF_PAINT.far && p !== REEF_PAINT.sand) expect(used.has(p)).toBe(true);
+    // Жар тріщин — лише на вулканічній скелі (`cracks`).
+    for (const p of Object.values(REEF_PAINT)) if (p !== REEF_PAINT.far && p !== REEF_PAINT.sand && p !== REEF_PAINT.ember) expect(used.has(p)).toBe(true);
+    expect(used.has(REEF_PAINT.ember)).toBe(false);
+  });
+
+  it('вулканічна скеля: кілька тонких тріщин жару, що світяться, на самій скелі (власник, 2026-10-05)', () => {
+    const volcanic = buildReefIsland('2022-12-26', R, undefined, { cracks: true });
+    const paint = Array.from(volcanic.island.paint);
+    const ember = paint.map((p, i) => [p, i] as const).filter(([p]) => p === REEF_PAINT.ember).map(([, i]) => i);
+    expect(ember.length).toBeGreaterThan(0);
+    // Мало: не більше 3% вершин острова — «трохи червонуватих тріщин».
+    expect(ember.length / paint.length).toBeLessThan(0.03);
+    for (const i of ember) {
+      expect(volcanic.island.glow[i]).toBeGreaterThan(0.5);
+      // Нижче краю плато — на скелі, а не на траві.
+      expect(volcanic.island.positions[i * 3 + 1]!).toBeLessThan(0.01);
+    }
   });
 
   it('трикутники цілі, числа скінченні, атрибути на кожну вершину', () => {

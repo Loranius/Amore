@@ -145,6 +145,8 @@ export default function VolcanoScene() {
             island={island}
             rockRadius={model.baseRadius * frame.scale}
             glow={model.glow}
+            streamReach={model.streamReach}
+            craterRadius={model.craterRadius}
             fishKinds={model.fishKinds}
             season={seasonOf(model.asOf)}
             onTap={chronicle.onTap}

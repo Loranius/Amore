@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import type { CrystalV2Snapshot } from '../crystalV2/model';
-import { buildVolcanoGeometry, volcanoConeRadiusAt, volcanoCrater, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinIndices, volcanoVeinPaths } from './geometry';
+import { buildVolcanoGeometry, volcanoFootRadius, volcanoConeRadiusAt, volcanoCrater, volcanoPlacements, volcanoRingHit, volcanoRings, volcanoUndergrowth, volcanoVeinIndices, volcanoVeinPaths } from './geometry';
 import { buildVolcanoModel, volcanoLayerThickness, volcanoSlopeRadius } from './model';
 
 // ============================================================
@@ -113,12 +113,14 @@ describe('вулкан: меш', () => {
   it('конус чистий: усе життя — на плато кільцем довкола підніжжя (референс власника)', () => {
     for (const place of [...volcanoPlacements(model), ...volcanoUndergrowth(model)]) {
       expect(place.base[1]).toBe(0);
-      expect(Math.hypot(place.base[0], place.base[2])).toBeGreaterThanOrEqual(model.baseRadius * 0.97);
+      // На плато за справжнім краєм асиметричного підніжжя, не в камені.
+      expect(Math.hypot(place.base[0], place.base[2])).toBeGreaterThanOrEqual(volcanoFootRadius(model, Math.atan2(place.base[2], place.base[0])) * 1.0);
     }
   });
 
   it('колонії років — кільце, що росте назовні: старші ближче до підніжжя', () => {
-    const firsts = volcanoPlacements(model).filter((p) => p.body === 0).map((p) => Math.hypot(p.base[0], p.base[2]));
+    // Підніжжя асиметричне: відстань міряється в частках краю під своїм азимутом.
+    const firsts = volcanoPlacements(model).filter((p) => p.body === 0).map((p) => Math.hypot(p.base[0], p.base[2]) / volcanoFootRadius(model, Math.atan2(p.base[2], p.base[0])));
     for (let i = 1; i < firsts.length; i += 1) expect(firsts[i]!).toBeGreaterThanOrEqual(firsts[i - 1]! - 1e-9);
   });
 
@@ -161,9 +163,11 @@ describe('вулкан: меш', () => {
     }
   });
 
-  it('ріки лави — від кратера до підніжжя: 3…5 рік', () => {
-    expect(model.veins).toBeGreaterThanOrEqual(3);
-    expect(model.veins).toBeLessThanOrEqual(5);
+  it('потоки лави тонкі й дозовані (1…3), на дотик доходять до підніжжя (власник, 2026-10-05)', () => {
+    expect(model.veins).toBeGreaterThanOrEqual(1);
+    expect(model.veins).toBeLessThanOrEqual(3);
+    // Тонкі: ширина берега — не більше п'ятої частини радіуса кратера.
+    for (const path of volcanoVeinPaths(model)) for (const p of path) expect(Math.max(p.wl, p.wr)).toBeLessThanOrEqual(model.craterRadius * 0.2);
     let low = Infinity;
     for (let i = 1; i < geometry.lava.positions.length; i += 3) low = Math.min(low, geometry.lava.positions[i]!);
     expect(low).toBeLessThan(model.height * 0.1);
@@ -207,17 +211,27 @@ describe('вулкан: без бічних конусів, більше гра�
     for (let i = 0; i < rock.length; i += 3) {
       const y = rock[i + 1]!;
       if (y < 0.05 || y > model.height * 0.95) continue;
-      expect(Math.hypot(rock[i]!, rock[i + 2]!)).toBeLessThan(volcanoSlopeRadius(model, y) * 1.2);
+      // Конус асиметричний (до +17% на широкому боці) і з хребтами (+7%),
+      // але бічних конусів немає: ніщо не виходить за 1.4 гладкого схилу.
+      expect(Math.hypot(rock[i]!, rock[i + 2]!)).toBeLessThan(volcanoSlopeRadius(model, y) * 1.4);
     }
   });
 
-  it('кожна грань конуса — чотири трикутники; жовтих тріщин планів більше немає (власник, 2026-10-05)', () => {
+  it('великі фасети: 10 граней довкола, кожна — два трикутники; плани не додають лави (власник, 2026-10-05)', () => {
     const rings = volcanoRings(model);
+    for (const ring of rings) expect(ring.points).toHaveLength(10);
+    // Кілець небагато: грані високі, а не смуги.
+    expect(rings.length).toBeLessThanOrEqual(5);
     const bare = buildVolcanoModel(at('2030-10-15', { plans: [] }));
-    // Плани більше не додають лави на схил: тріщини прибрано.
     expect(buildVolcanoGeometry(model).lava.positions.length).toBe(buildVolcanoGeometry({ ...model, vents: bare.vents }).lava.positions.length);
-    const cone = (rings.length - 1) * 12 * 4;
-    expect(buildVolcanoGeometry(model).rock.positions.length / 9).toBeGreaterThan(cone);
+    const cone = (rings.length - 1) * 10 * 2;
+    const crater = 4 * 10 * 2;
+    expect(buildVolcanoGeometry(model).rock.positions.length / 9).toBe(cone + crater);
+  });
+
+  it('конус асиметричний: один бік ширший за протилежний', () => {
+    const foot = volcanoRings(model)[1]!.points.map((p) => Math.hypot(p[0], p[2]));
+    expect(Math.max(...foot) / Math.min(...foot)).toBeGreaterThan(1.2);
   });
 
   it('бажання додають мешканців по черзі: рибка, медуза, устриця, риба, кит, дельфін, далі — рибки нових кольорів (власник, 2026-10-05)', () => {
@@ -236,5 +250,38 @@ describe('вулкан: без бічних конусів, більше гра�
     expect(buildVolcanoModel(at('2030-10-15', { wishes: wishes(9) })).creatures).toEqual(nine);
     // Не більше тридцяти.
     expect(buildVolcanoModel(at('2030-10-15', { wishes: wishes(45) })).creatures.length).toBe(30);
+  });
+});
+
+describe('вулкан прокидається з роками (власник, 2026-10-05)', () => {
+  const byYears = (y: number) => buildVolcanoModel(at(`${2012 + Math.floor(y)}-${String(1 + Math.round((y % 1) * 11)).padStart(2, '0')}-28`));
+
+  it('сплячий → світіння в кратері → тріщини лави → більший кратер → світиться зсередини', () => {
+    const one = byYears(0.8);
+    expect(one.glow).toBeLessThan(0.3);
+    expect(one.veins).toBe(0);
+    expect(one.innerGlow).toBe(0);
+    const two = byYears(2.5);
+    // Без жодних подій жар — від самого віку; свіжі роки додають до 30%.
+    expect(two.glow).toBeGreaterThan(0.5);
+    expect(two.veins).toBe(0);
+    const five = byYears(5);
+    expect(five.veins).toBeGreaterThanOrEqual(1);
+    expect(five.innerGlow).toBe(0);
+    const fourteen = byYears(14);
+    expect(fourteen.innerGlow).toBeGreaterThan(0.6);
+    expect(fourteen.veins).toBeLessThanOrEqual(3);
+    // Кратер більшає не лише з висотою: частка кратера від висоти росте.
+    expect(byYears(12).craterRadius / byYears(12).height).toBeGreaterThan(0);
+    expect(byYears(12).awakening.crater).toBeGreaterThan(byYears(5).awakening.crater);
+  });
+
+  it('стадії не стрибають назад: жар, кратер і внутрішнє світло ростуть із роками', () => {
+    let prev = byYears(0.5).awakening;
+    for (const y of [1, 2, 3, 4, 6, 8, 10, 12, 16, 25]) {
+      const next = byYears(y).awakening;
+      for (const k of ['glow', 'streams', 'crater', 'inner'] as const) expect(next[k]).toBeGreaterThanOrEqual(prev[k] - 1e-9);
+      prev = next;
+    }
   });
 });
