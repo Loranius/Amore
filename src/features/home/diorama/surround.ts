@@ -280,7 +280,9 @@ export function buildReefSurround(seed: string, calm = false): IslandMesh {
   // якраз під шапку головної — тож стовпи стоять самі й нижчі за неї.
   const N = 26;
   const turn = unit(seed, 'deep:turn') * TAU;
-  for (let k = 0; k < N; k += 1) {
+  // Вулкан (calm) — без стовпів: їхні верхівки з коралами читались
+  // другорядними героями обабіч (власник, 2026-10-06).
+  for (let k = 0; k < (calm ? 0 : N); k += 1) {
     const key = `deep:pillar${k}`;
     const a = turn + (k / N) * TAU + (unit(seed, `${key}:a`) - 0.5) * 0.15;
     const r = 88 + 45 * unit(seed, `${key}:r`);

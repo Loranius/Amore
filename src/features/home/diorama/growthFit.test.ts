@@ -12,7 +12,7 @@ import { treeV2Frame } from '../crystal3d/treeV2/treeV2Frame';
 import { treeIslandBase, treeIslandGround } from '../crystal3d/treeV2/treeIsland';
 import { reefV2Frame } from '../reef3d/v2/reefV2Frame';
 import { buildReefIsland, inReefWater, reefIslandGround } from '../reef3d/v2/reefIsland';
-import { DIORAMA_ISLAND_RADIUS, dioramaIslandRadius } from './dioramaStyle';
+import { dioramaIslandRadius } from './dioramaStyle';
 import { buildVolcanoModel } from '@/engine/species/volcano/model';
 import { buildVolcanoGeometry, volcanoPlacements } from '@/engine/species/volcano/geometry';
 import { volcanoFrame, volcanoIsland } from '../volcano3d/volcanoFrame';
@@ -95,14 +95,17 @@ describe.each(cases)('%s, %i', (history, year) => {
     for (const t of [0, 0.3, 0.6, 0.9, 1]) expect(reefIslandGround(island, island * t)).toBeLessThan(0);
   });
 
-  it('вулкан: скелет сцени той самий — острів не більший, ніж у кристала й дерева того ж віку (ADR-0235)', () => {
-    // Власник: «скелет сцени має збігатись з деревом і кристалом (розмір
-    // острова)». Було 1.76 проти 1.30 у пари ~4 років: камера відступала.
-    const crystal = dioramaIslandRadius(crystalV2Frame(buildCrystalV2Geometry(buildCrystalV2Model(snap))).reach * 1.3);
-    const tree = dioramaIslandRadius(treeV2Frame(buildTreeV2Geometry(buildTreeV2Model(snap as never))).reach * 0.9);
-    const volcano = volcanoIsland(volcanoFrame(buildVolcanoGeometry(buildVolcanoModel(snap))));
-    expect(volcano).toBeLessThanOrEqual(Math.max(crystal, tree) + 1e-9);
-    if (year <= 2030) expect(volcano).toBe(DIORAMA_ISLAND_RADIUS);
+  it('вулкан: компактний острів, з якого вулкан виростає — вулкан домінує (власник, 2026-10-06)', () => {
+    // Власник: «зменшив би платформу … краще компактний острів, з якого
+    // вулкан буквально виростає». Це скасовує давнє правило «острів того ж
+    // розміру, що в кристала й дерева» (ADR-0235, поправка 2026-10-06).
+    const model = buildVolcanoModel(snap);
+    const frame = volcanoFrame(buildVolcanoGeometry(model));
+    const island = volcanoIsland(frame);
+    // Острів лише трохи ширший за вулкан із коралами підніжжя…
+    expect(island).toBeLessThanOrEqual(frame.reach * 1.1);
+    // …і підніжжя конуса займає щонайменше 60% його радіуса.
+    expect((model.baseRadius * frame.scale) / island).toBeGreaterThan(0.6);
   });
 
   it('вулкан: острів без лагуни — колонії на плато, жодна не у воді й не за краєм', () => {

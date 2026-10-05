@@ -101,6 +101,48 @@ function createLavaMaterial(): THREE.ShaderMaterial {
   });
 }
 
+/**
+ * Пара над кратером (власник, 2026-10-06: «невеликий дим/пара»): кілька
+ * м'яких клубів повільно здіймаються, розширюються й тануть. Звичайне
+ * змішування, а не додавання світла: пара — не сяйво.
+ */
+function createSteamMaterial(colour: string): THREE.ShaderMaterial {
+  return new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    uniforms: { uTime: { value: 0 }, uScale: { value: 400 }, uSize: { value: 0.3 }, uRise: { value: 1 }, uStrength: { value: 0.35 }, uColour: { value: new THREE.Color(colour) } },
+    vertexShader: /* glsl */ `
+      attribute float seed;
+      uniform float uTime;
+      uniform float uScale;
+      uniform float uSize;
+      uniform float uRise;
+      varying float vAlpha;
+      void main() {
+        float life = fract(uTime * 0.05 + seed);
+        vec3 p = position;
+        p.y += life * uRise;
+        p.x += sin(uTime * 0.3 + seed * 20.0) * uRise * 0.12 * life;
+        p.z += cos(uTime * 0.25 + seed * 13.0) * uRise * 0.1 * life;
+        vAlpha = smoothstep(0.0, 0.2, life) * (1.0 - smoothstep(0.55, 1.0, life));
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        gl_PointSize = uSize * (0.6 + 1.2 * life) * uScale / -mv.z;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColour;
+      uniform float uStrength;
+      varying float vAlpha;
+      void main() {
+        float r = length(gl_PointCoord - 0.5) * 2.0;
+        float a = smoothstep(1.0, 0.1, r) * vAlpha * uStrength;
+        gl_FragColor = vec4(uColour, a);
+      }
+    `,
+  });
+}
+
 interface VolcanoWorldProps {
   seed: string;
   geometry: VolcanoGeometry;
@@ -169,15 +211,30 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
     g.setAttribute('seed', new THREE.BufferAttribute(new Float32Array([0.5]), 1));
     return g;
   }, [geometry, craterRadius]);
+  const steam = useMemo(() => {
+    const out: number[] = [];
+    const seeds: number[] = [];
+    for (let k = 0; k < 9; k += 1) {
+      const a = unit(seed, `steam${k}:a`) * Math.PI * 2;
+      const r = craterRadius * 0.4 * Math.sqrt(unit(seed, `steam${k}:r`));
+      out.push(Math.cos(a) * r, geometry.magmaY + craterRadius * 1.1, Math.sin(a) * r);
+      seeds.push(k / 9 + 0.05 * unit(seed, `steam${k}`));
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(out), 3));
+    g.setAttribute('seed', new THREE.BufferAttribute(new Float32Array(seeds), 1));
+    return g;
+  }, [geometry, seed, craterRadius]);
   const materials = useMemo(() => ({
     rock: createVolcanoRockMaterial(REEF_PALETTES[theme], VOLCANO_ROCK[theme], PORTAL_GROUND_Y),
     lava: createLavaMaterial(),
     embers: createGlowMaterial('#ffb0a0', 0.05 + 1.3 * glow, 0.09, 'bubbles'),
     halo: createGlowMaterial('#ff6f6a', 0.05 + 0.28 * glow, craterRadius * scale * 4.5, 'still'),
+    steam: createSteamMaterial(theme === 'light' ? '#eef0fa' : '#c9c4e0'),
   }), [glow, theme, craterRadius, scale]);
 
-  useEffect(() => () => { lava.dispose(); embers.dispose(); halo.dispose(); }, [lava, embers, halo]);
-  useEffect(() => () => { materials.rock.dispose(); materials.lava.dispose(); materials.embers.dispose(); materials.halo.dispose(); }, [materials]);
+  useEffect(() => () => { lava.dispose(); embers.dispose(); halo.dispose(); steam.dispose(); }, [lava, embers, halo, steam]);
+  useEffect(() => () => { for (const m of Object.values(materials)) m.dispose(); }, [materials]);
 
   useFrame(({ clock, size }) => {
     const t = reduceMotion ? 0 : clock.getElapsedTime();
@@ -200,6 +257,13 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
     materials.embers.uniforms.uTime!.value = t;
     materials.embers.uniforms.uScale!.value = size.height;
     materials.halo.uniforms.uScale!.value = size.height;
+    materials.steam.uniforms.uScale!.value = size.height;
+    materials.steam.uniforms.uTime!.value = t;
+    // Розмір і висота клубів — у сцені: група масштабована (`scale`).
+    materials.steam.uniforms.uSize!.value = craterRadius * scale * 2.2;
+    materials.steam.uniforms.uRise!.value = craterRadius * 4;
+    // Сплячий вулкан ледь парує; прокинутий — помітніше, але легко.
+    materials.steam.uniforms.uStrength!.value = 0.08 + 0.18 * glow;
     // Сяйво дихає разом із серцем вулкана.
     materials.halo.uniforms.uStrength!.value = (0.05 + 0.28 * glow) * (0.85 + 0.25 * beat);
   });
@@ -252,6 +316,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
           <mesh name={VOLCANO_LAVA_NAME} geometry={lava} material={materials.lava} />
           <points geometry={embers} material={materials.embers} frustumCulled={false} />
           <points geometry={halo} material={materials.halo} frustumCulled={false} />
+          <points geometry={steam} material={materials.steam} frustumCulled={false} renderOrder={3} />
           <VolcanoCreatures creatures={creatures} reduceMotion={reduceMotion} />
         </group>
       </group>

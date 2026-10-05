@@ -220,8 +220,9 @@ describe('вулкан: без бічних конусів, більше гра�
   it('великі фасети: 10 граней довкола, кожна — два трикутники; плани не додають лави (власник, 2026-10-05)', () => {
     const rings = volcanoRings(model);
     for (const ring of rings) expect(ring.points).toHaveLength(10);
-    // Кілець небагато: грані високі, а не смуги.
-    expect(rings.length).toBeLessThanOrEqual(5);
+    // Кілець небагато: грані високі, а не смуги. Два з них — кам'яний
+    // уступ біля підніжжя (2026-10-06).
+    expect(rings.length).toBeLessThanOrEqual(7);
     const bare = buildVolcanoModel(at('2030-10-15', { plans: [] }));
     expect(buildVolcanoGeometry(model).lava.positions.length).toBe(buildVolcanoGeometry({ ...model, vents: bare.vents }).lava.positions.length);
     const cone = (rings.length - 1) * 10 * 2;
@@ -264,7 +265,8 @@ describe('вулкан прокидається з роками (власник,
     const two = byYears(2.5);
     // Без жодних подій жар — від самого віку; свіжі роки додають до 30%.
     expect(two.glow).toBeGreaterThan(0.5);
-    expect(two.veins).toBe(0);
+    // Щойно кратер засвітився — дві тонкі тріщини (власник, 2026-10-06).
+    expect(two.veins).toBe(2);
     const five = byYears(5);
     expect(five.veins).toBeGreaterThanOrEqual(1);
     expect(five.innerGlow).toBe(0);

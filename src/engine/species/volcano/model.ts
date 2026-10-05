@@ -118,8 +118,11 @@ export function volcanoAwakening(years: number): { glow: number; streams: number
  * багато лави — вулкан має бути романтичним, а не пекельним» (власник).
  */
 export function volcanoStreamCount(years: number, recent: number): number {
-  if (years < VOLCANO_STAGES.streams) return 0;
-  const byAge = 1 + Math.floor((years - VOLCANO_STAGES.streams) / 4);
+  // 2026-10-06 (власник: «кілька тонких тріщин, що світяться»): щойно
+  // кратер засвітився — дві тріщини; з потоками й свіжими роками — три.
+  if (years < VOLCANO_STAGES.glow) return 0;
+  if (years < VOLCANO_STAGES.streams) return 2;
+  const byAge = 2 + Math.floor((years - VOLCANO_STAGES.streams) / 6);
   return Math.min(3, byAge + (recent >= 12 ? 1 : 0));
 }
 

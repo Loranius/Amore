@@ -51,6 +51,11 @@ export function volcanoRings(model: VolcanoModel): Ring[] {
   const seed = model.startDate;
   const heights: { y: number; key: string }[] = [
     { y: -0.08, key: 'foot' },
+    // Кам'яні уступи біля підніжжя (власник, 2026-10-06): тераса — частина
+    // конуса, а не дошка зі схилу (такі вже раз прибирали). Зовнішній край
+    // тераси майже на ширині підніжжя, внутрішній — на схилі трохи вище.
+    { y: Math.min(model.height, 0.35) * 0.4, key: 'ledge' },
+    { y: Math.min(model.height, 0.35) * 0.55, key: 'ledgeIn' },
     { y: Math.min(model.height, 0.35), key: 'hill' },
     // Не більше п'яти кілець шарів (плюс верхнє): великі грані, як у
     // референсі власника. Кільце на кожен рік робило конус дрібно
@@ -70,7 +75,12 @@ export function volcanoRings(model: VolcanoModel): Ring[] {
     for (let i = 0; i < SIDES; i += 1) {
       const tag = `${key}:${i}`;
       const a = ((i + 0.3 * (unit(seed, `cone:${i}:a`) - 0.5)) / SIDES) * Math.PI * 2;
-      const base = key === 'foot' ? model.baseRadius * 1.04 : volcanoSlopeRadius(model, y);
+      const base = key === 'foot'
+        ? model.baseRadius * 1.04
+        : key === 'ledge'
+          // Край уступу: нерівний — то широкий виступ, то вузький.
+          ? model.baseRadius * (0.9 + 0.12 * unit(seed, `${tag}:shelf`))
+          : volcanoSlopeRadius(model, y);
       // Хребти й западини: вершина ребра виступає, сусідня — западає.
       const ridge = 1 + (i % 2 === 0 ? 0.07 : -0.05) * (key === 'foot' ? 0.5 : 1);
       const r = base * lobe(a) * ridge * (1 + 0.14 * (unit(seed, `${tag}:r`) - 0.5)) * (last ? 1.05 : 1);
