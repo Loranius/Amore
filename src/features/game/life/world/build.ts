@@ -37,6 +37,7 @@ export interface BuildingSpec {
   sideDoor?: boolean;
   /** Бік, яким частина прилягає до іншої частини тієї ж споруди. */
   join?: 'left' | 'right';
+  joinTo?: { x: number; y: number; w: number; h: number };
   chimney?: boolean;
 }
 
@@ -65,7 +66,7 @@ export class MapBuilder {
 
   building(spec: BuildingSpec): this {
     const doorX = spec.doorX ?? spec.x + Math.floor(spec.w / 2);
-    this.buildings.push({ id: spec.id, x: spec.x, y: spec.y, w: spec.w, h: spec.h, style: spec.style, label: spec.label, doorX, sign: spec.sign, wall: spec.wall, roof: spec.roof, action: spec.action, door: spec.door, notch: spec.notch, sideDoor: spec.sideDoor, join: spec.join, chimney: spec.chimney });
+    this.buildings.push({ id: spec.id, x: spec.x, y: spec.y, w: spec.w, h: spec.h, style: spec.style, label: spec.label, doorX, sign: spec.sign, wall: spec.wall, roof: spec.roof, action: spec.action, door: spec.door, notch: spec.notch, sideDoor: spec.sideDoor, join: spec.join, joinTo: spec.joinTo, chimney: spec.chimney });
     if (spec.door === false) return this;
     // Ґанок під дверима — завжди прохідний.
     const below = this.at(doorX, spec.y + spec.h);

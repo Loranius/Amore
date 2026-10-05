@@ -78,14 +78,34 @@ function storeyOf(style: BuildingStyle): number {
   }
 }
 
+/** Висота стіни фасаду для сліду глибиною `h` клітинок. */
+function wallOf(style: BuildingStyle, h: number): number {
+  return Math.max(storeyOf(style), Math.round(h * TILE * (1 - STYLES[style].roofFrac)));
+}
+
 /** Двері — на зріст людини. */
 const DOOR_H = 25;
 
 // ------------------------------------------------------------
 // Дах.
 // ------------------------------------------------------------
-function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, color: string, season: Season, seed: number, flush: Flush = null): void {
+/**
+ * Де полотно спрайта стоїть у світі (px) — візерунок даху рахується від
+ * світу, а не від краю спрайта, тож у частин однієї будівлі смуги соломи й
+ * ряди черепиці продовжуються через стик, а не зсуваються.
+ */
+interface WorldAt { x: number; y: number }
+
+/** Стале зерно від кольору даху: у частин однієї будівлі воно однакове. */
+function colorSeed(color: string): number {
+  let h = 7;
+  for (let i = 0; i < color.length; i += 1) h = (h * 31 + color.charCodeAt(i)) >>> 0;
+  return h;
+}
+
+function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, color: string, season: Season, seed: number, flush: Flush = null, at: WorldAt = { x: 0, y: 0 }, flushRows: { from: number; until: number } = { from: -Infinity, until: Infinity }): void {
   const H = bottom - top;
+  const cs = colorSeed(color);
   if (rule.roof === 'none') return;
   if (rule.roof === 'flat') {
     rect(g, 1, top, W - 2, H, color);
@@ -97,31 +117,38 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
   const inset = rule.roof === 'thatch' ? 10 : 8;
   // Бік, яким дах прилягає до іншого крила тієї ж хати, — без скосу:
   // скати сходяться, і двох окремих дахів не видно.
-  const kl = (k: number) => (flush === 'left' ? 0 : k);
-  const kr = (k: number) => (flush === 'right' ? 0 : k);
+  // Стик з іншою частиною — лише в тих рядках, де та частина справді
+  // поруч; вище чи нижче — звичайний край даху.
+  const fl = (r: number): Flush => (top + r >= flushRows.from && top + r < flushRows.until ? flush : null);
+  const kl = (k: number, r = 0) => (fl(r) === 'left' ? 0 : k);
+  const kr = (k: number, r = 0) => (fl(r) === 'right' ? 0 : k);
+  const m6 = (v: number, n: number) => ((v % n) + n) % n;
   for (let r = 0; r < H; r += 1) {
     const k = Math.round((1 - r / H) * inset);
-    const band = Math.floor(r / 4);
+    const ry = at.y + top + r;
+    const band = Math.floor(ry / 4);
     let c = color;
     if (rule.roof === 'thatch') {
-      c = r % 3 === 0 ? shade(color, -0.12) : color;
-    } else if (r % 4 === 3) c = shade(color, -0.28);
-    else if (r % 4 === 0) c = shade(color, 0.14);
-    rect(g, kl(k), top + r, W - kl(k) - kr(k), 1, c);
-    // Шви черепиці / стебла соломи.
-    if (rule.roof === 'tile' && r % 4 !== 3) {
-      const off = band % 2 === 0 ? 0 : 3;
-      for (let x = kl(k) + off; x < W - kr(k); x += 6) px(g, x, top + r, shade(color, -0.2));
+      c = m6(ry, 3) === 0 ? shade(color, -0.12) : color;
+    } else if (m6(ry, 4) === 3) c = shade(color, -0.28);
+    else if (m6(ry, 4) === 0) c = shade(color, 0.14);
+    const x0 = kl(k, r);
+    const x1 = W - kr(k, r);
+    rect(g, x0, top + r, x1 - x0, 1, c);
+    // Шви черепиці / стебла соломи — за світовими координатами.
+    if (rule.roof === 'tile' && m6(ry, 4) !== 3) {
+      const off = m6(band, 2) === 0 ? 0 : 3;
+      for (let x = x0; x < x1; x += 1) if (m6(at.x + x - off, 6) === 0) px(g, x, top + r, shade(color, -0.2));
     }
-    if (rule.roof === 'metal' && r % 4 !== 3) {
-      for (let x = kl(k) + 2; x < W - kr(k); x += 5) px(g, x, top + r, shade(color, -0.12));
+    if (rule.roof === 'metal' && m6(ry, 4) !== 3) {
+      for (let x = x0; x < x1; x += 1) if (m6(at.x + x - 2, 5) === 0) px(g, x, top + r, shade(color, -0.12));
     }
     if (rule.roof === 'thatch') {
-      for (let x = kl(k); x < W - kr(k); x += 1) if (cellHash(x, r, seed) % 5 === 0) px(g, x, top + r, shade(color, 0.18));
+      for (let x = x0; x < x1; x += 1) if (cellHash(at.x + x, ry, cs) % 5 === 0) px(g, x, top + r, shade(color, 0.18));
     }
     // Темні краї даху.
-    if (flush !== 'left') px(g, k, top + r, shade(color, -0.35));
-    if (flush !== 'right') px(g, W - k - 1, top + r, shade(color, -0.35));
+    if (fl(r) !== 'left') px(g, k, top + r, shade(color, -0.35));
+    if (fl(r) !== 'right') px(g, W - k - 1, top + r, shade(color, -0.35));
   }
   // Латки: стріху перекривали частинами, стара солома темніша й сіріша.
   if (rule.roof === 'thatch') {
@@ -142,7 +169,7 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
   if (rule.roof === 'thatch' && season !== 'winter') {
     // Солом'яна стріха звисає нерівною бахромою.
     for (let x = 1; x < W - 1; x += 1) {
-      const len = cellHash(x, seed, 5) % 3;
+      const len = cellHash(at.x + x, cs, 5) % 3;
       if (len) rect(g, x, bottom, 1, len, shade(color, x % 2 ? -0.18 : -0.05));
     }
   }
@@ -207,8 +234,10 @@ function wall(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
   if (flush !== 'right') rect(g, W - 6, top, 3, H, shade(color, -0.2));
   else rect(g, W - 3, top, 3, H, color);
   // Цоколь.
-  rect(g, 3, bottom - 3, W - 6, 3, shade(color, -0.32));
-  rect(g, 3, bottom - 3, W - 6, 1, shade(color, -0.2));
+  const x0 = flush === 'left' ? 0 : 3;
+  const x1 = flush === 'right' ? W : W - 3;
+  rect(g, x0, bottom - 3, x1 - x0, 3, shade(color, -0.32));
+  rect(g, x0, bottom - 3, x1 - x0, 1, shade(color, -0.2));
 }
 
 // ------------------------------------------------------------
@@ -379,13 +408,35 @@ const cache = new Map<string, BuildingSprite>();
 
 export function buildingSprite(b: Building, season: Season): BuildingSprite {
   const n = b.notch;
-  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}|${b.join ?? ''}|${b.chimney === false ? 'nochim' : ''}`;
+  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}|${b.join ?? ''}${b.joinTo ? `@${b.joinTo.x},${b.joinTo.y},${b.joinTo.w},${b.joinTo.h}` : ''}|${b.chimney === false ? 'nochim' : ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const sprite = n ? ellSprite(b, season) : partSprite(b, season, { flush: b.join ?? null, chimney: b.chimney !== false });
+  const sprite = n ? ellSprite(b, season) : partSprite(b, season, joinOpts(b));
   disciplinePalette(sprite.img);
   cache.set(key, sprite);
   return sprite;
+}
+
+/**
+ * Частина споруди з двох будівель (`join`, крила хати різної глибини):
+ *   • гребінь спільний — дах нижчої (меншої вглиб) частини тягнеться до
+ *     гребеня сусідньої, тож дах читається одним;
+ *   • дах без краю лише в рядках, де поруч справді дах сусіда; нижче —
+ *     звичайний край (там кут крила, що виступає);
+ *   • стіна без краю, лише якщо фасади на одній лінії.
+ */
+function joinOpts(b: Building): PartOpts {
+  const opts: PartOpts = { flush: b.join ?? null, chimney: b.chimney !== false };
+  const n = b.joinTo;
+  if (!b.join || !n) return opts;
+  const rule = STYLES[b.style];
+  const extra = Math.max(0, b.y - n.y) * TILE;
+  const wallPx = wallOf(b.style, b.h);
+  const Ht = rule.rise + Math.round(b.h * TILE * rule.roofFrac) + extra + wallPx;
+  const top = (b.y + b.h) * TILE - Ht;
+  // Звис сусіда — у світі; рядки даху вище за нього прилягають до сусіда.
+  const nEave = (n.y + n.h) * TILE - wallOf(b.style, n.h);
+  return { ...opts, extraRoof: extra, flushRows: { from: -Infinity, until: nEave - top }, wallFlush: n.y + n.h === b.y + b.h ? b.join : null };
 }
 
 /**
@@ -396,12 +447,18 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
 function ellSprite(b: Building, season: Season): BuildingSprite {
   const rule = STYLES[b.style];
   const [tall, low] = buildingParts(b) as [Rect, Rect];
-  const wallPx = Math.max(storeyOf(b.style), Math.round(low.h * TILE * (1 - rule.roofFrac)));
+  const wallPx = wallOf(b.style, low.h);
   const side = b.notch!.side;
   const hasDoor = (r: Rect) => b.door !== false && b.doorX >= r.x && b.doorX < r.x + r.w;
   const rightEdge = (r: Rect) => !!b.sideDoor && r.x + r.w === b.x + b.w;
-  const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall), sideDoor: rightEdge(tall) }, season, { wallPx, flush: null, chimney: true });
-  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low), sideDoor: rightEdge(low) }, season, { wallPx, flush: side === 'right' ? 'left' : 'right', chimney: false });
+  // Стик: у високого крила — з боку низького, у низького — з боку високого.
+  // Стіни на одній лінії фасаду, тож шва на них немає зовсім; дах високого
+  // крила без краю лише там, де поруч дах низького.
+  const toLow: Flush = side === 'right' ? 'right' : 'left';
+  const toTall: Flush = side === 'right' ? 'left' : 'right';
+  const lowTop = (tall.h - low.h) * TILE * rule.roofFrac;
+  const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall), sideDoor: rightEdge(tall) }, season, { wallPx, flush: toLow, flushRows: { from: Math.round(lowTop) + rule.rise, until: Infinity }, wallFlush: toLow, chimney: true });
+  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low), sideDoor: rightEdge(low) }, season, { wallPx, flush: toTall, wallFlush: toTall, chimney: false });
   const W = b.w * TILE + 6;
   // Обидва крила стоять на одній лінії фасаду: низи спрайтів збігаються.
   const Ht = A.img.height;
@@ -412,13 +469,6 @@ function ellSprite(b: Building, season: Season): BuildingSprite {
   const by = Ht - B.img.height;
   g.drawImage(A.img, ax, 0);
   g.drawImage(B.img, bx, by);
-  // Стик крил: кожне крило світле зліва й темне справа, тож на стику
-  // фасаду лягала б смуга, наче це дві хати. Зафарбувати стіною й цоколем.
-  const joint = side === 'right' ? bx : ax;
-  const wallColor = b.wall ?? rule.wall;
-  rect(g, joint - 1, Ht - wallPx + 2, 7, wallPx - 5, wallColor);
-  rect(g, joint - 1, Ht - 3, 7, 3, shade(wallColor, -0.32));
-  rect(g, joint - 1, Ht - 3, 7, 1, shade(wallColor, -0.2));
   const windows = [...A.windows.map((w) => ({ ...w, x: w.x + ax })), ...B.windows.map((w) => ({ ...w, x: w.x + bx, y: w.y + by }))];
   return { img, ox: -3, oy: -(Ht - b.h * TILE), windows, smoke: A.smoke ? { x: A.smoke.x + ax, y: A.smoke.y } : null };
 }
@@ -426,7 +476,14 @@ function ellSprite(b: Building, season: Season): BuildingSprite {
 interface PartOpts {
   /** Висота стіни фасаду (px) — спільна для крил Г-подібної хати. */
   wallPx?: number;
+  /** Бік стику для даху. */
   flush?: Flush;
+  /** Рядки спрайта, у яких дах справді прилягає до сусідньої частини. */
+  flushRows?: { from: number; until: number };
+  /** Бік стику для стіни — лише коли фасади на одній лінії. */
+  wallFlush?: Flush;
+  /** На скільки px дах тягнеться вглиб понад слід (спільний гребінь). */
+  extraRoof?: number;
   chimney?: boolean;
 }
 
@@ -436,8 +493,8 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
   const W = b.w * TILE + 6;
   // Дах — як і раніше, частка глибини сліду; стіна — щонайменше поверх.
   // Зайва висота росте вгору: низ спрайта завжди на нижньому краї сліду.
-  const roofBottom = rule.rise + Math.round(b.h * TILE * rule.roofFrac);
-  const wallPx = opts.wallPx ?? Math.max(storeyOf(b.style), Math.round(b.h * TILE * (1 - rule.roofFrac)));
+  const roofBottom = rule.rise + Math.round(b.h * TILE * rule.roofFrac) + (opts.extraRoof ?? 0);
+  const wallPx = opts.wallPx ?? wallOf(b.style, b.h);
   const Ht = roofBottom + wallPx;
   const img = canvas(W, Ht);
   const g = ctx2d(img);
@@ -446,7 +503,7 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
   const windows: Rect[] = [];
   const doorCx = (b.doorX - b.x) * TILE + 8 + 3;
 
-  wall(g, W, roofBottom - 2, Ht, rule, wallColor, seed, opts.flush ?? null);
+  wall(g, W, roofBottom - 2, Ht, rule, wallColor, seed, opts.wallFlush ?? null);
 
   // Вікна рядами по фасаду, оминаючи двері.
   const wallTop = roofBottom + 3;
@@ -456,6 +513,10 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
   const dh = Math.min(DOOR_H, wallH - 4);
   const doorHalf = dw / 2 + 3;
   const cottage = b.style === 'cottage';
+  // На стику з іншою частиною стіни смуги (тінь під звисом, цоколь,
+  // призьба) доходять до краю полотна, щоб не лишалося щілини.
+  const sx0 = opts.wallFlush === 'left' ? 0 : 3;
+  const sx1 = opts.wallFlush === 'right' ? W : W - 3;
   const place = (ww: number, wh: number, gap: number, rows: number, shutters: boolean, box: boolean) => {
     const rowH = Math.floor(wallH / rows);
     for (let r = 0; r < rows; r += 1) {
@@ -497,9 +558,9 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
 
   // Хата: призьба — низький глиняний виступ уздовж стіни, підведений синім.
   if (cottage) {
-    rect(g, 3, Ht - 6, W - 6, 6, '#6f86ad');
-    rect(g, 3, Ht - 6, W - 6, 1, '#9fb3d3');
-    rect(g, 3, Ht - 1, W - 6, 1, '#4f6488');
+    rect(g, sx0, Ht - 6, sx1 - sx0, 6, '#6f86ad');
+    rect(g, sx0, Ht - 6, sx1 - sx0, 1, '#9fb3d3');
+    rect(g, sx0, Ht - 1, sx1 - sx0, 1, '#4f6488');
     ornament(g, W, roofBottom + 3);
     const avoid = windows.map((w) => ({ x0: w.x - 4, x1: w.x + w.w + 4 }));
     if (b.door !== false) avoid.push({ x0: doorCx - dw / 2 - 3, x1: doorCx + dw / 2 + 3 });
@@ -528,9 +589,9 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
   }
 
   // Дах і все, що над ним.
-  roof(g, W, rule.rise, roofBottom, rule, roofColor, season, seed, opts.flush ?? null);
+  roof(g, W, rule.rise, roofBottom, rule, roofColor, season, seed, opts.flush ?? null, { x: b.x * TILE - 3, y: (b.y + b.h) * TILE - Ht }, opts.flushRows);
   // Тінь від даху на стіну.
-  rect(g, 3, roofBottom, W - 6, 2, 'rgba(30,20,30,0.28)');
+  rect(g, sx0, roofBottom, sx1 - sx0, 2, 'rgba(30,20,30,0.28)');
 
   let smoke: BuildingSprite['smoke'] = null;
   if (rule.chimney && opts.chimney !== false) {

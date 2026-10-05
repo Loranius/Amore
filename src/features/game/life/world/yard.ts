@@ -95,8 +95,8 @@ export function yardMap(): GameMap {
   // одної без краю даху й стіни (`join`); димар один. Головний вхід — у
   // правій стіні правого крила; всередині він веде у веранду.
   const hata = { style: 'cottage' as const, wall: '#f4eee0', roof: '#b8954e', label: 'Хата', door: false };
-  m.building({ id: 'house', ...LEFT_WING, ...hata, join: 'right', chimney: false });
-  m.building({ id: 'house-right', ...RIGHT_WING, ...hata, join: 'left', sideDoor: true });
+  m.building({ id: 'house', ...LEFT_WING, ...hata, join: 'right', joinTo: RIGHT_WING, chimney: false });
+  m.building({ id: 'house-right', ...RIGHT_WING, ...hata, join: 'left', joinTo: LEFT_WING, sideDoor: true });
   m.fill(YARD.porch.x, YARD.porch.y + 1, 1, 2, 'c');
   m.prop('pot', YARD.porch.x + 0.6, YARD.porch.y - 0.3, { solid: false });
   m.zone('home', YARD.porch.x, YARD.porch.y, YARD.porch.w, YARD.porch.h, { type: 'home' }, 'У хату');

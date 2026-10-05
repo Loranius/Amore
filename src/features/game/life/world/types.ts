@@ -80,6 +80,8 @@ export interface Building {
    * глибиною — Лєна перед заглибленим крилом не ховається за стіну.
    */
   join?: 'left' | 'right' | undefined;
+  /** Слід сусідньої частини, до якої прилягає (`join`): спільний гребінь, стик лише де сусід поруч. */
+  joinTo?: { x: number; y: number; w: number; h: number } | undefined;
   /** `false` — без димаря (димар у сусідньої частини). */
   chimney?: boolean | undefined;
   action?: ZoneAction | undefined;
