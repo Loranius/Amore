@@ -777,6 +777,15 @@ function MomPanel({ c, life }: { c: GameController; life: LifeState }) {
   );
 }
 
+function DogPanel({ c }: { c: GameController }) {
+  return (
+    <Sheet title="Бася" sub="Чорний коргі, найкраща подруга" onClose={() => c.closePanel()}>
+      <button type="button" className="lg-btn is-paper" onClick={() => { c.closePanel(); void c.petBasia(); }}>Погладити</button>
+      <button type="button" className="lg-btn is-paper" onClick={() => { c.closePanel(); void c.feedBasia(); }}>Нагодувати</button>
+    </Sheet>
+  );
+}
+
 export function Panels({ c, life, panel }: { c: GameController; life: LifeState; panel: Panel }) {
   switch (panel.kind) {
     case 'shop': return <ShopPanel c={c} life={life} shop={panel.shop} />;
@@ -794,5 +803,6 @@ export function Panels({ c, life, panel }: { c: GameController; life: LifeState;
     case 'laptop': return <LaptopPanel c={c} life={life} />;
     case 'person': return <PersonPanel c={c} life={life} id={panel.id} />;
     case 'decorate': return <DecoratePanel c={c} life={life} />;
+    case 'dog': return <DogPanel c={c} />;
   }
 }

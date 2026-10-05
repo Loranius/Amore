@@ -12,7 +12,7 @@ import { buildingSprite, drawBuildingShadow } from './buildings';
 import { drawLeafLitter, drawTreeShadow, treeSprite, TREE_BASE } from './nature';
 import { ambientAt, lightsOn } from './palette';
 import { sheetFor, walkFrame, type Dir, type Look } from './people';
-import { cellHash, ellipse, type Ctx } from './pixel';
+import { cellHash, ellipse, rect, shade, type Ctx } from './pixel';
 import { drawProp, propBase, propLight } from './props';
 import { drawWater, groundCanvas } from './tiles';
 import { drawBitmap } from './icons';
@@ -32,6 +32,8 @@ export interface Actor {
   emote?: 'heart' | 'note' | 'sleep' | null;
   /** Падіння: 0…1 — частка від початку до кінця (зірочки над головою). */
   fall?: number | null;
+  /** Лежить у ліжку під ковдрою цього кольору: видно лише голову на подушці. */
+  inBed?: string | null;
   /** Куди падає: 1 — праворуч, -1 — ліворуч (геть від Басі). */
   fallDir?: 1 | -1;
 }
@@ -43,6 +45,8 @@ export interface Pet {
   dir: Dir;
   moving: boolean;
   t: number;
+  /** Секунди радості: над нею сердечко. */
+  happy?: number;
 }
 
 export interface SceneEnv {
@@ -177,6 +181,19 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
       y: a.y,
       draw: () => {
         ellipse(g, a.x, a.y, a.look.kid ? 4 : 5, 2, 'rgba(28,20,40,0.28)');
+        if (a.inBed) {
+          // Голова на подушці, решта — під ковдрою.
+          const head = 14;
+          g.drawImage(img, 0, 0, img.width, head, Math.round(a.x - img.width / 2), Math.round(a.y - 20), img.width, head);
+          rect(g, Math.round(a.x - 9), Math.round(a.y - 7), 18, 17, a.inBed);
+          rect(g, Math.round(a.x - 9), Math.round(a.y - 7), 18, 2, shade(a.inBed, 0.3));
+          rect(g, Math.round(a.x - 9), Math.round(a.y + 8), 18, 2, shade(a.inBed, -0.3));
+          if (a.emote === 'sleep') {
+            const bob = Math.round(Math.sin(env.time * 3) * 1.5);
+            drawBitmap(g, 'sleep', Math.round(a.x + 4), Math.round(a.y - 30 + bob));
+          }
+          return;
+        }
         if (a.fall != null) {
           // Перечепилась: падає вперед, обертаючись довкола ніг; над головою — зірочки.
           const ang = fallAngle(a.fall) * (a.fallDir ?? 1);
@@ -208,6 +225,10 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
       draw: () => {
         ellipse(g, pet.x, pet.y, 7, 2, 'rgba(28,20,40,0.28)');
         drawDog(g, pet.x, pet.y, pet.dir, pet.moving, pet.t);
+        if (pet.happy && pet.happy > 0) {
+          const bob = Math.round(Math.sin(env.time * 6) * 1.5);
+          drawBitmap(g, 'heart', Math.round(pet.x - 3), Math.round(pet.y - 30 + bob));
+        }
       },
     });
   }

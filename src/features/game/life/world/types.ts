@@ -39,6 +39,8 @@ export type ZoneAction =
   | { type: 'lyceum' }
   | { type: 'stone' }
   | { type: 'mom' }
+  /** Бася — погладити чи нагодувати. */
+  | { type: 'dog' }
   | { type: 'walk'; to: CityId }
   /** Із села — на подвір'я Лєниної садиби; з подвір'я — назад у село. */
   | { type: 'yard' }

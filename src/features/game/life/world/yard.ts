@@ -17,6 +17,7 @@
 //     стежки до хвіртки; хвіртка внизу, до села.
 // ============================================================
 import { MapBuilder } from './build';
+import type { MomSpot } from '../sim/mom';
 import type { GameMap, TreeKind } from './types';
 import { cellHash } from './hash';
 
@@ -33,9 +34,19 @@ const RIGHT_WING = { x: 10, y: 16, w: 7, h: 8 } as const;
 const KITCHEN = { x: 22, y: 19, w: 8, h: 4, annexW: 3 } as const;
 
 /** Тайли садиби, на які посилаються контролер і тести. */
+/**
+ * Де мама буває протягом дня (клітинки): вона ходить від точки до точки
+ * свого місця (`MomSpot`, розклад — `sim/mom.ts`).
+ */
+export const MOM_SPOTS: Record<Exclude<MomSpot, 'bed'>, readonly [number, number][]> = {
+  kitchen: [[21, 20.6], [20.4, 22], [21.3, 19.4]],
+  garden: [[4, 4], [8, 6.5], [11, 3], [13, 7], [6, 2.5]],
+  orchard: [[31, 22], [33, 25.5], [35.5, 28], [36, 17], [31.5, 14]],
+  chickens: [[21, 14.6], [23, 14.6], [19.5, 14.7]],
+  bench: [[6.6, 26.9]],
+};
+
 export const YARD = {
-  /** Де стоїть мама: біля входу в літню кухню. */
-  mom: [21, 21] as [number, number],
   /**
    * Вхід у хату — у правій стіні правого крила (на плані власника — x17, y22).
    * Праве крило закінчується на y24, тож вхід (y21–24) — біля його фасаду,
@@ -120,7 +131,6 @@ export function yardMap(): GameMap {
   });
   m.fill(KITCHEN.x, KITCHEN.y, KITCHEN.annexW, 1, 'c');
   m.zone('summerKitchen', KITCHEN.x, KITCHEN.y, KITCHEN.annexW, 1, { type: 'activity', id: 'summerKitchen' }, 'Літня кухня · з мамою');
-  m.zone('mom', YARD.mom[0] - 1, YARD.mom[1], 2, 2, { type: 'mom' }, 'Поговорити з мамою');
   // Погріб під кухнею — вхід знизу.
   m.prop('cellar', 27.6, 23.1);
   m.zone('cellar', 28, 24, 1, 1, { type: 'info', text: 'Погріб: картопля, банки з огірками й мамине вишневе варення' }, 'Погріб');

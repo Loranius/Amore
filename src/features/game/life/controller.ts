@@ -48,10 +48,11 @@ import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
 import { colliderFor, tileFeet, zoneAt } from './world/collide';
-import { HATA_MOM, homeInterior } from './world/interior';
+import { HATA_MOM_BED, homeInterior } from './world/interior';
 import { cityMap, homeYard } from './world/maps';
-import { YARD, YARD_ID } from './world/yard';
-import { LENA_FALL_S, newDog, stepDog, type Dog } from './sim/dog';
+import { MOM_SPOTS, YARD, YARD_ID } from './world/yard';
+import { momPlan, type MomPlan } from './sim/mom';
+import { DOG_HAPPY_S, LENA_FALL_S, feedBasia, newDog, petBasia, stepDog, type Dog } from './sim/dog';
 
 /** Стеля щільності пікселів полотна гри (власник: «оптимізуй під айфони»). */
 export const GAME_MAX_DPR = 2;
@@ -72,7 +73,8 @@ export type Panel =
   | { kind: 'dima' }
   | { kind: 'person'; id: string }
   | { kind: 'laptop' }
-  | { kind: 'decorate' };
+  | { kind: 'decorate' }
+  | { kind: 'dog' };
 
 export type Speaker = 'n' | 'l' | 'd' | 'm' | 'o';
 export interface Line { who: Speaker; text: string }
@@ -138,6 +140,8 @@ export class GameController {
   private extras: Actor[] = [];
   /** Бася — лише на подвір'ї; зберігається, поки Лєна там. */
   private dog: Dog | null = null;
+  /** Мама Лєни: ходить подвір'ям за розкладом або відпочиває у своїй кімнаті. */
+  private momA: (Actor & { target: { x: number; y: number } | null; wait: number; stuck: number; leaving: boolean; plan: MomPlan }) | null = null;
   /** Скільки ще секунд Лєна лежить, перечепившись об Басю. */
   private fallLeft = 0;
   /** Падає геть від Басі, щоб не впасти на неї. */
@@ -453,20 +457,13 @@ export class GameController {
       this.dog = null;
       this.fallLeft = 0;
     }
-    if (this.map.id === YARD_ID) {
-      // Мама — біля літньої кухні на подвір'ї.
-      const mom = tileFeet(YARD.mom[0], YARD.mom[1]);
-      this.extras.push({ id: 'mom', x: mom.x, y: mom.y, dir: 0, moving: false, t: 0, look: MOM });
-    }
+    // Мама з'являється сама — за розкладом (`updateMom`).
+    this.momA = null;
     if (this.map.id === 'zhylyntsi') {
       if (info.week < 12) {
         const o = tileFeet(36, 10);
         this.extras.push({ id: 'olya', x: o.x, y: o.y, dir: 1, moving: false, t: 0, look: { ...OLYA, kid: info.week <= 6 } });
       }
-    }
-    if (this.map.interior && life.home === 'zhylyntsi') {
-      const m = tileFeet(HATA_MOM[0], HATA_MOM[1]);
-      this.extras.push({ id: 'mom', x: m.x, y: m.y, dir: 1, moving: false, t: 0, look: MOM });
     }
     // Діма йде разом із Лєною лише тоді, коли вона його покликала.
     this.dimaRole = null;
@@ -603,6 +600,7 @@ export class GameController {
     this.updateFolk(dt);
     this.updateResidents(dt);
     this.updateDog(dt);
+    this.updateMom(dt);
     if (!this.blocked()) {
       if (this.fallLeft > 0) { this.fallLeft = Math.max(0, this.fallLeft - dt); this.player.moving = false; }
       else this.movePlayer(dt);
@@ -672,6 +670,16 @@ export class GameController {
     if (!z && d && this.dimaRole !== 'arriving' && this.life?.flags.metDima && Math.hypot(d.x - this.player.x, d.y - this.player.y) < 26) {
       z = { id: 'talk:dima', x: d.x, y: d.y, w: 1, h: 1, action: { type: 'talk' }, label: 'Діма' };
     }
+    // Мама — де б вона не була: на подвір'ї чи в кімнаті на ліжку.
+    const mom = this.momA;
+    if (!z && mom && Math.hypot(mom.x - this.player.x, mom.y - this.player.y) < (mom.inBed ? 30 : 26)) {
+      z = { id: 'talk:mom', x: mom.x, y: mom.y, w: 1, h: 1, action: { type: 'mom' }, label: `Мама ${mom.plan.task}` };
+    }
+    // Бася поруч — погладити чи нагодувати.
+    const dog = this.dog;
+    if (!z && dog && Math.hypot(dog.x - this.player.x, dog.y - this.player.y) < 22) {
+      z = { id: 'talk:basia', x: dog.x, y: dog.y, w: 1, h: 1, action: { type: 'dog' }, label: 'погладити чи нагодувати' };
+    }
     // Мешканець поруч — підійти й заговорити.
     if (!z && this.life) {
       const near = this.residents.find((r) => Math.hypot(r.x - this.player.x, r.y - this.player.y) < 24);
@@ -734,6 +742,70 @@ export class GameController {
       this.fallDir = this.dog.x > this.player.x ? -1 : 1;
       sfx.oops();
     }
+  }
+
+  /**
+   * Мама за розкладом (`momPlan`): на подвір'ї ходить від точки до точки
+   * свого місця й трохи там стоїть, ніби порається; коли час до хати —
+   * іде до ґанку й зникає; у хаті — відпочиває чи спить на своєму ліжку.
+   */
+  private updateMom(dt: number): void {
+    const life = this.life;
+    if (!life || life.home !== 'zhylyntsi') { this.momA = null; return; }
+    const plan = momPlan(life.minute, today(life).season);
+    const inHata = this.map.interior && this.map.id.startsWith('home:hata');
+    if (inHata) {
+      if (plan.spot !== 'bed') { this.momA = null; return; }
+      const bx = HATA_MOM_BED.x * TILE + 8;
+      const by = HATA_MOM_BED.y * TILE + 15;
+      this.momA = { id: 'mom', x: bx, y: by, dir: 0, moving: false, t: (this.momA?.t ?? 0) + dt, look: MOM, inBed: HATA_MOM_BED.tint, emote: plan.task === 'спить' ? 'sleep' : null, target: null, wait: 0, stuck: 0, leaving: false, plan };
+      return;
+    }
+    if (this.map.id !== YARD_ID) { this.momA = null; return; }
+    const porch = tileFeet(YARD.porch.x, YARD.porch.y + 1);
+    let m = this.momA;
+    if (!m) {
+      if (!plan.outside) return;
+      // Виходить із хати, якщо Лєна вже тут; інакше вже на своєму місці.
+      const p0 = plan.spot === 'bed' ? porch : tileFeet(...MOM_SPOTS[plan.spot][0]!);
+      m = this.momA = { id: 'mom', x: p0.x, y: p0.y, dir: 0, moving: false, t: 0, look: MOM, target: null, wait: 0, stuck: 0, leaving: false, plan };
+    }
+    m.t += dt;
+    m.plan = plan;
+    m.emote = null;
+    if (!plan.outside && !m.leaving) { m.leaving = true; m.target = porch; }
+    if (plan.outside) m.leaving = false;
+    if (m.wait > 0) { m.wait -= dt; m.moving = false; return; }
+    if (!m.target && plan.spot !== 'bed') {
+      const spots = MOM_SPOTS[plan.spot];
+      const r = rngFor(life.seed, 'mom-walk', life.day, Math.floor(m.t * 2));
+      const [tx, ty] = spots[Math.floor(r() * spots.length)]!;
+      m.target = tileFeet(tx, ty);
+    }
+    if (!m.target) return;
+    const dx = m.target.x - m.x;
+    const dy = m.target.y - m.y;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 2) {
+      m.target = null;
+      m.moving = false;
+      if (m.leaving) { this.momA = null; return; }
+      // Порається на місці кілька секунд.
+      m.wait = 3 + (Math.floor(m.t * 7) % 4);
+      return;
+    }
+    const c = colliderFor(this.map);
+    const st = Math.min(44 * dt, dist);
+    const sx = (dx / dist) * st;
+    const sy = (dy / dist) * st;
+    let moved = false;
+    if (c.canStand(m.x + sx, m.y)) { m.x += sx; moved = true; }
+    if (c.canStand(m.x, m.y + sy)) { m.y += sy; moved = true; }
+    m.moving = moved;
+    m.dir = Math.abs(dx) > Math.abs(dy) ? (dx > 0 ? 2 : 1) : (dy > 0 ? 0 : 3);
+    // Застрягла за будівлею — обходить її «за кадром»: одразу на місці.
+    m.stuck = moved ? 0 : m.stuck + dt;
+    if (m.stuck > 1.2) { m.x = m.target.x; m.y = m.target.y; m.stuck = 0; }
   }
 
   private updateResidents(dt: number): void {
@@ -832,6 +904,7 @@ export class GameController {
     this.cameraY += (ty - this.cameraY) * 0.15;
     const info = dayInfo(life?.day ?? 3);
     const actors: Actor[] = [...this.folk, ...this.residents, ...this.extras];
+    if (this.momA) actors.push(this.momA);
     if (this.ui.screen === 'world') actors.push(this.fallLeft > 0 ? { ...this.player, fall: 1 - this.fallLeft / LENA_FALL_S, fallDir: this.fallDir } : this.player);
     if (this.dima) actors.push({ ...this.dima, emote: this.ui.celebrate ? 'heart' : null });
     renderScene(g, this.map, actors, {
@@ -941,6 +1014,7 @@ export class GameController {
         this.openPanel({ kind: 'date' });
         return;
       case 'mom': this.openPanel({ kind: 'mom' }); return;
+      case 'dog': this.openPanel({ kind: 'dog' }); return;
       case 'talk': this.openPanel(a.who ? { kind: 'person', id: a.who } : { kind: 'dima' }); return;
       case 'laptop': this.openPanel({ kind: 'laptop' }); return;
       case 'activity': {
@@ -1271,6 +1345,16 @@ export class GameController {
 
   dimaLook(): Look {
     return DIMA;
+  }
+
+  /** Погладити Басю: сідає біля Лєни, над нею сердечко. */
+  async petBasia(): Promise<void> {
+    if (await this.attempt(petBasia) && this.dog) this.dog = { ...this.dog, happy: DOG_HAPPY_S };
+  }
+
+  /** Нагодувати Басю — раз на день. */
+  async feedBasia(): Promise<void> {
+    if (await this.attempt(feedBasia) && this.dog) this.dog = { ...this.dog, happy: DOG_HAPPY_S + 1 };
   }
 
   momLook(): Look {

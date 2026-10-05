@@ -70,3 +70,30 @@ describe('Бася на подвір\'ї (власник, 2026-10-05)', () => {
     expect(a).toBe(b);
   });
 });
+
+describe('догляд за Басею (власник, 2026-10-05: «погладити чи покормити»)', () => {
+  it('погладити — настрій росте перші три рази на день, далі просто радіє', async () => {
+    const { newLife } = await import('./life');
+    const { petBasia, PETS_PER_DAY } = await import('./dog');
+    let s = { ...newLife(1, 'sadok'), mood: 50 };
+    for (let i = 0; i < PETS_PER_DAY; i += 1) s = petBasia(s).state;
+    expect(s.mood).toBe(50 + 2 * PETS_PER_DAY);
+    expect(petBasia(s).state.mood).toBe(s.mood);
+  });
+
+  it('нагодувати — раз на день', async () => {
+    const { newLife, LifeRuleError } = await import('./life');
+    const { feedBasia } = await import('./dog');
+    const s = feedBasia({ ...newLife(1, 'sadok'), mood: 50 }).state;
+    expect(s.mood).toBe(53);
+    expect(() => feedBasia(s)).toThrow(LifeRuleError);
+  });
+
+  it('погладжена Бася сидить біля Лєни, а не біжить', () => {
+    const w: DogWorld = { lena: { x: 300, y: 250 }, canStand: open };
+    const d = { ...newDog(280, 250, 1), happy: 1 };
+    const r = run(d, 0.9, w).dog;
+    expect(Math.hypot(r.x - 280, r.y - 250)).toBe(0);
+    expect(r.dir).toBe(2);
+  });
+});

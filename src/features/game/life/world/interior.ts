@@ -37,8 +37,8 @@ export function homeKind(state: LifeState): HomeKind {
 const ROOM_DX = 0;
 const ROOM_DY = 12;
 
-/** Де в хаті стоїть мама — у своїй кімнаті. */
-export const HATA_MOM: [number, number] = [4, 7];
+/** Мамине ліжко (клітинки) — там вона відпочиває й спить (`sim/mom.ts`). */
+export const HATA_MOM_BED = { x: 1.1, y: 2.3, tint: '#9ab8d9' } as const;
 
 function hataInterior(state: LifeState): GameMap {
   const W = 24;
@@ -123,7 +123,7 @@ function hataInterior(state: LifeState): GameMap {
     m.zone('brothers', 10, 5, 3, 1, { type: 'info', text: 'Кімната братів: Діма й Саша вже роз\'їхались, а їхні медалі за футбол досі на полиці.' }, 'Кімната братів');
   }
   // ── Мама ─────────────────────────────────────────────────
-  m.prop('bed', 1.1, 2.3, { tint: '#9ab8d9' }).prop('wardrobe', 3.2, 2.1).prop('window', 5, 0.4).prop('rushnyk', 2.4, 0.6).prop('clock', 4.2, 0.5);
+  m.prop('bed', HATA_MOM_BED.x, HATA_MOM_BED.y, { tint: HATA_MOM_BED.tint }).prop('wardrobe', 3.2, 2.1).prop('window', 5, 0.4).prop('rushnyk', 2.4, 0.6).prop('clock', 4.2, 0.5);
   m.prop('rug', 3, 6, { tint: '#c98aa8' }).prop('plant', 1, 10.6);
   // ── Коридорчик і веранда ─────────────────────────────────
   m.prop('rug', 10.4, 9.2, { tint: '#b85a4a' }).prop('shelf', 12, 8.1).prop('plant', 22, 10.6);
