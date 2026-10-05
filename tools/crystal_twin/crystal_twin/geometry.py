@@ -131,7 +131,7 @@ def body(seed, tag, sides, height, tip, apex, ridge, bury, profile=SPINDLE) -> l
     return faces
 
 
-def monarch_body(seed, sides, height, tip, apex, ridge, bury, profile):
+def monarch_body(seed, sides, height, tip, ridge, bury, profile):
     """Монарх як великий гранчастий кристал — те саме, що `monarchBody` у
     `geometry.ts` (ADR-0244): 12 поздовжніх граней із 6 сторін, вершина у
     два яруси (пояс над ребрами сторін і кінчик із точок планів)."""
@@ -170,8 +170,8 @@ def monarch_body(seed, sides, height, tip, apex, ridge, bury, profile):
     for i in range(n):
         s = shoulder[2 * i + 1]
         a = math.atan2(s[2] - sz, s[0] - sx)
-        r = radius * last_scale * 0.5 * (0.85 + 0.3 * unit(seed, f"monarch:mid{i}:r"))
-        y = y1 + mid_height * (0.7 + 0.6 * unit(seed, f"monarch:mid{i}:y"))
+        r = radius * last_scale * 0.5 * (0.95 + 0.1 * unit(seed, f"monarch:mid{i}:r"))
+        y = y1 + mid_height * (0.95 + 0.1 * unit(seed, f"monarch:mid{i}:y"))
         mid.append(np.array([sx + math.cos(a) * r, y, sz + math.sin(a) * r]))
     inside = np.array([sx, y1 - tip * 0.2, sz])
 
@@ -185,11 +185,46 @@ def monarch_body(seed, sides, height, tip, apex, ridge, bury, profile):
         for tri in (facing(c0, s, m0), facing(s, c1, m0), facing(c1, m1, m0)):
             faces.append((np.array(tri), face, TRI))
             face += 1
-    tip_at = (apex[0] + sx, apex[1] + sz)
-    mid_top = max(p[1] for p in mid)
-    for tri in crown(seed, "monarch", mid, mid_top, height - mid_top, tip_at, ridge, radius * last_scale * 0.3):
-        faces.append((np.array(tri), face, TRI))
-        face += 1
+    # Вістря точно над центром плеча; плани — рівне кільце навколо осі.
+    apex_point = np.array([sx, height, sz])
+    mid_top = sum(p[1] for p in mid) / n
+
+    def tip_faces(ring):
+        nonlocal face
+        for i in range(len(ring)):
+            faces.append((np.array(facing(ring[i], ring[(i + 1) % len(ring)], apex_point)), face, TRI))
+            face += 1
+
+    if ridge < 2:
+        tip_faces(mid)
+    else:
+        qy = mid_top + (height - mid_top) * 0.45
+        qr = radius * last_scale * 0.5 * 0.45
+        turn = unit(seed, "monarch:ridge:turn") * math.pi * 2
+        q = [np.array([sx + math.cos(turn + k / ridge * math.pi * 2) * qr, qy,
+                       sz + math.sin(turn + k / ridge * math.pi * 2) * qr]) for k in range(ridge)]
+
+        def angle(p):
+            return math.atan2(p[2] - sz, p[0] - sx)
+
+        def owner(p):
+            gaps = [abs(math.atan2(math.sin(angle(p) - angle(r)), math.cos(angle(p) - angle(r)))) for r in q]
+            return gaps.index(min(gaps))
+
+        owners = [owner(p) for p in mid]
+        for i in range(n):
+            j = (i + 1) % n
+            k = owners[i]
+            guard = 0
+            while k != owners[j] and guard < ridge:
+                nxt = (k + 1) % ridge
+                faces.append((np.array(facing(mid[i], q[k], q[nxt])), face, TRI))
+                face += 1
+                k = nxt
+                guard += 1
+            faces.append((np.array(facing(mid[i], mid[j], q[owners[j]])), face, TRI))
+            face += 1
+        tip_faces(q)
     return faces
 
 
@@ -218,7 +253,7 @@ def colony(model: dict[str, Any]) -> list[dict[str, Any]]:
     bodies = [{
         "kind": "monarch",
         "faces": monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
-                              (m["apex"][0] * 4, m["apex"][1] * 4), m["tiers"], 0.12 * m["height"],
+                              m["tiers"], 0.12 * m["height"],
                               monarch_profile(model["startDate"])),
         "sparks": [],
     }]

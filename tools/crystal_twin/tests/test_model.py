@@ -210,7 +210,7 @@ class Geometry(unittest.TestCase):
         model = build_model(fixture("busy"))
         m = model["monarch"]
         faces = monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
-                             m["apex"], m["tiers"], 0.3, monarch_profile(model["startDate"]))
+                             m["tiers"], 0.3, monarch_profile(model["startDate"]))
         by_face: dict[int, list[np.ndarray]] = {}
         for tri, face, _ in faces:
             by_face.setdefault(face, []).extend(tri)

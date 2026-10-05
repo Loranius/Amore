@@ -261,9 +261,8 @@ function body(
  *     6 точок над ребрами сторін (зсунутого на пів кроку — грані ярусів
  *     перетинаються, а не стоять одна над одною). Другий: кінчик із тих
  *     самих `ridge` точок, що й раніше (плани → грані вершини, ADR-0217).
- *     Виміряно на фікстурах двійника: грані поясу — 47…66° від
- *     горизонталі (кварц ~52°), кінчика — 27…85°, бо точки планів стоять
- *     на різній висоті.
+ *     Вістря — рівно над центром плеча: зсув вершини моделі (`apex`) для
+ *     монарха не береться, бо косив верхівку вбік (власник, 2026-10-05).
  *   * Кант лише на поздовжніх ребрах, ребрі плеча й вершині: горизонтальний
  *     злам поясу без канта, бо смуги поперек призми власник відкинув.
  */
@@ -272,7 +271,6 @@ function monarchBody(
   sides: readonly (readonly [number, number])[],
   height: number,
   tip: number,
-  apex: readonly [number, number],
   ridge: number,
   bury: number,
   profile: readonly ProfileRing[],
@@ -314,14 +312,15 @@ function monarchBody(
   const sx = last.shift[0] * radius;
   const sz = last.shift[1] * radius;
   // ── Ярус 1: пояс граней від плеча до кільця над ребрами сторін ──
+  // Пояс майже рівний (±5 %): різні висоти точок нахиляли всю вершину вбік
+  // (власник, 2026-10-05: «верхівку косить — хай дивиться чітко вгору»).
   const midHeight = tip * 0.42;
   const mid: V3[] = [];
   for (let i = 0; i < n; i += 1) {
     const s = shoulder[2 * i + 1]!;
     const a = Math.atan2(s[2] - sz, s[0] - sx);
-    const r = radius * last.scale * 0.5 * (0.85 + 0.3 * unit(seed, `monarch:mid${i}:r`));
-    // Висоти поясу різні (±30 %): грані ярусу різного розміру й нахилу.
-    const y = y1 + midHeight * (0.7 + 0.6 * unit(seed, `monarch:mid${i}:y`));
+    const r = radius * last.scale * 0.5 * (0.95 + 0.1 * unit(seed, `monarch:mid${i}:r`));
+    const y = y1 + midHeight * (0.95 + 0.1 * unit(seed, `monarch:mid${i}:y`));
     mid.push([sx + Math.cos(a) * r, y, sz + Math.sin(a) * r]);
   }
   const inside: V3 = [sx, y1 - tip * 0.2, sz];
@@ -343,13 +342,56 @@ function monarchBody(
       face += 1;
     }
   }
-  // ── Ярус 2: кінчик із точок планів ───────────────────────────
-  const tipAt: [number, number] = [apex[0] + sx, apex[1] + sz];
-  const midTop = Math.max(...mid.map((p) => p[1]));
-  // Точки планів тісніше, ніж у дітей: кінчик гострий, а не плаский купол.
-  for (const points of crown(seed, 'monarch', mid, midTop, height - midTop, tipAt, ridge, radius * last.scale * 0.3)) {
-    tris.push({ points, face, edges: TRI });
-    face += 1;
+  // ── Ярус 2: вістря точно над центром плеча ──────────────────
+  // Плани дають грані вершини (ADR-0217) — тепер це рівне кільце з `ridge`
+  // точок навколо осі на одній висоті, а над ним одне вістря на осі. Раніше
+  // точки кінчика стояли на різній висоті й зсунуті від осі, і вістря
+  // косило вбік. Кількість граней та сама, напрям — вертикальний.
+  const apexPoint: V3 = [sx, height, sz];
+  const midTop = mid.reduce((sum, p) => sum + p[1], 0) / n;
+  const tipFaces = (ring: V3[]) => {
+    for (let i = 0; i < ring.length; i += 1) {
+      tris.push({ points: facing(ring[i]!, ring[(i + 1) % ring.length]!, apexPoint), face, edges: TRI });
+      face += 1;
+    }
+  };
+  if (ridge < 2) {
+    tipFaces(mid);
+  } else {
+    const qy = midTop + (height - midTop) * 0.45;
+    const qr = radius * last.scale * 0.5 * 0.45;
+    const turn = unit(seed, 'monarch:ridge:turn') * Math.PI * 2;
+    const q: V3[] = Array.from({ length: ridge }, (_, k) => {
+      const a = turn + (k / ridge) * Math.PI * 2;
+      return [sx + Math.cos(a) * qr, qy, sz + Math.sin(a) * qr];
+    });
+    // Кожна точка поясу сходиться до найближчої точки кільця; де сусіди
+    // дивляться на різні точки — перехідний трикутник (як у `crown`).
+    const angle = (p: V3) => Math.atan2(p[2] - sz, p[0] - sx);
+    const owner = mid.map((p) => {
+      let best = 0;
+      let gap = Infinity;
+      q.forEach((r, k) => {
+        const d = Math.abs(Math.atan2(Math.sin(angle(p) - angle(r)), Math.cos(angle(p) - angle(r))));
+        if (d < gap) { gap = d; best = k; }
+      });
+      return best;
+    });
+    for (let i = 0; i < n; i += 1) {
+      const j = (i + 1) % n;
+      let k = owner[i]!;
+      let guard = 0;
+      while (k !== owner[j]! && guard < ridge) {
+        const next = (k + 1) % ridge;
+        tris.push({ points: facing(mid[i]!, q[k]!, q[next]!), face, edges: TRI });
+        face += 1;
+        k = next;
+        guard += 1;
+      }
+      tris.push({ points: facing(mid[i]!, mid[j]!, q[owner[j]!]!), face, edges: TRI });
+      face += 1;
+    }
+    tipFaces(q);
   }
   return tris;
 }
@@ -445,7 +487,7 @@ export function buildCrystalV2Geometry(model: CrystalV2Model, form: CrystalForm 
     tris: form === 'stalagmite'
       ? stalagmite(seed, 'monarch', m.radius, m.height, 3 + m.tiers, 0.12 * m.height)
       : monarchBody(seed, m.sides, m.height, m.tierHeights.reduce((sum, h) => sum + h, 0),
-        [m.apex[0] * 4, m.apex[1] * 4], m.tiers, 0.12 * m.height, monarchProfile(seed)),
+        m.tiers, 0.12 * m.height, monarchProfile(seed)),
     height: m.height,
   }];
   const sparks: number[] = [];

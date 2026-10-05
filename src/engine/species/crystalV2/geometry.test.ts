@@ -208,5 +208,23 @@ describe('кристал v2: геометрія', () => {
       expect(nearest).toBe(true);
     }
   });
+
+  it('вістря монарха дивиться прямо вгору: точки під ним — рівне кільце навколо осі вістря', () => {
+    for (const name of ['busy', 'empty', 'gifts_red', 'leap_day']) {
+      const model = buildCrystalV2Model(fixture(name));
+      const { positions } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const pts: V3[] = [];
+      for (let v = 0; v < positions.length / 3; v += 1) pts.push(point(positions, v));
+      const top = pts.reduce((best, p) => (p[1] > best[1] ? p : best));
+      expect(top[1]).toBeCloseTo(model.monarch.height, 5);
+      // Найближчий нижчий ярус вершин під вістрям: та сама висота й той
+      // самий відступ від осі вістря — інакше вістря косить убік.
+      const below = [...new Set(pts.filter((p) => p[1] < top[1] - 1e-6).map((p) => p[1].toFixed(6)))].map(Number).sort((a, b) => b - a)[0]!;
+      const ring = pts.filter((p) => Math.abs(p[1] - below) < 1e-6);
+      const reach = ring.map((p) => Math.hypot(p[0] - top[0], p[2] - top[2]));
+      expect(Math.max(...reach) - Math.min(...reach)).toBeLessThan(1e-5);
+      expect(Math.min(...reach)).toBeGreaterThan(0);
+    }
+  });
 });
 
