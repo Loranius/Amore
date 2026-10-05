@@ -87,7 +87,8 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(house[0]!.sideDoor).toBe(true);
     const homeZone = yard.zones.find((z) => z.action.type === 'home')!;
     expect(homeZone.x).toBe(house[0]!.x + house[0]!.w);
-    expect(homeZone.y + homeZone.h).toBe(house[0]!.y + house[0]!.h);
+    expect(homeZone.y).toBeGreaterThanOrEqual(house[0]!.y);
+    expect(homeZone.y + homeZone.h).toBeLessThanOrEqual(house[0]!.y + house[0]!.h);
     const houseTop = house[0]!.y;
     for (const x of back) expect(x.y + x.h).toBeLessThanOrEqual(houseTop);
     // У кутку «Г» можна стати — це двір, а не стіна.
@@ -118,6 +119,34 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     // Хвіртка — внизу, до села.
     const gate = yard.zones.find((z) => z.action.type === 'village')!;
     expect(gate.y).toBeGreaterThanOrEqual(yard.h - 3);
+  });
+
+  it('подвір\'я за планом власника: туалет, січкарня, літній душ, котельня з окремим входом, курник відчиняється у вигул', () => {
+    const yard = homeYard();
+    const b = (id: string) => yard.buildings.find((x) => x.id === id)!;
+    for (const id of ['toilet', 'sichkarnia', 'shower']) expect(b(id), id).toBeDefined();
+    // Туалет — лівіше за хліви, січкарня — правіше за курник; душ — у саду.
+    expect(b('toilet').x).toBeLessThan(b('barn1').x);
+    expect(b('sichkarnia').x).toBeGreaterThan(b('coop').x);
+    const orchard = yard.zones.find((z) => z.id === 'orchard')!;
+    expect(b('shower').x).toBeGreaterThan(orchard.x);
+    // Курник — двері збоку, у вигул.
+    expect(b('coop').sideDoor).toBe(true);
+    expect(b('coop').door).toBe(false);
+    // Котельня — окремий вхід праворуч від хати, вище за головний.
+    const house = b('house');
+    const boiler = yard.zones.find((z) => z.id === 'boiler')!;
+    const home = yard.zones.find((z) => z.action.type === 'home')!;
+    expect(boiler.x).toBe(house.x + house.w);
+    expect(boiler.y).toBeLessThan(home.y);
+    // Майстерня — вхід згори; погріб — знизу, під кухнею.
+    const shop = b('workshop');
+    expect(yard.zones.find((z) => z.id === 'workshop')!.y).toBe(shop.y - 1);
+    const kitchen = b('summerKitchen');
+    expect(yard.zones.find((z) => z.id === 'cellar')!.y).toBeGreaterThan(kitchen.y + kitchen.h);
+    // Дерева саду не стоять на верстаку й душі.
+    const blocked = [{ x: 30, y: 16, w: 2, h: 3 }, b('shower')];
+    for (const t of yard.trees) for (const r of blocked) expect(t.x >= r.x && t.x < r.x + r.w && t.y >= r.y && t.y < r.y + r.h, `${t.x},${t.y}`).toBe(false);
   });
 
   it('хата всередині — за ескізом власника: мама над Лєною зліва, брати праворуч від мами, коридорчик між ними й Лєною, веранда справа зі входом, кімната над верандою', () => {
