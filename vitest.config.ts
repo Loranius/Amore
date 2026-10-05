@@ -13,6 +13,9 @@ export default defineConfig({
   // Той самий аліас, що у vite.config.ts. Донедавна тести жили лише в
   // artifact/, де всі імпорти відносні, тож аліас був не потрібен — і
   // перший же тест поза рушієм падав на «Cannot find package '@/…'».
+  // Позначка збірки, як у vite.config.ts: модулі, що її читають, мають
+  // імпортуватися й у тестах.
+  define: { __BUILD_ID__: JSON.stringify('test') },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

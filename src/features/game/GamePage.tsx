@@ -6,7 +6,9 @@
 // відкрито цей роут, тож портал не тягне гру за собою. BASE_URL — щоб
 // шлях працював і під підкаталогом на GitHub Pages.
 // ============================================================
-const GAME_SRC = `${import.meta.env.BASE_URL}game.html?v=5`;
+import { gameSrc } from './gameSrc';
+
+const GAME_SRC = gameSrc(import.meta.env.BASE_URL, __BUILD_ID__);
 
 export function GamePage() {
   return (

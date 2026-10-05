@@ -9,3 +9,6 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Коротка позначка збірки (sha коміту в CI, `dev` локально) — `vite.config.ts`. */
+declare const __BUILD_ID__: string;

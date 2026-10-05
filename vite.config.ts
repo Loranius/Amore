@@ -7,6 +7,9 @@ import { VitePWA } from 'vite-plugin-pwa';
 const base = process.env.BASE_PATH ?? '/';
 
 export default defineConfig({
+  // Позначка збірки: адреса гри змінюється з кожним викладанням, тож
+  // десятихвилинний кеш GitHub Pages на `game.html` не показує стару гру.
+  define: { __BUILD_ID__: JSON.stringify(process.env.GITHUB_SHA?.slice(0, 8) ?? 'dev') },
   plugins: [
     react(),
     tailwindcss(),
