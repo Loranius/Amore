@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 from crystal_twin.calendar import anniversary, year_index  # noqa: E402
 from crystal_twin.hashing import hash32  # noqa: E402
 from crystal_twin.model import build_model  # noqa: E402
-from crystal_twin.geometry import body  # noqa: E402
+from crystal_twin.geometry import body, monarch_profile  # noqa: E402
 
 import numpy as np  # noqa: E402
 
@@ -210,7 +210,7 @@ class Geometry(unittest.TestCase):
         model = build_model(fixture("busy"))
         m = model["monarch"]
         faces = body(model["startDate"], "monarch", m["sides"], m["height"], sum(m["tierHeights"]),
-                     m["apex"], m["tiers"], bury=0.3)
+                     m["apex"], m["tiers"], bury=0.3, profile=monarch_profile(model["startDate"]))
         by_face: dict[int, list[np.ndarray]] = {}
         for tri, face, _ in faces:
             by_face.setdefault(face, []).extend(tri)

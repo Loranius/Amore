@@ -3,10 +3,10 @@ import { useEffect, useMemo, useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
 import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
-import { DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
+import { DIORAMA_PALETTES, DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 import { buildCrystalSurround } from '@/features/home/diorama/surround';
 import type { Season } from '@/engine/species/grammar/season';
-import { EMPTY_MESH, buildCrystalIsland, type IslandMesh } from './crystalIsland';
+import { EMPTY_MESH, PAINT, buildCrystalIsland, type IslandMesh } from './crystalIsland';
 
 // ============================================================
 // Острів кристала за референсом власника (ADR-0221, гранчастий — ADR-0227):
@@ -20,6 +20,7 @@ const END = /* glsl */ `
 `;
 
 const KEY = new THREE.Vector3(-0.45, 0.8, 0.4).normalize();
+const BUFFER = new THREE.Vector2();
 
 /** Фарби: бруківка, скеля, камінь руїн, плющ, самоцвіт, земля між плитами. */
 /**
@@ -33,9 +34,15 @@ const KEY = new THREE.Vector3(-0.45, 0.8, 0.4).normalize();
  * пісковик, скеля — темний сланцево-ліловий камінь замість насиченого
  * синього, земля — бура. Лілове лишається лише в тіні скелі.
  */
+/*
+ * Святилище (ADR-0242, власник 2026-10-05: «зелень доповнює рожеве, а не
+ * домінує»): плющ — м'якший і прохолодніший зелений; скеля — світліший
+ * лілово-сланцевий камінь замість майже чорного (підошва читалась дірою);
+ * 8 — дрібні рожеві квіти, 9 — світліші пласти породи в підошві.
+ */
 const ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
-  light: ['#cfc6c3', '#5e5470', '#c5b9aa', '#5cae45', '#ff8fd0', '#7a6656', '#ffffff', '#8a7a9a'],
-  dark: ['#9a909c', '#3d3552', '#968b8f', '#4a9a3e', '#ff82d2', '#55463f', '#d8cff0', '#2f2846'],
+  light: ['#cfc6c3', '#6a5f84', '#c5b9aa', '#5f9f5c', '#ff8fd0', '#7a6656', '#ffffff', '#8a7a9a', '#ff9fd6', '#9184ad'],
+  dark: ['#9a909c', '#4a4068', '#968b8f', '#4c8c56', '#ff82d2', '#55463f', '#e8dcf0', '#2f2846', '#ff96d8', '#6b5d8c'],
 };
 
 /**
@@ -69,13 +76,33 @@ export interface IslandHaze {
    * об'єктива, лягали важкими плямами на шапку головної. 0 — вимкнено.
    */
   near?: number;
+  /**
+   * Тонути не в сталому кольорі, а в небі за спиною (ADR-0242): той самий
+   * екранний градієнт і сяйво, що малює тло діорами. Далекий храм тоді
+   * розчиняється в повітрі, а не стоїть темними смугами поперед нього.
+   */
+  sky?: { top: string; bottom: string; glow: string };
 }
 
 /**
  * Матеріал острова: фарба з палітри, м'яке світло діорами. Палітра — 8
  * кольорів або більше (риф має дев'ятий — пісок дна, ADR-0224).
  */
-export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze): THREE.ShaderMaterial {
+/**
+ * Світло кристала на святилищі (ADR-0242): кристал — головне джерело
+ * світла сцени, тож підлога біля нього й внутрішні боки колон теплішають
+ * його кольором, а далі світло гасне. Лише для острова кристала: дерево й
+ * риф ділять цей матеріал і світла не отримують (сила 0).
+ */
+export interface IslandSpill {
+  colour: THREE.Color;
+  /** Звідки світить — точка в серці колонії, у сцені. */
+  centre: THREE.Vector3;
+  radius: number;
+  strength: number;
+}
+
+export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze, spill?: IslandSpill): THREE.ShaderMaterial {
   const count = paints.length;
   return new THREE.ShaderMaterial({
     // Обидва боки: віяла кришок плит і кавалків закручені як прийдеться, а
@@ -89,6 +116,14 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       uTime: { value: 0 },
       uHaze: { value: new THREE.Color(haze?.colour ?? '#000000') },
       uHazeRange: { value: new THREE.Vector4(haze?.from ?? 1, haze?.to ?? 2, haze?.strength ?? 0, haze?.near ?? 0) },
+      uSkyTop: { value: new THREE.Color(haze?.sky?.top ?? '#000000') },
+      uSkyBottom: { value: new THREE.Color(haze?.sky?.bottom ?? '#000000') },
+      uSkyGlow: { value: new THREE.Color(haze?.sky?.glow ?? '#000000') },
+      uSkyOn: { value: haze?.sky ? 1 : 0 },
+      uResolution: { value: new THREE.Vector2(1, 1) },
+      uSpill: { value: spill?.colour.clone() ?? new THREE.Color(0, 0, 0) },
+      uSpillCentre: { value: spill?.centre.clone() ?? new THREE.Vector3() },
+      uSpillRange: { value: new THREE.Vector2(spill?.radius ?? 1, spill?.strength ?? 0) },
     },
     vertexShader: /* glsl */ `
       attribute float paint;
@@ -116,6 +151,14 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       uniform float uTime;
       uniform vec3 uHaze;
       uniform vec4 uHazeRange;
+      uniform vec3 uSkyTop;
+      uniform vec3 uSkyBottom;
+      uniform vec3 uSkyGlow;
+      uniform float uSkyOn;
+      uniform vec2 uResolution;
+      uniform vec3 uSpill;
+      uniform vec3 uSpillCentre;
+      uniform vec2 uSpillRange;
       varying vec3 vWorld;
       varying float vPaint;
       varying float vTone;
@@ -133,12 +176,29 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
         vec3 c = dioramaShade(base * vTone, n, view);
         // Самоцвіти в скелі світяться самі й повільно дихають.
         c = mix(c, base * (1.25 + 0.2 * sin(uTime * 1.3 + vWorld.x * 3.0)), vGlow * 0.85);
+        if (uSpillRange.y > 0.0) {
+          // Світло кристала: гасне з відстанню, сильніше на гранях до нього.
+          vec3 toward = uSpillCentre - vWorld;
+          float fall = 1.0 - smoothstep(0.0, uSpillRange.x, length(toward));
+          float facingCrystal = 0.35 + 0.65 * max(0.0, dot(n, normalize(toward)));
+          c += (base * 0.9 + 0.1) * uSpill * fall * fall * facingCrystal * uSpillRange.y;
+        }
         float haze = smoothstep(uHazeRange.x, uHazeRange.y, length(vWorld)) * uHazeRange.z;
         if (uHazeRange.w > 0.0) {
           float near = 1.0 - smoothstep(uHazeRange.w * 0.35, uHazeRange.w, distance(cameraPosition, vWorld));
           haze = max(haze, near * 0.92);
         }
-        c = mix(c, uHaze, haze);
+        vec3 air = uHaze;
+        if (uSkyOn > 0.5) {
+          // Небо за цим пікселем — та сама формула, що в тла діорами.
+          vec2 uv = gl_FragCoord.xy / uResolution;
+          air = mix(uSkyBottom, uSkyTop, smoothstep(0.05, 0.95, uv.y));
+          vec2 d = (uv - 0.5) * vec2(uResolution.x / uResolution.y, 1.0);
+          air += uSkyGlow * exp(-dot(d, d) * 16.0) * 0.3;
+          air *= mix(0.72, 1.0, smoothstep(0.95, 0.35, length(uv - 0.5)));
+          air = mix(air, uHaze, 0.25);
+        }
+        c = mix(c, air, haze);
         gl_FragColor = vec4(c, 1.0);
         ${END}
       }
@@ -250,27 +310,50 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
   const built = useMemo(() => buildCrystalIsland(seed, radius, druses, season), [seed, radius, druses, season]);
   const island = useMemo(() => meshGeometry(built.island), [built]);
   const debris = useMemo(() => meshGeometry(built.debris), [built]);
+  const ground = useMemo(() => meshGeometry(built.ground), [built]);
   // Давній храм у підземеллі навколо острова, на всі 360° (ADR-0224).
   const temple = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildCrystalSurround(seed)), [seed, bare]);
   const glowHex = `#${glowColour.getHexString()}`;
-  const materials = useMemo(() => ({
-    island: createIslandMaterial(ISLAND_PAINTS[theme]),
-    temple: createIslandMaterial(TEMPLE_PAINTS[theme], { colour: CAVE[theme].air, from: 12, to: 130, strength: 0.88, near: 30 }),
-    ray: createRayMaterial(CAVE[theme].ray),
-    // Сяйво в основі — м'яке біле, як у референсі: кристал суцільний, і
-    // яскравий ореол кольору колонії розмивав би його грані.
-    // Магія — усередині кристала (шейдер), а не хмарою навколо: сяйво в
-    // основі лишилось ледь помітним (власник, 2026-10-06).
-    core: createGlowMaterial(glowHex, theme === 'dark' ? 0.18 : 0.12),
-  }), [theme, glowHex]);
+  const materials = useMemo(() => {
+    // Світло кристала: з серця колонії, на третині висоти монарха.
+    const spill: IslandSpill = {
+      colour: glowColour.clone().lerp(new THREE.Color(1, 0.9, 0.96), 0.25),
+      centre: new THREE.Vector3(0, groundY + crystalHeight * 0.3, 0),
+      radius: radius * 1.25,
+      strength: theme === 'dark' ? 0.55 : 0.32,
+    };
+    // Земля кристала світиться його кольором, а не сталим рожевим самоцвітів.
+    const groundPaints = ISLAND_PAINTS[theme].map((hex, i) => (i === PAINT.gem ? glowHex : hex));
+    return {
+      island: createIslandMaterial(ISLAND_PAINTS[theme], undefined, spill),
+      ground: createIslandMaterial(groundPaints, undefined, spill),
+      // Далекий храм тоне в небі, а не в сталому кольорі (ADR-0242): ближні
+      // колони печери стояли яскравими смугами через увесь кадр і
+      // сперечались із кристалом. Тепер ближче за 5 — повністю, далі — небо.
+      temple: createIslandMaterial(TEMPLE_PAINTS[theme], {
+        colour: CAVE[theme].air,
+        from: 5,
+        to: 40,
+        strength: 0.82,
+        near: 30,
+        sky: DIORAMA_PALETTES.crystal[theme],
+      }),
+      ray: createRayMaterial(CAVE[theme].ray),
+      // Сяйво в основі — м'яке, ледь помітне: магія всередині кристала
+      // (шейдер), а не хмарою навколо (власник, 2026-10-06).
+      core: createGlowMaterial(glowHex, theme === 'dark' ? 0.12 : 0.08),
+    };
+  }, [theme, glowHex, glowColour, groundY, crystalHeight, radius]);
   const debrisRef = useRef<THREE.Group>(null);
 
-  useEffect(() => () => { island.dispose(); debris.dispose(); temple.dispose(); }, [island, debris, temple]);
+  useEffect(() => () => { island.dispose(); debris.dispose(); ground.dispose(); temple.dispose(); }, [island, debris, ground, temple]);
   useEffect(() => () => { for (const m of Object.values(materials)) m.dispose(); }, [materials]);
 
-  useFrame(({ clock }) => {
+  useFrame(({ clock, gl }) => {
     const t = reduceMotion ? 0 : clock.getElapsedTime();
+    materials.temple.uniforms.uResolution!.value.copy(gl.getDrawingBufferSize(BUFFER));
     materials.island.uniforms.uTime!.value = t;
+    materials.ground.uniforms.uTime!.value = t;
     materials.temple.uniforms.uTime!.value = t;
     materials.ray.uniforms.uTime!.value = t;
     materials.core.uniforms.uPulse!.value = 0.85 + 0.15 * Math.sin(t * 0.9);
@@ -300,13 +383,15 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
       ))}
       <group position={[0, groundY, 0]}>
         <mesh geometry={island} material={materials.island} />
+        <mesh geometry={ground} material={materials.ground} />
         <group ref={debrisRef}>
           <mesh geometry={debris} material={materials.island} />
         </group>
-        {/* Сяйво в основі кристала: він світиться зсередини, найяскравіше знизу. */}
-        <Billboard position={[0, crystalHeight * 0.18, 0]}>
+        {/* Сяйво в основі кристала — біля самої землі: вище воно лягало
+            круглим ореолом поперек монарха (ADR-0242). */}
+        <Billboard position={[0, crystalHeight * 0.06, 0]}>
           <mesh material={materials.core} renderOrder={5}>
-            <planeGeometry args={[crystalHeight * 0.7, crystalHeight * 0.7]} />
+            <planeGeometry args={[crystalHeight * 0.85, crystalHeight * 0.5]} />
           </mesh>
         </Billboard>
       </group>

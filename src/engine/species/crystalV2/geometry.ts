@@ -166,6 +166,42 @@ function crown(
   });
 }
 
+/**
+ * Кільце профілю тіла: `at` — частка шляху від основи (0) до плеча (1),
+ * `scale` — множник кільця плеча, `shift` — зсув осі в частках радіуса.
+ * Кільце — те саме кільце плеча, стиснуте й зсунуте, тож ребра сусідніх
+ * кілець паралельні і кожна грань між ними ПЛАСКА за побудовою.
+ */
+export interface ProfileRing {
+  at: number;
+  scale: number;
+  shift: readonly [number, number];
+}
+
+/** Звичайне тіло року: основа — `FOOT` плеча, плече — саме кільце. */
+const SPINDLE: readonly ProfileRing[] = [
+  { at: 0, scale: FOOT, shift: [0, 0] },
+  { at: 1, scale: 1, shift: [0, 0] },
+];
+
+/**
+ * Монарх — монументальний кристал, що виріс, а не видавлений багатокутник
+ * (власник, 2026-10-05: «природно вирослий монумент … нижня частина має
+ * вагу … легка асиметрія»). Три кільця замість двох: важка основа (0.86
+ * плеча, а не 0.72), ледь ширший пояс на третині висоти, де кристал
+ * набирав масу, і плече, зсунуте від осі. Кожна грань стовбура ділиться на
+ * дві великі пласкі грані з різним нахилом — більше читаних граней без
+ * дрібних трикутників. Зсуви — з хешу дати, тож кожна пара має свій монарх.
+ */
+export function monarchProfile(seed: string): ProfileRing[] {
+  const jitter = (key: string, span: number) => (unit(seed, `monarch:profile:${key}`) - 0.5) * span;
+  return [
+    { at: 0, scale: 0.86, shift: [0, 0] },
+    { at: 0.32 + jitter('belly:at', 0.08), scale: 1.05, shift: [jitter('belly:x', 0.06), jitter('belly:z', 0.06)] },
+    { at: 1, scale: 0.97, shift: [jitter('shoulder:x', 0.14), jitter('shoulder:z', 0.14)] },
+  ];
+}
+
 function body(
   seed: string,
   tag: string,
@@ -175,24 +211,34 @@ function body(
   apex: readonly [number, number],
   ridge: number,
   bury: number,
+  profile: readonly ProfileRing[] = SPINDLE,
 ): Tri[] {
   const base = ring(sides);
   const n = base.length;
   const y0 = -bury;
   const y1 = height - tip;
-  const lift = (p: V3, y: number): V3 => [p[0], y, p[2]];
-  const bottom = base.map((p) => lift([p[0] * FOOT, 0, p[2] * FOOT], y0));
-  const top = base.map((p) => lift(p, y1));
+  const radius = Math.max(...base.map((p) => Math.hypot(p[0], p[2])));
+  const rings = profile.map((r) => {
+    const y = y0 + (y1 - y0) * r.at;
+    return base.map((p): V3 => [p[0] * r.scale + r.shift[0] * radius, y, p[2] * r.scale + r.shift[1] * radius]);
+  });
   const tris: Tri[] = [];
   let face = 0;
-  for (let i = 0; i < n; i += 1) {
-    const j = (i + 1) % n;
-    tris.push(outward(bottom[i]!, bottom[j]!, top[j]!, face, QUAD_A));
-    tris.push(outward(bottom[i]!, top[j]!, top[i]!, face, QUAD_B));
-    face += 1;
+  for (let k = 0; k + 1 < rings.length; k += 1) {
+    const lower = rings[k]!;
+    const upper = rings[k + 1]!;
+    for (let i = 0; i < n; i += 1) {
+      const j = (i + 1) % n;
+      tris.push(outward(lower[i]!, lower[j]!, upper[j]!, face, QUAD_A));
+      tris.push(outward(lower[i]!, upper[j]!, upper[i]!, face, QUAD_B));
+      face += 1;
+    }
   }
-  const radius = Math.max(...base.map((p) => Math.hypot(p[0], p[2])));
-  for (const points of crown(seed, tag, top, y1, tip, apex, ridge, radius)) {
+  const top = rings[rings.length - 1]!;
+  const shoulder = profile[profile.length - 1]!;
+  // Кінчик іде за плечем: зсунуте плече з кінчиком на осі читалось би зламом.
+  const tipAt: [number, number] = [apex[0] + shoulder.shift[0] * radius, apex[1] + shoulder.shift[1] * radius];
+  for (const points of crown(seed, tag, top, y1, tip, tipAt, ridge, radius * shoulder.scale)) {
     tris.push({ points, face, edges: TRI });
     face += 1;
   }
@@ -282,7 +328,7 @@ export function buildCrystalV2Geometry(model: CrystalV2Model, form: CrystalForm 
     tris: form === 'stalagmite'
       ? stalagmite(seed, 'monarch', m.radius, m.height, 3 + m.tiers, 0.12 * m.height)
       : body(seed, 'monarch', m.sides, m.height, m.tierHeights.reduce((sum, h) => sum + h, 0),
-        [m.apex[0] * 4, m.apex[1] * 4], m.tiers, 0.12 * m.height),
+        [m.apex[0] * 4, m.apex[1] * 4], m.tiers, 0.12 * m.height, monarchProfile(seed)),
     height: m.height,
   }];
   const sparks: number[] = [];

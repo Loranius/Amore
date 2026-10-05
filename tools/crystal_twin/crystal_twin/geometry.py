@@ -81,26 +81,51 @@ def crown(seed, tag, top, y1, tip, apex, ridge, radius):
     return out
 
 
-def body(seed, tag, sides, height, tip, apex, ridge, bury) -> list[tuple[np.ndarray, int, tuple]]:
+# Звичайне тіло року: основа — FOOT плеча, плече — саме кільце.
+# Кільце профілю: (частка шляху від основи до плеча, множник, зсув осі в радіусах).
+SPINDLE = ((0.0, FOOT, (0.0, 0.0)), (1.0, 1.0, (0.0, 0.0)))
+
+
+def monarch_profile(seed):
+    """Монарх — три кільця, як `monarchProfile` у `geometry.ts`: важка
+    основа, ледь ширший пояс на третині висоти й плече, зсунуте від осі."""
+    def jitter(key, span):
+        return (unit(seed, f"monarch:profile:{key}") - 0.5) * span
+    return (
+        (0.0, 0.86, (0.0, 0.0)),
+        (0.32 + jitter("belly:at", 0.08), 1.05, (jitter("belly:x", 0.06), jitter("belly:z", 0.06))),
+        (1.0, 0.97, (jitter("shoulder:x", 0.14), jitter("shoulder:z", 0.14))),
+    )
+
+
+def body(seed, tag, sides, height, tip, apex, ridge, bury, profile=SPINDLE) -> list[tuple[np.ndarray, int, tuple]]:
     """Трикутники тіла як (3×3 вершини, номер грані, які ребра справжні).
 
     Ребро k — навпроти вершини k. Діагональ, що ділить пласку грань на два
-    трикутники, ребром не є, і кант на ній малював би неіснуючу грань."""
+    трикутники, ребром не є, і кант на ній малював би неіснуючу грань.
+    Кожне кільце профілю — кільце плеча, стиснуте й зсунуте, тож грані між
+    кільцями пласкі за побудовою."""
     ring0 = _ring(sides)
     y0 = -bury
     y1 = height - tip
+    radius = max(math.hypot(p[0], p[2]) for p in ring0)
+    rings = []
+    for at, scale, (sx, sz) in profile:
+        y = y0 + (y1 - y0) * at
+        rings.append(ring0 * scale + np.array([sx * radius, y, sz * radius]))
     faces: list[tuple[np.ndarray, int]] = []
     face = 0
     n = len(ring0)
-    bottom = ring0 * FOOT + np.array([0, y0, 0])
-    top = ring0 + np.array([0, y1, 0])
-    for i in range(n):
-        j = (i + 1) % n
-        faces.append((np.array([bottom[i], bottom[j], top[j]]), face, QUAD_A))
-        faces.append((np.array([bottom[i], top[j], top[i]]), face, QUAD_B))
-        face += 1
-    radius = max(math.hypot(p[0], p[2]) for p in ring0)
-    for tri in crown(seed, tag, list(top), y1, tip, apex, ridge, radius):
+    for lower, upper in zip(rings, rings[1:]):
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append((np.array([lower[i], lower[j], upper[j]]), face, QUAD_A))
+            faces.append((np.array([lower[i], upper[j], upper[i]]), face, QUAD_B))
+            face += 1
+    top = rings[-1]
+    _, shoulder_scale, (sx, sz) = profile[-1]
+    tip_at = (apex[0] + sx * radius, apex[1] + sz * radius)
+    for tri in crown(seed, tag, list(top), y1, tip, tip_at, ridge, radius * shoulder_scale):
         faces.append((np.array(tri), face, TRI))
         face += 1
     return faces
@@ -127,7 +152,8 @@ def colony(model: dict[str, Any]) -> list[dict[str, Any]]:
     bodies = [{
         "kind": "monarch",
         "faces": body(model["startDate"], "monarch", m["sides"], m["height"], sum(m["tierHeights"]),
-                      (m["apex"][0] * 4, m["apex"][1] * 4), m["tiers"], bury=0.12 * m["height"]),
+                      (m["apex"][0] * 4, m["apex"][1] * 4), m["tiers"], bury=0.12 * m["height"],
+                      profile=monarch_profile(model["startDate"])),
         "sparks": [],
     }]
     seed = model["startDate"]

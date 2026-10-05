@@ -23,14 +23,19 @@ export interface DioramaPalette {
   /** Частинки світла довкола. */
   mote: string;
   moteStrength: number;
+  /**
+   * Далекі зорі в тлі (ADR-0242), 0…1. Лише кристал — «святилище в
+   * магічному небі»; небо дерева денне, риф — під водою.
+   */
+  stars?: number;
 }
 
 export const DIORAMA_PALETTES: Record<DioramaSpecies, Record<'light' | 'dark', DioramaPalette>> = {
   crystal: {
     // Сутінковий фіолетовий грот референсу власника (ADR-0221). Верх темний:
     // шапка головної над ним — білі літери.
-    light: { top: '#4f4596', bottom: '#b69ad8', glow: '#ffd6f2', ground: '#bfe6c8', cliff: '#a597d6', mote: '#ffe6f8', moteStrength: 0.7 },
-    dark: { top: '#15123a', bottom: '#3a2a6e', glow: '#ff8fd6', ground: '#4f6aa6', cliff: '#45427f', mote: '#ffc4f0', moteStrength: 0.9 },
+    light: { top: '#4f4596', bottom: '#b69ad8', glow: '#ffd6f2', ground: '#bfe6c8', cliff: '#a597d6', mote: '#ffe6f8', moteStrength: 0.7, stars: 0.35 },
+    dark: { top: '#15123a', bottom: '#3a2a6e', glow: '#ff8fd6', ground: '#4f6aa6', cliff: '#45427f', mote: '#ffc4f0', moteStrength: 0.9, stars: 0.8 },
   },
   tree: {
     // «Небесний сад» (власник, 2026-10-05): синє небо → молочні хмари →

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildCrystalV2Geometry } from './geometry';
+import { buildCrystalV2Geometry, monarchProfile } from './geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from './model';
 
 // ============================================================
@@ -157,4 +157,24 @@ describe('кристал v2: геометрія', () => {
     expect(empty.height).toBeGreaterThan(1.4);
     for (const value of empty.crystals.positions) expect(Number.isFinite(value)).toBe(true);
   });
+
+  it('монарх — три кільця (ADR-0242): важка основа, ширший пояс, плече зсунуте від осі', () => {
+    const profile = monarchProfile(busy.startDate);
+    expect(profile.map((r) => r.at)).toEqual([0, profile[1]!.at, 1]);
+    expect(profile[0]!.scale).toBeGreaterThan(0.8);
+    expect(profile[1]!.scale).toBeGreaterThan(profile[0]!.scale);
+    expect(profile[1]!.at).toBeGreaterThan(0.2);
+    expect(profile[1]!.at).toBeLessThan(0.45);
+    for (const ring of profile) for (const s of ring.shift) expect(Math.abs(s)).toBeLessThanOrEqual(0.07);
+    expect(monarchProfile(busy.startDate)).toEqual(profile);
+  });
+
+  it('монарх має вдвічі більше граней стовбура, ніж кристал року: два пояси замість одного', () => {
+    const sides = busy.monarch.sides.length;
+    // Перші 2·sides·2 трикутники — два пояси монарха; кожен пояс — sides граней.
+    const tones = new Set<number>();
+    for (let t = 0; t < sides * 4; t += 1) tones.add(geometry.crystals.faceTone[t * 3]!);
+    expect(tones.size).toBeGreaterThan(sides);
+  });
 });
+
