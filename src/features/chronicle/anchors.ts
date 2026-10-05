@@ -125,15 +125,13 @@ function volcanoAnchor(model: VolcanoModel, trace: ChronicleTrace): ChronicleAnc
   };
   switch (trace.kind) {
     case 'wishes': {
-      const k = model.life.anemones.findIndex((a) => a.id === trace.id);
-      const anemone = k >= 0 ? orn.anemones[k] : undefined;
-      return anemone ? at(anemone.position, 0.45) : at(crater, WHOLE, 'object', 'Актинія цього бажання вже серед найновіших');
+      // Мешканець цього бажання — там, де він починає своє коло.
+      const c = model.creatures.find((x) => x.wishId === trace.id);
+      if (!c) return at(crater, WHOLE, 'object', 'Мешканців не більше тридцяти — це бажання серед них');
+      const a = (c.phase * Math.PI) / 180;
+      return at([Math.cos(a) * c.orbit, c.height, Math.sin(a) * c.orbit], c.kind === 'whale' ? WHOLE : 0.5);
     }
-    case 'plans': {
-      const vent = model.vents[trace.index % Math.max(1, model.vents.length)];
-      if (!vent) return at(crater, 0.6, 'object', 'Тріщина лави з\'явиться на третьому виконаному плані');
-      return at(onSlope(vent.azimuth, vent.at * model.height + vent.size * 0.6));
-    }
+    case 'plans': return at(onSlope(0, model.height * 0.85), 0.6);
     case 'memories': {
       const colony = volcanoPlacements(model).find((p) => p.colony.year === trace.year);
       return colony ? at(colony.base, 0.45) : at(crater, WHOLE);
@@ -196,8 +194,8 @@ export const MODULE_TRACE: Record<'crystal' | 'tree' | 'reef', Record<ActivityKi
   },
   reef: {
     memories: 'Спогади — корали колонії свого року',
-    plans: 'Виконані плани — тріщини лави на схилі',
-    wishes: 'Виконані бажання — актинії, колір — хто виконав',
+    plans: 'Виконані плани — товщий шар року й жар кратера',
+    wishes: 'Виконані бажання — морські мешканці: рибка, медуза, устриця, риба, кит, дельфін, далі — кольорові рибки',
     milestones: 'Віхи — мушлі з перлиною',
     events: 'Події живлять шар свого року',
     places: 'Місця — морські зірки',

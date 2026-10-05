@@ -11,6 +11,8 @@ import { useFrame, type ThreeEvent } from '@react-three/fiber';
 import * as THREE from 'three';
 import { unit } from '@/engine/species/crystalV2/hash';
 import type { VolcanoGeometry } from '@/engine/species/volcano/geometry';
+import type { VolcanoCreature } from '@/engine/species/volcano/model';
+import { VolcanoCreatures } from './VolcanoCreatures';
 import type { Season } from '@/engine/species/grammar/season';
 import { PORTAL_GROUND_Y } from '../crystal3d/scene/portalScene';
 import { ReefV2World } from '../reef3d/v2/ReefV2World';
@@ -110,9 +112,11 @@ interface VolcanoWorldProps {
   season?: Season;
   /** Дотик по вулкану, крім виверження, відкриває хроніку росту (ADR-0238). */
   onTap?: (() => void) | undefined;
+  /** Мешканці за виконаними бажаннями (2026-10-05). */
+  creatures?: readonly VolcanoCreature[];
 }
 
-export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, glow, bare = false, fishKinds = 1, season, onTap }: VolcanoWorldProps) {
+export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, glow, bare = false, fishKinds = 1, season, onTap, creatures = [] }: VolcanoWorldProps) {
   const lava = useMemo(() => {
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(geometry.lava.positions, 3));
@@ -217,6 +221,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         <group scale={scale}>
           <mesh name={VOLCANO_LAVA_NAME} geometry={lava} material={materials.lava} />
           <points geometry={embers} material={materials.embers} frustumCulled={false} />
+          <VolcanoCreatures creatures={creatures} reduceMotion={reduceMotion} />
         </group>
       </group>
     </group>

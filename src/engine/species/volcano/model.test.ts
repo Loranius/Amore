@@ -211,13 +211,30 @@ describe('вулкан: без бічних конусів, більше гра�
     }
   });
 
-  it('кожна грань конуса — чотири трикутники, а плани лишають тріщини лави', () => {
+  it('кожна грань конуса — чотири трикутники; жовтих тріщин планів більше немає (власник, 2026-10-05)', () => {
     const rings = volcanoRings(model);
     const bare = buildVolcanoModel(at('2030-10-15', { plans: [] }));
-    const lavaWith = buildVolcanoGeometry(model).lava.positions.length;
-    const lavaBare = buildVolcanoGeometry(bare).lava.positions.length;
-    expect(lavaWith).toBeGreaterThan(lavaBare);
+    // Плани більше не додають лави на схил: тріщини прибрано.
+    expect(buildVolcanoGeometry(model).lava.positions.length).toBe(buildVolcanoGeometry({ ...model, vents: bare.vents }).lava.positions.length);
     const cone = (rings.length - 1) * 12 * 4;
     expect(buildVolcanoGeometry(model).rock.positions.length / 9).toBeGreaterThan(cone);
+  });
+
+  it('бажання додають мешканців по черзі: рибка, медуза, устриця, риба, кит, дельфін, далі — рибки нових кольорів (власник, 2026-10-05)', () => {
+    const wishes = (n: number) => Array.from({ length: n }, (_, i) => ({ id: 100 + i, date: `2020-0${1 + (i % 9)}-1${i % 10}`, isShared: true, ownerId: null, fulfilledById: null }));
+    const kinds = (n: number) => buildVolcanoModel(at('2030-10-15', { wishes: wishes(n) })).creatures.map((c) => c.kind);
+    expect(kinds(0)).toEqual([]);
+    expect(kinds(1)).toEqual(['fish']);
+    expect(kinds(2)).toEqual(['fish', 'jellyfish']);
+    expect(kinds(6)).toEqual(['fish', 'jellyfish', 'oyster', 'bigFish', 'whale', 'dolphin']);
+    const nine = buildVolcanoModel(at('2030-10-15', { wishes: wishes(9) })).creatures;
+    expect(nine.slice(6).map((c) => c.kind)).toEqual(['fish', 'fish', 'fish']);
+    // Кожна нова рибка — свого кольору, не як перша й не як сусідня.
+    const hues = [nine[0]!.hue, ...nine.slice(6).map((c) => c.hue)];
+    for (let i = 1; i < hues.length; i += 1) expect(Math.abs(hues[i]! - hues[i - 1]!)).toBeGreaterThan(0.1);
+    // Порядок — за днем бажання; те саме — побітово те саме.
+    expect(buildVolcanoModel(at('2030-10-15', { wishes: wishes(9) })).creatures).toEqual(nine);
+    // Не більше тридцяти.
+    expect(buildVolcanoModel(at('2030-10-15', { wishes: wishes(45) })).creatures.length).toBe(30);
   });
 });

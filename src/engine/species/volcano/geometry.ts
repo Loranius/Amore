@@ -397,39 +397,8 @@ export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
       prev = point;
     }
   }
-  // Виконані плани — тріщини лави на схилі (ADR-0237, поправка
-  // 2026-10-04): власник прибрав бічні конуси, але план не зникає зі
-  // світу вулкана — він лишає жевріючу зигзагом розколину там, де стояв
-  // конус. Тріщина лежить трохи над справжньою гранню, щоб жодна її не
-  // перекрила.
-  const rings = volcanoRings(model);
-  for (const vent of model.vents) {
-    const a = (vent.azimuth * Math.PI) / 180;
-    const y0 = vent.at * model.height;
-    const len = vent.size * 1.3;
-    const width = vent.size * 0.13;
-    const side: V3 = [-Math.sin(a), 0, Math.cos(a)];
-    const N = 6;
-    const spine = Array.from({ length: N + 1 }, (_, k) => {
-      const y = y0 + len * (0.55 - k / N);
-      const r = volcanoConeRadiusAt(rings, a, y) * 1.015;
-      const zig = (k % 2 === 0 ? 1 : -1) * width * 0.8 * (0.5 + unit(model.startDate, `fissure${vent.index}:${k}`));
-      const w = width * Math.sin(((k + 0.5) / (N + 1)) * Math.PI);
-      return { at: [Math.cos(a) * r + side[0] * zig, y, Math.sin(a) * r + side[2] * zig] as V3, w };
-    });
-    for (let k = 0; k < N; k += 1) {
-      const p0 = spine[k]!;
-      const p1 = spine[k + 1]!;
-      const l0: V3 = [p0.at[0] + side[0] * p0.w, p0.at[1], p0.at[2] + side[2] * p0.w];
-      const r0: V3 = [p0.at[0] - side[0] * p0.w, p0.at[1], p0.at[2] - side[2] * p0.w];
-      const l1: V3 = [p1.at[0] + side[0] * p1.w, p1.at[1], p1.at[2] + side[2] * p1.w];
-      const r1: V3 = [p1.at[0] - side[0] * p1.w, p1.at[1], p1.at[2] - side[2] * p1.w];
-      push(l0, 0.7); push(l1, 0.7); push(p0.at, 1);
-      push(p0.at, 1); push(l1, 0.7); push(p1.at, 1);
-      push(r0, 0.7); push(p0.at, 1); push(r1, 0.7);
-      push(p0.at, 1); push(p1.at, 1); push(r1, 0.7);
-    }
-  }
+  // Тріщин лави на схилі більше немає (власник, 2026-10-05: «прибери ці
+  // жовті тріщини»): виконані плани живлять шар року й жар кратера.
   return { positions: new Float32Array(p), heat: new Float32Array(h), flow: new Float32Array(f) };
 }
 
@@ -492,11 +461,9 @@ export function volcanoOrnaments(model: VolcanoModel): ReefV2Ornaments {
   const seed = model.startDate;
   const life = model.life;
   return {
-    anemones: life.anemones.map((a) => {
-      const t = 2 * Math.PI * unit(seed, `anemone${a.id}:a`);
-      const r = model.baseRadius * (1.02 + 0.2 * unit(seed, `anemone${a.id}:r`));
-      return { position: [Math.cos(t) * r, 0, Math.sin(t) * r] as V3, channel: a.channel };
-    }),
+    // Бажання на вулкані — не актинії, а морські мешканці (`model.creatures`,
+    // власник 2026-10-05); їх малює й рухає сцена.
+    anemones: [],
     clams: Array.from({ length: life.clams }, (_, k): V3 => {
       const a = 2 * Math.PI * unit(seed, `clam${k}:a`);
       const r = model.baseRadius * (1.02 + 0.12 * unit(seed, `clam${k}:r`));

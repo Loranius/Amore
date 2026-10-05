@@ -17,7 +17,11 @@
 //   останні два роки    → жар кратера й кількість жил лави
 //   роки разом          → колонія корала на шарі СВОГО року: вулкан —
 //                         літопис знизу вгору
-//   виконані плани      → тріщини лави на схилі (ADR-0237, поправка 2026-10-04)
+//   виконані плани      → товщий шар року й жар кратера (через активність);
+//                         тріщини лави на схилі прибрано (власник, 2026-10-05)
+//   виконані бажання    → морські мешканці по черзі: рибка, медуза, устриця з
+//                         перлиною, більша риба, кит на тлі, дельфін над
+//                         вулканом, далі — рибки нових кольорів (2026-10-05)
 //   5 / 10 / 20 років   → новий вид риб у зграї (ADR-0237)
 //   решта (актинії-бажання, мушлі-віхи, риби-медіа, трава-вихідні,
 //   зірки-місця, підріст) — ті самі правила, що в рифі v2 (ADR-0219):
@@ -31,7 +35,7 @@ import { ACTIVITY_WEIGHTS, datedItems, r6, type CrystalV2Snapshot } from '../cry
 import { buildReefV2Model, type ReefV2Model } from '../reefV2/model';
 import { yearFertility } from '../grammar/grammar';
 
-export const VOLCANO_VERSION = 'volcano/2026-09-29';
+export const VOLCANO_VERSION = 'volcano/2026-10-05';
 
 /** Висота конуса до першого шару: пагорб, з якого все почалось. */
 export const VOLCANO_BASE_HEIGHT = 0.35;
@@ -60,6 +64,31 @@ export interface VolcanoLayer {
 /** Скільки бічних конусів дають виконані плани: 3 → 1, 9 → 2, 21 → 3 (ADR-0237). */
 export function volcanoVentCount(plans: number): number {
   return Math.min(3, Math.floor(Math.log2(1 + Math.max(0, plans) / 3)));
+}
+
+/**
+ * Мешканці за виконаними бажаннями (власник, 2026-10-05): кожне нове бажання
+ * додає наступного — 1 рибка, 2 медуза, 3 устриця з перлиною, 4 більша
+ * риба, 5 кит на тлі, 6 дельфін над вулканом; далі — рибка нового кольору
+ * за кожне бажання.
+ */
+export type VolcanoCreatureKind = 'fish' | 'jellyfish' | 'oyster' | 'bigFish' | 'whale' | 'dolphin';
+export const VOLCANO_CREATURE_ORDER: readonly VolcanoCreatureKind[] = ['fish', 'jellyfish', 'oyster', 'bigFish', 'whale', 'dolphin'];
+/** Більше мешканців не додається: вулкан не акваріум. */
+export const VOLCANO_MAX_CREATURES = 30;
+
+export interface VolcanoCreature {
+  /** Бажання, що його привело (id), і його порядковий номер. */
+  wishId: number;
+  index: number;
+  kind: VolcanoCreatureKind;
+  /** Відтінок 0…1 (для рибок; решта — свій колір). */
+  hue: number;
+  /** Орбіта довкола осі вулкана, висота над плато, фаза (градуси), кутова швидкість (рад/с). */
+  orbit: number;
+  height: number;
+  phase: number;
+  speed: number;
 }
 
 /** Роки разом, на яких у зграї з'являється новий вид риб (ADR-0237, власник). */
@@ -91,8 +120,42 @@ export interface VolcanoModel {
   vents: VolcanoVent[];
   /** Скільки видів риб у зграї: 1 + віхи 5 / 10 / 20 років разом. */
   fishKinds: number;
+  /** Мешканці за виконаними бажаннями, у порядку бажань. */
+  creatures: VolcanoCreature[];
   /** Модель рифу тієї ж пари: колонії, актинії, мушлі, риби, трава, зірки. */
   life: ReefV2Model;
+}
+
+/** Кожне бажання — свій мешканець: вид за порядком, місце й рух — із хешу. */
+export function volcanoCreatures(
+  wishIds: readonly number[],
+  seed: string,
+  shape: { height: number; baseRadius: number; craterRadius: number },
+): VolcanoCreature[] {
+  const { height, baseRadius, craterRadius } = shape;
+  return wishIds.slice(0, VOLCANO_MAX_CREATURES).map((wishId, index) => {
+    const kind = VOLCANO_CREATURE_ORDER[index] ?? 'fish';
+    const u = (tag: string) => unit(seed, `creature${index}:${tag}`);
+    // Перша рибка — помаранчева; рибки після дельфіна — щоразу новий колір
+    // (золотий кут по колу відтінків, щоб сусідні не були схожі).
+    const hue = index === 0 ? 0.07 : (0.07 + (index - 5) * 0.618034) % 1;
+    const phase = r6(360 * u('p'));
+    const base = { wishId, index, kind, hue: r6(hue), phase };
+    switch (kind) {
+      case 'jellyfish':
+        return { ...base, orbit: r6(baseRadius * (1.35 + 0.2 * u('r'))), height: r6(height * (0.55 + 0.2 * u('y'))), speed: 0.06 };
+      case 'oyster':
+        return { ...base, orbit: r6(baseRadius * (1.1 + 0.06 * u('r'))), height: 0, speed: 0 };
+      case 'bigFish':
+        return { ...base, orbit: r6(baseRadius * (1.8 + 0.25 * u('r'))), height: r6(height * (0.4 + 0.25 * u('y'))), speed: 0.16 };
+      case 'whale':
+        return { ...base, orbit: r6(baseRadius * 3.6 + 1.2), height: r6(height * 0.85 + 0.4), speed: 0.035 };
+      case 'dolphin':
+        return { ...base, orbit: r6(craterRadius + 0.45 + 0.15 * u('r')), height: r6(height + 0.5), speed: 0.45 };
+      default:
+        return { ...base, orbit: r6(baseRadius * (1.2 + 0.5 * u('r'))), height: r6(0.25 + height * 0.8 * u('y')), speed: r6(0.24 + 0.16 * u('s')) };
+    }
+  });
 }
 
 export function volcanoLayerThickness(year: number, lived: number, activity: number): number {
@@ -129,6 +192,13 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
     top += thickness;
   }
 
+  // Виконані бажання в порядку дня (і id при рівних днях) — черга мешканців.
+  const wishIds = (snapshot.wishes ?? [])
+    .filter((w) => w.date && dayNumber(parseDay(w.date)) >= dayNumber(start) && dayNumber(parseDay(w.date)) <= dayNumber(asOf))
+    .map((w) => [dayNumber(parseDay(w.date!)), w.id] as const)
+    .sort((a, b) => a[0] - b[0] || a[1] - b[1])
+    .map(([, id]) => id);
+
   const recent = (activityByYear.get(lastYear) ?? 0) + (activityByYear.get(lastYear - 1) ?? 0);
   const glow = 0.35 + 0.65 * Math.min(1, Math.log1p(recent) / Math.log1p(30));
 
@@ -155,6 +225,7 @@ export function buildVolcanoModel(snapshot: CrystalV2Snapshot): VolcanoModel {
       size: r6((0.34 + 0.1 * unit(life.startDate, `vent${i}:s`)) * (0.55 + 0.45 * Math.min(1, life.years / 8))),
     })),
     fishKinds: 1 + VOLCANO_FISH_YEARS.filter((year) => life.years >= year).length,
+    creatures: volcanoCreatures(wishIds, life.startDate, { height: r6(top), baseRadius: r6(0.72 * top), craterRadius: r6(0.16 + 0.05 * top) }),
     life,
   };
 }

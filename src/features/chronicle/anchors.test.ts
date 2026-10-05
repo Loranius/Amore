@@ -5,7 +5,6 @@ import { buildCrystalV2Model, type CrystalV2Snapshot } from '@/engine/species/cr
 import { chronicleTraces } from '@/engine/species/grammar/chronicle';
 import { treeV2Ornaments, treeV2Skeleton } from '@/engine/species/treeV2/geometry';
 import { buildTreeV2Model } from '@/engine/species/treeV2/model';
-import { volcanoOrnaments } from '@/engine/species/volcano/geometry';
 import { buildVolcanoModel } from '@/engine/species/volcano/model';
 import { MODULE_TRACE, chronicleAnchor, type ChronicleSubject } from './anchors';
 
@@ -50,15 +49,14 @@ describe('опорні точки хроніки', () => {
     expect(limbEnds).toContainEqual(chronicleAnchor(subject, plan).point);
   });
 
-  it('вулкан: бажання — до своєї актинії; план без тріщин чесно каже, куди дивиться замість нього', () => {
+  it('вулкан: бажання — до свого морського мешканця; план — до кратера (тріщин більше немає)', () => {
     const model = buildVolcanoModel(BUSY);
-    const orn = volcanoOrnaments(model);
     const wish = traces.filter((t) => t.kind === 'wishes').at(-1)!;
-    const k = model.life.anemones.findIndex((a) => a.id === wish.id);
-    expect(chronicleAnchor({ species: 'reef', model }, wish).point).toEqual(orn.anemones[k]!.position);
-    const bare = buildVolcanoModel({ ...BUSY, plans: [] });
+    const c = model.creatures.find((x) => x.wishId === wish.id)!;
+    const a = (c.phase * Math.PI) / 180;
+    expect(chronicleAnchor({ species: 'reef', model }, wish).point).toEqual([Math.cos(a) * c.orbit, c.height, Math.sin(a) * c.orbit]);
     const plan = { kind: 'plans' as const, id: 1, date: BUSY.asOf.slice(0, 10), year: 0, index: 0 };
-    expect(chronicleAnchor({ species: 'reef', model: bare }, plan).note).toMatch(/[Тт]ріщин/);
+    expect(chronicleAnchor({ species: 'reef', model }, plan).point[1]).toBeCloseTo(model.height * 0.85, 6);
   });
 
   it('кристал: вихідний — до своєї друзи на острові', () => {

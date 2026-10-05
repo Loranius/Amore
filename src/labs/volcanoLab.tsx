@@ -39,6 +39,7 @@ function Island({ years, fill, theme, x }: { years: number; fill: number; theme:
         <VolcanoWorld
           bare
           seed={built.model.startDate}
+          creatures={built.model.creatures}
           geometry={built.geometry}
           scale={built.frame.scale}
           theme={theme}

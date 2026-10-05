@@ -137,6 +137,7 @@ export default function VolcanoScene() {
         >
           <VolcanoWorld
             seed={model.startDate}
+            creatures={model.creatures}
             geometry={shown.geometry}
             scale={frame.scale}
             theme={theme}
