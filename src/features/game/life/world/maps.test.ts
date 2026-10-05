@@ -3,7 +3,7 @@ import { CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
 import { ROOM_FLOOR } from '../sim/economy';
 import { newLife } from '../sim/life';
 import { propSolid } from '../render/props';
-import { colliderFor, reachableTiles, zoneTiles } from './collide';
+import { colliderFor, reachableTiles, tileFeet, zoneTiles } from './collide';
 import { HATA_DOORS, HATA_ROOMS, homeInterior } from './interior';
 import { cellarMap } from './cellar';
 import { summerKitchenMap } from './kitchen';
@@ -163,7 +163,7 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     const reach = reachableTiles(hata, hata.spawns.door!);
     const g = (x: number, y: number) => hata.ground[y]![x];
     // Кожна кімната — рівно того розміру, що на збереженому плані.
-    const saved = { mom: [5, 10, 2], bro: [7, 5, 2], up: [6, 5, 2], hall: [7, 5, 2], ver: [6, 5, 2], lena: [12, 6, 3] } as const;
+    const saved = { mom: [5, 10, 2], bro: [7, 5, 2], up: [6, 5, 2], hall: [7, 5, 2], ver: [6, 5, 2], lena: [12, 7, 3] } as const;
     for (const [id, [w, h, wall]] of Object.entries(saved)) {
       const r = HATA_ROOMS[id as keyof typeof HATA_ROOMS];
       expect([r.w, r.h, r.wall], id).toEqual([w, h, wall]);
@@ -200,6 +200,20 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(brotherBeds(homeInterior({ ...newLife(1, 'uni'), home: 'zhylyntsi' }))).toHaveLength(1);
   });
 
+  it('кімната Лєни (власник, 2026-10-05): шафа праворуч від ліжка, стіл унизу посередині, двері на клітинку лівіше', () => {
+    const hata = homeInterior({ ...newLife(1, 'sadok'), home: 'zhylyntsi' });
+    const R = HATA_ROOMS.lena;
+    const inLena = (t: string) => hata.props.find((p) => p.type === t && p.y >= R.y && p.y < R.y + R.h)!;
+    const bed = inLena('bed');
+    const wardrobe = inLena('wardrobe');
+    expect(wardrobe.x).toBeGreaterThan(bed.x + 1.25);
+    expect(wardrobe.x - (bed.x + 1.25)).toBeLessThan(1);
+    const table = inLena('table');
+    expect(table.y).toBeGreaterThan(R.y + R.h - 2);
+    expect(Math.abs(table.x + 0.95 - (R.x + R.w / 2))).toBeLessThanOrEqual(0.5);
+    expect(HATA_DOORS.hallLena.x).toBe(8);
+  });
+
   it('у хаті будь-яке облаштування з рамки 16×12 лягає на підлогу Лєниної кімнати й не перекриває дверей', () => {
     const s = newLife(1, 'adult');
     const all = { rug: 'rugPink', plant: 'plant', lamp: 'lamp', shelf: 'shelf', tv: 'tv', desk: 'desk', sofa: 'sofa', poster: 'poster', pet: 'kitten' };
@@ -210,7 +224,12 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
       assertReachable(hata);
       for (const p of hata.props.filter((q) => q.y >= R.y + R.wall && q.type !== 'wardrobe')) {
         expect(p.x, p.type).toBeGreaterThanOrEqual(R.x + 1);
-        expect(p.x, p.type).toBeLessThan(HATA_DOORS.hallLena.x - 1);
+      }
+      // Двері з коридорчика не заставлені: від них можна пройти вглиб кімнати.
+      const col = colliderFor(hata);
+      for (let y = R.y + R.wall; y < R.y + R.h - 1; y += 1) {
+        const f = tileFeet(HATA_DOORS.hallLena.x, y);
+        expect(col.canStand(f.x, f.y), `двері, ряд ${y}`).toBe(true);
       }
       // Меблі не налазять одна на одну.
       const solids = hata.props.filter((q) => q.y >= R.y + R.wall).map((q) => [q.type, propSolid(q)] as const).filter(([, r]) => r);
