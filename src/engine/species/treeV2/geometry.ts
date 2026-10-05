@@ -310,7 +310,8 @@ export function treeV2Roots(model: TreeV2Model): Omit<TreeV2Branch, 'order'>[] {
 
 export interface TreeV2Ornaments {
   /** Стрічки бажань: де стрічку зав'язано (низ крони гілки свого року). */
-  blossoms: { position: V3 }[];
+  /** `cluster` — центр кластера, до якого зав'язано: від нього яблуко виходить з листя. */
+  blossoms: { position: V3; cluster: V3 }[];
   fruits: V3[];
   fireflies: V3[];
   flowers: { position: V3; tint: number }[];
@@ -332,7 +333,10 @@ export function treeV2Ornaments(model: TreeV2Model, clusters: readonly TreeV2Clu
   // поправка 2026-10-04): звисає з-під листя, а не лежить на ньому.
   const blossoms = model.blossoms.map((b) => {
     const own = clusters.filter((c) => c.key === `y${b.year}` || c.key.startsWith(`y${b.year}.`));
-    return { position: onCluster(`blossom${b.id}`, false, 1.0, own.length > 0 ? own : clusters) };
+    const pool = own.length > 0 ? own : clusters;
+    const tag = `blossom${b.id}`;
+    const c = pool[Math.min(pool.length - 1, Math.floor(unit(seed, `${tag}:c`) * pool.length))]!;
+    return { position: onCluster(tag, false, 1.0, pool), cluster: c.centre };
   });
   const fruits = Array.from({ length: model.fruits }, (_, k) => onCluster(`fruit${k}`, false, 0.92));
 
@@ -407,12 +411,192 @@ function icosphere(): { verts: V3[]; faces: [number, number, number][] } {
 
 const ICO = icosphere();
 
-/** Вершини гранчастого «кулачка» листя кластера — одні для меша й для квіток на ньому. */
-function leafBlob(seed: string, c: TreeV2Cluster): V3[] {
-  return ICO.verts.map((v, i): V3 => {
-    const k = c.radius * 1.14 * (0.82 + 0.3 * unit(seed, `${c.key}:v${i}`));
-    return [c.centre[0] + v[0] * k, c.centre[1] + v[1] * k * (c.squash ?? 0.82), c.centre[2] + v[2] * k];
+/**
+ * Крона — одна асиметрична маса, а не кульки на кінчиках (власник,
+ * 2026-10-05: «переробити крону … 6–9 великих кластерів; кожен кластер із
+ * 4–7 фасетних мас листя; без ідеальних сфер; більше вертикальної
+ * структури; верхівка трохи ширша, але не кругла»).
+ *
+ * Кластери скелета (кінчики гілок) лишаються даними росту — їх бачить
+ * двійник і голдени. Малюнок крони з них виводиться: кластери групуються
+ * найвіддаленішими точками (від найвищого) у групи — по групі на ~4
+ * кластери, не більше дев'яти, тож молоде дерево має 1–2 купки, а старе —
+ * складну крону. Кожна група — 4–7 гранчастих мас: витягнуті вгору, з
+ * пласкішим низом, кожна повернута по-своєму, підтягнуті до центру групи,
+ * щоб купка читалась одним цілим. Маса накриває кожен свій кластер, тож
+ * кінчик гілки не стирчить голим.
+ */
+export interface TreeV2CrownMass {
+  centre: V3;
+  /** Піввісі еліпсоїда маси (до тремтіння вершин). */
+  scale: V3;
+  /** Поворот навколо вертикалі, рад. */
+  turn: number;
+  key: string;
+  group: number;
+}
+
+const dist3 = (a: V3, b: V3) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+/** Найвіддаленіші одна від одної точки, жадібно від `first`. */
+function farthestPoints(pts: readonly V3[], count: number, first: number): number[] {
+  const picked = [first];
+  const gap = pts.map((p) => dist3(p, pts[first]!));
+  while (picked.length < Math.min(count, pts.length)) {
+    let far = 0;
+    gap.forEach((g, i) => {
+      if (g > gap[far]!) far = i;
+    });
+    if (gap[far]! <= 1e-9) break;
+    picked.push(far);
+    pts.forEach((p, i) => {
+      gap[i] = Math.min(gap[i]!, dist3(p, pts[far]!));
+    });
+  }
+  return picked;
+}
+
+/** Глибина точки в масі: 1 — на поверхні еліпсоїда, менше — всередині. */
+function massDepth(p: V3, m: TreeV2CrownMass): number {
+  const c = Math.cos(m.turn);
+  const s = Math.sin(m.turn);
+  const dx = p[0] - m.centre[0];
+  const dz = p[2] - m.centre[2];
+  const ly = p[1] - m.centre[1];
+  const sy = m.scale[1] * (ly < 0 ? 0.8 : 1);
+  return Math.hypot((dx * c + dz * s) / m.scale[0], ly / sy, (-dx * s + dz * c) / m.scale[2]);
+}
+
+export function treeV2CrownMasses(model: TreeV2Model, clusters: readonly TreeV2Cluster[]): TreeV2CrownMass[] {
+  if (clusters.length === 0) return [];
+  const seed = model.startDate;
+  const centres = clusters.map((c) => c.centre);
+  const highest = (pts: readonly V3[]) => pts.reduce((b, p, i) => (p[1] > pts[b]![1] ? i : b), 0);
+  const groups = Math.max(1, Math.min(9, Math.round(clusters.length / 4)));
+  const seeds = farthestPoints(centres, groups, highest(centres));
+  const members: number[][] = seeds.map(() => []);
+  centres.forEach((p, i) => {
+    let best = 0;
+    seeds.forEach((sd, g) => {
+      if (dist3(p, centres[sd]!) < dist3(p, centres[seeds[best]!]!)) best = g;
+    });
+    members[best]!.push(i);
   });
+  const crownMid = centres.reduce((sum, p) => sum + p[1], 0) / centres.length;
+  const out: TreeV2CrownMass[] = [];
+  members.forEach((list, g) => {
+    if (list.length === 0) return;
+    const gk = `crown${g}`;
+    const weight = list.reduce((sum, i) => sum + clusters[i]!.radius, 0);
+    const gc = list.reduce<V3>((sum, i) => add(sum, mul(centres[i]!, clusters[i]!.radius / weight)), [0, 0, 0]);
+    const meanR = weight / list.length;
+    const squash = clusters[list[0]!]!.squash ?? 0.82;
+    const count = Math.max(4, Math.min(7, list.length + 2));
+    // Кандидати — центри кластерів групи; бракує — довкола центру групи,
+    // з нахилом угору (вертикальна структура).
+    const pts: V3[] = list.map((i) => centres[i]!);
+    for (let k = 0; pts.length < count; k += 1) {
+      const phi = 2 * Math.PI * unit(seed, `${gk}:x${k}:phi`);
+      const up = 0.2 + 0.6 * unit(seed, `${gk}:x${k}:up`);
+      pts.push(add(gc, mul([Math.cos(phi) * (1 - up), up, Math.sin(phi) * (1 - up)], meanR * 0.75)));
+    }
+    // Маси — як k-середні: старт із найвіддаленіших точок, кожен кластер —
+    // до найближчої маси, центр маси — середнє її кластерів, підтягнуте до
+    // центру купки. Два кроки досить: точність тут — не мета, мета — щоб
+    // кожна маса накривала свої кінчики гілок і не роздувалась.
+    let centresOf = farthestPoints(pts, count - 1, highest(pts)).map((pi) => pts[pi]!);
+    let owned: number[][] = [];
+    for (let iter = 0; iter < 2; iter += 1) {
+      owned = centresOf.map(() => []);
+      for (const i of list) {
+        let best = 0;
+        centresOf.forEach((c, m) => {
+          if (dist3(centres[i]!, c) < dist3(centres[i]!, centresOf[best]!)) best = m;
+        });
+        owned[best]!.push(i);
+      }
+      centresOf = centresOf.map((c, m) => {
+        const mine = owned[m]!;
+        if (mine.length === 0) return c;
+        return mul(mine.reduce<V3>((sum, i) => add(sum, centres[i]!), [0, 0, 0]), 1 / mine.length);
+      });
+    }
+    const placed = centresOf.map((c) => add(mul(c, 0.75), mul(gc, 0.25)));
+    // Маса над центром купки — купка росте вгору, а не розпливається.
+    placed.push(add(gc, [0, meanR * (0.7 + 0.3 * unit(seed, `${gk}:upper`)), 0]));
+    owned.push([]);
+    placed.forEach((centre, m) => {
+      const key = `${gk}.${m}`;
+      // Над серединою крони маси ширші: верхівка ширша, але не куля.
+      const wide = centre[1] > crownMid ? 1.12 : 1;
+      const shape: V3 = [
+        (0.85 + 0.25 * unit(seed, `${key}:sx`)) * wide,
+        squash * (1.1 + 0.25 * unit(seed, `${key}:sy`)),
+        (0.85 + 0.25 * unit(seed, `${key}:sz`)) * wide,
+      ];
+      const mass: TreeV2CrownMass = { centre, scale: shape, turn: 2 * Math.PI * unit(seed, `${key}:turn`), key, group: g };
+      // Розмір: не менший за свій, і такий, щоб кожен свій кінчик гілки
+      // лежав не мілкіше 0.8 поверхні — гілка не стирчить голою.
+      const need = Math.max(0, ...owned[m]!.map((i) => massDepth(centres[i]!, mass) / 0.8));
+      const r = Math.max(meanR * (1.2 + 0.35 * unit(seed, `${key}:r`)), need);
+      mass.scale = mul(shape, r);
+      out.push(mass);
+    });
+  });
+  return out;
+}
+
+/** Вершини маси крони: еліпсоїд із тремтінням, пласкіший знизу. */
+function massBlob(seed: string, m: TreeV2CrownMass): V3[] {
+  const c = Math.cos(m.turn);
+  const s = Math.sin(m.turn);
+  return ICO.verts.map((v, i): V3 => {
+    const k = 0.84 + 0.28 * unit(seed, `${m.key}:v${i}`);
+    const x = v[0] * m.scale[0] * k;
+    const y = v[1] * m.scale[1] * k * (v[1] < 0 ? 0.8 : 1);
+    const z = v[2] * m.scale[2] * k;
+    return [m.centre[0] + x * c - z * s, m.centre[1] + y, m.centre[2] + x * s + z * c];
+  });
+}
+
+/** Чи лежить точка в масі (у частках її еліпсоїда; `shrink` < 1 — глибше). */
+function inMass(p: V3, m: TreeV2CrownMass, shrink: number): boolean {
+  return massDepth(p, m) < shrink;
+}
+
+/**
+ * Точка прикраси — на поверхні найближчої маси крони, у напрямку від її
+ * центру: яблуко й ягода висять на листі, а не сховані всередині купки.
+ */
+export function treeV2OnCrown(masses: readonly TreeV2CrownMass[], p: V3, depth = 0.96, from?: V3): V3 {
+  if (masses.length === 0) return p;
+  if (from) {
+    // Від своєї гілки — тим самим променем назовні, доки не вийде з листя:
+    // яблуко лишається під гілкою свого року, а не стрибає на сусідню купку.
+    const ray: V3 = [p[0] - from[0], p[1] - from[1], p[2] - from[2]];
+    // Перший вихід із листя від центру кластера: яблуко на поверхні, не
+    // глибоко в купці й не в повітрі під нею.
+    for (let t = 0.05; t < 8; t += 0.05) {
+      const q = add(from, mul(ray, t));
+      if (masses.every((m) => massDepth(q, m) >= depth)) return q;
+    }
+    return p;
+  }
+  let q = p;
+  // Винесена на поверхню однієї маси точка може лягти в сусідню — тоді
+  // виносимо й з неї (кілька кроків вистачає: маси опуклі й їх мало поруч).
+  for (let step = 0; step < 6; step += 1) {
+    const m = masses.reduce((best, x) => (massDepth(q, x) < massDepth(q, best) ? x : best));
+    const r = massDepth(q, m);
+    if (step > 0 && r >= depth - 1e-9) break;
+    if (r < 1e-9) {
+      q = [m.centre[0], m.centre[1] - m.scale[1] * 0.8 * depth, m.centre[2]];
+      continue;
+    }
+    const k = depth / r;
+    q = [m.centre[0] + (q[0] - m.centre[0]) * k, m.centre[1] + (q[1] - m.centre[1]) * k, m.centre[2] + (q[2] - m.centre[2]) * k];
+  }
+  return q;
 }
 
 /**
@@ -430,16 +614,10 @@ function leafBlob(seed: string, c: TreeV2Cluster): V3[] {
 export function treeV2SakuraFlowerSpots(model: TreeV2Model, clusters: readonly TreeV2Cluster[], count: number): { point: V3; normal: V3 }[] {
   if (count <= 0) return [];
   const seed = model.startDate;
-  const buried = (p: V3, own: TreeV2Cluster) =>
-    clusters.some((o) => {
-      if (o === own) return false;
-      const k = o.radius * 1.14 * 0.82 * 0.95;
-      const dy = (p[1] - o.centre[1]) / (o.squash ?? 0.82);
-      return (p[0] - o.centre[0]) ** 2 + dy * dy + (p[2] - o.centre[2]) ** 2 < k * k;
-    });
+  const masses = treeV2CrownMasses(model, clusters);
   const spots: { point: V3; normal: V3 }[] = [];
-  for (const c of clusters) {
-    const pts = leafBlob(seed, c);
+  for (const m of masses) {
+    const pts = massBlob(seed, m);
     for (const [a, b, cc] of ICO.faces) {
       const A = pts[a]!;
       const B = pts[b]!;
@@ -448,9 +626,10 @@ export function treeV2SakuraFlowerSpots(model: TreeV2Model, clusters: readonly T
       const e1: V3 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
       const e2: V3 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
       let normal = norm([e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]]);
-      const outward: V3 = [point[0] - c.centre[0], point[1] - c.centre[1], point[2] - c.centre[2]];
+      const outward: V3 = [point[0] - m.centre[0], point[1] - m.centre[1], point[2] - m.centre[2]];
       if (normal[0] * outward[0] + normal[1] * outward[1] + normal[2] * outward[2] < 0) normal = [-normal[0], -normal[1], -normal[2]];
-      if (normal[1] < 0.1 || buried(point, c)) continue;
+      // Не в сусідній масі: квітка, схована в листі, — не квітка.
+      if (normal[1] < 0.1 || masses.some((o) => o !== m && inMass(point, o, 0.84 * 0.95))) continue;
       spots.push({ point, normal });
     }
   }
@@ -719,9 +898,10 @@ export function treeV2WishPoints(model: TreeV2Model, form: TreeForm, skeleton?: 
   // за азимутом і висотою вершина краю «спіднички», трохи під лапою.
   const rim = form === 'spruce' ? treeV2SpruceSkirts(model, clusters).tris.flat() : [];
   const flowers = form === 'sakura' ? treeV2SakuraFlowerSpots(model, clusters, model.blossoms.length) : [];
+  const masses = form === 'oak' ? treeV2CrownMasses(model, clusters) : [];
   const H = model.height;
   return model.blossoms.map((b, k) => {
-    if (form === 'oak') return orn.blossoms[k]!.position;
+    if (form === 'oak') return treeV2OnCrown(masses, orn.blossoms[k]!.position, 0.96, orn.blossoms[k]!.cluster);
     if (form === 'spruce') {
       const own = branches.find((x) => x.key === `y${b.year}`);
       const end = own ? own.end : trunkAt(treeTrunkDir(model, form), FORMS[form].top * H);
@@ -800,11 +980,19 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
       }
     });
   }
-  for (const c of spruce ? [] : clusters) {
-    const pts = leafBlob(seed, c);
-    const autumn = unit(seed, `${c.key}:autumn`) < model.autumn ? 1 : 0;
+  // Крона з мас (див. `treeV2CrownMasses`). Осінь — цілими купками й лише
+  // половина сезонної частки, і не до кінця: «зелений + золотистий, але
+  // золотого менше» (власник, 2026-10-05).
+  const crownMasses = spruce ? [] : treeV2CrownMasses(model, clusters);
+  for (const m of crownMasses) {
+    const pts = massBlob(seed, m);
+    const gk = `crown${m.group}`;
+    const autumn = unit(seed, `${gk}:autumn`) < model.autumn * 0.5 ? 0.8 : 0;
+    const groupTone = 0.92 + 0.16 * unit(seed, `${gk}:tone`);
     ICO.faces.forEach(([a, b, cc], k) => {
-      const tone = 0.85 + 0.3 * unit(seed, `${c.key}:f${k}`);
+      // Нижні грані маси — у власній тіні: купка має об'єм, а не лише контур.
+      const low = (pts[a]![1] + pts[b]![1] + pts[cc]![1]) / 3 < m.centre[1] - m.scale[1] * 0.3 ? 0.88 : 1;
+      const tone = (0.88 + 0.24 * unit(seed, `${m.key}:f${k}`)) * groupTone * low;
       for (const p of [pts[a]!, pts[b]!, pts[cc]!]) {
         leaves.push(p[0], p[1], p[2]);
         leafTone.push(tone);
@@ -943,7 +1131,8 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     wood: { positions: new Float32Array(wood), tone: new Float32Array(woodTone), normal: new Float32Array(woodNormal) },
     leaves: { positions: new Float32Array(leaves), tone: new Float32Array(leafTone), autumn: new Float32Array(leafAutumn) },
     wishes: { positions: new Float32Array(wishPos), colour: new Float32Array(wishCol), sway: new Float32Array(wishSway), anchor: new Float32Array(wishAnchor) },
-    fruits: new Float32Array(orn.fruits.flat()),
+    // Плоди — на поверхні крони, а не всередині купки листя.
+    fruits: new Float32Array((spruce ? orn.fruits : orn.fruits.map((p) => treeV2OnCrown(crownMasses, p, 0.98))).flat()),
     fireflies: new Float32Array(orn.fireflies.flat()),
     flowers: {
       positions: new Float32Array(orn.flowers.flatMap((f) => f.position)),

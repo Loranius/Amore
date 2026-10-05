@@ -194,8 +194,14 @@ describe('дерево v3: гілка року ярусами (ADR-0237, вла�
     const own = clusters.filter((c) => c.key === 'y1' || c.key.startsWith('y1.'));
     const blossom = buildTreeV2Geometry(model).wishes.positions;
     const at = [blossom[0]!, blossom[1]!, blossom[2]!];
-    const near = Math.min(...own.map((c) => Math.hypot(at[0]! - c.centre[0], at[1]! - c.centre[1], at[2]! - c.centre[2]) - c.radius));
-    expect(near).toBeLessThan(0.1);
+    // Крона тепер із купок мас (ADR-0237, 2026-10-05), що накривають
+    // кластер із запасом, тож яблуко лежить на поверхні купки, а не за
+    // радіусом кластера. Вимога та сама: найближчий до яблука кластер —
+    // гілки його року, і воно поруч із нею.
+    const gap = (c: (typeof clusters)[number]) => Math.hypot(at[0]! - c.centre[0], at[1]! - c.centre[1], at[2]! - c.centre[2]) - c.radius;
+    const nearest = clusters.reduce((best, c) => (gap(c) < gap(best) ? c : best));
+    expect(own).toContain(nearest);
+    expect(gap(nearest)).toBeLessThan(0.2);
   });
 });
 

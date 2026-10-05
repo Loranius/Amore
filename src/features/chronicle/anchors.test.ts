@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from '@/engine/species/crystalV2/model';
 import { chronicleTraces } from '@/engine/species/grammar/chronicle';
-import { treeV2Ornaments, treeV2Skeleton } from '@/engine/species/treeV2/geometry';
+import { treeV2Skeleton, treeV2WishPoints } from '@/engine/species/treeV2/geometry';
 import { buildTreeV2Model } from '@/engine/species/treeV2/model';
 import { buildVolcanoModel } from '@/engine/species/volcano/model';
 import { MODULE_TRACE, chronicleAnchor, type ChronicleSubject } from './anchors';
@@ -39,11 +39,11 @@ describe('опорні точки хроніки', () => {
   it('дерево: бажання — рівно до своєї квітки; план — до гілки верхівки', () => {
     const model = buildTreeV2Model(BUSY);
     const subject: ChronicleSubject = { species: 'tree', model, form: 'oak' };
-    const { branches, clusters } = treeV2Skeleton(model, 'oak');
-    const orn = treeV2Ornaments(model, clusters);
+    const { branches } = treeV2Skeleton(model, 'oak');
     const wish = traces.filter((t) => t.kind === 'wishes').at(-1)!;
     const k = model.blossoms.findIndex((b) => b.id === wish.id);
-    expect(chronicleAnchor(subject, wish).point).toEqual(orn.blossoms[k]!.position);
+    // Квітка бажання — там, де її малює геометрія (на поверхні крони).
+    expect(chronicleAnchor(subject, wish).point).toEqual(treeV2WishPoints(model, 'oak')[k]);
     const plan = traces.find((t) => t.kind === 'plans')!;
     const limbEnds = branches.filter((b) => /^c\d+$/.test(b.key)).map((b) => b.end);
     expect(limbEnds).toContainEqual(chronicleAnchor(subject, plan).point);

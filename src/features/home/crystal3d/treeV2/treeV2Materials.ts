@@ -144,8 +144,9 @@ export function createLeafMaterial(p: TreePalette, ground: number): THREE.Shader
       ...litUniforms(p),
       uLeaf: { value: colour(p.leaf) },
       uAutumn: { value: colour(p.leafAutumn) },
-      // Верх кластерів жовтіє на сонці, як лаймова крона референсу (ADR-0222).
-      uSunLeaf: { value: colour('#e4ec5a') },
+      // Верх кластерів трохи золотіє на сонці (ADR-0222), стримано: «золотого
+      // менше» (власник, 2026-10-05).
+      uSunLeaf: { value: colour('#d4e46e') },
       uTime: { value: 0 },
       uWind: { value: 1 },
       uGround: { value: ground },
@@ -186,7 +187,7 @@ export function createLeafMaterial(p: TreePalette, ground: number): THREE.Shader
         // Крона обтічна: гранчастий силует, плавне світло (власник, 2026-10-04).
         vec3 n = softNormal(vNormal, vWorld);
         vec3 base = mix(uLeaf, uAutumn, vAutumn) * vTone;
-        base = mix(base, uSunLeaf * vTone, smoothstep(0.35, 0.95, n.y) * 0.2 * (1.0 - vAutumn));
+        base = mix(base, uSunLeaf * vTone, smoothstep(0.35, 0.95, n.y) * 0.13 * (1.0 - vAutumn));
         vec3 c = lit(base, n) + base * pow(max(0.0, n.y), 3.0) * 0.18;
         gl_FragColor = vec4(c, 1.0);
         ${END}
