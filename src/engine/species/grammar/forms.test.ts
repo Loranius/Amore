@@ -156,7 +156,16 @@ describe('форми дерева: той самий ріст, інший мал
     // найвертикальніша з них продовжує стовбур (2026-10-06, без «браслета»).
     const limbs = branches.some((b) => /^c\d+$/.test(b.key));
     const tips = branches.filter((b) => b.order > 0 && !parents.has(b.key)).length + (limbs ? 0 : 1);
-    expect(oak.wood.positions.length / 9).toBe(branches.length * WOOD_SIDES * 2 + tips * WOOD_SIDES + treeV2Roots(model).length * 10);
+    // Продовження йде дугою з чотирьох підвідрізків (2026-10-06: «плавний
+    // вигин замість заломів»), прямий відрізок — однією призмою; коріння —
+    // такими самими 8-гранними дугами. Тож трикутників від однієї до
+    // чотирьох призм на відрізок, плюс ковпачки, і завжди ціле число граней.
+    const pieces = branches.length + treeV2Roots(model).length;
+    const caps = tips * WOOD_SIDES + (treeV2Roots(model).length / 2) * WOOD_SIDES;
+    const count = oak.wood.positions.length / 9;
+    expect(count % WOOD_SIDES).toBe(0);
+    expect(count).toBeGreaterThanOrEqual(pieces * WOOD_SIDES * 2 + caps);
+    expect(count).toBeLessThanOrEqual(pieces * WOOD_SIDES * 2 * 4 + caps);
     expect(trunk).toBeGreaterThan(1);
   });
 

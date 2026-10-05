@@ -20,6 +20,7 @@ type V3 = [number, number, number];
 
 const add = (a: V3, b: V3): V3 => [a[0] + b[0], a[1] + b[1], a[2] + b[2]];
 const mul = (a: V3, k: number): V3 => [a[0] * k, a[1] * k, a[2] * k];
+const sub3 = (a: V3, b: V3): V3 => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
 const cross = (a: V3, b: V3): V3 => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 const norm = (a: V3): V3 => {
   const length = Math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2]);
@@ -302,13 +303,17 @@ export function treeV2Roots(model: TreeV2Model): Omit<TreeV2Branch, 'order'>[] {
     const length = model.rootReach * (0.7 + 0.5 * unit(seed, `root${i}:len`));
     const c = Math.cos(phi);
     const s = Math.sin(phi);
-    const a: V3 = [c * r * 0.3, r * 0.6, s * r * 0.3];
-    const mid: V3 = [c * length * 0.4, length * 0.08, s * length * 0.4];
+    // Корінь виростає з напливу стовбура (власник, 2026-10-06: «стовбур має
+    // плавно переходити в коріння»): починається всередині напливу вище
+    // землі, товстий, як контрфорс, і сходить донизу назовні.
+    const a: V3 = [c * r * 0.12, r * 1.5, s * r * 0.12];
+    const spread = Math.max(r * 1.75, length * 0.4);
+    const mid: V3 = [c * spread, r * 0.12, s * spread];
     // Кінчик пірнає в землю круто (власник, 2026-10-05: «коріння, що
     // справді йде в землю»), а не лежить на ній.
     const end: V3 = [c * length, -length * 0.14, s * length];
-    out.push({ start: a, end: mid, r0: r * 0.75, r1: r * 0.4, key: `root${i}a` });
-    out.push({ start: mid, end, r0: r * 0.4, r1: r * 0.08, key: `root${i}b` });
+    out.push({ start: a, end: mid, r0: r * 0.5, r1: r * 0.32, key: `root${i}a` });
+    out.push({ start: mid, end, r0: r * 0.32, r1: r * 0.06, key: `root${i}b` });
   }
   return out;
 }
@@ -709,7 +714,10 @@ interface WoodRing { points: V3[]; normals: V3[] }
 
 function prism(start: V3, end: V3, r0: number, r1: number, sides: number, frame?: V3, cap = false, joint?: WoodRing, next?: V3): { tris: V3[][]; normals: V3[][]; end: WoodRing } {
   const d = norm([end[0] - start[0], end[1] - start[1], end[2] - start[2]]);
-  const [a, b] = frame ? [frame, cross(d, frame)] : basis(d);
+  // Рамка — перпендикулярна саме цій осі (на дузі підвідрізки трохи
+  // повернуті відносно рамки гілки).
+  const fa = frame ? sub3(frame, mul(d, frame[0] * d[0] + frame[1] * d[1] + frame[2] * d[2])) : null;
+  const [a, b] = fa && Math.hypot(fa[0], fa[1], fa[2]) > 1e-6 ? [norm(fa), cross(d, norm(fa))] : basis(d);
   const ring0: V3[] = [];
   const ring1: V3[] = [];
   const radial: V3[] = [];
@@ -1026,18 +1034,57 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     if (ends.has(`${b.key}~`)) return `${b.key}~`;
     return null;
   };
+  /**
+   * Дуга замість ламаної (власник, 2026-10-06: «на гілках сильні заломи …
+   * має плавно формуватись вигин»). Відрізок, що продовжує попередній,
+   * іде квадратичною кривою: виходить у напрямку, яким закінчився
+   * попередній, і повертає до свого кінця. Чотири підвідрізки, зварені
+   * кільцями з митрою, — вигин плавний, а силует лишається гранчастим.
+   */
+  const tangents = new Map<string, V3>();
+  const tube = (key: string, start: V3, end: V3, r0: number, r1: number, frame: V3 | undefined, cap: boolean, joint: WoodRing | undefined, tangentIn: V3 | undefined, next: V3 | undefined, tone: (face: number) => number) => {
+    const chord = norm(sub3(end, start));
+    const L = Math.hypot(end[0] - start[0], end[1] - start[1], end[2] - start[2]);
+    const bend = tangentIn ? tangentIn[0] * chord[0] + tangentIn[1] * chord[1] + tangentIn[2] * chord[2] : 1;
+    const curved = tangentIn !== undefined && bend < Math.cos(rad(4)) && bend > -0.2;
+    const ctrl = curved ? add(start, mul(tangentIn, L * 0.4)) : null;
+    const at = (t: number): V3 => (ctrl
+      ? add(add(mul(start, (1 - t) * (1 - t)), mul(ctrl, 2 * t * (1 - t))), mul(end, t * t))
+      : add(start, mul(sub3(end, start), t)));
+    const steps = curved ? 4 : 1;
+    let ring = joint;
+    let f = frame;
+    for (let k = 0; k < steps; k += 1) {
+      const p0 = at(k / steps);
+      const p1 = at((k + 1) / steps);
+      const last = k === steps - 1;
+      const nextDir = last ? next : norm(sub3(at((k + 2) / steps), p1));
+      const built = prism(p0, p1, r0 + (r1 - r0) * (k / steps), r0 + (r1 - r0) * ((k + 1) / steps), WOOD_SIDES, f, last && cap, ring, nextDir);
+      pushTris(built, wood, woodTone, tone);
+      ring = built.end;
+      // Рамка переноситься по дузі: вершина №k лишається тією ж гранню.
+      f = built.end.points[0] ? norm(sub3(built.end.points[0], p1)) : f;
+    }
+    const outTangent = ctrl ? norm(sub3(end, ctrl)) : chord;
+    ends.set(key, ring!);
+    tangents.set(key, outTangent);
+    return outTangent;
+  };
+  const bark = (face: number) => 0.94 + 0.12 * unit(seed, `bark:${face}`);
   for (const b of spruce ? branches.filter((x) => x.order === 0 && x.start[1] < spruceTop) : branches) {
     const prev = predecessor(b);
     const joint = prev === null ? undefined : ends.get(prev);
+    const tangentIn = prev === null ? undefined : tangents.get(prev);
     // Зварене продовження не відступає назад усередину попереднього. Плавний
     // вихід гілки (`~`) починається на осі стовбура — він уже весь у
     // стовбурі; відступ назад виводив його низ назовні тупим кутом.
     const seg = joint || b.key.endsWith('~') ? { start: b.start, end: b.end } : treeV2WoodSegment(b);
+    // Низ стовбура — під землею: край напливу не лежить «капюшоном» над
+    // корінням (власник, 2026-10-06).
+    const start: V3 = b.order === 0 && prev === null ? [seg.start[0], seg.start[1] - b.r0 * 0.6, seg.start[2]] : seg.start;
     if (spruce) {
       const end: V3 = b.end[1] > spruceTop ? trunkAt(norm([b.end[0] - b.start[0], b.end[1] - b.start[1], b.end[2] - b.start[2]]), spruceTop) : b.end;
-      const built = prism(seg.start, end, b.r0 * taper(b.start[1]), b.r1 * taper(end[1]), WOOD_SIDES, frames.get(b.key), !continued.has(b.key), joint, b.end[1] > spruceTop ? undefined : dirOf(successor(b)));
-      ends.set(b.key, built.end);
-      pushTris(built, wood, woodTone, (face) => 0.94 + 0.12 * unit(seed, `bark:${face}`));
+      tube(b.key, start, end, b.r0 * taper(b.start[1]), b.r1 * taper(end[1]), frames.get(b.key), !continued.has(b.key), joint, tangentIn, b.end[1] > spruceTop ? undefined : dirOf(successor(b)), bark);
       continue;
     }
     // Верхній сегмент стовбура звужується до товщини гілок верхівки (0.6):
@@ -1045,12 +1092,17 @@ export function buildTreeV2Geometry(model: TreeV2Model, form: TreeForm = 'oak'):
     // З провідником верхівки звужується вже він сам, плавно по своїй довжині:
     // різке звуження тут світилось смугою на розвилці.
     const r1 = b === topTrunk && !leader ? b.r1 * 0.6 : b.r1;
-    const built = prism(seg.start, seg.end, b.r0, r1, WOOD_SIDES, frames.get(b.key), !continued.has(b.key), joint, dirOf(successor(b)));
-    ends.set(b.key, built.end);
-    pushTris(built, wood, woodTone, (face) => 0.94 + 0.12 * unit(seed, `bark:${face}`));
+    tube(b.key, start, seg.end, b.r0, r1, frames.get(b.key), !continued.has(b.key), joint, tangentIn, dirOf(successor(b)), bark);
   }
+  // Коріння — продовження напливу: дві ланки зварені й ідуть дугою, кора
+  // того ж тону, що й стовбур, тож перехід стовбур → корінь плавний.
   for (const r of treeV2Roots(model)) {
-    pushTris(prism(r.start, r.end, r.r0, r.r1, 5), wood, woodTone, (face) => 0.75 + 0.3 * unit(seed, `${r.key}:w${face}`));
+    const first = r.key.endsWith('a');
+    const prevKey = first ? null : `${r.key.slice(0, -1)}a`;
+    const joint = prevKey ? ends.get(prevKey) : undefined;
+    const tangentIn = prevKey ? tangents.get(prevKey) : undefined;
+    const next = first ? norm(sub3(r.end, r.start)) : undefined;
+    tube(r.key, r.start, r.end, r.r0, r.r1, undefined, !first, joint, tangentIn, next, bark);
   }
 
   const leaves: number[] = [];

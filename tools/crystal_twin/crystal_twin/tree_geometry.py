@@ -177,11 +177,12 @@ def roots(model: dict[str, Any]) -> list[dict[str, Any]]:
         phi = math.radians(i * 360.0 / n + (unit(seed, f"root{i}:az") - 0.5) * 40.0)
         length = model["rootReach"] * (0.7 + 0.5 * unit(seed, f"root{i}:len"))
         c, s = math.cos(phi), math.sin(phi)
-        a = (c * r * 0.3, r * 0.6, s * r * 0.3)
-        mid = (c * length * 0.4, length * 0.08, s * length * 0.4)
+        a = (c * r * 0.12, r * 1.5, s * r * 0.12)
+        out_r = max(r * 1.75, length * 0.4)
+        mid = (c * out_r, r * 0.12, s * out_r)
         end = (c * length, -length * 0.14, s * length)
-        out.append({"start": a, "end": mid, "r0": r * 0.75, "r1": r * 0.4, "key": f"root{i}a"})
-        out.append({"start": mid, "end": end, "r0": r * 0.4, "r1": r * 0.08, "key": f"root{i}b"})
+        out.append({"start": a, "end": mid, "r0": r * 0.5, "r1": r * 0.32, "key": f"root{i}a"})
+        out.append({"start": mid, "end": end, "r0": r * 0.32, "r1": r * 0.06, "key": f"root{i}b"})
     return out
 
 
