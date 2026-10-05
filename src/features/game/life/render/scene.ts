@@ -16,7 +16,7 @@ import { cellHash, ellipse, type Ctx } from './pixel';
 import { drawProp, propBase, propLight } from './props';
 import { drawWater, groundCanvas } from './tiles';
 import { drawBitmap } from './icons';
-import { dogFrame, dogSheet } from './dog';
+import { drawDog } from './dog';
 
 export type Weather = 'clear' | 'rain' | 'snow' | 'leaves' | 'petals';
 
@@ -203,12 +203,11 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     });
   }
   for (const pet of opts.pets ?? []) {
-    const img = dogSheet()[pet.dir]![dogFrame(pet.moving, pet.t)]!;
     items.push({
       y: pet.y,
       draw: () => {
-        ellipse(g, pet.x, pet.y, 6, 2, 'rgba(28,20,40,0.28)');
-        g.drawImage(img, Math.round(pet.x - img.width / 2), Math.round(pet.y - img.height + 1));
+        ellipse(g, pet.x, pet.y, 7, 2, 'rgba(28,20,40,0.28)');
+        drawDog(g, pet.x, pet.y, pet.dir, pet.moving, pet.t);
       },
     });
   }

@@ -1,9 +1,44 @@
 // ============================================================
 // Бася — чорний триколірний коргі (власник, 2026-10-05). Великі стоячі
-// вуха, коротенькі лапи, біла грудка й мордочка, руді брови й щоки,
-// пухнастий задок без хвоста. Чотири кадри бігу на кожен напрям.
+// вуха, коротенькі лапи, біла грудка й мордочка, руді брови й щоки.
+// ------------------------------------------------------------
+// Основний малюнок — аркуш із PixelLab (`assets/basia.png`, персонаж
+// «Бася (мала)», шаблон dog, вигляд «low top-down»): клітинки 36×36,
+// рядки — напрям (вниз, ліворуч, праворуч, угору; «ліворуч» — дзеркало
+// «праворуч»), стовпці — стоїть, далі 6 кадрів бігу. Поки аркуш вантажиться,
+// малюється піксельний коргі нижче, намальований кодом.
 // ============================================================
+import basiaUrl from './assets/basia.png';
 import { canvas, ctx2d, flipX, outline, px, rect, type Ctx } from './pixel';
+
+const CELL = 36;
+/** Де в клітинці лапи: низ спрайта на рядку 27, середина — 18. */
+const FOOT_X = 18;
+const FOOT_Y = 27;
+const RUN_FRAMES = 6;
+
+let art: HTMLImageElement | null = null;
+let artReady = false;
+
+function loadArt(): void {
+  if (art || typeof Image === 'undefined') return;
+  art = new Image();
+  art.onload = () => { artReady = true; };
+  art.onerror = () => console.error(`Бася: не вдалося завантажити аркуш ${basiaUrl}`);
+  art.src = basiaUrl;
+}
+
+/** Намалювати Басю лапами в точці (x, y). */
+export function drawDog(g: CanvasRenderingContext2D, x: number, y: number, dir: 0 | 1 | 2 | 3, moving: boolean, t: number): void {
+  loadArt();
+  if (art && artReady) {
+    const col = moving ? 1 + (Math.floor(t * 12) % RUN_FRAMES) : 0;
+    g.drawImage(art, col * CELL, dir * CELL, CELL, CELL, Math.round(x - FOOT_X), Math.round(y - FOOT_Y), CELL, CELL);
+    return;
+  }
+  const img = dogSheet()[dir]![dogFrame(moving, t)]!;
+  g.drawImage(img, Math.round(x - img.width / 2), Math.round(y - img.height + 1));
+}
 
 const BLACK = '#1f1b24';
 const SHEEN = '#3d3646';
