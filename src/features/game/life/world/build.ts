@@ -72,7 +72,7 @@ export class MapBuilder {
     if (spec.door === false) return this;
     // Ґанок під дверима — завжди прохідний.
     const below = this.at(doorX, spec.y + spec.h);
-    if (below === undefined || ['w', 'h', 'F', 'x', 'W', 'r'].includes(below)) this.fill(doorX, spec.y + spec.h, 1, 1, 'd');
+    if (below === undefined || ['w', 'h', 'F', 'x', 'W', 'r', 'S'].includes(below)) this.fill(doorX, spec.y + spec.h, 1, 1, 'd');
     if (spec.action) this.zones.push({ id: spec.id, x: doorX, y: spec.y + spec.h, w: 1, h: 1, action: spec.action, label: spec.zoneLabel ?? spec.label });
     return this;
   }

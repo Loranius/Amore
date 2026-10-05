@@ -223,6 +223,39 @@ function wallTile(g: Ctx, x: number, y: number, i: number, j: number, map: GameM
   if (j === 0) rect(g, x, y, TILE, 3, '#6e4a2a');
 }
 
+/** Погріб: утоптана земля з камінцями, темніша під стінами. */
+function earthTile(g: Ctx, x: number, y: number, i: number, j: number, map: GameMap): void {
+  const base = '#6e5a46';
+  rect(g, x, y, TILE, TILE, base);
+  for (let k = 0; k < 7; k += 1) {
+    const h = cellHash(i, j, k + 31);
+    px(g, x + (h % 16), y + ((h >>> 4) % 16), k % 3 === 0 ? shade(base, 0.16) : shade(base, -0.12));
+  }
+  if (cellHash(i, j, 5) % 4 === 0) rect(g, x + (cellHash(i, j, 6) % 12), y + (cellHash(i, j, 7) % 12), 3, 2, '#8a7c6c');
+  // Тінь від стіни над клітинкою.
+  if (map.ground[j - 1]?.[i] === 'S') rect(g, x, y, TILE, 4, 'rgba(20,12,10,0.35)');
+}
+
+/** Погріб: бутова стіна — камені на темному розчині. */
+function stoneWallTile(g: Ctx, x: number, y: number, i: number, j: number, map: GameMap): void {
+  rect(g, x, y, TILE, TILE, '#3c332c');
+  for (let r = 0; r < 3; r += 1) {
+    const off = (j * 3 + r) % 2 ? 0 : 5;
+    for (let c = -1; c < 3; c += 1) {
+      const sx = x + off + c * 8;
+      const tone = shade('#857a6c', ((cellHash(i * 4 + c, j * 3 + r) % 5) - 2) * 0.05);
+      const l = Math.max(sx, x);
+      const rgt = Math.min(sx + 7, x + TILE);
+      if (rgt <= l) continue;
+      rect(g, l, y + r * 5 + 1, rgt - l, 4, tone);
+      rect(g, l, y + r * 5 + 1, rgt - l, 1, shade(tone, 0.14));
+    }
+  }
+  if (j === 0) rect(g, x, y, TILE, 3, '#241c18');
+  const below = map.ground[j + 1]?.[i];
+  if (below === 'e') rect(g, x, y + 14, TILE, 2, '#2a221c');
+}
+
 /** Рваний край трави, що лягає на стежку: стежка «врізана» в траву. */
 function grassFringe(g: Ctx, map: GameMap, P: SeasonPalette): void {
   for (let j = 0; j < map.h; j += 1) {
@@ -281,6 +314,8 @@ export function groundCanvas(map: GameMap, season: Season): HTMLCanvasElement {
         case 'F': fenceTile(g, x, y, i, j, P); break;
         case 'f': case 't': case 'k': floorTile(g, x, y, i, j, t); break;
         case 'W': wallTile(g, x, y, i, j, map); break;
+        case 'e': earthTile(g, x, y, i, j, map); break;
+        case 'S': stoneWallTile(g, x, y, i, j, map); break;
         case 'w': rect(g, x, y, TILE, TILE, P.water); break;
         case 'x': rect(g, x, y, TILE, TILE, '#1b1420'); break;
       }

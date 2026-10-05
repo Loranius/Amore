@@ -135,7 +135,7 @@ export function yardMap(): GameMap {
   m.zone('summerKitchen', KITCHEN.x, KITCHEN.y, KITCHEN.annexW, 1, { type: 'kitchen' }, 'Літня кухня');
   // Погріб під кухнею — вхід знизу.
   m.prop('cellar', 27.6, 23.1);
-  m.zone('cellar', 28, 24, 1, 1, { type: 'info', text: 'Погріб: картопля, банки з огірками й мамине вишневе варення' }, 'Погріб');
+  m.zone('cellar', 28, 24, 1, 1, { type: 'cellar' }, 'Погріб');
 
   // ── Фруктовий сад: увесь правий край ─────────────────────────
   // Верстак і дошки й літній душ стоять у саду; дерева їх оминають.
@@ -161,5 +161,6 @@ export function yardMap(): GameMap {
   m.spawn('gate', YARD.gate.x, H - 3).spawn('default', YARD.gate.x, H - 3);
   m.spawn('house', YARD.porch.x + 1, YARD.porch.y + 1);
   m.spawn('kitchen', KITCHEN.x, KITCHEN.y - 1);
+  m.spawn('cellar', 28, 25);
   return m.build();
 }

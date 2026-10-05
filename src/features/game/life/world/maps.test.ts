@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
 import { newLife } from '../sim/life';
+import { propSolid } from '../render/props';
 import { colliderFor, reachableTiles, zoneTiles } from './collide';
 import { homeInterior } from './interior';
+import { cellarMap } from './cellar';
 import { summerKitchenMap } from './kitchen';
 import { ALL_CITY_IDS, cityMap, homeYard } from './maps';
 import { TILE, buildingParts, type GameMap } from './types';
@@ -228,5 +230,33 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(k.zones.some((z) => z.action.type === 'activity' && z.action.id === 'summerKitchen')).toBe(true);
     // На подвір'ї вхід у кухню веде всередину, а не в одразу заняття.
     expect(homeYard().zones.find((z) => z.id === 'summerKitchen')!.action.type).toBe('kitchen');
+  });
+
+  it('погріб — за планом власника: перегородки з обох боків, прямо стелаж із банками, засіки за перегородками, вхід знизу сходами', () => {
+    const c = cellarMap();
+    assertReachable(c);
+    const all = (t: string) => c.props.filter((x) => x.type === t);
+    const [pl, pr] = all('partition').sort((a, b) => a.x - b.x);
+    const shelf = all('jarShelf')[0]!;
+    // Стелаж — прямо, між перегородками, біля задньої (кам'яної) стіни.
+    expect(shelf.x).toBeGreaterThan(pl!.x);
+    expect(shelf.x + 9).toBeLessThan(pr!.x);
+    expect(c.ground[Math.floor(shelf.y) - 1]![Math.floor(shelf.x) + 1]).toBe('S');
+    // Засіки — за перегородками: картопля ліворуч, буряк і морква праворуч.
+    const bins = all('zasik').sort((a, b) => a.x - b.x);
+    expect(bins.map((b) => b.variant)).toEqual([0, 1]);
+    expect(bins[0]!.x).toBeLessThan(pl!.x);
+    expect(bins[1]!.x).toBeGreaterThan(pr!.x);
+    // Перегородки — на всю глибину погреба.
+    for (const p of [pl!, pr!]) expect(propSolid(p)!.h).toBeGreaterThan(9 * TILE);
+    // Вихід — знизу, по сходах, на подвір'я біля лядки.
+    const exit = c.zones.find((z) => z.action.type === 'exit')!;
+    const stairs = all('cellarStairs')[0]!;
+    expect(exit.y).toBeGreaterThan(c.h - 3);
+    expect(exit.x).toBeGreaterThanOrEqual(Math.floor(stairs.x));
+    const yard = homeYard();
+    expect(yard.zones.find((z) => z.id === 'cellar')!.action.type).toBe('cellar');
+    assertReachable(yard);
+    expect(yard.spawns.cellar).toBeDefined();
   });
 });

@@ -10,11 +10,15 @@ import { TILE, type Prop, type PropType, type Rect } from '../world/types';
 import { PALETTES } from './palette';
 import { cellHash, disc, ellipse, px, rect, shade, type Ctx } from './pixel';
 
+/** Довжина засіку й перегородки в погребі (пікселі): на всю глибину. */
+const ZASIK_H = 146;
+const PARTITION_H = 154;
+
 /** Нижня межа пропа для сортування за глибиною (пікселі світу). */
 export function propBase(p: Prop): number {
   const y = p.y * TILE;
   switch (p.type) {
-    case 'rug': case 'sandbox': case 'flowerBed': case 'pier': case 'stairs': case 'poster': case 'window': case 'rushnyk': case 'clock': case 'photo':
+    case 'rug': case 'sandbox': case 'flowerBed': case 'pier': case 'stairs': case 'poster': case 'window': case 'rushnyk': case 'clock': case 'photo': case 'cellarStairs':
       return y - 100; // лежить на землі чи висить на стіні — під усім
     case 'bigFountain': return y + 40;
     case 'lighthouse': return y + 30;
@@ -29,7 +33,7 @@ const SOLID: ReadonlySet<PropType> = new Set<PropType>([
   'bench', 'lamp', 'well', 'mailbox', 'busStop', 'fountain', 'bigFountain', 'stall', 'car', 'bin', 'planter', 'pot', 'haystack',
   'swing', 'slide', 'goal', 'flagpole', 'yellowStone', 'boat', 'lighthouse', 'cafeTable', 'signpost', 'board', 'bush', 'rock', 'statue', 'tram',
   'bed', 'plant', 'floorLamp', 'shelf', 'tv', 'table', 'stove', 'wardrobe', 'desk', 'sofa', 'fridge',
-  'woodpile', 'workbench', 'clayOven', 'chair', 'crates',
+  'woodpile', 'workbench', 'clayOven', 'chair', 'crates', 'jarShelf', 'zasik', 'partition',
 ]);
 
 /** Тверда частина пропа (пікселі світу) або `null`, якщо крізь нього можна пройти. */
@@ -65,6 +69,9 @@ export function propSolid(p: Prop): Rect | null {
     case 'clayOven': return { x, y: y + 18, w: 64, h: 34 };
     case 'chair': return { x: x + 3, y: y + 9, w: 10, h: 5 };
     case 'crates': return { x, y: y + 6, w: 28, h: 9 };
+    case 'jarShelf': return { x, y: y + 4, w: 144, h: 12 };
+    case 'zasik': return { x, y, w: 48, h: ZASIK_H };
+    case 'partition': return { x, y, w: 8, h: PARTITION_H };
     case 'woodpile': return { x, y: y + 6, w: 28, h: 9 };
     case 'workbench': return { x, y: y + 6, w: 22, h: 9 };
     case 'swing': return { x, y: y + 10, w: 26, h: 6 };
@@ -742,6 +749,86 @@ function drawFurniture(g: Ctx, p: Prop, x: number, y: number, t: number, season:
       }
       disc(g, x + 6, y + 2, 1, '#e8b83a');
       disc(g, x + 20, y + 2, 1, '#e8d07a');
+      break;
+    }
+    case 'jarShelf': {
+      // Стелаж із банками закруток: три полиці на всю ширину, банки різної
+      // висоти — огірки, помідори, лечо, компот, вишневе варення.
+      const W = 144;
+      const top = y - 34;
+      rect(g, x, top, 4, 50, '#5a3a24');
+      rect(g, x + W - 4, top, 4, 50, '#5a3a24');
+      rect(g, x + W / 2 - 2, top, 4, 50, '#4a2e1c');
+      const jars = ['#6f8f3a', '#c8432e', '#d9842a', '#8c2a3e', '#a8402e', '#7a9a4a', '#e0b04a', '#5a1e2e'];
+      for (let shelf = 0; shelf < 3; shelf += 1) {
+        const sy = top + 14 + shelf * 16;
+        rect(g, x + 2, sy, W - 4, 3, '#8a5a34');
+        rect(g, x + 2, sy, W - 4, 1, '#b07a4a');
+        rect(g, x + 2, sy + 3, W - 4, 1, '#3a2418');
+        for (let k = 0; k < 11; k += 1) {
+          const h = cellHash(k, shelf, 47);
+          if (h % 9 === 0) continue;
+          const jx = x + 6 + k * 12 + (h % 3);
+          const jh = 7 + (h >>> 3) % 4;
+          const fill = jars[(h >>> 5) % jars.length]!;
+          rect(g, jx, sy - jh, 8, jh, fill);
+          rect(g, jx + 1, sy - jh + 2, 2, jh - 3, shade(fill, 0.35));
+          rect(g, jx + 6, sy - jh + 1, 1, jh - 1, shade(fill, -0.25));
+          // Кришка — жерстяна або тканина з мотузочкою.
+          rect(g, jx, sy - jh - 2, 8, 2, h % 4 === 0 ? '#e8dcc0' : '#c9c4b8');
+          if (h % 4 === 0) px(g, jx + 3, sy - jh, '#8a5a34');
+        }
+      }
+      rect(g, x, y + 14, W, 2, 'rgba(20,12,10,0.35)');
+      break;
+    }
+    case 'zasik': {
+      // Засік: дощаний короб на всю глибину, повний городини.
+      const H = ZASIK_H;
+      rect(g, x, y, 48, H, '#4a3222');
+      rect(g, x + 2, y + 2, 44, H - 4, '#2e2018');
+      const veg = p.variant === 1 ? ['#8c2a4a', '#a8344e', '#e07a2a', '#c8601e'] : ['#b08a52', '#9a7444', '#c49a62', '#86663c'];
+      for (let k = 0; k < 150; k += 1) {
+        const h = cellHash(k, p.variant ?? 0, 53);
+        const vx = x + 5 + (h % 38);
+        const vy = y + 5 + ((h >>> 6) % (H - 10));
+        const c = veg[(h >>> 12) % veg.length]!;
+        if (p.variant === 1 && (h >>> 12) % veg.length >= 2) {
+          rect(g, vx, vy, 2, 5, c); // морква
+          px(g, vx, vy - 1, '#5a8a3a');
+        } else {
+          ellipse(g, vx, vy, 3, 2, shade(c, -0.25));
+          ellipse(g, vx, vy - 1, 2, 1, c);
+          px(g, vx - 1, vy - 1, shade(c, 0.25));
+        }
+      }
+      for (let k = 0; k < H; k += 24) rect(g, x, y + k, 48, 2, '#5a3a24');
+      break;
+    }
+    case 'partition': {
+      // Дощана перегородка на всю глибину: видно верхній край і торець.
+      const H = PARTITION_H;
+      rect(g, x + 1, y - 10, 6, H, '#7a5232');
+      rect(g, x + 1, y - 10, 2, H, '#9a6a40');
+      for (let k = 0; k < H; k += 22) rect(g, x + 1, y - 10 + k, 6, 1, '#4a3222');
+      rect(g, x, y + H - 10, 8, 14, '#6a4628');
+      rect(g, x, y + H - 10, 8, 1, '#a8784a');
+      rect(g, x + 3, y + H - 9, 1, 13, '#4a3222');
+      rect(g, x + 8, y - 6, 3, H, 'rgba(20,12,10,0.3)');
+      break;
+    }
+    case 'cellarStairs': {
+      // Сходи нагору до лядки: що вище (нижче на екрані) — то світліше.
+      for (let k = 0; k < 7; k += 1) {
+        const tone = shade('#6a4a30', k * 0.07);
+        rect(g, x, y + k * 6, 48, 5, tone);
+        rect(g, x, y + k * 6, 48, 1, shade(tone, 0.2));
+        rect(g, x, y + k * 6 + 5, 48, 1, '#2a1c14');
+      }
+      rect(g, x - 2, y - 2, 2, 46, '#4a3222');
+      rect(g, x + 48, y - 2, 2, 46, '#4a3222');
+      // Денне світло з лядки.
+      rect(g, x + 4, y + 26, 40, 16, 'rgba(255,236,180,0.18)');
       break;
     }
     case 'door': {

@@ -13,9 +13,11 @@ export const TILE = 16;
  *   t кахель · k килимова підлога · W стіна кімнати · x порожнеча ·
  *   v грядки городу
  */
-export type Ground = 'g' | 'G' | 'd' | 'c' | 'p' | 'a' | 'm' | 'z' | 's' | 'b' | 'w' | 'r' | 'h' | 'F' | 'f' | 't' | 'k' | 'W' | 'x' | 'v';
+export type Ground = 'g' | 'G' | 'd' | 'c' | 'p' | 'a' | 'm' | 'z' | 's' | 'b' | 'w' | 'r' | 'h' | 'F' | 'f' | 't' | 'k' | 'W' | 'x' | 'v'
+  // погріб: утоптана земля й бутова стіна
+  | 'e' | 'S';
 
-export const SOLID_GROUND: ReadonlySet<Ground> = new Set<Ground>(['w', 'h', 'F', 'W', 'x', 'r']);
+export const SOLID_GROUND: ReadonlySet<Ground> = new Set<Ground>(['w', 'h', 'F', 'W', 'x', 'r', 'S']);
 
 export type BuildingStyle =
   | 'cottage' | 'house' | 'sadok' | 'school' | 'shop' | 'cafe' | 'block' | 'office'
@@ -41,6 +43,7 @@ export type ZoneAction =
   | { type: 'mom' }
   /** Зайти в літню кухню. */
   | { type: 'kitchen' }
+  | { type: 'cellar' }
   /** Бася — погладити чи нагодувати. */
   | { type: 'dog' }
   | { type: 'walk'; to: CityId }
@@ -129,7 +132,9 @@ export type PropType =
   // садиба
   | 'woodpile' | 'workbench' | 'cellar' | 'planks'
   // літня кухня
-  | 'clayOven' | 'chair' | 'crates';
+  | 'clayOven' | 'chair' | 'crates'
+  // погріб
+  | 'jarShelf' | 'zasik' | 'partition' | 'cellarStairs';
 
 export interface Prop {
   type: PropType;

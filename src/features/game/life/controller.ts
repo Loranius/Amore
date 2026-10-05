@@ -51,6 +51,7 @@ import { colliderFor, tileFeet, zoneAt } from './world/collide';
 import { HATA_MOM_BED, homeInterior } from './world/interior';
 import { cityMap, homeYard } from './world/maps';
 import { MOM_DOORS, MOM_SPOTS, YARD_ID } from './world/yard';
+import { CELLAR_ID, cellarMap } from './world/cellar';
 import { KITCHEN_ID, KITCHEN_MOM_SPOTS, summerKitchenMap } from './world/kitchen';
 import { momPlan, type MomPlan } from './sim/mom';
 import { DOG_HAPPY_S, LENA_FALL_S, feedBasia, newDog, petBasia, stepDog, type Dog } from './sim/dog';
@@ -419,7 +420,18 @@ export class GameController {
     this.emit();
   }
 
-  enterYard(spawnName: 'gate' | 'house' | 'kitchen'): void {
+  /** Спуститись у погріб (лядка біля літньої кухні). */
+  enterCellar(): void {
+    this.map = cellarMap();
+    this.place(this.map.spawns.door!);
+    this.folk = [];
+    this.residents = [];
+    this.setupCompanions();
+    this.ui = { ...this.ui, near: null };
+    this.emit();
+  }
+
+  enterYard(spawnName: 'gate' | 'house' | 'kitchen' | 'cellar'): void {
     this.map = homeYard();
     this.place(this.map.spawns[spawnName] ?? this.map.spawns.default!);
     this.folk = [];
@@ -1014,12 +1026,14 @@ export class GameController {
         // З літньої кухні — на подвір'я біля неї; з хати в Жилинцях — на
         // своє подвір'я, а не одразу на сільську вулицю.
         if (this.map.id === KITCHEN_ID) this.enterYard('kitchen');
+        else if (this.map.id === CELLAR_ID) this.enterYard('cellar');
         else if (life.home === 'zhylyntsi') this.enterYard('house');
         else this.enterCity(life.home, 'home');
         await this.checkStory();
         return;
       case 'yard': this.enterYard('gate'); return;
       case 'kitchen': this.enterKitchen(); return;
+      case 'cellar': this.enterCellar(); return;
       case 'village': this.enterCity('zhylyntsi', 'home'); return;
       case 'bed': this.openPanel({ kind: 'sleep' }); return;
       case 'wardrobe': this.openPanel({ kind: 'wardrobe' }); return;
@@ -1415,7 +1429,7 @@ export class GameController {
 
   /** Для HUD: де Лєна зараз. */
   placeName(): string {
-    return this.map.interior && this.map.id !== KITCHEN_ID ? this.life?.homeName ?? '' : this.map.name;
+    return this.map.interior && this.map.id !== KITCHEN_ID && this.map.id !== CELLAR_ID ? this.life?.homeName ?? '' : this.map.name;
   }
 
   shiftJobTitle(): string | null {
