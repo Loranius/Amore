@@ -7,6 +7,12 @@ import type { CityId } from '../sim/content';
 import { cellHash } from './hash';
 import { buildingParts, type Building, type BuildingStyle, type GameMap, type Ground, type Notch, type Prop, type PropType, type SignIcon, type Tree, type TreeKind, type Zone, type ZoneAction } from './types';
 
+/** Меблі, що в домі малюються більшими (`Prop.scale`). */
+export const INTERIOR_FURNITURE: ReadonlySet<PropType> = new Set<PropType>([
+  'bed', 'wardrobe', 'table', 'desk', 'sofa', 'shelf', 'tv', 'fridge', 'stove', 'floorLamp', 'plant', 'rug',
+]);
+export const INTERIOR_FURNITURE_SCALE = 1.25;
+
 export interface BuildingSpec {
   id: string;
   x: number;
@@ -74,7 +80,10 @@ export class MapBuilder {
   }
 
   prop(type: PropType, x: number, y: number, extra: Partial<Prop> = {}): this {
-    this.props.push({ type, x, y, ...extra });
+    // У домі меблі трохи більші, ніж намальовані: поруч із людьми в
+    // масштабі вулиці вони виглядали іграшковими (власник, 2026-10-05).
+    const scale = this.interior && INTERIOR_FURNITURE.has(type) ? INTERIOR_FURNITURE_SCALE : undefined;
+    this.props.push({ type, x, y, ...(scale ? { scale } : {}), ...extra });
     return this;
   }
 

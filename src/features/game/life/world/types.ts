@@ -130,6 +130,8 @@ export interface Prop {
   tint?: string | undefined;
   variant?: number | undefined;
   solid?: boolean | undefined;
+  /** Масштаб малюнка й твердого сліду довкола основи пропу (меблі в домі — 1.25). */
+  scale?: number | undefined;
 }
 
 export interface Zone {

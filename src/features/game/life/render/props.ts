@@ -33,7 +33,18 @@ const SOLID: ReadonlySet<PropType> = new Set<PropType>([
 ]);
 
 /** Тверда частина пропа (пікселі світу) або `null`, якщо крізь нього можна пройти. */
+/** Точка, довкола якої масштабується проп: середина основи першої клітинки. */
+function scaleAnchor(p: Prop): { x: number; y: number } {
+  return { x: p.x * TILE + 8, y: p.y * TILE + 14 };
+}
+
 export function propSolid(p: Prop): Rect | null {
+  if (p.scale && p.scale !== 1) {
+    const r = propSolid({ ...p, scale: undefined });
+    if (!r) return null;
+    const a = scaleAnchor(p);
+    return { x: a.x + (r.x - a.x) * p.scale, y: a.y + (r.y - a.y) * p.scale, w: r.w * p.scale, h: r.h * p.scale };
+  }
   if (p.solid === false) return null;
   if (!SOLID.has(p.type)) return null;
   const x = p.x * TILE;
@@ -78,6 +89,16 @@ function shadow(g: Ctx, cx: number, cy: number, rx: number, ry = 2): void {
 }
 
 export function drawProp(g: Ctx, p: Prop, season: Season, t: number): void {
+  if (p.scale && p.scale !== 1) {
+    const a = scaleAnchor(p);
+    g.save();
+    g.translate(a.x, a.y);
+    g.scale(p.scale, p.scale);
+    g.translate(-a.x, -a.y);
+    drawProp(g, { ...p, scale: undefined }, season, t);
+    g.restore();
+    return;
+  }
   const x = Math.round(p.x * TILE);
   const y = Math.round(p.y * TILE);
   const P = PALETTES[season];

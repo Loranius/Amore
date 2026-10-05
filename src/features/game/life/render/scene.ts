@@ -16,6 +16,7 @@ import { cellHash, ellipse, type Ctx } from './pixel';
 import { drawProp, propBase, propLight } from './props';
 import { drawWater, groundCanvas } from './tiles';
 import { drawBitmap } from './icons';
+import { dogFrame, dogSheet } from './dog';
 
 export type Weather = 'clear' | 'rain' | 'snow' | 'leaves' | 'petals';
 
@@ -29,6 +30,19 @@ export interface Actor {
   look: Look;
   /** Серце чи нотка над головою. */
   emote?: 'heart' | 'note' | 'sleep' | null;
+  /** Падіння: 0…1 — частка від початку до кінця (зірочки над головою). */
+  fall?: number | null;
+  /** Куди падає: 1 — праворуч, -1 — ліворуч (геть від Басі). */
+  fallDir?: 1 | -1;
+}
+
+/** Тварина на мапі (Бася). */
+export interface Pet {
+  x: number;
+  y: number;
+  dir: Dir;
+  moving: boolean;
+  t: number;
 }
 
 export interface SceneEnv {
@@ -55,6 +69,14 @@ export interface SceneOptions {
   target: Zone | null;
   /** Зона, в якій стоїть Лєна — підсвічується. */
   near: Zone | null;
+  /** Тварини — Бася на подвір'ї. */
+  pets?: readonly Pet[];
+}
+
+/** Кут падіння (радіани): швидко вниз, полежати, підвестись. */
+export function fallAngle(p: number): number {
+  const k = p < 0.3 ? p / 0.3 : p < 0.75 ? 1 : 1 - (p - 0.75) / 0.25;
+  return Math.max(0, Math.min(1, k)) * (Math.PI / 2);
 }
 
 let lightCanvas: HTMLCanvasElement | null = null;
@@ -155,11 +177,38 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
       y: a.y,
       draw: () => {
         ellipse(g, a.x, a.y, a.look.kid ? 4 : 5, 2, 'rgba(28,20,40,0.28)');
+        if (a.fall != null) {
+          // Перечепилась: падає вперед, обертаючись довкола ніг; над головою — зірочки.
+          const ang = fallAngle(a.fall) * (a.fallDir ?? 1);
+          g.save();
+          g.translate(Math.round(a.x), Math.round(a.y));
+          g.rotate(ang);
+          g.drawImage(img, -Math.round(img.width / 2), -img.height + 2);
+          g.restore();
+          const hh = img.height - 8;
+          const hx = a.x + Math.sin(ang) * hh;
+          const hy = a.y - Math.cos(ang) * hh - 6;
+          for (let k = 0; k < 3; k += 1) {
+            const s = env.time * 7 + (k * Math.PI * 2) / 3;
+            drawBitmap(g, 'star', Math.round(hx + Math.cos(s) * 8 - 3), Math.round(hy + Math.sin(s) * 3 - 3));
+          }
+          return;
+        }
         g.drawImage(img, Math.round(a.x - img.width / 2), Math.round(a.y - img.height + 2));
         if (a.emote) {
           const bob = Math.round(Math.sin(env.time * 5) * 1.5);
           drawBitmap(g, a.emote === 'heart' ? 'heart' : a.emote === 'sleep' ? 'sleep' : 'star', Math.round(a.x - 3), Math.round(a.y - img.height - 8 + bob));
         }
+      },
+    });
+  }
+  for (const pet of opts.pets ?? []) {
+    const img = dogSheet()[pet.dir]![dogFrame(pet.moving, pet.t)]!;
+    items.push({
+      y: pet.y,
+      draw: () => {
+        ellipse(g, pet.x, pet.y, 6, 2, 'rgba(28,20,40,0.28)');
+        g.drawImage(img, Math.round(pet.x - img.width / 2), Math.round(pet.y - img.height + 1));
       },
     });
   }

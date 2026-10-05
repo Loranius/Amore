@@ -51,6 +51,7 @@ import { colliderFor, tileFeet, zoneAt } from './world/collide';
 import { HATA_MOM, homeInterior } from './world/interior';
 import { cityMap, homeYard } from './world/maps';
 import { YARD, YARD_ID } from './world/yard';
+import { LENA_FALL_S, newDog, stepDog, type Dog } from './sim/dog';
 
 /** Стеля щільності пікселів полотна гри (власник: «оптимізуй під айфони»). */
 export const GAME_MAX_DPR = 2;
@@ -135,6 +136,12 @@ export class GameController {
   /** Мешканці, з якими можна познайомитись: стоять біля свого місця. */
   private residents: (Walker & { home: { x: number; y: number } })[] = [];
   private extras: Actor[] = [];
+  /** Бася — лише на подвір'ї; зберігається, поки Лєна там. */
+  private dog: Dog | null = null;
+  /** Скільки ще секунд Лєна лежить, перечепившись об Басю. */
+  private fallLeft = 0;
+  /** Падає геть від Басі, щоб не впасти на неї. */
+  private fallDir: 1 | -1 = 1;
   private dima: Actor | null = null;
   /**
    * Що Діма робить на екрані: іде за Лєною, стоїть у кімнаті (чекає вдома),
@@ -440,6 +447,13 @@ export class GameController {
     if (!life) return;
     const info = today(life);
     if (this.map.id === YARD_ID) {
+      // Бася вибігає назустріч, щойно Лєна на подвір'ї.
+      if (!this.dog) { const p = tileFeet(24, 27); this.dog = newDog(p.x, p.y, life.seed); }
+    } else {
+      this.dog = null;
+      this.fallLeft = 0;
+    }
+    if (this.map.id === YARD_ID) {
       // Мама — біля літньої кухні на подвір'ї.
       const mom = tileFeet(YARD.mom[0], YARD.mom[1]);
       this.extras.push({ id: 'mom', x: mom.x, y: mom.y, dir: 0, moving: false, t: 0, look: MOM });
@@ -588,8 +602,10 @@ export class GameController {
     this.player.t += dt;
     this.updateFolk(dt);
     this.updateResidents(dt);
+    this.updateDog(dt);
     if (!this.blocked()) {
-      this.movePlayer(dt);
+      if (this.fallLeft > 0) { this.fallLeft = Math.max(0, this.fallLeft - dt); this.player.moving = false; }
+      else this.movePlayer(dt);
       // Час іде, поки Лєна в місті.
       this.minuteAcc += dt * MINUTES_PER_SECOND;
       if (this.minuteAcc >= 1) {
@@ -707,6 +723,19 @@ export class GameController {
     } else d.moving = false;
   }
 
+  private updateDog(dt: number): void {
+    if (!this.dog) return;
+    const c = colliderFor(this.map);
+    const r = stepDog(this.dog, dt, { lena: this.player, canStand: (x, y) => c.canStand(x, y) });
+    this.dog = r.dog;
+    // Перечепилась — лише коли Лєна вільна (не в розмові, не в панелі).
+    if (r.trip && this.fallLeft <= 0 && !this.blocked()) {
+      this.fallLeft = LENA_FALL_S;
+      this.fallDir = this.dog.x > this.player.x ? -1 : 1;
+      sfx.oops();
+    }
+  }
+
   private updateResidents(dt: number): void {
     const c = colliderFor(this.map);
     for (const f of this.residents) {
@@ -782,8 +811,11 @@ export class GameController {
   }
 
   private worldScale(w: number, h: number): number {
-    // ~15 клітинок на ширину телефона, ~22 — на широкому екрані.
-    const tilesWide = this.map.interior ? this.map.w : w > h ? 24 : 14;
+    // ~15 клітинок на ширину телефона, ~22 — на широкому екрані. Усередині —
+    // той самий масштаб, що надворі (власник: «у будинку все здається
+    // занадто дрібним»): раніше камера вміщала всю ширину хати, і люди з
+    // меблями ставали вдвічі меншими, ніж на вулиці.
+    const tilesWide = w > h ? 24 : 14;
     return Math.max(2, Math.round(w / (tilesWide * TILE)));
   }
 
@@ -800,7 +832,7 @@ export class GameController {
     this.cameraY += (ty - this.cameraY) * 0.15;
     const info = dayInfo(life?.day ?? 3);
     const actors: Actor[] = [...this.folk, ...this.residents, ...this.extras];
-    if (this.ui.screen === 'world') actors.push(this.player);
+    if (this.ui.screen === 'world') actors.push(this.fallLeft > 0 ? { ...this.player, fall: 1 - this.fallLeft / LENA_FALL_S, fallDir: this.fallDir } : this.player);
     if (this.dima) actors.push({ ...this.dima, emote: this.ui.celebrate ? 'heart' : null });
     renderScene(g, this.map, actors, {
       season: info.season,
@@ -810,6 +842,7 @@ export class GameController {
     }, { w, h, scale, camX: this.cameraX, camY: this.cameraY, dpr }, {
       target: this.ui.screen === 'world' ? this.targetZone() : null,
       near: this.ui.screen === 'world' ? this.ui.near : null,
+      pets: this.dog && this.ui.screen === 'world' ? [this.dog] : [],
     });
     if (this.joy) {
       const r = this.canvas!.getBoundingClientRect();

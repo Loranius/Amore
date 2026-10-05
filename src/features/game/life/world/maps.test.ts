@@ -189,6 +189,15 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(brotherBeds(homeInterior({ ...newLife(1, 'uni'), home: 'zhylyntsi' }))).toHaveLength(1);
   });
 
+  it('меблі в домі — у масштабі людей, як надворі (власник, 2026-10-05: «у будинку все занадто дрібне»)', () => {
+    const hata = homeInterior({ ...newLife(1, 'sadok'), home: 'zhylyntsi' });
+    const bed = hata.props.find((p) => p.type === 'bed')!;
+    expect(bed.scale).toBe(1.25);
+    // Стінне (вікна, фото) й надвірне не збільшується.
+    expect(hata.props.filter((p) => p.type === 'window' || p.type === 'photo').every((p) => p.scale === undefined)).toBe(true);
+    expect(homeYard().props.every((p) => p.scale === undefined)).toBe(true);
+  });
+
   it('у хаті будь-які куплені меблі на типових місцях не перекривають дверей до кімнати Лєни', () => {
     const s = newLife(1, 'adult');
     const all = { rug: 'rugPink', plant: 'plant', lamp: 'lamp', shelf: 'shelf', tv: 'tv', desk: 'desk', sofa: 'sofa', poster: 'poster', pet: 'kitten' };
