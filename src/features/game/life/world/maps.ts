@@ -8,6 +8,7 @@
 //   Львів — бруківка, ратуша, шоколадна майстерня, пекарня;
 //   Одеса — вокзал, місто й пляж Отрада з Жовтим каменем.
 // ============================================================
+import { summerKitchenMap } from './kitchen';
 import type { CityId } from '../sim/content';
 import { MapBuilder } from './build';
 import type { GameMap } from './types';
@@ -327,7 +328,7 @@ export function homeYard(): GameMap {
   return yard;
 }
 
-/** Усі мапи міста: саме місто й, для Жилинців, подвір'я садиби. */
+/** Усі мапи міста: саме місто й, для Жилинців, подвір'я садиби та літня кухня. */
 export function mapsOf(city: CityId): GameMap[] {
-  return city === 'zhylyntsi' ? [cityMap(city), homeYard()] : [cityMap(city)];
+  return city === 'zhylyntsi' ? [cityMap(city), homeYard(), summerKitchenMap()] : [cityMap(city)];
 }

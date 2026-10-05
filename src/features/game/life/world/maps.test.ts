@@ -3,6 +3,7 @@ import { CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
 import { newLife } from '../sim/life';
 import { colliderFor, reachableTiles, zoneTiles } from './collide';
 import { homeInterior } from './interior';
+import { summerKitchenMap } from './kitchen';
 import { ALL_CITY_IDS, cityMap, homeYard } from './maps';
 import { TILE, buildingParts, type GameMap } from './types';
 
@@ -203,5 +204,29 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     const all = { rug: 'rugPink', plant: 'plant', lamp: 'lamp', shelf: 'shelf', tv: 'tv', desk: 'desk', sofa: 'sofa', poster: 'poster', pet: 'kitten' };
     const hata = homeInterior({ ...s, home: 'zhylyntsi', decor: { ...s.decor, ...all } as typeof s.decor });
     assertReachable(hata);
+  });
+
+  it('літня кухня — за планом власника: вхід згори прибудови, піч унизу посередині, плита в лівому куті, холодильник праворуч, ящики в сінях', () => {
+    const k = summerKitchenMap();
+    assertReachable(k);
+    const p = (t: string) => k.props.find((x) => x.type === t)!;
+    const exit = k.zones.find((z) => z.action.type === 'exit')!;
+    const crates = p('crates');
+    // Вхід — у задній (верхній) стіні сіней; ящики — у сінях, лівіше за кухню.
+    expect(exit.x).toBeLessThan(6);
+    expect(k.ground[exit.y - 1]![exit.x]).not.toBe('f');
+    expect(crates.x).toBeLessThan(6);
+    const oven = p('clayOven');
+    expect(oven.y).toBeGreaterThan(6);
+    expect(oven.x).toBeGreaterThan(9);
+    expect(oven.x).toBeLessThan(13);
+    expect(p('stove').x).toBeLessThan(8);
+    expect(p('stove').y).toBeLessThan(4);
+    expect(p('fridge').x).toBeGreaterThan(16);
+    expect(k.props.filter((x) => x.type === 'chair')).toHaveLength(4);
+    // Готувати з мамою — біля печі.
+    expect(k.zones.some((z) => z.action.type === 'activity' && z.action.id === 'summerKitchen')).toBe(true);
+    // На подвір'ї вхід у кухню веде всередину, а не в одразу заняття.
+    expect(homeYard().zones.find((z) => z.id === 'summerKitchen')!.action.type).toBe('kitchen');
   });
 });

@@ -9,7 +9,7 @@ import { buildingParts, type Building, type BuildingStyle, type GameMap, type Gr
 
 /** Меблі, що в домі малюються більшими (`Prop.scale`). */
 export const INTERIOR_FURNITURE: ReadonlySet<PropType> = new Set<PropType>([
-  'bed', 'wardrobe', 'table', 'desk', 'sofa', 'shelf', 'tv', 'fridge', 'stove', 'floorLamp', 'plant', 'rug',
+  'bed', 'wardrobe', 'table', 'desk', 'sofa', 'shelf', 'tv', 'fridge', 'stove', 'floorLamp', 'plant', 'rug', 'chair', 'crates',
 ]);
 export const INTERIOR_FURNITURE_SCALE = 1.25;
 

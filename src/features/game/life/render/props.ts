@@ -29,7 +29,7 @@ const SOLID: ReadonlySet<PropType> = new Set<PropType>([
   'bench', 'lamp', 'well', 'mailbox', 'busStop', 'fountain', 'bigFountain', 'stall', 'car', 'bin', 'planter', 'pot', 'haystack',
   'swing', 'slide', 'goal', 'flagpole', 'yellowStone', 'boat', 'lighthouse', 'cafeTable', 'signpost', 'board', 'bush', 'rock', 'statue', 'tram',
   'bed', 'plant', 'floorLamp', 'shelf', 'tv', 'table', 'stove', 'wardrobe', 'desk', 'sofa', 'fridge',
-  'woodpile', 'workbench',
+  'woodpile', 'workbench', 'clayOven', 'chair', 'crates',
 ]);
 
 /** Тверда частина пропа (пікселі світу) або `null`, якщо крізь нього можна пройти. */
@@ -62,6 +62,9 @@ export function propSolid(p: Prop): Rect | null {
     case 'sofa': return { x, y: y + 2, w: 30, h: 12 };
     case 'table': case 'desk': return { x, y: y + 2, w: 24, h: 12 };
     case 'shelf': case 'wardrobe': case 'fridge': case 'stove': return { x, y, w: 16, h: 14 };
+    case 'clayOven': return { x, y: y + 18, w: 64, h: 34 };
+    case 'chair': return { x: x + 3, y: y + 9, w: 10, h: 5 };
+    case 'crates': return { x, y: y + 6, w: 28, h: 9 };
     case 'woodpile': return { x, y: y + 6, w: 28, h: 9 };
     case 'workbench': return { x, y: y + 6, w: 22, h: 9 };
     case 'swing': return { x, y: y + 10, w: 26, h: 6 };
@@ -686,6 +689,59 @@ function drawFurniture(g: Ctx, p: Prop, x: number, y: number, t: number, season:
       rect(g, x + 4, y + 6, 12, 8, '#7a5230');
       for (let k = 0; k < 12; k += 4) rect(g, x + 4 + k, y + 6, 1, 8, '#5a3a24');
       rect(g, x + 9, y + 9, 3, 2, '#3a3a40');
+      break;
+    }
+    case 'clayOven': {
+      // Велика глиняна піч літньої кухні: побілена, з челом, де горить
+      // вогонь, припічком і горщиком.
+      const wall = '#efe8da';
+      // Комин — короткий, над лежанкою (димохід іде далі в стелю).
+      rect(g, x + 44, y - 6, 12, 16, '#e6dece');
+      rect(g, x + 42, y - 8, 16, 3, '#cfc5b2');
+      rect(g, x + 52, y - 6, 4, 16, '#d6cdbb');
+      rect(g, x, y + 12, 64, 40, wall);
+      rect(g, x + 2, y + 4, 60, 10, '#f8f4ec');
+      rect(g, x + 2, y + 13, 60, 1, '#d6cdbb');
+      rect(g, x + 56, y + 12, 8, 40, '#dad1bf');
+      rect(g, x, y + 48, 64, 4, '#b9ae9a');
+      // Чело: темна арка, вогонь і жар.
+      rect(g, x + 18, y + 26, 22, 17, '#2a1c1a');
+      rect(g, x + 20, y + 24, 18, 2, '#2a1c1a');
+      rect(g, x + 21, y + 35, 16, 7, '#c4521f');
+      const flick = Math.floor(t * 6) % 2;
+      rect(g, x + 23 + flick, y + 31, 4, 5, '#f39a35');
+      rect(g, x + 30 - flick, y + 32, 4, 4, '#f6c14e');
+      // Припічок і горщик.
+      rect(g, x + 14, y + 43, 30, 3, '#d8cfbd');
+      disc(g, x + 48, y + 40, 4, '#9a5a34');
+      rect(g, x + 45, y + 35, 6, 2, '#7a4428');
+      // Розпис: сині квіточки й червона смужка.
+      for (const [fx, fy] of [[6, 22], [9, 34], [50, 22], [6, 42]] as const) {
+        px(g, x + fx, y + fy, '#3f6fb0'); px(g, x + fx - 1, y + fy + 1, '#3f6fb0'); px(g, x + fx + 1, y + fy + 1, '#3f6fb0'); px(g, x + fx, y + fy + 2, '#3f6fb0'); px(g, x + fx, y + fy + 1, '#f6c14e');
+      }
+      rect(g, x + 2, y + 15, 52, 1, '#b8323a');
+      break;
+    }
+    case 'chair': {
+      rect(g, x + 4, y - 2, 8, 2, '#8a5a34');
+      rect(g, x + 4, y, 1, 7, '#7a4a2a');
+      rect(g, x + 11, y, 1, 7, '#7a4a2a');
+      rect(g, x + 3, y + 6, 10, 3, '#a8784a');
+      rect(g, x + 3, y + 6, 10, 1, '#c49a6c');
+      rect(g, x + 4, y + 9, 1, 5, '#6e4a2a');
+      rect(g, x + 11, y + 9, 1, 5, '#6e4a2a');
+      break;
+    }
+    case 'crates': {
+      // Ящики з фруктами й городиною.
+      for (const [cx, fruit] of [[0, '#d9473a'], [15, '#b88a4a']] as const) {
+        rect(g, x + cx, y + 4, 13, 11, '#a8784a');
+        rect(g, x + cx, y + 8, 13, 1, '#7a4a2a');
+        rect(g, x + cx, y + 12, 13, 1, '#7a4a2a');
+        for (let k = 0; k < 6; k += 1) disc(g, x + cx + 2 + (k % 3) * 4, y + 3 + Math.floor(k / 3) * 2, 1, fruit);
+      }
+      disc(g, x + 6, y + 2, 1, '#e8b83a');
+      disc(g, x + 20, y + 2, 1, '#e8d07a');
       break;
     }
     case 'door': {

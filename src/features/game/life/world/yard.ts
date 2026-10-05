@@ -38,13 +38,15 @@ const KITCHEN = { x: 22, y: 19, w: 8, h: 4, annexW: 3 } as const;
  * Де мама буває протягом дня (клітинки): вона ходить від точки до точки
  * свого місця (`MomSpot`, розклад — `sim/mom.ts`).
  */
-export const MOM_SPOTS: Record<Exclude<MomSpot, 'bed'>, readonly [number, number][]> = {
-  kitchen: [[21, 20.6], [20.4, 22], [21.3, 19.4]],
+export const MOM_SPOTS: Record<Exclude<MomSpot, 'bed' | 'kitchen'>, readonly [number, number][]> = {
   garden: [[4, 4], [8, 6.5], [11, 3], [13, 7], [6, 2.5]],
   orchard: [[31, 22], [33, 25.5], [35.5, 28], [36, 17], [31.5, 14]],
   chickens: [[21, 14.6], [23, 14.6], [19.5, 14.7]],
   bench: [[6.6, 26.9]],
 };
+
+/** Куди мама заходить, коли йде з подвір'я: у хату чи в літню кухню. */
+export const MOM_DOORS = { bed: [RIGHT_WING.x + RIGHT_WING.w, 22] as [number, number], kitchen: [KITCHEN.x + 1, KITCHEN.y] as [number, number] };
 
 export const YARD = {
   /**
@@ -130,7 +132,7 @@ export function yardMap(): GameMap {
     wall: '#efe4c8', roof: '#8a5a44', door: false, notch: { w: KITCHEN.annexW, h: 1, side: 'left' },
   });
   m.fill(KITCHEN.x, KITCHEN.y, KITCHEN.annexW, 1, 'c');
-  m.zone('summerKitchen', KITCHEN.x, KITCHEN.y, KITCHEN.annexW, 1, { type: 'activity', id: 'summerKitchen' }, 'Літня кухня · з мамою');
+  m.zone('summerKitchen', KITCHEN.x, KITCHEN.y, KITCHEN.annexW, 1, { type: 'kitchen' }, 'Літня кухня');
   // Погріб під кухнею — вхід знизу.
   m.prop('cellar', 27.6, 23.1);
   m.zone('cellar', 28, 24, 1, 1, { type: 'info', text: 'Погріб: картопля, банки з огірками й мамине вишневе варення' }, 'Погріб');
@@ -158,5 +160,6 @@ export function yardMap(): GameMap {
 
   m.spawn('gate', YARD.gate.x, H - 3).spawn('default', YARD.gate.x, H - 3);
   m.spawn('house', YARD.porch.x + 1, YARD.porch.y + 1);
+  m.spawn('kitchen', KITCHEN.x, KITCHEN.y - 1);
   return m.build();
 }

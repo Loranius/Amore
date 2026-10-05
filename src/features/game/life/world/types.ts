@@ -39,6 +39,8 @@ export type ZoneAction =
   | { type: 'lyceum' }
   | { type: 'stone' }
   | { type: 'mom' }
+  /** Зайти в літню кухню. */
+  | { type: 'kitchen' }
   /** Бася — погладити чи нагодувати. */
   | { type: 'dog' }
   | { type: 'walk'; to: CityId }
@@ -125,7 +127,9 @@ export type PropType =
   | 'bed' | 'rug' | 'plant' | 'floorLamp' | 'poster' | 'shelf' | 'tv' | 'pet' | 'table' | 'stove' | 'window' | 'wardrobe'
   | 'desk' | 'sofa' | 'fridge' | 'rushnyk' | 'door'
   // садиба
-  | 'woodpile' | 'workbench' | 'cellar' | 'planks';
+  | 'woodpile' | 'workbench' | 'cellar' | 'planks'
+  // літня кухня
+  | 'clayOven' | 'chair' | 'crates';
 
 export interface Prop {
   type: PropType;

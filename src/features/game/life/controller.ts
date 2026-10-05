@@ -50,7 +50,8 @@ import { sfx, unlockAudio } from './sound';
 import { colliderFor, tileFeet, zoneAt } from './world/collide';
 import { HATA_MOM_BED, homeInterior } from './world/interior';
 import { cityMap, homeYard } from './world/maps';
-import { MOM_SPOTS, YARD, YARD_ID } from './world/yard';
+import { MOM_DOORS, MOM_SPOTS, YARD_ID } from './world/yard';
+import { KITCHEN_ID, KITCHEN_MOM_SPOTS, summerKitchenMap } from './world/kitchen';
 import { momPlan, type MomPlan } from './sim/mom';
 import { DOG_HAPPY_S, LENA_FALL_S, feedBasia, newDog, petBasia, stepDog, type Dog } from './sim/dog';
 
@@ -407,7 +408,18 @@ export class GameController {
   }
 
   /** Подвір'я садиби в Жилинцях (власник, 2026-10-06): хата, хліви, город, кухня, сад. */
-  enterYard(spawnName: 'gate' | 'house'): void {
+  /** Зайти в літню кухню (з прибудови, вхід згори). */
+  enterKitchen(): void {
+    this.map = summerKitchenMap();
+    this.place(this.map.spawns.door!);
+    this.folk = [];
+    this.residents = [];
+    this.setupCompanions();
+    this.ui = { ...this.ui, near: null };
+    this.emit();
+  }
+
+  enterYard(spawnName: 'gate' | 'house' | 'kitchen'): void {
     this.map = homeYard();
     this.place(this.map.spawns[spawnName] ?? this.map.spawns.default!);
     this.folk = [];
@@ -761,23 +773,27 @@ export class GameController {
       this.momA = { id: 'mom', x: bx, y: by, dir: 0, moving: false, t: (this.momA?.t ?? 0) + dt, look: MOM, inBed: HATA_MOM_BED.tint, emote: plan.task === 'спить' ? 'sleep' : null, target: null, wait: 0, stuck: 0, leaving: false, plan };
       return;
     }
-    if (this.map.id !== YARD_ID) { this.momA = null; return; }
-    const porch = tileFeet(YARD.porch.x, YARD.porch.y + 1);
+    const inKitchen = this.map.id === KITCHEN_ID;
+    if (this.map.id !== YARD_ID && !inKitchen) { this.momA = null; return; }
+    // На подвір'ї мама — коли вона на городі, в саду, біля курей чи на
+    // лавці; кухня й ліжко — під дахом, туди вона заходить дверима.
+    const here = inKitchen ? plan.spot === 'kitchen' : plan.spot !== 'kitchen' && plan.spot !== 'bed';
+    const spotsHere = (): readonly [number, number][] => (inKitchen ? KITCHEN_MOM_SPOTS : MOM_SPOTS[plan.spot as keyof typeof MOM_SPOTS]);
+    const door = inKitchen ? tileFeet(4, 5) : tileFeet(...(plan.spot === 'kitchen' ? MOM_DOORS.kitchen : MOM_DOORS.bed));
     let m = this.momA;
     if (!m) {
-      if (!plan.outside) return;
-      // Виходить із хати, якщо Лєна вже тут; інакше вже на своєму місці.
-      const p0 = plan.spot === 'bed' ? porch : tileFeet(...MOM_SPOTS[plan.spot][0]!);
+      if (!here) return;
+      const p0 = tileFeet(...spotsHere()[0]!);
       m = this.momA = { id: 'mom', x: p0.x, y: p0.y, dir: 0, moving: false, t: 0, look: MOM, target: null, wait: 0, stuck: 0, leaving: false, plan };
     }
     m.t += dt;
     m.plan = plan;
     m.emote = null;
-    if (!plan.outside && !m.leaving) { m.leaving = true; m.target = porch; }
-    if (plan.outside) m.leaving = false;
+    if (!here && !m.leaving) { m.leaving = true; m.target = door; }
+    if (here) m.leaving = false;
     if (m.wait > 0) { m.wait -= dt; m.moving = false; return; }
-    if (!m.target && plan.spot !== 'bed') {
-      const spots = MOM_SPOTS[plan.spot];
+    if (!m.target && here) {
+      const spots = spotsHere();
       const r = rngFor(life.seed, 'mom-walk', life.day, Math.floor(m.t * 2));
       const [tx, ty] = spots[Math.floor(r() * spots.length)]!;
       m.target = tileFeet(tx, ty);
@@ -995,12 +1011,15 @@ export class GameController {
         this.enterHome('door');
         return;
       case 'exit':
-        // З хати в Жилинцях — на своє подвір'я, а не одразу на сільську вулицю.
-        if (life.home === 'zhylyntsi') this.enterYard('house');
+        // З літньої кухні — на подвір'я біля неї; з хати в Жилинцях — на
+        // своє подвір'я, а не одразу на сільську вулицю.
+        if (this.map.id === KITCHEN_ID) this.enterYard('kitchen');
+        else if (life.home === 'zhylyntsi') this.enterYard('house');
         else this.enterCity(life.home, 'home');
         await this.checkStory();
         return;
       case 'yard': this.enterYard('gate'); return;
+      case 'kitchen': this.enterKitchen(); return;
       case 'village': this.enterCity('zhylyntsi', 'home'); return;
       case 'bed': this.openPanel({ kind: 'sleep' }); return;
       case 'wardrobe': this.openPanel({ kind: 'wardrobe' }); return;
@@ -1396,7 +1415,7 @@ export class GameController {
 
   /** Для HUD: де Лєна зараз. */
   placeName(): string {
-    return this.map.interior ? this.life?.homeName ?? '' : this.map.name;
+    return this.map.interior && this.map.id !== KITCHEN_ID ? this.life?.homeName ?? '' : this.map.name;
   }
 
   shiftJobTitle(): string | null {
