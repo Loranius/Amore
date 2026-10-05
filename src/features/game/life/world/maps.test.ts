@@ -120,34 +120,43 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(gate.y).toBeGreaterThanOrEqual(yard.h - 3);
   });
 
-  it('хата всередині: вхід справа у веранду, кухня над нею; коридорчик зв\'язує братів (угорі), маму (ліворуч), Лєну (внизу); кімнати впритул', () => {
-    const s = newLife(1, 'sadok');
-    const hata = homeInterior({ ...s, home: 'zhylyntsi' });
+  it('хата всередині — за ескізом власника: мама над Лєною зліва, брати праворуч від мами, коридорчик між ними й Лєною, веранда справа зі входом, кімната над верандою', () => {
+    const hata = homeInterior({ ...newLife(1, 'sadok'), home: 'zhylyntsi' });
     assertReachable(hata);
     const reach = reachableTiles(hata, hata.spawns.door!);
-    const rooms = { веранда: [19, 9], кухня: [16, 4], коридор: [9, 9], брати: [9, 4], мама: [3, 12], Лєна: [12, 17] } as const;
+    const rooms = { веранда: [19, 10], надВерандою: [17, 4], коридор: [9, 10], брати: [9, 4], мама: [3, 6], Лєна: [5, 19] } as const;
     for (const [name, [x, y]] of Object.entries(rooms)) expect(reach.has(`${x},${y}`), name).toBe(true);
-    expect(rooms.кухня[1]).toBeLessThan(rooms.веранда[1]);
-    expect(rooms.коридор[0]).toBeLessThan(rooms.веранда[0]);
-    expect(rooms.брати[1]).toBeLessThan(rooms.коридор[1]);
-    expect(rooms.мама[0]).toBeLessThan(rooms.коридор[0]);
-    expect(rooms.Лєна[1]).toBeGreaterThan(rooms.коридор[1]);
-    // Вихід — у правій стіні веранди, а не знизу.
+    const g = (x: number, y: number) => hata.ground[y]![x];
+    // Мама — над кімнатою Лєни, у лівому верхньому куті: між ними лише стіна Лєниної кімнати.
+    expect([g(3, 11), g(3, 12), g(3, 15)]).toEqual(['f', 'W', 'f']);
+    // Брати — праворуч від мами, угорі; коридорчик — під братами й над Лєною.
+    expect(rooms.брати[0]).toBeGreaterThan(rooms.мама[0]);
+    expect(rooms.коридор[1]).toBeGreaterThan(rooms.брати[1]);
+    expect(rooms.коридор[1]).toBeLessThan(rooms.Лєна[1]);
+    // Коридорчик зв'язує всі три кімнати: двері до мами, братів і Лєни виходять у нього.
+    expect([g(7, 8), g(11, 7), g(13, 12)]).toEqual(['f', 'f', 'f']);
+    // Веранда праворуч від коридорчика, кімната — над верандою; вхід — у правій стіні веранди.
+    expect(g(15, 8)).toBe('f');
+    expect(g(20, 6)).toBe('f');
     const exit = hata.zones.find((z) => z.action.type === 'exit')!;
     expect(exit.x + exit.w).toBe(hata.w);
-    expect(exit.y).toBeLessThan(rooms.Лєна[1]);
-    // Кімната мами — одразу за лівою стіною Лєниної: між ними одна стіна.
-    const g = (x: number, y: number) => hata.ground[y]![x];
-    expect([g(6, 15), g(7, 15), g(8, 15)]).toEqual(['f', 'x', 'f']);
-    // Коридорчик короткий.
-    expect(hata.ground[9]!.slice(8, 14).every((t) => t === 'f')).toBe(true);
-    expect(hata.ground[10]![7]).toBe('x');
+    expect(exit.y).toBeGreaterThanOrEqual(6);
+    expect(exit.y).toBeLessThan(12);
+    // Кімната Лєни — та сама рамка 16×12: облаштування переноситься без змін.
+    expect(hata.spawns.wake!.y).toBeGreaterThan(14);
     const stove = hata.props.find((p) => p.type === 'stove')!;
-    expect(stove.x).toBeGreaterThan(14);
+    expect(stove.x).toBeGreaterThan(15);
     expect(stove.y).toBeLessThan(6);
     // Брати живуть удома, поки Лєна в садочку й школі; у ВДПУ — роз'їхались.
-    const brotherBeds = (m: typeof hata) => m.props.filter((p) => p.type === 'bed' && p.x > 7 && p.x < 14 && p.y < 6);
+    const brotherBeds = (m: typeof hata) => m.props.filter((p) => p.type === 'bed' && p.x > 7 && p.x < 15 && p.y < 6);
     expect(brotherBeds(hata)).toHaveLength(2);
     expect(brotherBeds(homeInterior({ ...newLife(1, 'uni'), home: 'zhylyntsi' }))).toHaveLength(1);
+  });
+
+  it('у хаті будь-які куплені меблі на типових місцях не перекривають дверей до кімнати Лєни', () => {
+    const s = newLife(1, 'adult');
+    const all = { rug: 'rugPink', plant: 'plant', lamp: 'lamp', shelf: 'shelf', tv: 'tv', desk: 'desk', sofa: 'sofa', poster: 'poster', pet: 'kitten' };
+    const hata = homeInterior({ ...s, home: 'zhylyntsi', decor: { ...s.decor, ...all } as typeof s.decor });
+    assertReachable(hata);
   });
 });
