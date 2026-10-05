@@ -210,6 +210,20 @@ function druse(p: Painter, seed: string, key: string, c: V3, size: number) {
  * Де стоїть друза `k` на острові радіуса `R` (ADR-0237): одна формула на
  * острів і хроніку росту (ADR-0238), щоб камера летіла саме до неї.
  */
+/**
+ * Друз менше (власник, 2026-10-06: «прибери частину рожевих дрібних
+ * кристалів навколо»): одна друза — на кожні три спільні вихідні, і не
+ * більше восьми на острові. Вихідний `k` належить друзі `druseOfDay(k)`.
+ */
+export const DAYS_PER_DRUSE = 3;
+export const MAX_DRUSES = 8;
+export function druseCount(days: number): number {
+  return Math.min(MAX_DRUSES, Math.ceil(Math.max(0, days) / DAYS_PER_DRUSE));
+}
+export function druseOfDay(k: number): number {
+  return Math.min(MAX_DRUSES - 1, Math.floor(Math.max(0, k) / DAYS_PER_DRUSE));
+}
+
 export function druseAt(seed: string, R: number, k: number): V3 {
   const key = `isle:druse${k}`;
   const turn = unit(seed, 'isle:turn') * Math.PI * 2;
@@ -228,7 +242,9 @@ export function buildCrystalIsland(seed: string, radius: number, druses = 0, sea
 
   // ── Земля під плитами (видно в щілинах) ───────────────────
   const SEG = 24;
-  const rimR = (j: number) => R * (0.97 + 0.07 * unit(seed, `isle:rim${j % SEG}`));
+  // Край нерівний — природна скеля, а не вирізаний диск (власник,
+  // 2026-10-06: «платформа природніша … не шаблонний floating island»).
+  const rimR = (j: number) => R * (0.93 + 0.12 * unit(seed, `isle:rim${j % SEG}`));
   const dirt = Array.from({ length: SEG }, (_, j) => polar(rimR(j), (j / SEG) * Math.PI * 2, 0.004));
   p.poly(dirt, PAINT.dirt, 1);
 
@@ -240,7 +256,7 @@ export function buildCrystalIsland(seed: string, radius: number, druses = 0, sea
   ];
   rings.forEach((ring, ri) => {
     const spin = unit(seed, `isle:ring${ri}`) * Math.PI * 2;
-    for (let k = 0; k < ring.n; k += 1) {
+    for (let k = 0; k < ring.n; k += 1) (() => {
       const key = `isle:tile${ri}:${k}`;
       const a0 = spin + (k / ring.n) * Math.PI * 2;
       const a1 = spin + ((k + 1) / ring.n) * Math.PI * 2;
@@ -253,18 +269,29 @@ export function buildCrystalIsland(seed: string, radius: number, druses = 0, sea
       const h = R * (0.016 + 0.012 * unit(seed, `${key}:h`));
       const lower = outline.map((v): V3 => [cx + (v[0] - cx) * gap, 0, cz + (v[2] - cz) * gap]);
       const upper = lower.map((v): V3 => [v[0], h, v[2]]);
-      const tone = 0.9 + 0.16 * unit(seed, `${key}:t`);
-      p.band(lower, upper, PAINT.paving, () => tone * 0.9, true);
-    }
+      // Частини зовнішніх плит немає — вибиті роками; на їхньому місці
+      // земля й мох. Плита, що лишилась, трохи осіла й перекошена.
+      if (ri === 2 && unit(seed, `${key}:gone`) < 0.3) {
+        chunk(p, seed, `${key}:moss`, [cx, R * 0.004, cz], R * (0.09 + 0.03 * unit(seed, `${key}:ms`)), PAINT.ivy, 0, 0.18);
+        return;
+      }
+      const sink = (unit(seed, `${key}:sink`) - 0.5) * h * 0.8;
+      const tilt = (unit(seed, `${key}:tilt`) - 0.5) * h * 0.9;
+      const tilted = upper.map((v, i): V3 => [v[0], v[1] + sink + (i === 0 ? tilt : i === upper.length - 1 ? -tilt : 0), v[2]]);
+      const tone = 0.86 + 0.24 * unit(seed, `${key}:t`);
+      p.band(lower, tilted, PAINT.paving, () => tone * 0.9, true);
+    })();
   });
 
   // ── Підошва: світлий обідок плит, під ним фіолетовий клин ──
   // Як у рифу й дерева (ADR-0225, ADR-0226): під краєм (24 вершини) —
   // дванадцять сегментів із сильним розкидом, небагато широких граней.
+  // Під плитами — шар землі, далі скеля: острів виглядає відламаним
+  // шматком землі, а не тарілкою з обідком.
   const top = [
     { r: 1.0, y: 0, paint: PAINT.ruin },
-    { r: 1.0, y: -0.07, paint: PAINT.ruin },
-    { r: 0.98, y: -0.12, paint: PAINT.cliff },
+    { r: 1.01, y: -0.05, paint: PAINT.dirt },
+    { r: 0.97, y: -0.12, paint: PAINT.cliff },
   ] as const;
   const topRing = (li: number) => Array.from({ length: SEG }, (_, j): V3 => {
     // Верхнє кільце — ТІ САМІ вершини, що й край землі під плитами: між
@@ -331,7 +358,12 @@ export function buildCrystalIsland(seed: string, radius: number, druses = 0, sea
     const w = R * (0.13 + 0.03 * unit(seed, `${key}:w`));
     const broken = unit(seed, `${key}:broken`) < 0.4;
     box(p, [base[0], -R * 0.02, base[2]], [base[0], R * 0.05, base[2]], w * 1.2, w * 1.2, PAINT.ruin, 0.94);
-    box(p, base, [base[0], h, base[2]], w, w, PAINT.ruin, 1);
+    // Кожен стовп свого відтінку й темніший донизу — вивітрений камінь, а не
+    // однаковий білий пластик (власник, 2026-10-06).
+    const shade = 0.82 + 0.16 * unit(seed, `${key}:shade`);
+    const mid: V3 = [base[0], h * 0.45, base[2]];
+    box(p, base, mid, w, w, PAINT.ruin, shade * 0.9);
+    box(p, mid, [base[0], h, base[2]], w * 0.97, w * 0.97, PAINT.ruin, shade);
     if (broken) {
       // Зламаний верх: скошений уламок трохи зсунутий убік.
       const cap: V3 = [base[0] + w * 0.12, h, base[2] - w * 0.1];
@@ -407,7 +439,7 @@ export function buildCrystalIsland(seed: string, radius: number, druses = 0, sea
   // ── Друзи — спільні вихідні (ADR-0237) ─────────────────────
   // Між колонією в центрі й колонами по краю, золотим кутом — рівно
   // розсипані, і кожна нова лягає на своє місце, не зсуваючи старих.
-  for (let k = 0; k < druses; k += 1) {
+  for (let k = 0; k < druseCount(druses); k += 1) {
     const key = `isle:druse${k}`;
     druse(p, seed, key, druseAt(seed, R, k), R * (0.07 + 0.05 * unit(seed, `${key}:s`)));
   }

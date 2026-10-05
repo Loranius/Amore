@@ -27,9 +27,15 @@ const KEY = new THREE.Vector3(-0.45, 0.8, 0.4).normalize();
  * колони — теплий білий камінь, підошва — насичений фіолетовий, плющ
  * соковито-зелений.
  */
+/*
+ * Природна гама (власник, 2026-10-06: «руїни менш білими/пластиковими …
+ * платформа природніша»): плити — теплий сірий камінь, руїни — вивітрений
+ * пісковик, скеля — темний сланцево-ліловий камінь замість насиченого
+ * синього, земля — бура. Лілове лишається лише в тіні скелі.
+ */
 const ISLAND_PAINTS: Record<'light' | 'dark', readonly string[]> = {
-  light: ['#e9e3f0', '#6b62d2', '#f2eee8', '#5cbf45', '#ff8fd0', '#b3a8cc', '#ffffff', '#9c86cf'],
-  dark: ['#b4abc9', '#4a42a6', '#d2cbd8', '#4aa53e', '#ff82d2', '#6c6388', '#d8cff0', '#3a2c6c'],
+  light: ['#cfc6c3', '#5e5470', '#c5b9aa', '#5cae45', '#ff8fd0', '#7a6656', '#ffffff', '#8a7a9a'],
+  dark: ['#9a909c', '#3d3552', '#968b8f', '#4a9a3e', '#ff82d2', '#55463f', '#d8cff0', '#2f2846'],
 };
 
 /**
@@ -253,7 +259,9 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
     ray: createRayMaterial(CAVE[theme].ray),
     // Сяйво в основі — м'яке біле, як у референсі: кристал суцільний, і
     // яскравий ореол кольору колонії розмивав би його грані.
-    core: createGlowMaterial(glowHex, theme === 'dark' ? 0.6 : 0.4),
+    // Магія — усередині кристала (шейдер), а не хмарою навколо: сяйво в
+    // основі лишилось ледь помітним (власник, 2026-10-06).
+    core: createGlowMaterial(glowHex, theme === 'dark' ? 0.18 : 0.12),
   }), [theme, glowHex]);
   const debrisRef = useRef<THREE.Group>(null);
 
@@ -298,7 +306,7 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
         {/* Сяйво в основі кристала: він світиться зсередини, найяскравіше знизу. */}
         <Billboard position={[0, crystalHeight * 0.18, 0]}>
           <mesh material={materials.core} renderOrder={5}>
-            <planeGeometry args={[crystalHeight * 1.1, crystalHeight * 1.1]} />
+            <planeGeometry args={[crystalHeight * 0.7, crystalHeight * 0.7]} />
           </mesh>
         </Billboard>
       </group>

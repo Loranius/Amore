@@ -16,7 +16,7 @@ import { treeV2Ornaments, treeV2Roots, treeV2Skeleton, treeV2WishPoints, type Tr
 import type { TreeV2Model } from '@/engine/species/treeV2/model';
 import { volcanoOrnaments, volcanoPlacements } from '@/engine/species/volcano/geometry';
 import { volcanoSlopeRadius, type VolcanoModel } from '@/engine/species/volcano/model';
-import { druseAt } from '@/features/home/crystal3d/v2/crystalIsland';
+import { druseAt, druseOfDay } from '@/features/home/crystal3d/v2/crystalIsland';
 
 export type V3 = [number, number, number];
 
@@ -62,7 +62,7 @@ function crystalAnchor(model: CrystalV2Model, trace: ChronicleTrace): ChronicleA
     case 'plans': return at([m.apex[0] * 4, H * 0.95, m.apex[1] * 4]);
     case 'wishes': return at([0, H * 0.55, 0], WHOLE);
     case 'media': return at([0, H * 0.35, 0], 0.62);
-    case 'daysOff': return at(druseAt(model.startDate, 1, trace.index), CLOSE, 'island');
+    case 'daysOff': return at(druseAt(model.startDate, 1, druseOfDay(trace.index)), CLOSE, 'island');
     case 'milestones':
     case 'places':
     case 'events': {

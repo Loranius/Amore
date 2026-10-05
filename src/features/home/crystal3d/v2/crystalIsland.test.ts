@@ -89,6 +89,13 @@ describe('острів кристала', () => {
       if (paint[v] === PAINT.dirt) dirt.add(key(v));
       if (paint[v] === PAINT.cliff || paint[v] === PAINT.ruin) cliff.add(key(v));
     }
+    // Шар ґрунту під краєм (2026-10-06) — частина підошви: трикутник землі,
+    // що сходить нижче плит, стуляє край так само, як скеля.
+    for (let t = 0; t < paint.length / 3; t += 1) {
+      if (paint[t * 3] !== PAINT.dirt) continue;
+      const low = [0, 1, 2].some((c) => positions[(t * 3 + c) * 3 + 1]! < -R * 0.01);
+      if (low) for (let c = 0; c < 3; c += 1) cliff.add(key(t * 3 + c));
+    }
     const rim = [...dirt].filter((k) => Math.hypot(Number(k.split(':')[0]), Number(k.split(':')[2])) > R * 0.5);
     expect(rim.length).toBeGreaterThan(0);
     for (const k of rim) expect(cliff.has(k)).toBe(true);

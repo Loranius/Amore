@@ -38,6 +38,23 @@ const FRAGMENT = /* glsl */ `
   uniform vec3 uKey;
   uniform float uGlow;
   uniform float uPulse;
+  uniform float uTime;
+  uniform float uInvScale;
+  // Згладжений шум у просторі — для світла всередині тіла.
+  float hash3(vec3 p) {
+    p = fract(p * 0.3183099 + 0.1);
+    p *= 17.0;
+    return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+  }
+  float noise3(vec3 x) {
+    vec3 i = floor(x);
+    vec3 f = fract(x);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(
+      mix(mix(hash3(i), hash3(i + vec3(1, 0, 0)), f.x), mix(hash3(i + vec3(0, 1, 0)), hash3(i + vec3(1, 1, 0)), f.x), f.y),
+      mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x), f.y),
+      f.z);
+  }
   varying vec3 vWorld;
   varying float vTone;
   varying vec3 vEdge;
@@ -90,6 +107,29 @@ const FRAGMENT = /* glsl */ `
     float glint = spec * (0.75 + 0.5 * vTone);
     colour += vec3(1.0) * glint * 0.85;
     colour = mix(colour, mix(uColour, vec3(1.0), 0.55), fresnel * 0.35);
+    /*
+     * МАГІЯ ВСЕРЕДИНІ (власник, 2026-10-06: «більше магії саме всередину
+     * кристала, а не навколо нього»).
+     *
+     * Світло читається внутрішнім, коли воно ЗСУВАЄТЬСЯ з поглядом інакше,
+     * ніж поверхня: поле береться не в точці грані, а глибше вздовж погляду
+     * (паралакс), тож жили світла лежать у товщі й пливуть повільно. Ядро
+     * найяскравіше там, де дивимось у тіло прямо (грань до камери), і
+     * гасне до силуету — протилежно френелю, тож грані й кант лишаються.
+     * Поле тривимірне: воно не перетинає ребра малюнком на поверхні
+     * (правило навички crystal-look).
+     */
+    vec3 inner = vWorld * uInvScale - view * (0.12 + 0.3 * facing);
+    float drift = uTime * 0.12;
+    // Жилки — гребінь шуму (тонкі світлі нитки, а не плями).
+    float ridge = 1.0 - abs(noise3(inner * 2.2 + vec3(0.0, -drift, drift * 0.5)) * 2.0 - 1.0);
+    float veins = pow(ridge, 10.0);
+    float motes = pow(noise3(inner * 9.0 + vec3(drift * 0.7)), 9.0) * 4.0;
+    float core = facing * facing * (0.3 + 0.7 * pow(vRise, 0.6));
+    float magic = (0.2 * core + 1.0 * veins + motes) * (0.5 + 0.5 * uGlow) * (0.75 + 0.25 * uPulse);
+    // Колір світла — колір колонії, висвітлений до білого лише в серці жилки.
+    vec3 glowTint = mix(uColour * 1.7, vec3(1.0), 0.15 + 0.35 * veins);
+    colour += glowTint * magic * 0.6;
     float alpha = mix(0.84, 1.0, max(rim, fresnel));
     alpha = max(alpha, clamp(glint * 1.5, 0.0, 1.0));
     gl_FragColor = vec4(colour, alpha);
@@ -158,6 +198,9 @@ export function createCrystalV2Material(rgb: readonly [number, number, number], 
       uKey: { value: KEY.clone() },
       uGlow: { value: glow },
       uPulse: { value: 1 },
+      uTime: { value: 0 },
+      // Одиниці сцени → одиниці моделі: поле всередині не залежить від масштабу кадру.
+      uInvScale: { value: 1 },
     },
   });
 }

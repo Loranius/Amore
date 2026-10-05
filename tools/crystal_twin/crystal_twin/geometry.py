@@ -20,7 +20,7 @@ from .hashing import unit
 
 # Веретено, а не стовп: нижнє кільце — FOOT плеча (еталон
 # low_poly_dirt_crystals; те саме, що в `geometry.ts`). Фаски немає.
-FOOT = 0.5
+FOOT = 0.72  # 2026-10-06: призма майже паралельна, як у кварцу
 
 
 def _ring(sides: list[list[float]]) -> np.ndarray:

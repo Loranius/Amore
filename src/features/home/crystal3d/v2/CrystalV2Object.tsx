@@ -55,6 +55,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
   }, [geometry]);
 
   const crystalMaterial = useMemo(() => createCrystalV2Material(rgb, glow), [rgb, glow]);
+  useEffect(() => { crystalMaterial.uniforms.uInvScale!.value = 1 / Math.max(1e-6, scale); }, [crystalMaterial, scale]);
   const rockMaterial = useMemo(
     () => createGeodeMaterial(rgb, glow, theme, CRYSTAL_GROUND_BASELINE),
     [rgb, glow, theme],
@@ -122,6 +123,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     const value = 0.85 + 0.15 * Math.sin(t * 0.9);
     const pulse = crystalMaterial.uniforms.uPulse;
     if (pulse) pulse.value = value;
+    crystalMaterial.uniforms.uTime!.value = t;
     sparkMaterial.uniforms.uOpacity!.value = 0.7 + 0.3 * Math.sin(t * 1.7);
   });
 
