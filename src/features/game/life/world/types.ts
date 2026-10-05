@@ -82,6 +82,8 @@ export interface Building {
   join?: 'left' | 'right' | undefined;
   /** Слід сусідньої частини, до якої прилягає (`join`): спільний гребінь, стик лише де сусід поруч. */
   joinTo?: { x: number; y: number; w: number; h: number } | undefined;
+  /** Фронтон із горищем до глядача (за замовчуванням — у стилю `house`). */
+  gable?: boolean | undefined;
   /** `false` — без димаря (димар у сусідньої частини). */
   chimney?: boolean | undefined;
   action?: ZoneAction | undefined;

@@ -83,6 +83,54 @@ function wallOf(style: BuildingStyle, h: number): number {
   return Math.max(storeyOf(style), Math.round(h * TILE * (1 - STYLES[style].roofFrac)));
 }
 
+/**
+ * Двосхилий дах із фронтоном до глядача й горищем (власник, 2026-10-05,
+ * за прийомом сільських будинків у піксельних RPG): спереду трикутна
+ * стіна горища з віконцем, обабіч — схили (лівий освітлений, правий у
+ * тіні), гребінь іде вглиб. Міські житлові будинки — завжди; хата й літня
+ * кухня Лєни — за `Building.gable`.
+ */
+function hasGable(b: Building): boolean {
+  return b.gable ?? b.style === 'house';
+}
+
+function frontGable(g: Ctx, W: number, top: number, bottom: number, roofColor: string, gableColor: string, boards: boolean, frame: string, season: Season, windows: Rect[]): void {
+  const cx = Math.floor(W / 2);
+  const half = Math.floor((W - 12) / 2);
+  const gh = Math.min(bottom - top - 4, Math.round(half * 0.85));
+  if (gh < 10) return;
+  // Схили: правий — у тіні; гребінь іде від вершини фронтону вглиб.
+  g.fillStyle = 'rgba(40,18,48,0.09)';
+  g.fillRect(cx, top, W - cx - 1, bottom - top);
+  rect(g, cx - 1, top, 2, bottom - gh - top - 2, shade(roofColor, 0.22));
+  rect(g, cx, top, 1, bottom - gh - top - 2, shade(roofColor, -0.3));
+  // Фронтон — трикутна стіна горища.
+  const trim = shade(gableColor, 0.35);
+  const edge = shade(roofColor, -0.45);
+  for (let r = 0; r < gh; r += 1) {
+    const y = bottom - gh + r;
+    const hw = Math.max(1, Math.round((half * (r + 1)) / gh));
+    rect(g, cx - hw, y, hw * 2, 1, gableColor);
+    if (boards) for (let x = cx - hw; x < cx + hw; x += 1) if ((x - cx + 64) % 4 === 0) px(g, x, y, shade(gableColor, -0.18));
+    // Лиштва вздовж схилів і темний край даху за нею.
+    rect(g, cx - hw - 2, y, 2, 1, trim);
+    rect(g, cx + hw, y, 2, 1, trim);
+    px(g, cx - hw - 3, y, edge);
+    px(g, cx + hw + 2, y, edge);
+    if (season === 'winter' && r % 2 === 0) { px(g, cx - hw - 2, y - 1, '#ffffff'); px(g, cx + hw + 1, y - 1, '#ffffff'); }
+  }
+  rect(g, cx - 1, bottom - gh - 1, 2, 2, trim);
+  // Віконце горища.
+  const wy = bottom - Math.round(gh * 0.62);
+  rect(g, cx - 5, wy - 1, 10, 10, frame);
+  rect(g, cx - 4, wy, 8, 8, '#3d3050');
+  rect(g, cx - 4, wy, 8, 2, '#5a4a70');
+  rect(g, cx, wy, 1, 8, frame);
+  rect(g, cx - 4, wy + 4, 8, 1, frame);
+  rect(g, cx - 6, wy + 9, 12, 1, shade(frame, -0.25));
+  windows.push({ x: cx - 4, y: wy, w: 8, h: 8 });
+}
+
 /** Двері — на зріст людини. */
 const DOOR_H = 25;
 
@@ -408,7 +456,7 @@ const cache = new Map<string, BuildingSprite>();
 
 export function buildingSprite(b: Building, season: Season): BuildingSprite {
   const n = b.notch;
-  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}|${b.join ?? ''}${b.joinTo ? `@${b.joinTo.x},${b.joinTo.y},${b.joinTo.w},${b.joinTo.h}` : ''}|${b.chimney === false ? 'nochim' : ''}`;
+  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}|${b.join ?? ''}${b.joinTo ? `@${b.joinTo.x},${b.joinTo.y},${b.joinTo.w},${b.joinTo.h}` : ''}|${b.chimney === false ? 'nochim' : ''}|${hasGable(b) ? 'gable' : ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
   const sprite = n ? ellSprite(b, season) : partSprite(b, season, joinOpts(b));
@@ -458,7 +506,7 @@ function ellSprite(b: Building, season: Season): BuildingSprite {
   const toTall: Flush = side === 'right' ? 'left' : 'right';
   const lowTop = (tall.h - low.h) * TILE * rule.roofFrac;
   const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall), sideDoor: rightEdge(tall) }, season, { wallPx, flush: toLow, flushRows: { from: Math.round(lowTop) + rule.rise, until: Infinity }, wallFlush: toLow, chimney: true });
-  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low), sideDoor: rightEdge(low) }, season, { wallPx, flush: toTall, wallFlush: toTall, chimney: false });
+  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low), sideDoor: rightEdge(low), gable: false }, season, { wallPx, flush: toTall, wallFlush: toTall, chimney: false });
   const W = b.w * TILE + 6;
   // Обидва крила стоять на одній лінії фасаду: низи спрайтів збігаються.
   const Ht = A.img.height;
@@ -590,6 +638,7 @@ function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite
 
   // Дах і все, що над ним.
   roof(g, W, rule.rise, roofBottom, rule, roofColor, season, seed, opts.flush ?? null, { x: b.x * TILE - 3, y: (b.y + b.h) * TILE - Ht }, opts.flushRows);
+  if (hasGable(b)) frontGable(g, W, rule.rise, roofBottom, roofColor, cottage ? '#d8b88a' : wallColor, cottage, rule.frame, season, windows);
   // Тінь від даху на стіну.
   rect(g, sx0, roofBottom, sx1 - sx0, 2, 'rgba(30,20,30,0.28)');
 
