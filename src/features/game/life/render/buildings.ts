@@ -7,7 +7,7 @@
 import type { Season } from '../sim/calendar';
 import { TILE, buildingParts, type Building, type BuildingStyle, type Rect } from '../world/types';
 import { bitmapSize, drawBitmap } from './icons';
-import { canvas, cellHash, ctx2d, disc, ellipse, mix, px, rect, shade, type Ctx } from './pixel';
+import { canvas, cellHash, ctx2d, disc, disciplinePalette, ellipse, mix, px, rect, shade, type Ctx } from './pixel';
 
 export interface BuildingSprite {
   img: HTMLCanvasElement;
@@ -383,6 +383,7 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
   const hit = cache.get(key);
   if (hit) return hit;
   const sprite = n ? ellSprite(b, season) : partSprite(b, season, { flush: b.join ?? null, chimney: b.chimney !== false });
+  disciplinePalette(sprite.img);
   cache.set(key, sprite);
   return sprite;
 }
