@@ -34,7 +34,7 @@ const SHEETS: HdSheet[] = [
   // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).
   { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
   // Персонаж PixelLab «Діма HD» (ff0178ab-…), власник 2026-10-06: «Діму давай далі».
-  { url: dimaUrl, cell: 92, frames: 0, footX: 46, footY: 75, match: (l) => l.hairStyle === DIMA.hairStyle && l.top === DIMA.top && !!l.hoodie },
+  { url: dimaUrl, cell: 92, frames: 4, footX: 46, footY: 75, match: (l) => l.hairStyle === DIMA.hairStyle && l.top === DIMA.top && !!l.hoodie },
 ];
 
 function sheetOf(look: Look): HdSheet | null {
