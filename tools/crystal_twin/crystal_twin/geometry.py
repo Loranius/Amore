@@ -91,7 +91,7 @@ def _outward(a, b, c, face, edges, shade):
     return (np.array([a, c, b]), face, (edges[0], edges[2], edges[1]), shade)
 
 
-def broken_shaft(seed, tag, base, profile, y0, y1, radius, first_face):
+def broken_shaft(seed, tag, base, profile, y0, y1, radius, first_face, top_drop=()):
     """Стовбур — як `brokenShaft` у `geometry.ts`: ребра прямі, проміжні
     вершини на ребрі на своїй висоті, грань — чотирикутник одного тону."""
     n = len(base)
@@ -106,7 +106,8 @@ def broken_shaft(seed, tag, base, profile, y0, y1, radius, first_face):
         key = f"{tag}:ring{last}:{i}"
         out = 1 + 0.06 * (unit(seed, f"{key}:r") - 0.5)
         lift = (unit(seed, f"{key}:y") - 0.5) * last_gap * 0.12
-        top_ring.append(np.array([p[0] * t_scale * out + tx * radius, y1 + lift, p[2] * t_scale * out + tz * radius]))
+        drop = top_drop[i] if i < len(top_drop) else 0.0
+        top_ring.append(np.array([p[0] * t_scale * out + tx * radius, y1 + lift - drop, p[2] * t_scale * out + tz * radius]))
     rings = [foot_ring]
     for k in range(1, last):
         at = profile[k][0]
@@ -189,10 +190,16 @@ def monarch_splits(seed, sides):
     return flags
 
 
+def monarch_crown_height(height, tip):
+    """Висота корони монарха — як `monarchCrownHeight` (ADR-0247)."""
+    return min(0.3 * height, max(0.2 * height, tip * 1.2))
+
+
 def monarch_body(seed, sides, height, tip, ridge, bury, profile):
     """Монарх як великий гранчастий кристал — те саме, що `monarchBody` у
-    `geometry.ts` (ADR-0244): 12 поздовжніх граней із 6 сторін, вершина у
-    два яруси (пояс над ребрами сторін і кінчик із точок планів)."""
+    `geometry.ts`: стовбур у три пояси (ADR-0244, ADR-0245) і корона
+    самоцвіта (ADR-0247) — шов клинами, широкі плечі, зірка граней на
+    півкроку, рівне кільце під вістрям."""
     corners = _ring(sides)
     n = len(corners)
     splits = monarch_splits(seed, sides)
@@ -210,79 +217,97 @@ def monarch_body(seed, sides, height, tip, ridge, bury, profile):
             split_at.append(-1)
     ring12 = np.array(ring12)
     y0 = -bury
-    y1 = height - tip
+    crown_height = monarch_crown_height(height, tip)
+    y1 = height - crown_height
     radius = max(math.hypot(p[0], p[2]) for p in corners)
-    faces, rings, face = broken_shaft(seed, "monarch", ring12, profile, y0, y1, radius, 0)
+    corner_drop = [crown_height * (0.04 + 0.22 * unit(seed, f"monarch:crown:drop{i}")) for i in range(n)]
+    top_drop = []
+    for v in range(len(ring12)):
+        if v in corner_at:
+            top_drop.append(corner_drop[corner_at.index(v)])
+        else:
+            side = split_at.index(v)
+            top_drop.append(0.25 * (corner_drop[side] + corner_drop[(side + 1) % n]) / 2)
+    faces, rings, face = broken_shaft(seed, "monarch", ring12, profile, y0, y1, radius, 0, top_drop)
     shoulder = rings[-1]
     _, last_scale, (lx, lz) = profile[-1]
     sx, sz = lx * radius, lz * radius
-    mid_height = tip * 0.42
-    shoulder_top = max(p[1] for p in shoulder)
-    mid = []
-    for i in range(n):
-        c0, c1 = shoulder[corner_at[i]], shoulder[corner_at[(i + 1) % n]]
-        s = shoulder[split_at[i]] if split_at[i] >= 0 else (c0 + c1) / 2
-        a = math.atan2(s[2] - sz, s[0] - sx)
-        r = radius * last_scale * 0.5 * (0.95 + 0.1 * unit(seed, f"monarch:mid{i}:r"))
-        y = shoulder_top + mid_height * (0.95 + 0.1 * unit(seed, f"monarch:mid{i}:y"))
-        mid.append(np.array([sx + math.cos(a) * r, y, sz + math.sin(a) * r]))
-    inside = np.array([sx, y1 - tip * 0.2, sz])
+    big_r = radius * last_scale
 
-    def facing(a, b, c):
-        nrm = np.cross(b - a, c - a)
-        return (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
+    def side_angle(i):
+        c0 = shoulder[corner_at[i]]
+        return math.atan2(c0[2] - sz, c0[0] - sx)
 
-    for i in range(n):
-        c0, c1 = shoulder[corner_at[i]], shoulder[corner_at[(i + 1) % n]]
-        m0, m1 = mid[i], mid[(i + 1) % n]
-        if split_at[i] >= 0:
-            s = shoulder[split_at[i]]
-            belt = (facing(c0, s, m0), facing(s, c1, m0), facing(c1, m1, m0))
-        else:
-            belt = (facing(c0, c1, m0), facing(c1, m1, m0))
-        for tri in belt:
-            faces.append((np.array(tri), face, TRI, face))
-            face += 1
-    # Вістря точно над центром плеча; плани — рівне кільце навколо осі.
-    apex_point = np.array([sx, height, sz])
-    mid_top = sum(p[1] for p in mid) / n
+    def halfway(a, b):
+        return a + math.atan2(math.sin(b - a), math.cos(b - a)) / 2
 
-    def tip_faces(ring):
+    inside = np.array([sx, y1 - crown_height * 0.2, sz])
+
+    def add(a, b, c):
         nonlocal face
-        for i in range(len(ring)):
-            faces.append((np.array(facing(ring[i], ring[(i + 1) % len(ring)], apex_point)), face, TRI, face))
-            face += 1
+        nrm = np.cross(b - a, c - a)
+        tri = (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
+        faces.append((np.array(tri), face, TRI, face))
+        face += 1
 
-    if ridge < 2:
-        tip_faces(mid)
-    else:
-        qy = mid_top + (height - mid_top) * 0.45
-        qr = radius * last_scale * 0.5 * 0.45
-        turn = unit(seed, "monarch:ridge:turn") * math.pi * 2
-        q = [np.array([sx + math.cos(turn + k / ridge * math.pi * 2) * qr, qy,
-                       sz + math.sin(turn + k / ridge * math.pi * 2) * qr]) for k in range(ridge)]
+    def at(angle, reach, y):
+        return np.array([sx + math.cos(angle) * reach, y, sz + math.sin(angle) * reach])
 
-        def angle(p):
-            return math.atan2(p[2] - sz, p[0] - sx)
+    shoulders = [at(side_angle(i), big_r * (0.88 + 0.06 * unit(seed, f"monarch:crown:shoulder{i}:r")),
+                    y1 + crown_height * (0.12 + 0.08 * unit(seed, f"monarch:crown:shoulder{i}:y")))
+                 for i in range(n)]
+    star = []
+    for i in range(n):
+        a0, a1 = side_angle(i), side_angle((i + 1) % n)
+        gap = math.atan2(math.sin(a1 - a0), math.cos(a1 - a0))
+        star.append(at(halfway(a0, a1) + gap * 0.18 * (unit(seed, f"monarch:crown:star{i}:a") - 0.5),
+                       big_r * (0.5 + 0.08 * unit(seed, f"monarch:crown:star{i}:r")),
+                       y1 + crown_height * (0.5 + 0.12 * unit(seed, f"monarch:crown:star{i}:y"))))
+    for i in range(n):
+        j = (i + 1) % n
+        c0, c1 = shoulder[corner_at[i]], shoulder[corner_at[j]]
+        v0, v1 = shoulders[i], shoulders[j]
+        if split_at[i] >= 0:
+            sp = shoulder[split_at[i]]
+            add(c0, sp, v0)
+            add(sp, c1, v1)
+            add(sp, v1, v0)
+        elif unit(seed, f"monarch:crown:diag{i}") < 0.5:
+            add(c0, c1, v1)
+            add(c0, v1, v0)
+        else:
+            add(c0, c1, v0)
+            add(c1, v1, v0)
+    for i in range(n):
+        j = (i + 1) % n
+        add(shoulders[i], shoulders[j], star[i])
+        add(shoulders[j], star[j], star[i])
+    count = max(1, ridge) + 2
+    qy = y1 + crown_height * 0.85
+    turn = unit(seed, "monarch:ridge:turn") * math.pi * 2
+    q = [at(turn + k / count * math.pi * 2, big_r * 0.2, qy) for k in range(count)]
 
-        def owner(p):
-            gaps = [abs(math.atan2(math.sin(angle(p) - angle(r)), math.cos(angle(p) - angle(r)))) for r in q]
-            return gaps.index(min(gaps))
+    def angle(p):
+        return math.atan2(p[2] - sz, p[0] - sx)
 
-        owners = [owner(p) for p in mid]
-        for i in range(n):
-            j = (i + 1) % n
-            k = owners[i]
-            guard = 0
-            while k != owners[j] and guard < ridge:
-                nxt = (k + 1) % ridge
-                faces.append((np.array(facing(mid[i], q[k], q[nxt])), face, TRI, face))
-                face += 1
-                k = nxt
-                guard += 1
-            faces.append((np.array(facing(mid[i], mid[j], q[owners[j]])), face, TRI, face))
-            face += 1
-        tip_faces(q)
+    def owner(p):
+        gaps = [abs(math.atan2(math.sin(angle(p) - angle(r)), math.cos(angle(p) - angle(r)))) for r in q]
+        return gaps.index(min(gaps))
+
+    owners = [owner(p) for p in star]
+    for i in range(n):
+        j = (i + 1) % n
+        k = owners[i]
+        guard = 0
+        while k != owners[j] and guard < count:
+            nxt = (k + 1) % count
+            add(star[i], q[k], q[nxt])
+            k = nxt
+            guard += 1
+        add(star[i], star[j], q[owners[j]])
+    apex_point = np.array([sx, height, sz])
+    for k in range(count):
+        add(q[k], q[(k + 1) % count], apex_point)
     return faces
 
 
