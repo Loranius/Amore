@@ -9,7 +9,8 @@
 // малюється піксельний коргі нижче, намальований кодом.
 // ============================================================
 import basiaUrl from './assets/basia.png';
-import { canvas, ctx2d, flipX, outline, px, rect, type Ctx } from './pixel';
+import basiaHdUrl from './assets/hd/basia.png';
+import { canvas, ctx2d, densityOf, flipX, outline, px, rect, type Ctx } from './pixel';
 
 const CELL = 36;
 /** Де в клітинці лапи: низ спрайта на рядку 27, середина — 18. */
@@ -28,8 +29,38 @@ function loadArt(): void {
   art.src = basiaUrl;
 }
 
+// 32×32 (власник, 2026-10-06): аркуш персонажа PixelLab «Бася HD»
+// (ee1aa312-…, шаблон dog, size 48): клітинки 68×68, ті самі рядки
+// напрямів, стовпці — стоїть, далі кадри бігу. Піксель аркуша — пів
+// світового, тож Бася малюється вдвічі меншою за аркуш.
+const HD_CELL = 68;
+const HD_FOOT_X = 34;
+const HD_FOOT_Y = 50;
+const HD_RUN_FRAMES = 0;
+
+let hdArt: HTMLImageElement | null = null;
+let hdReady = false;
+
+function loadHd(): void {
+  if (hdArt || typeof Image === 'undefined') return;
+  hdArt = new Image();
+  hdArt.onload = () => { hdReady = true; };
+  hdArt.onerror = () => console.error(`Бася 32×32: не вдалося завантажити аркуш ${basiaHdUrl}`);
+  hdArt.src = basiaHdUrl;
+}
+
 /** Намалювати Басю лапами в точці (x, y). */
 export function drawDog(g: CanvasRenderingContext2D, x: number, y: number, dir: 0 | 1 | 2 | 3, moving: boolean, t: number): void {
+  if (densityOf(g) > 1) {
+    loadHd();
+    if (hdArt && hdReady) {
+      const col = moving && HD_RUN_FRAMES > 0 ? 1 + (Math.floor(t * 12) % HD_RUN_FRAMES) : 0;
+      const dx = Math.round((x - HD_FOOT_X / 2) * 2) / 2;
+      const dy = Math.round((y - HD_FOOT_Y / 2) * 2) / 2;
+      g.drawImage(hdArt, col * HD_CELL, dir * HD_CELL, HD_CELL, HD_CELL, dx, dy, HD_CELL / 2, HD_CELL / 2);
+      return;
+    }
+  }
   loadArt();
   if (art && artReady) {
     const col = moving ? 1 + (Math.floor(t * 12) % RUN_FRAMES) : 0;
