@@ -10,8 +10,15 @@
     python scripts/pixellab/build_sheet.py spec.json out.png
 
 spec.json: {"cell": 92, "rotations": {"south": url, ...},
-            "walk": {"south": [url, ...], "east": [...], ...}}
+            "walk": {"south": [url, ...], "east": [...], ...},
+            "eyes": {"band": [0.17, 0.31], "color": "#5a3a26"}}
+
+"eyes" необов'язкове: PixelLab малює блакитні очі навіть тоді, коли просиш
+карі. У смузі обличчя (частки висоти силуету кадру, відлік від маківки)
+кожен синій піксель стає кольору `color`, трохи темнішим (карі темніші за
+блакитні), а співвідношення світла лишається — тінь і відблиск ока на місці.
 """
+import colorsys
 import io
 import json
 import subprocess
@@ -25,12 +32,42 @@ def fetch(url: str) -> Image.Image:
     return Image.open(io.BytesIO(data)).convert('RGBA')
 
 
+def recolor_eyes(img: Image.Image, band: list, color: str) -> Image.Image:
+    """Сині пікселі в смузі обличчя — у барву `color`, на чверть темніше."""
+    out = img.copy()
+    px = out.load()
+    w, h = out.size
+    rows = [y for y in range(h) if any(px[x, y][3] > 0 for x in range(w))]
+    if not rows:
+        return out
+    top, bottom = rows[0], rows[-1]
+    th, ts, _ = colorsys.rgb_to_hsv(*(int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)))
+    for y in range(h):
+        rel = (y - top) / max(1, bottom - top)
+        if not band[0] <= rel <= band[1]:
+            continue
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            if a == 0:
+                continue
+            hh, ss, vv = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+            if 0.5 < hh < 0.75 and ss > 0.15:
+                nr, ng, nb = colorsys.hsv_to_rgb(th, min(1.0, ts * max(ss, 0.3) / 0.5), vv * 0.72)
+                px[x, y] = (round(nr * 255), round(ng * 255), round(nb * 255), a)
+    return out
+
+
 def main() -> None:
     spec = json.load(open(sys.argv[1]))
     out = sys.argv[2]
     cell = spec['cell']
     rot = {k: fetch(v) for k, v in spec['rotations'].items()}
     walk = {k: [fetch(u) for u in v] for k, v in spec.get('walk', {}).items()}
+    eyes = spec.get('eyes')
+    if eyes:
+        # Зі спини очей не видно — «угору» не чіпаємо.
+        rot = {k: v if k == 'north' else recolor_eyes(v, eyes['band'], eyes['color']) for k, v in rot.items()}
+        walk = {k: v if k == 'north' else [recolor_eyes(f, eyes['band'], eyes['color']) for f in v] for k, v in walk.items()}
     frames = max([len(v) for v in walk.values()] + [0])
     if 'west' not in walk and 'east' in walk:
         walk['west'] = [ImageOps.mirror(f) for f in walk['east']]

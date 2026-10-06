@@ -11,9 +11,10 @@
 // ============================================================
 import lenaKidUrl from './assets/hd/lena-kid.png';
 import lenaTeenUrl from './assets/hd/lena-teen.png';
+import lenaAdultUrl from './assets/hd/lena-adult.png';
 import dimaUrl from './assets/hd/dima.png';
 import momUrl from './assets/hd/mom.png';
-import { DIMA, LENA_KID, LENA_TEEN, MOM, type Dir, type Look } from './people';
+import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, type Dir, type Look } from './people';
 
 interface HdSheet {
   url: string;
@@ -34,6 +35,8 @@ const SHEETS: HdSheet[] = [
   { url: lenaKidUrl, cell: 68, frames: 4, footX: 34, footY: 56, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
   // Персонаж PixelLab «Лєна підліток HD» (e7e9f230-…), власник 2026-10-06: «Лєна підліток».
   { url: lenaTeenUrl, cell: 84, frames: 4, footX: 42, footY: 70, match: (l) => isLenaTeen(l) },
+  // Персонаж PixelLab «Лєна доросла HD» (2ddf3605-…), власник 2026-10-06: «Доросла Лєна».
+  { url: lenaAdultUrl, cell: 92, frames: 4, footX: 46, footY: 76, match: (l) => isLenaAdult(l) },
   // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).
   { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
   // Персонаж PixelLab «Діма HD» (ff0178ab-…), власник 2026-10-06: «Діму давай далі».
@@ -41,13 +44,23 @@ const SHEETS: HdSheet[] = [
 ];
 
 /**
- * Лєна 7–11 тижня (`look.ts`): її хвіст, волосся, шкіра й очі, хоч би який
- * одяг. Перехожі без шапки, шарфа й окулярів теж можуть мати хвіст — тому
- * збіг потрібен за всіма чотирма ознаками.
+ * Лєна за її зачіскою, волоссям, шкірою й очима, хоч би який одяг з шафи
+ * (`look.ts`). Перехожі без шапки, шарфа й окулярів теж бувають із хвостом
+ * чи довгим волоссям — тому збіг потрібен за всіма чотирма ознаками.
  */
-export function isLenaTeen(l: Look): boolean {
+function isLenaAt(l: Look, base: Look): boolean {
   return !l.kid && !l.hat && !l.scarf && !l.glasses
-    && l.hairStyle === LENA_TEEN.hairStyle && l.hair === LENA_TEEN.hair && l.skin === LENA_TEEN.skin && l.eyes === LENA_TEEN.eyes;
+    && l.hairStyle === base.hairStyle && l.hair === base.hair && l.skin === base.skin && l.eyes === base.eyes;
+}
+
+/** Лєна 7–11 тижня. */
+export function isLenaTeen(l: Look): boolean {
+  return isLenaAt(l, LENA_TEEN);
+}
+
+/** Доросла Лєна, з 12 тижня. */
+export function isLenaAdult(l: Look): boolean {
+  return isLenaAt(l, LENA_ADULT);
 }
 
 function sheetOf(look: Look): HdSheet | null {
