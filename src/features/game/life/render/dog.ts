@@ -36,7 +36,7 @@ function loadArt(): void {
 const HD_CELL = 68;
 const HD_FOOT_X = 34;
 const HD_FOOT_Y = 50;
-const HD_RUN_FRAMES = 0;
+const HD_RUN_FRAMES = 6;
 
 let hdArt: HTMLImageElement | null = null;
 let hdReady = false;
