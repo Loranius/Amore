@@ -119,8 +119,8 @@ def render(model: dict[str, Any], width: int = 480, height: int = 640,
     for tri, fid, _ in geode(model):
         draw(tri, np.array([0.20, 0.17, 0.24]), f"rock{fid}", True)
     for b in colony(model):
-        for tri, fid, edges in b["faces"]:
-            draw(tri, tint, f"{b['kind']}:{fid}", False, edges, fid)
+        for tri, _, edges, shade in b["faces"]:
+            draw(tri, tint, f"{b['kind']}:{shade}", False, edges, shade)
 
     image = Image.fromarray((colour * 255).astype(np.uint8))
     painter = ImageDraw.Draw(image)

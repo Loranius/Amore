@@ -1,11 +1,12 @@
 import { SOFT_NORMAL_GLSL, softNormals, softScalar } from '@/features/home/diorama/softNormals';
 import { useEffect, useMemo, useRef } from 'react';
-import { useFrame, useThree } from '@react-three/fiber';
+import { useFrame } from '@react-three/fiber';
 import { Billboard } from '@react-three/drei';
 import * as THREE from 'three';
 import { DIORAMA_PALETTES, DIORAMA_SHADE } from '@/features/home/diorama/dioramaStyle';
 import { buildCrystalSurround } from '@/features/home/diorama/surround';
 import { rockGrainTexture } from '../scene/rockGrainTexture';
+import { SHADOW_FRAGMENT_PARS, SHADOW_TINT, SHADOW_VERTEX, SHADOW_VERTEX_PARS, ShadowSun, shadowLightUniforms } from '@/features/home/diorama/shadowSun';
 import type { Season } from '@/engine/species/grammar/season';
 import { EMPTY_MESH, PAINT, buildCrystalIsland, type IslandMesh } from './crystalIsland';
 
@@ -101,6 +102,18 @@ export interface IslandSurface {
    * Лягає лише на камінь — не на плющ, квіти, самоцвіти й хмари.
    */
   grain?: THREE.Texture | null;
+  /**
+   * Які фарби палітри — камінь, тобто отримують зерно. Типово — усе, крім
+   * плюща, самоцвітів, хмар і квітів (слоти 3, 4, 6, 8 палітри кристала).
+   * Острів вулкана має іншу палітру й передає лише плато, скелю й брили.
+   */
+  stonePaints?: readonly number[];
+  /**
+   * Руїни (фарба 2) темніють і зеленіють до землі, з патьоками — лише в
+   * святилищі кристала. У палітрі рифу слот 2 — брили, і без цього прапорця
+   * уламки вулкана зеленіли (виміряно в DevTools, ADR-0246).
+   */
+  mossyRuins?: boolean;
   /** Висота землі святилища у сцені: від неї темніє й зеленіє низ колон. */
   ground?: number;
   /**
@@ -116,12 +129,13 @@ export interface IslandSurface {
   crystalLight?: { colour: THREE.Color; strength: number };
 }
 
-/** Холодна тінь, а не сіра: тінь у діорамі лілова (`DIORAMA_SHADE`). */
-const SHADOW_TINT = new THREE.Color(0.56, 0.54, 0.74);
 
 export function createIslandMaterial(paints: readonly string[], haze?: IslandHaze, surface?: IslandSurface): THREE.ShaderMaterial {
   const count = paints.length;
   const grain = surface?.grain ?? null;
+  const stoneTest = surface?.stonePaints
+    ? surface.stonePaints.map((k) => `i == ${Math.round(k)}`).join(' || ') || 'false'
+    : 'i != 3 && i != 4 && i != 6 && i != 8';
   const shadows = surface?.shadows === true;
   const light = surface?.crystalLight;
   const own = {
@@ -144,8 +158,9 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
   };
   const defines: Record<string, string> = {};
   if (grain) defines.USE_STONE_GRAIN = '';
+  if (surface?.mossyRuins) defines.USE_MOSSY_RUINS = '';
   if (light) defines.USE_CRYSTAL_LIGHT = '';
-  if (shadows) defines.USE_ISLAND_SHADOWS = '';
+  if (shadows) defines.USE_DIORAMA_SHADOWS = '';
   return new THREE.ShaderMaterial({
     // Обидва боки: віяла кришок плит і кавалків закручені як прийдеться, а
     // нормаль шейдер однаково повертає до камери. Перший кадр показав
@@ -155,7 +170,7 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
     // Маска тіні three приходить лише в матеріал зі світлом: тоді рендерер
     // кладе в нього карти тіней і їхні матриці.
     lights: shadows,
-    uniforms: shadows ? { ...THREE.UniformsUtils.clone(THREE.UniformsLib.lights), ...own } : own,
+    uniforms: shadows ? { ...shadowLightUniforms(), ...own } : own,
     vertexShader: /* glsl */ `
       attribute float paint;
       attribute float tone;
@@ -165,10 +180,7 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       varying float vTone;
       varying float vGlow;
       varying vec3 vNormal;
-      #ifdef USE_ISLAND_SHADOWS
-        #include <common>
-        #include <shadowmap_pars_vertex>
-      #endif
+      ${SHADOW_VERTEX_PARS}
       void main() {
         vec4 w = modelMatrix * vec4(position, 1.0);
         vWorld = w.xyz;
@@ -176,11 +188,7 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
         vPaint = paint;
         vTone = tone;
         vGlow = glow;
-        #ifdef USE_ISLAND_SHADOWS
-          vec3 transformedNormal = normalMatrix * normal;
-          vec4 worldPosition = w;
-          #include <shadowmap_vertex>
-        #endif
+        ${SHADOW_VERTEX}
         gl_Position = projectionMatrix * viewMatrix * w;
       }
     `,
@@ -206,13 +214,7 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
       varying float vTone;
       varying float vGlow;
       varying vec3 vNormal;
-      #ifdef USE_ISLAND_SHADOWS
-        #include <common>
-        #include <packing>
-        #include <lights_pars_begin>
-        #include <shadowmap_pars_fragment>
-        #include <shadowmask_pars_fragment>
-      #endif
+      ${SHADOW_FRAGMENT_PARS}
       ${DIORAMA_SHADE}
       ${SOFT_NORMAL_GLSL}
       #ifdef USE_STONE_GRAIN
@@ -235,13 +237,14 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
         vec3 base = uPaint[0];
         for (int k = 1; k < ${count}; k++) if (k == i) base = uPaint[k];
         vec3 albedo = base * vTone;
-        // Камінь — усе, крім плюща (3), самоцвітів (4), хмар (6) і квітів (8).
-        bool stone = i != 3 && i != 4 && i != 6 && i != 8;
+        // Камінь — фарби з \`stonePaints\` (типово все, крім плюща, самоцвітів, хмар і квітів).
+        bool stone = ${stoneTest};
         #ifdef USE_STONE_GRAIN
           if (stone) {
             albedo *= mix(1.0, stoneGrain(vWorld, n), 0.85);
             // Руїни (2): низ темніший і зеленіє — колона століттями стоїть
             // у вологій землі; на прямовисних гранях — темні патьоки згори.
+            #ifdef USE_MOSSY_RUINS
             if (i == 2) {
               float h = vWorld.y - uGround;
               float foot = 1.0 - smoothstep(0.0, 0.32, h);
@@ -251,15 +254,11 @@ export function createIslandMaterial(paints: readonly string[], haze?: IslandHaz
               float streak = texture2D(uGrain, vec2(dot(vWorld.xz, vec2(3.1, 2.3)), vWorld.y * 0.35)).r;
               albedo *= mix(1.0, smoothstep(0.55, 1.0, streak) * 0.25 + 0.78, side * 0.7);
             }
+            #endif
           }
         #endif
         vec3 c = dioramaShade(albedo, n, view);
-        #ifdef USE_ISLAND_SHADOWS
-          // Тінь лише там, куди світло й так падає: тіньовий бік уже темний,
-          // і подвійна тінь пробивала б у ньому чорну діру.
-          float lit = smoothstep(0.0, 0.3, dot(n, uKey));
-          c *= mix(vec3(1.0), uShadowTint, (1.0 - getShadowMask()) * lit);
-        #endif
+        c = dioramaShadow(c, n, uKey, uShadowTint);
         #ifdef USE_CRYSTAL_LIGHT
           // Далекий храм: грані до острова ловлять колір кристала, верх
           // колон — світло з розлому, низ тоне в тіні підземелля.
@@ -413,7 +412,7 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
   const materials = useMemo(() => {
     // Земля кристала світиться його кольором, а не сталим рожевим самоцвітів.
     const groundPaints = ISLAND_PAINTS[theme].map((hex, i) => (i === PAINT.gem ? glowHex : hex));
-    const stone: IslandSurface = { grain, ground: groundY, shadows };
+    const stone: IslandSurface = { grain, ground: groundY, shadows, mossyRuins: true };
     return {
       island: createIslandMaterial(ISLAND_PAINTS[theme], undefined, stone),
       ground: createIslandMaterial(groundPaints, undefined, { shadows }),
@@ -440,47 +439,6 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
   }, [theme, glowHex, grain, groundY, shadows]);
   const debrisRef = useRef<THREE.Group>(null);
 
-  /*
-   * Світло, що кидає тінь (ADR-0243). Сили в нього нуль: острів
-   * намальований, а не освітлений (`DIORAMA_SHADE` має власний ключ), і
-   * друге світло лише пересвітило б вбудовані матеріали. Від нього потрібна
-   * тільки карта тіней — уздовж ТОГО САМОГО ключа, що в шейдері, тож тінь
-   * лягає туди, куди її чекає око.
-   *
-   * Острів і колонія не рухаються (обертається камера), тож карта
-   * малюється один раз і після кожної зміни геометрії, а не щокадру:
-   * на телефоні тіні коштують вибірку в шейдері, а не другий прохід сцени.
-   */
-  const sun = useMemo(() => {
-    const light = new THREE.DirectionalLight(0xffffff, 0);
-    light.castShadow = true;
-    light.shadow.mapSize.set(1024, 1024);
-    // Зсув лише вздовж променя, без `normalBias`: нормалі частини плит
-    // дивляться всередину (кришки закручені як прийдеться), і зсув уздовж
-    // нормалі заганяв точку під поверхню — уся підлога ставала тінню
-    // (виміряно в DevTools: 22.9 % пікселів у «тіні» проти 6.9 % справжньої).
-    light.shadow.bias = -0.004;
-    light.shadow.normalBias = 0;
-    light.shadow.radius = 3;
-    const cam = light.shadow.camera;
-    const span = radius * 1.7;
-    cam.left = -span;
-    cam.right = span;
-    cam.top = span;
-    cam.bottom = -span;
-    cam.near = 0.1;
-    cam.far = radius * 12;
-    light.position.set(KEY.x * radius * 5, groundY + KEY.y * radius * 5, KEY.z * radius * 5);
-    light.target.position.set(0, groundY, 0);
-    return light;
-  }, [radius, groundY]);
-  useEffect(() => () => sun.dispose(), [sun]);
-  const gl = useThree((state) => state.gl);
-  useEffect(() => {
-    if (!shadows) return;
-    gl.shadowMap.autoUpdate = false;
-    gl.shadowMap.needsUpdate = true;
-  }, [gl, shadows, sun, built, crystalHeight]);
 
   useEffect(() => () => { island.dispose(); debris.dispose(); ground.dispose(); temple.dispose(); }, [island, debris, ground, temple]);
   useEffect(() => () => { for (const m of Object.values(materials)) m.dispose(); }, [materials]);
@@ -517,8 +475,8 @@ export function CrystalIsland({ seed, theme, radius, groundY, glowColour, crysta
           </mesh>
         </Billboard>
       ))}
-      {shadows && <primitive object={sun} />}
-      {shadows && <primitive object={sun.target} />}
+      {/* Світло, що кидає тінь (ADR-0243), — уздовж ключа діорами. */}
+      {shadows && <ShadowSun direction={KEY} radius={radius} groundY={groundY} version={built} />}
       <group position={[0, groundY, 0]}>
         <mesh geometry={island} material={materials.island} castShadow receiveShadow />
         <mesh geometry={ground} material={materials.ground} receiveShadow />

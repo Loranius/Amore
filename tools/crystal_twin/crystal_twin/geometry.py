@@ -31,8 +31,6 @@ def _ring(sides: list[list[float]]) -> np.ndarray:
     return np.array(pts)
 
 
-QUAD_A = (True, False, True)   # [b_i, b_j, t_j]: діагональ t_j–b_i не ребро
-QUAD_B = (True, True, False)   # [b_i, t_j, t_i]: діагональ b_i–t_j не ребро
 TRI = (True, True, True)
 
 
@@ -81,115 +79,235 @@ def crown(seed, tag, top, y1, tip, apex, ridge, radius):
     return out
 
 
-# Звичайне тіло року: основа — FOOT плеча, плече — саме кільце.
+# Кристал року: основа, ледь ширший пояс посередині й плече (ADR-0245).
 # Кільце профілю: (частка шляху від основи до плеча, множник, зсув осі в радіусах).
-SPINDLE = ((0.0, FOOT, (0.0, 0.0)), (1.0, 1.0, (0.0, 0.0)))
+CHILD_PROFILE = ((0.0, FOOT, (0.0, 0.0)), (0.5, (FOOT + 1) / 2, (0.0, 0.0)), (1.0, 1.0, (0.0, 0.0)))
+CHILD_LEAN = 0.5
+CHILD_STEP_OUT = 0.35
+
+
+def _outward(a, b, c, face, edges, shade):
+    """Як `outward` у `geometry.ts`: природний порядок дивиться всередину."""
+    return (np.array([a, c, b]), face, (edges[0], edges[2], edges[1]), shade)
+
+
+def broken_shaft(seed, tag, base, profile, y0, y1, radius, first_face, top_drop=()):
+    """Стовбур — як `brokenShaft` у `geometry.ts`: ребра прямі, проміжні
+    вершини на ребрі на своїй висоті, грань — чотирикутник одного тону."""
+    n = len(base)
+    last = len(profile) - 1
+    f_at, f_scale, (fx, fz) = profile[0]
+    t_at, t_scale, (tx, tz) = profile[last]
+    span = y1 - y0
+    last_gap = span * (t_at - profile[last - 1][0])
+    foot_ring = [np.array([p[0] * f_scale + fx * radius, y0, p[2] * f_scale + fz * radius]) for p in base]
+    top_ring = []
+    for i, p in enumerate(base):
+        key = f"{tag}:ring{last}:{i}"
+        out = 1 + 0.06 * (unit(seed, f"{key}:r") - 0.5)
+        lift = (unit(seed, f"{key}:y") - 0.5) * last_gap * 0.12
+        drop = top_drop[i] if i < len(top_drop) else 0.0
+        top_ring.append(np.array([p[0] * t_scale * out + tx * radius, y1 + lift - drop, p[2] * t_scale * out + tz * radius]))
+    rings = [foot_ring]
+    for k in range(1, last):
+        at = profile[k][0]
+        room = min(at - profile[k - 1][0], profile[k + 1][0] - at)
+        ring = []
+        for i in range(n):
+            key = f"{tag}:ring{k}:{i}"
+            t = at + (unit(seed, f"{key}:y") - 0.5) * room * 0.7
+            f, u = foot_ring[i], top_ring[i]
+            q = f + (u - f) * t
+            ax = (fx + (tx - fx) * t) * radius
+            az = (fz + (tz - fz) * t) * radius
+            out = 1 + 0.04 * (unit(seed, f"{key}:r") - 0.5)
+            ring.append(np.array([ax + (q[0] - ax) * out, q[1], az + (q[2] - az) * out]))
+        rings.append(ring)
+    rings.append(top_ring)
+    lift_step = n + (2 if n % 3 == 2 else 1)
+    faces = []
+    face = first_face
+    for k in range(last):
+        lower, upper = rings[k], rings[k + 1]
+        for i in range(n):
+            j = (i + 1) % n
+            li, lj, ui, uj = lower[i], lower[j], upper[i], upper[j]
+            shade = first_face + k * lift_step + i
+            if unit(seed, f"{tag}:diag{k}:{i}") < 0.5:
+                faces.append(_outward(li, lj, uj, face, (True, False, True), shade))
+                faces.append(_outward(li, uj, ui, face + 1, (True, True, False), shade))
+            else:
+                faces.append(_outward(li, lj, ui, face, (False, True, True), shade))
+                faces.append(_outward(lj, uj, ui, face + 1, (True, False, True), shade))
+            face += 2
+    return faces, rings, max(face, first_face + last * lift_step)
 
 
 def monarch_profile(seed):
-    """Монарх — три кільця, як `monarchProfile` у `geometry.ts`: важка
-    основа, ледь ширший пояс на третині висоти й плече, зсунуте від осі."""
+    """Монарх — як `monarchProfile` у `geometry.ts`: бік — пряма від основи
+    до плеча (проміжні кільця на прямій), плече зсунуте від осі."""
     def jitter(key, span):
         return (unit(seed, f"monarch:profile:{key}") - 0.5) * span
-    return (
-        (0.0, 0.86, (0.0, 0.0)),
-        (0.32 + jitter("belly:at", 0.08), 1.05, (jitter("belly:x", 0.06), jitter("belly:z", 0.06))),
-        (1.0, 0.97, (jitter("shoulder:x", 0.14), jitter("shoulder:z", 0.14))),
-    )
+    foot = (0.0, 0.86, (0.0, 0.0))
+    shoulder = (1.0, 0.97, (jitter("shoulder:x", 0.14), jitter("shoulder:z", 0.14)))
+
+    def on(at):
+        return (at, foot[1] + (shoulder[1] - foot[1]) * at, (shoulder[2][0] * at, shoulder[2][1] * at))
+    return (foot, on(0.32 + jitter("belly:at", 0.08)), on(0.68 + jitter("upper:at", 0.06)), shoulder)
 
 
-def body(seed, tag, sides, height, tip, apex, ridge, bury, profile=SPINDLE) -> list[tuple[np.ndarray, int, tuple]]:
-    """Трикутники тіла як (3×3 вершини, номер грані, які ребра справжні).
-
-    Ребро k — навпроти вершини k. Діагональ, що ділить пласку грань на два
-    трикутники, ребром не є, і кант на ній малював би неіснуючу грань.
-    Кожне кільце профілю — кільце плеча, стиснуте й зсунуте, тож грані між
-    кільцями пласкі за побудовою."""
+def body(seed, tag, sides, height, tip, apex, ridge, bury, profile=CHILD_PROFILE) -> list[tuple]:
+    """Трикутники тіла як (3×3 вершини, номер грані, які ребра справжні,
+    тонова група). Ребро k — навпроти вершини k."""
     ring0 = _ring(sides)
     y0 = -bury
     y1 = height - tip
     radius = max(math.hypot(p[0], p[2]) for p in ring0)
-    rings = []
-    for at, scale, (sx, sz) in profile:
-        y = y0 + (y1 - y0) * at
-        rings.append(ring0 * scale + np.array([sx * radius, y, sz * radius]))
-    faces: list[tuple[np.ndarray, int]] = []
-    face = 0
-    n = len(ring0)
-    for lower, upper in zip(rings, rings[1:]):
-        for i in range(n):
-            j = (i + 1) % n
-            faces.append((np.array([lower[i], lower[j], upper[j]]), face, QUAD_A))
-            faces.append((np.array([lower[i], upper[j], upper[i]]), face, QUAD_B))
-            face += 1
+    faces, rings, face = broken_shaft(seed, tag, ring0, profile, y0, y1, radius, 0)
     top = rings[-1]
     _, shoulder_scale, (sx, sz) = profile[-1]
     tip_at = (apex[0] + sx * radius, apex[1] + sz * radius)
-    for tri in crown(seed, tag, list(top), y1, tip, tip_at, ridge, radius * shoulder_scale):
-        faces.append((np.array(tri), face, TRI))
+    top_y = max(p[1] for p in top)
+    for tri in crown(seed, tag, list(top), top_y, height - top_y, tip_at, ridge, radius * shoulder_scale):
+        faces.append((np.array(tri), face, TRI, face))
         face += 1
     return faces
 
 
-def monarch_body(seed, sides, height, tip, apex, ridge, bury, profile):
+def monarch_splits(seed, sides):
+    """Як `monarchSplits` у `geometry.ts`: ребро на половині сторін, але
+    щонайменше на двох і не на всіх."""
+    flags = [unit(seed, f"monarch:split{i}:on") < 0.5 for i in range(len(sides))]
+    order = sorted(range(len(sides)), key=lambda i: unit(seed, f"monarch:split{i}:rank"))
+    for i in order:
+        if sum(flags) >= 2:
+            break
+        flags[i] = True
+    for i in order:
+        if sum(flags) < len(sides):
+            break
+        flags[i] = False
+    return flags
+
+
+def monarch_crown_height(height, tip):
+    """Висота корони монарха — як `monarchCrownHeight` (ADR-0247)."""
+    return min(0.3 * height, max(0.2 * height, tip * 1.2))
+
+
+def monarch_body(seed, sides, height, tip, ridge, bury, profile):
     """Монарх як великий гранчастий кристал — те саме, що `monarchBody` у
-    `geometry.ts` (ADR-0244): 12 поздовжніх граней із 6 сторін, вершина у
-    два яруси (пояс над ребрами сторін і кінчик із точок планів)."""
+    `geometry.ts`: стовбур у три пояси (ADR-0244, ADR-0245) і корона
+    самоцвіта (ADR-0247) — шов клинами, широкі плечі, зірка граней на
+    півкроку, рівне кільце під вістрям."""
     corners = _ring(sides)
     n = len(corners)
-    ring12 = []
+    splits = monarch_splits(seed, sides)
+    ring12, corner_at, split_at = [], [], []
     for i in range(n):
         a, b = corners[i], corners[(i + 1) % n]
-        t = 0.35 + 0.3 * unit(seed, f"monarch:split{i}:t")
-        bulge = 1.06 + 0.08 * unit(seed, f"monarch:split{i}:b")
+        corner_at.append(len(ring12))
         ring12.append(a)
-        ring12.append((a + (b - a) * t) * bulge)
+        if splits[i]:
+            t = 0.25 + 0.5 * unit(seed, f"monarch:split{i}:t")
+            bulge = 1.02 + 0.03 * unit(seed, f"monarch:split{i}:b")
+            split_at.append(len(ring12))
+            ring12.append((a + (b - a) * t) * bulge)
+        else:
+            split_at.append(-1)
     ring12 = np.array(ring12)
-    m = len(ring12)
     y0 = -bury
-    y1 = height - tip
+    crown_height = monarch_crown_height(height, tip)
+    y1 = height - crown_height
     radius = max(math.hypot(p[0], p[2]) for p in corners)
-    rings = []
-    for at, scale, (sx, sz) in profile:
-        y = y0 + (y1 - y0) * at
-        rings.append(ring12 * scale + np.array([sx * radius, y, sz * radius]))
-    faces = []
-    face = 0
-    for k in range(len(rings) - 1):
-        lower, upper = rings[k], rings[k + 1]
-        for i in range(m):
-            j = (i + 1) % m
-            faces.append((np.array([lower[i], lower[j], upper[j]]), face, (True, False, False)))
-            faces.append((np.array([lower[i], upper[j], upper[i]]), face, (k + 2 == len(rings), True, False)))
-            face += 1
+    corner_drop = [crown_height * (0.04 + 0.22 * unit(seed, f"monarch:crown:drop{i}")) for i in range(n)]
+    top_drop = []
+    for v in range(len(ring12)):
+        if v in corner_at:
+            top_drop.append(corner_drop[corner_at.index(v)])
+        else:
+            side = split_at.index(v)
+            top_drop.append(0.25 * (corner_drop[side] + corner_drop[(side + 1) % n]) / 2)
+    faces, rings, face = broken_shaft(seed, "monarch", ring12, profile, y0, y1, radius, 0, top_drop)
     shoulder = rings[-1]
     _, last_scale, (lx, lz) = profile[-1]
     sx, sz = lx * radius, lz * radius
-    mid_height = tip * 0.42
-    mid = []
-    for i in range(n):
-        s = shoulder[2 * i + 1]
-        a = math.atan2(s[2] - sz, s[0] - sx)
-        r = radius * last_scale * 0.5 * (0.85 + 0.3 * unit(seed, f"monarch:mid{i}:r"))
-        y = y1 + mid_height * (0.7 + 0.6 * unit(seed, f"monarch:mid{i}:y"))
-        mid.append(np.array([sx + math.cos(a) * r, y, sz + math.sin(a) * r]))
-    inside = np.array([sx, y1 - tip * 0.2, sz])
+    big_r = radius * last_scale
 
-    def facing(a, b, c):
+    def side_angle(i):
+        c0 = shoulder[corner_at[i]]
+        return math.atan2(c0[2] - sz, c0[0] - sx)
+
+    def halfway(a, b):
+        return a + math.atan2(math.sin(b - a), math.cos(b - a)) / 2
+
+    inside = np.array([sx, y1 - crown_height * 0.2, sz])
+
+    def add(a, b, c):
+        nonlocal face
         nrm = np.cross(b - a, c - a)
-        return (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
-
-    for i in range(n):
-        c0, s, c1 = shoulder[2 * i], shoulder[2 * i + 1], shoulder[(2 * i + 2) % m]
-        m0, m1 = mid[i], mid[(i + 1) % n]
-        for tri in (facing(c0, s, m0), facing(s, c1, m0), facing(c1, m1, m0)):
-            faces.append((np.array(tri), face, TRI))
-            face += 1
-    tip_at = (apex[0] + sx, apex[1] + sz)
-    mid_top = max(p[1] for p in mid)
-    for tri in crown(seed, "monarch", mid, mid_top, height - mid_top, tip_at, ridge, radius * last_scale * 0.3):
-        faces.append((np.array(tri), face, TRI))
+        tri = (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
+        faces.append((np.array(tri), face, TRI, face))
         face += 1
+
+    def at(angle, reach, y):
+        return np.array([sx + math.cos(angle) * reach, y, sz + math.sin(angle) * reach])
+
+    shoulders = [at(side_angle(i), big_r * (0.88 + 0.06 * unit(seed, f"monarch:crown:shoulder{i}:r")),
+                    y1 + crown_height * (0.12 + 0.08 * unit(seed, f"monarch:crown:shoulder{i}:y")))
+                 for i in range(n)]
+    star = []
+    for i in range(n):
+        a0, a1 = side_angle(i), side_angle((i + 1) % n)
+        gap = math.atan2(math.sin(a1 - a0), math.cos(a1 - a0))
+        star.append(at(halfway(a0, a1) + gap * 0.18 * (unit(seed, f"monarch:crown:star{i}:a") - 0.5),
+                       big_r * (0.5 + 0.08 * unit(seed, f"monarch:crown:star{i}:r")),
+                       y1 + crown_height * (0.5 + 0.12 * unit(seed, f"monarch:crown:star{i}:y"))))
+    for i in range(n):
+        j = (i + 1) % n
+        c0, c1 = shoulder[corner_at[i]], shoulder[corner_at[j]]
+        v0, v1 = shoulders[i], shoulders[j]
+        if split_at[i] >= 0:
+            sp = shoulder[split_at[i]]
+            add(c0, sp, v0)
+            add(sp, c1, v1)
+            add(sp, v1, v0)
+        elif unit(seed, f"monarch:crown:diag{i}") < 0.5:
+            add(c0, c1, v1)
+            add(c0, v1, v0)
+        else:
+            add(c0, c1, v0)
+            add(c1, v1, v0)
+    for i in range(n):
+        j = (i + 1) % n
+        add(shoulders[i], shoulders[j], star[i])
+        add(shoulders[j], star[j], star[i])
+    count = max(1, ridge) + 2
+    qy = y1 + crown_height * 0.85
+    turn = unit(seed, "monarch:ridge:turn") * math.pi * 2
+    q = [at(turn + k / count * math.pi * 2, big_r * 0.2, qy) for k in range(count)]
+
+    def angle(p):
+        return math.atan2(p[2] - sz, p[0] - sx)
+
+    def owner(p):
+        gaps = [abs(math.atan2(math.sin(angle(p) - angle(r)), math.cos(angle(p) - angle(r)))) for r in q]
+        return gaps.index(min(gaps))
+
+    owners = [owner(p) for p in star]
+    for i in range(n):
+        j = (i + 1) % n
+        k = owners[i]
+        guard = 0
+        while k != owners[j] and guard < count:
+            nxt = (k + 1) % count
+            add(star[i], q[k], q[nxt])
+            k = nxt
+            guard += 1
+        add(star[i], star[j], q[owners[j]])
+    apex_point = np.array([sx, height, sz])
+    for k in range(count):
+        add(q[k], q[(k + 1) % count], apex_point)
     return faces
 
 
@@ -218,7 +336,7 @@ def colony(model: dict[str, Any]) -> list[dict[str, Any]]:
     bodies = [{
         "kind": "monarch",
         "faces": monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
-                              (m["apex"][0] * 4, m["apex"][1] * 4), m["tiers"], 0.12 * m["height"],
+                              m["tiers"], 0.12 * m["height"],
                               monarch_profile(model["startDate"])),
         "sparks": [],
     }]
@@ -231,14 +349,17 @@ def colony(model: dict[str, Any]) -> list[dict[str, Any]]:
         faces = body(seed, key, child["sides"], child["height"], tip, apex,
                      1 + int(unit(seed, f"{key}:ridge") * 2), bury=0.12 * child["height"])
         az = math.radians(child["azimuth"])
-        offset = np.array([math.cos(az) * child["distance"], 0.0, math.sin(az) * child["distance"]])
+        # Друза — щільний пучок майже вертикальних кристалів (ADR-0245).
+        lean = child["lean"] * CHILD_LEAN
+        distance = child["distance"] + child["radius"] * CHILD_STEP_OUT
+        offset = np.array([math.cos(az) * distance, 0.0, math.sin(az) * distance])
         placed = []
-        for tri, f, edges in faces:
-            placed.append((_rotate(tri, child["lean"], child["azimuth"]) + offset, f, edges))
+        for tri, f, edges, shade in faces:
+            placed.append((_rotate(tri, lean, child["azimuth"]) + offset, f, edges, shade))
         sparks = []
         for s in range(child["sparks"]):
             h = child["height"] * (0.25 + 0.5 * unit(seed, f"child{child['year']}:spark{s}"))
-            p = _rotate(np.array([[0.0, h, 0.0]]), child["lean"], child["azimuth"])[0] + offset
+            p = _rotate(np.array([[0.0, h, 0.0]]), lean, child["azimuth"])[0] + offset
             sparks.append(p)
         bodies.append({"kind": f"year{child['year']}", "faces": placed, "sparks": sparks})
     return bodies

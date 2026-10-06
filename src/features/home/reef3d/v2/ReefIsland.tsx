@@ -6,6 +6,7 @@ import { createIslandMaterial, createRayMaterial, meshGeometry } from '../../cry
 import { buildReefSurround } from '@/features/home/diorama/surround';
 import { buildReefIsland } from './reefIsland';
 import { EMPTY_MESH } from '../../crystal3d/v2/crystalIsland';
+import { rockGrainTexture } from '../../crystal3d/scene/rockGrainTexture';
 
 // ============================================================
 // Острів рифу за референсом власника (ADR-0223): барвінкова скеля клином,
@@ -72,11 +73,19 @@ export function ReefIsland({ seed, theme, radius, rock, groundY, reduceMotion, b
   // Глибина навколо острова на всі 360° (ADR-0224): скелі з арками, ліс
   // водоростей, дно внизу.
   const far = useMemo(() => meshGeometry(bare ? EMPTY_MESH : buildReefSurround(seed, calmSurround)), [seed, bare, calmSurround]);
+  // Зерно базальту на вулканічному острові (ADR-0246): та сама сіра карта, що
+  // в каменю святилища кристала. Острів рифу лишається таким, як був.
+  const grain = useMemo(() => (volcanic ? rockGrainTexture() : null), [volcanic]);
+  useEffect(() => () => grain?.dispose(), [grain]);
   const materials = useMemo(() => ({
-    island: createIslandMaterial((volcanic ? VOLCANIC_ISLAND_PAINTS : REEF_ISLAND_PAINTS)[theme]),
+    island: createIslandMaterial(
+      (volcanic ? VOLCANIC_ISLAND_PAINTS : REEF_ISLAND_PAINTS)[theme],
+      undefined,
+      volcanic ? { grain, ground: groundY, stonePaints: [0, 1, 2] } : {},
+    ),
     ray: createRayMaterial(RAY[theme]),
     deep: createIslandMaterial(REEF_ISLAND_PAINTS[theme], { colour: WATER[theme], from: 12, to: 120, strength: 0.88, near: 30 }),
-  }), [theme, volcanic]);
+  }), [theme, volcanic, grain, groundY]);
   const debrisRef = useRef<THREE.Group>(null);
 
   useEffect(() => () => { island.dispose(); debris.dispose(); far.dispose(); }, [island, debris, far]);

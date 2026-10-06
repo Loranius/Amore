@@ -164,13 +164,46 @@ export function createSeabedMaterial(p: ReefPalette, base: string, ground: numbe
  * вершину — біля кратера й жил він тепліє до кольору жару й пульсує разом
  * із лавою (`uBeat`). Сам камінь не світить: жар лише підмішується.
  */
-export function createVolcanoRockMaterial(p: ReefPalette, base: string, ground: number): THREE.ShaderMaterial {
+/**
+ * Що базальт вулкана отримує понад рифовий камінь (ADR-0246). Без опцій —
+ * той самий матеріал, що й до ADR-0246.
+ */
+export interface VolcanoRockOptions {
+  /** Зерно базальту (`rockGrainTexture`), накладене з трьох боків, без шва. */
+  grain?: THREE.Texture | null;
+  /**
+   * Світло рік лави на камінь: меш має атрибут `lava` (близькість до ріки
+   * 0…1, `flow` найближчої точки ріки), і камінь тепліє лише там, де ріка
+   * зараз тече (`uFront`, `uRest` — ті самі, що в лави).
+   */
+  lavaLight?: boolean;
+}
+
+export function createVolcanoRockMaterial(p: ReefPalette, base: string, ground: number, options: VolcanoRockOptions = {}): THREE.ShaderMaterial {
+  const grain = options.grain ?? null;
+  const defines: Record<string, string> = {};
+  if (grain) defines.USE_BASALT_GRAIN = '';
+  if (options.lavaLight) defines.USE_LAVA_LIGHT = '';
+  const own = {
+    ...waterUniforms(p, ground),
+    uBase: { value: colour(base) },
+    uBeat: { value: 0 },
+    uGlow: { value: 1 },
+    uGrain: { value: grain },
+    uFront: { value: 0 },
+    uRest: { value: 0 },
+  };
   return new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
-    uniforms: { ...waterUniforms(p, ground), uBase: { value: colour(base) }, uBeat: { value: 0 }, uGlow: { value: 1 } },
+    defines,
+    uniforms: own,
     vertexShader: /* glsl */ `
       attribute float tone;
       attribute float heat;
+      #ifdef USE_LAVA_LIGHT
+        attribute vec2 lava;
+        varying vec2 vLava;
+      #endif
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vTone;
@@ -181,6 +214,9 @@ export function createVolcanoRockMaterial(p: ReefPalette, base: string, ground: 
         vNormal = mat3(modelMatrix) * normal;
         vTone = tone;
         vHeat = heat;
+        #ifdef USE_LAVA_LIGHT
+          vLava = lava;
+        #endif
         gl_Position = projectionMatrix * viewMatrix * w;
       }
     `,
@@ -188,20 +224,47 @@ export function createVolcanoRockMaterial(p: ReefPalette, base: string, ground: 
       uniform vec3 uBase;
       uniform float uBeat;
       uniform float uGlow;
+      uniform sampler2D uGrain;
+      uniform float uFront;
+      uniform float uRest;
       varying vec3 vWorld;
       varying vec3 vNormal;
       varying float vTone;
       varying float vHeat;
+      #ifdef USE_LAVA_LIGHT
+        varying vec2 vLava;
+      #endif
       ${WATER}
       void main() {
+        vec3 n = softNormal(vNormal, vWorld);
+        vec3 albedo = uBase * vTone;
+        #ifdef USE_BASALT_GRAIN
+          // Зерно базальту з трьох проєкцій; середина карти 0.86 — ділимо,
+          // щоб зерно додало деталь, а не пригасило камінь. Степінь 2.5
+          // розтягує світлі й темні цятки: пористий базальт, а не пил.
+          vec3 wt = pow(abs(n), vec3(4.0));
+          wt /= (wt.x + wt.y + wt.z);
+          float g = texture2D(uGrain, vWorld.zy * 3.0).r * wt.x
+                  + texture2D(uGrain, vWorld.xz * 3.0).r * wt.y
+                  + texture2D(uGrain, vWorld.xy * 3.0).r * wt.z;
+          albedo *= pow(g / 0.86, 2.5);
+        #endif
         // Обтічний базальт: гранчастий силует, плавне світло (власник, 2026-10-04).
-        vec3 c = underwater(uBase * vTone, softNormal(vNormal, vWorld), vWorld);
+        vec3 c = underwater(albedo, n, vWorld);
         // Легка тінь біля дна: камінь «сидить» на плато, а не висить.
         c *= mix(0.72, 1.0, smoothstep(uGround - 0.05, uGround + 0.9, vWorld.y));
         float h = vHeat * (0.6 + 0.4 * uGlow);
         // Жар рожево-помаранчевий, як і лава (власник, 2026-10-05).
         vec3 ember = vec3(1.0, 0.42, 0.42);
         c = mix(c, c * 0.55 + ember * 0.75, h * 0.6) + ember * h * uBeat * 0.28;
+        #ifdef USE_LAVA_LIGHT
+          // Світло ріки на схилі: лише там, де ріка вже дотекла, з тим самим
+          // подвійним ударом серця, що й лава.
+          float reach = max(uFront, uRest);
+          float flowing = smoothstep(-0.04, 0.0, reach - vLava.y);
+          float spill = pow(vLava.x, 1.6) * flowing * (0.6 + 0.4 * uGlow);
+          c += (albedo * 0.6 + 0.25) * ember * spill * (0.85 + 0.3 * uBeat);
+        #endif
         gl_FragColor = vec4(c, 1.0);
         ${END}
       }

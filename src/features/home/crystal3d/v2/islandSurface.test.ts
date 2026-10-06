@@ -21,7 +21,7 @@ describe('поверхня острова', () => {
   it('тіні беруть маску three: матеріал зі світлом і картами тіней у юніформах', () => {
     const shaded = createIslandMaterial(PAINTS, undefined, { shadows: true });
     expect(shaded.lights).toBe(true);
-    expect(shaded.defines).toHaveProperty('USE_ISLAND_SHADOWS');
+    expect(shaded.defines).toHaveProperty('USE_DIORAMA_SHADOWS');
     expect(shaded.uniforms).toHaveProperty('directionalShadowMap');
     expect(shaded.fragmentShader).toContain('getShadowMask()');
   });
@@ -43,5 +43,19 @@ describe('поверхня острова', () => {
     expect(castsShadows('balanced')).toBe(true);
     expect(castsShadows('low')).toBe(false);
     expect(castsShadows('fallback')).toBe(false);
+  });
+
+  it('мох і зелень на руїнах — лише святилищу кристала: вулканічний острів не зеленіє (ADR-0246)', () => {
+    const grain = new THREE.Texture();
+    expect(createIslandMaterial(PAINTS, undefined, { grain, mossyRuins: true }).defines).toHaveProperty('USE_MOSSY_RUINS');
+    expect(createIslandMaterial(PAINTS, undefined, { grain }).defines).not.toHaveProperty('USE_MOSSY_RUINS');
+  });
+
+  it('зерно лягає лише на фарби каменю: вулкан задає свої, корали й плющ лишаються чистими', () => {
+    const grain = new THREE.Texture();
+    const volcanic = createIslandMaterial(PAINTS, undefined, { grain, stonePaints: [0, 1, 2] });
+    expect(volcanic.fragmentShader).toContain('bool stone = i == 0 || i == 1 || i == 2;');
+    expect(createIslandMaterial(PAINTS, undefined, { grain, stonePaints: [] }).fragmentShader).toContain('bool stone = false;');
+    expect(createIslandMaterial(PAINTS, undefined, { grain }).fragmentShader).toContain('bool stone = i != 3');
   });
 });

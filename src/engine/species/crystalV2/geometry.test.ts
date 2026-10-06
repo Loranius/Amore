@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildCrystalV2Geometry, monarchProfile } from './geometry';
+import { buildCrystalV2Geometry, monarchCrownHeight, monarchProfile, monarchSplits } from './geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from './model';
 
 // ============================================================
@@ -37,27 +37,61 @@ describe('кристал v2: геометрія', () => {
     }
   });
 
-  it('кожна грань ПЛАСКА: трикутники однієї грані лежать в одній площині', () => {
+  it('грані пласкі (ADR-0245): трикутник — пласкі за побудовою; пара одного тону зламана менше ніж на 10°', () => {
+    // Стовбур ламається на площини, але грань не стає кривою: два трикутники
+    // з одним тоном — одна грань із легким зламом, решта — окремі грані.
     const { positions, faceTone, triangles } = geometry.crystals;
-    // Сусідні трикутники з тим самим тоном — дві половини однієї грані-чотирикутника.
     let pairs = 0;
     for (let t = 0; t + 1 < triangles; t += 1) {
       if (faceTone[t * 3] !== faceTone[(t + 1) * 3]) continue;
-      const a = point(positions, t * 3);
-      const b = point(positions, t * 3 + 1);
-      const c = point(positions, t * 3 + 2);
-      const n = cross(sub(b, a), sub(c, a));
-      const length = norm(n);
-      if (length < 1e-9) continue;
-      for (let corner = 0; corner < 3; corner += 1) {
-        const q = point(positions, (t + 1) * 3 + corner);
-        const d = sub(q, a);
-        const distance = Math.abs(n[0] * d[0] + n[1] * d[1] + n[2] * d[2]) / length;
-        expect(distance).toBeLessThan(1e-4);
-      }
+      const tri = (k: number): [V3, V3, V3] => [point(positions, k * 3), point(positions, k * 3 + 1), point(positions, k * 3 + 2)];
+      const na = cross(sub(tri(t)[1], tri(t)[0]), sub(tri(t)[2], tri(t)[0]));
+      const nb = cross(sub(tri(t + 1)[1], tri(t + 1)[0]), sub(tri(t + 1)[2], tri(t + 1)[0]));
+      const cos = Math.abs(na[0] * nb[0] + na[1] * nb[1] + na[2] * nb[2]) / (norm(na) * norm(nb));
+      expect((Math.acos(Math.min(1, cos)) * 180) / Math.PI).toBeLessThan(10);
       pairs += 1;
     }
-    expect(pairs).toBeGreaterThan(20);
+    expect(pairs).toBeGreaterThan(5);
+  });
+
+  it('бічні грані різної довжини: межі граней на багатьох висотах (ADR-0245, еталон low_poly_dirt_crystals)', () => {
+    // Еталон: вершини кристала на 9–17 висотах. Рівна смуга дала б 2–4.
+    for (const name of ['busy', 'empty']) {
+      const model = buildCrystalV2Model(fixture(name));
+      const { positions } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const shoulder = model.monarch.height - model.monarch.tierHeights.reduce((sum, h) => sum + h, 0);
+      const heights = new Set<string>();
+      for (let v = 0; v < positions.length / 3; v += 1) {
+        const y = positions[v * 3 + 1]!;
+        if (y > 0 && y < shoulder) heights.add(y.toFixed(4));
+      }
+      expect(heights.size).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it('бік монарха прямий — без дуги й бочки (власник, 2026-10-06)', () => {
+    // Кожна вершина стовбура — не далі від осі, ніж пряма від основи до плеча
+    // на тій самій висоті, плюс 4 % радіуса (злам грані ±2 %, ребро ±3 %).
+    for (const name of ['busy', 'empty', 'gifts_red', 'leap_day']) {
+      const model = buildCrystalV2Model(fixture(name));
+      const { positions } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const m = model.monarch;
+      const radius = Math.max(...m.sides.map((side) => side[1]));
+      const bury = 0.12 * m.height;
+      const shoulder = m.height - m.tierHeights.reduce((sum, h) => sum + h, 0);
+      const profile = monarchProfile(model.startDate);
+      const foot = profile[0]!;
+      const top = profile[profile.length - 1]!;
+      for (let v = 0; v < positions.length / 3; v += 1) {
+        const [x, y, z] = point(positions, v);
+        if (y < -bury + 1e-6 || y > shoulder - 0.08 * (shoulder + bury)) continue;
+        const t = (y + bury) / (shoulder + bury);
+        const ax = (foot.shift[0] + (top.shift[0] - foot.shift[0]) * t) * radius;
+        const az = (foot.shift[1] + (top.shift[1] - foot.shift[1]) * t) * radius;
+        const line = (foot.scale + (top.scale - foot.scale) * t) * radius * 1.05 * 1.03;
+        expect(Math.hypot(x - ax, z - az)).toBeLessThan(line * 1.04);
+      }
+    }
   });
 
   it('кожна грань дивиться НАЗОВНІ (регресія: закрут усередину ховав передні грані монарха)', () => {
@@ -158,9 +192,11 @@ describe('кристал v2: геометрія', () => {
     for (const value of empty.crystals.positions) expect(Number.isFinite(value)).toBe(true);
   });
 
-  it('монарх — три кільця (ADR-0242): важка основа, ширший пояс, плече зсунуте від осі', () => {
+  it('монарх — профіль (ADR-0242, ADR-0245): важка основа, ширший пояс, плече зсунуте від осі', () => {
     const profile = monarchProfile(busy.startDate);
-    expect(profile.map((r) => r.at)).toEqual([0, profile[1]!.at, 1]);
+    // Чотири кільця (ADR-0245): основа, пояс, верхній злам, плече.
+    expect(profile.map((r) => r.at)).toEqual([0, profile[1]!.at, profile[2]!.at, 1]);
+    expect(profile[2]!.at).toBeGreaterThan(profile[1]!.at);
     expect(profile[0]!.scale).toBeGreaterThan(0.8);
     expect(profile[1]!.scale).toBeGreaterThan(profile[0]!.scale);
     expect(profile[1]!.at).toBeGreaterThan(0.2);
@@ -177,21 +213,88 @@ describe('кристал v2: геометрія', () => {
     expect(tones.size).toBeGreaterThan(sides);
   });
 
-  it('монарх — гранчастий кристал (ADR-0244): 12 поздовжніх граней і вершина у два яруси', () => {
-    // Монарх — перше тіло: його трикутники йдуть до першого тіла року.
-    const { positions, triangles } = geometry.crystals;
+  it('монарх — гранчастий кристал (ADR-0244, ADR-0245, ADR-0247): стовбур у три пояси, корона самоцвіта', () => {
+    const alone = buildCrystalV2Geometry({ ...busy, children: [] });
     const sides = busy.monarch.sides.length;
-    const tops: number[] = [];
-    let monarchTris = 0;
-    for (let t = 0; t < triangles; t += 1) {
-      const ys = [0, 1, 2].map((c) => positions[(t * 3 + c) * 3 + 1]!);
-      if (t > 0 && Math.max(...ys) > busy.monarch.height * 1.01) break;
-      tops.push(Math.max(...ys));
-      monarchTris += 1;
-    }
-    // 2 пояси × 12 граней × 2 трикутники + 18 граней поясу вершини + кінчик.
-    expect(monarchTris).toBeGreaterThanOrEqual(2 * 2 * sides * 2 + 3 * sides);
-    expect(Math.max(...tops)).toBeCloseTo(busy.monarch.height, 5);
+    const splits = monarchSplits(busy.startDate, busy.monarch.sides).filter(Boolean).length;
+    expect(splits).toBeGreaterThanOrEqual(2);
+    expect(splits).toBeLessThan(sides);
+    // Стовбур: 3 пояси × грані × 2 трикутники. Корона: плечі (2 на сторону,
+    // 3 де є ребро), зірка (2 на сторону), промені до кільця (сторона + крок
+    // кільця) і вістря (крок кільця). Кільце — плани + 2.
+    const ring = busy.monarch.tiers + 2;
+    const crown = 2 * sides + splits + 2 * sides + sides + ring + ring;
+    expect(alone.crystals.triangles).toBe(3 * (sides + splits) * 2 + crown);
+  });
+
+  describe('корона самоцвіта (ADR-0247)', () => {
+    const FIXTURES = ['busy', 'empty', 'gifts_red', 'leap_day'];
+    const monarchOf = (name: string) => {
+      const model = buildCrystalV2Model(fixture(name));
+      const { positions } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const pts: V3[] = [];
+      for (let v = 0; v < positions.length / 3; v += 1) pts.push(point(positions, v));
+      const m = model.monarch;
+      const crown = monarchCrownHeight(m.height, m.tierHeights.reduce((sum, h) => sum + h, 0));
+      const profile = monarchProfile(model.startDate);
+      const last = profile[profile.length - 1]!;
+      const radius = Math.max(...m.sides.map((side) => side[1]));
+      const axis: [number, number] = [last.shift[0] * radius, last.shift[1] * radius];
+      return { model, pts, crown, R: radius * last.scale, axis };
+    };
+
+    it('кристал не вищий: вістря — на висоті моделі, корона — 20…30 % висоти', () => {
+      for (const name of FIXTURES) {
+        const { model, pts, crown } = monarchOf(name);
+        expect(Math.max(...pts.map((p) => p[1]))).toBeCloseTo(model.monarch.height, 5);
+        expect(crown / model.monarch.height).toBeGreaterThanOrEqual(0.2 - 1e-9);
+        expect(crown / model.monarch.height).toBeLessThanOrEqual(0.3 + 1e-9);
+      }
+    });
+
+    it('шов корони — не рівна лінія: кути призми врізаються в тіло на різну глибину', () => {
+      for (const name of FIXTURES) {
+        const { model, pts, crown } = monarchOf(name);
+        const y1 = model.monarch.height - crown;
+        // Верхнє кільце стовбура: від найглибшого клина до плечей корони (≥ 0.12).
+        const seam = pts.filter((p) => p[1] > y1 - crown * 0.3 && p[1] < y1 + crown * 0.11);
+        const heights = seam.map((p) => p[1]);
+        expect(Math.max(...heights) - Math.min(...heights)).toBeGreaterThan(crown * 0.1);
+      }
+    });
+
+    it('широкі плечі й опуклий профіль: радіус корони спадає дедалі швидше до вістря', () => {
+      for (const name of FIXTURES) {
+        const { model, pts, crown, R, axis } = monarchOf(name);
+        const y1 = model.monarch.height - crown;
+        const reachAt = (from: number, to: number) => Math.max(...pts
+          .filter((p) => p[1] > y1 + crown * from && p[1] <= y1 + crown * to)
+          .map((p) => Math.hypot(p[0] - axis[0], p[2] - axis[1])));
+        const shoulders = reachAt(0.1, 0.22);
+        const star = reachAt(0.45, 0.66);
+        const ring = reachAt(0.8, 0.9);
+        // Плечі майже на всю ширину тіла — не ковпак, звужений одразу.
+        expect(shoulders).toBeGreaterThan(R * 0.85);
+        // Опуклість: на другій половині корони радіус падає швидше, ніж на першій.
+        expect((star - ring) / 0.3).toBeGreaterThan((shoulders - star) / 0.4);
+        // Вістря гостре, але не голка: кільце під ним — п'ята частина радіуса.
+        expect(ring).toBeGreaterThan(R * 0.15);
+        expect(ring).toBeLessThan(R * 0.3);
+      }
+    });
+
+    it('корона коштує мало: щонайбільше 2·сторони + 6 трикутників понад колишню', () => {
+      for (const name of FIXTURES) {
+        const model = buildCrystalV2Model(fixture(name));
+        const sides = model.monarch.sides.length;
+        const splits = monarchSplits(model.startDate, model.monarch.sides).filter(Boolean).length;
+        const ridge = model.monarch.tiers;
+        // Колишня вершина: пояс (2 на сторону + ребра), промені й вістря.
+        const before = 2 * sides + splits + (ridge < 2 ? sides : sides + 2 * ridge);
+        const triangles = buildCrystalV2Geometry({ ...model, children: [] }).crystals.triangles - 6 * (sides + splits);
+        expect(triangles - before).toBeLessThanOrEqual(2 * sides + 6);
+      }
+    });
   });
 
   it('тон грані — один із трьох, тож сусідні грані ніколи не зливаються', () => {
@@ -200,6 +303,24 @@ describe('кристал v2: геометрія', () => {
       const tone = faceTone[t * 3]!;
       const nearest = [0.74, 1.0, 1.3].some((base) => tone >= base * 0.95 - 1e-6 && tone <= base * 1.05 + 1e-6);
       expect(nearest).toBe(true);
+    }
+  });
+
+  it('вістря монарха дивиться прямо вгору: точки під ним — рівне кільце навколо осі вістря', () => {
+    for (const name of ['busy', 'empty', 'gifts_red', 'leap_day']) {
+      const model = buildCrystalV2Model(fixture(name));
+      const { positions } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const pts: V3[] = [];
+      for (let v = 0; v < positions.length / 3; v += 1) pts.push(point(positions, v));
+      const top = pts.reduce((best, p) => (p[1] > best[1] ? p : best));
+      expect(top[1]).toBeCloseTo(model.monarch.height, 5);
+      // Найближчий нижчий ярус вершин під вістрям: та сама висота й той
+      // самий відступ від осі вістря — інакше вістря косить убік.
+      const below = [...new Set(pts.filter((p) => p[1] < top[1] - 1e-6).map((p) => p[1].toFixed(6)))].map(Number).sort((a, b) => b - a)[0]!;
+      const ring = pts.filter((p) => Math.abs(p[1] - below) < 1e-6);
+      const reach = ring.map((p) => Math.hypot(p[0] - top[0], p[2] - top[2]));
+      expect(Math.max(...reach) - Math.min(...reach)).toBeLessThan(1e-5);
+      expect(Math.min(...reach)).toBeGreaterThan(0);
     }
   });
 });

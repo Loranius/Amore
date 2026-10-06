@@ -22,6 +22,8 @@ import { eruptionAt } from './eruption';
 const VOLCANO_ROCK_NAME = 'volcano-rock';
 const VOLCANO_LAVA_NAME = 'volcano-lava';
 import { REEF_PALETTES, createGlowMaterial, createVolcanoRockMaterial } from '../reef3d/v2/reefV2Materials';
+import { rockGrainTexture } from '../crystal3d/scene/rockGrainTexture';
+import { lavaProximity } from './lavaProximity';
 
 /** Базальт: темніший і тепліший за камінь рифу. */
 /**
@@ -48,7 +50,7 @@ function createLavaMaterial(): THREE.ShaderMaterial {
   return new THREE.ShaderMaterial({
     side: THREE.DoubleSide,
     toneMapped: false,
-    uniforms: { uBeat: { value: 0 }, uGlow: { value: 1 }, uFront: { value: 0 }, uCool: { value: 0 }, uRest: { value: 0 } },
+    uniforms: { uBeat: { value: 0 }, uGlow: { value: 1 }, uFront: { value: 0 }, uCool: { value: 0 }, uRest: { value: 0 }, uTime: { value: 0 } },
     vertexShader: /* glsl */ `
       attribute float heat;
       attribute float flow;
@@ -68,9 +70,25 @@ function createLavaMaterial(): THREE.ShaderMaterial {
       uniform float uFront;
       uniform float uCool;
       uniform float uRest;
+      uniform float uTime;
       varying float vHeat;
       varying float vFlow;
       varying vec3 vLocal;
+      // Згладжений шум у просторі моделі — для кірки, що пливе рікою.
+      float lavaHash(vec3 p) {
+        p = fract(p * 0.3183099 + 0.1);
+        p *= 17.0;
+        return fract(p.x * p.y * p.z * (p.x + p.y + p.z));
+      }
+      float lavaNoise(vec3 x) {
+        vec3 i = floor(x);
+        vec3 f = fract(x);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(
+          mix(mix(lavaHash(i), lavaHash(i + vec3(1, 0, 0)), f.x), mix(lavaHash(i + vec3(0, 1, 0)), lavaHash(i + vec3(1, 1, 0)), f.x), f.y),
+          mix(mix(lavaHash(i + vec3(0, 0, 1)), lavaHash(i + vec3(1, 0, 1)), f.x), mix(lavaHash(i + vec3(0, 1, 1)), lavaHash(i + vec3(1, 1, 1)), f.x), f.y),
+          f.z);
+      }
       void main() {
         // Ріки (flow ≥ 0) видно лише до фронту дотику; фронт нерівний —
         // язики лави біжать трохи вперед і відстають. Чаша (flow < 0) — завжди.
@@ -95,6 +113,18 @@ function createLavaMaterial(): THREE.ShaderMaterial {
         vec3 core = vec3(1.0, 0.84, 0.46);
         float h = clamp(vHeat * (0.65 + 0.35 * uGlow) + 0.18 * uBeat * vHeat + 0.35 * head, 0.0, 1.0);
         vec3 c = h < 0.6 ? mix(crust, hot, h / 0.6) : mix(hot, core, (h - 0.6) / 0.4);
+        /*
+         * Кірка, що пливе (ADR-0246): темніші острівці застиглої лави
+         * сунуться вниз рікою — у ріці лава тече, у чаші ледь вирує. Голова
+         * потоку й серце кратера — без кірки: там найгарячіше.
+         */
+        float speed = vFlow >= 0.0 ? 0.16 : 0.03;
+        float crustNoise = lavaNoise(vLocal * 11.0 + vec3(0.0, uTime * speed, 0.0));
+        // У спокої фронту немає (uFront = 0, head = 1 скрізь) — кірка тоді
+        // лежить на всій ріці; лише серце кратера лишається чистим.
+        float hotCore = vFlow >= 0.0 ? 0.0 : smoothstep(0.7, 1.0, h);
+        float crustMask = smoothstep(0.45, 0.65, crustNoise) * (1.0 - head * step(0.001, uFront)) * (1.0 - hotCore);
+        c = mix(c, crust * 0.55, crustMask * 0.6);
         gl_FragColor = vec4(c * (0.9 + 0.5 * uBeat * vHeat), 1.0);
       }
     `,
@@ -225,13 +255,20 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
     g.setAttribute('seed', new THREE.BufferAttribute(new Float32Array(seeds), 1));
     return g;
   }, [geometry, seed, craterRadius]);
+  // Світло рік на схилі (ADR-0246): близькість кожної вершини до ріки.
+  const rockLava = useMemo(() => ({
+    lava: new THREE.BufferAttribute(lavaProximity(geometry.rock.positions, geometry.lava.positions, geometry.lava.flow, craterRadius * 0.9), 2),
+  }), [geometry, craterRadius]);
+  // Зерно базальту — одна сіра карта 256² на сцену (ADR-0246).
+  const grain = useMemo(() => rockGrainTexture(), []);
+  useEffect(() => () => grain?.dispose(), [grain]);
   const materials = useMemo(() => ({
-    rock: createVolcanoRockMaterial(REEF_PALETTES[theme], VOLCANO_ROCK[theme], PORTAL_GROUND_Y),
+    rock: createVolcanoRockMaterial(REEF_PALETTES[theme], VOLCANO_ROCK[theme], PORTAL_GROUND_Y, { grain, lavaLight: true }),
     lava: createLavaMaterial(),
     embers: createGlowMaterial('#ffb0a0', 0.05 + 1.3 * glow, 0.09, 'bubbles'),
     halo: createGlowMaterial('#ff6f6a', 0.05 + 0.28 * glow, craterRadius * scale * 4.5, 'still'),
     steam: createSteamMaterial(theme === 'light' ? '#eef0fa' : '#c9c4e0'),
-  }), [glow, theme, craterRadius, scale]);
+  }), [glow, theme, craterRadius, scale, grain]);
 
   useEffect(() => () => { lava.dispose(); embers.dispose(); halo.dispose(); steam.dispose(); }, [lava, embers, halo, steam]);
   useEffect(() => () => { for (const m of Object.values(materials)) m.dispose(); }, [materials]);
@@ -246,6 +283,10 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
     materials.lava.uniforms.uFront!.value = eruption.front;
     materials.lava.uniforms.uRest!.value = streamReach;
     materials.lava.uniforms.uCool!.value = eruption.cool;
+    materials.lava.uniforms.uTime!.value = t;
+    // Камінь бачить той самий фронт, що й ріка: світло біжить разом із нею.
+    materials.rock.uniforms.uFront!.value = eruption.front * (1 - eruption.cool);
+    materials.rock.uniforms.uRest!.value = streamReach;
     // Камінь тепліє з рікою: у спокої — лише біля жерла.
     const flowing = eruption.front * (1 - eruption.cool);
     materials.lava.uniforms.uBeat!.value = beat;
@@ -310,6 +351,7 @@ export function VolcanoWorld({ seed, geometry, scale, theme, reduceMotion, islan
         fishKinds={fishKinds}
         {...(season ? { season } : {})}
         bare={bare}
+        rockAttributes={rockLava}
       />
       <group position={[0, PORTAL_GROUND_Y, 0]}>
         <group scale={scale}>

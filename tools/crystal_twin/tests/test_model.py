@@ -15,7 +15,7 @@ sys.path.insert(0, str(ROOT))
 from crystal_twin.calendar import anniversary, year_index  # noqa: E402
 from crystal_twin.hashing import hash32  # noqa: E402
 from crystal_twin.model import build_model  # noqa: E402
-from crystal_twin.geometry import body, monarch_body, monarch_profile  # noqa: E402
+from crystal_twin.geometry import body, monarch_body, monarch_crown_height, monarch_profile  # noqa: E402
 
 import numpy as np  # noqa: E402
 
@@ -210,15 +210,33 @@ class Geometry(unittest.TestCase):
         model = build_model(fixture("busy"))
         m = model["monarch"]
         faces = monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
-                             m["apex"], m["tiers"], 0.3, monarch_profile(model["startDate"]))
+                             m["tiers"], 0.3, monarch_profile(model["startDate"]))
         by_face: dict[int, list[np.ndarray]] = {}
-        for tri, face, _ in faces:
+        for tri, face, *_ in faces:
             by_face.setdefault(face, []).extend(tri)
         for face, points in by_face.items():
             pts = np.array(points)
             centred = pts - pts.mean(axis=0)
             smallest = np.linalg.svd(centred, compute_uv=False)[-1]
             self.assertLess(smallest, 1e-9, f"грань {face} не пласка")
+
+
+    def test_monarch_crown_is_a_gem_not_a_cap(self):
+        """Корона самоцвіта (ADR-0247): та сама висота, корона — 20…30 %,
+        шов клинами, плечі майже на всю ширину тіла."""
+        for name in ("busy", "empty", "gifts_red", "leap_day"):
+            model = build_model(fixture(name))
+            m = model["monarch"]
+            crown = monarch_crown_height(m["height"], sum(m["tierHeights"]))
+            self.assertGreaterEqual(crown / m["height"], 0.2 - 1e-9)
+            self.assertLessEqual(crown / m["height"], 0.3 + 1e-9)
+            faces = monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
+                                 m["tiers"], 0.12 * m["height"], monarch_profile(model["startDate"]))
+            pts = np.array([p for tri, *_ in faces for p in tri])
+            self.assertAlmostEqual(float(pts[:, 1].max()), m["height"], places=6)
+            y1 = m["height"] - crown
+            seam = pts[(pts[:, 1] > y1 - crown * 0.3) & (pts[:, 1] < y1 + crown * 0.11)][:, 1]
+            self.assertGreater(float(seam.max() - seam.min()), crown * 0.1)
 
 
 if __name__ == "__main__":
