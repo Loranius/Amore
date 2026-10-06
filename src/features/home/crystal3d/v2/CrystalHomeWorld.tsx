@@ -10,10 +10,7 @@ import { CrystalV2Object } from './CrystalV2Object';
 import { linearColour } from './crystalV2Material';
 import type { CrystalV2Frame } from './crystalV2Frame';
 
-/** Тіні — лише там, де пристрій потягне вибірку карти тіней у шейдері. */
-export function castsShadows(quality: 'high' | 'balanced' | 'low' | 'fallback'): boolean {
-  return quality === 'high' || quality === 'balanced';
-}
+export { castsShadows } from '@/features/home/diorama/shadowSun';
 
 interface CrystalHomeWorldProps {
   model: CrystalV2Model;

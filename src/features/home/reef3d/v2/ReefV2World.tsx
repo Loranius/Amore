@@ -96,6 +96,8 @@ interface ReefV2WorldProps {
   fishKinds?: number;
   /** Пора року: світло й морський сніг у воді (ADR-0237). Без неї — палітра як є. */
   season?: Season;
+  /** Додаткові атрибути сітки каменю (вулкан: близькість до рік лави, ADR-0246). */
+  rockAttributes?: Readonly<Record<string, THREE.BufferAttribute>>;
 }
 
 /**
@@ -103,7 +105,7 @@ interface ReefV2WorldProps {
  * Земля — на тій самій лінії, що й острів кристала (`PORTAL_GROUND_Y`),
  * тож камера й жести порталу ті самі.
  */
-export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, rockCreaseDeg = ISLAND_CREASE_DEG, volcanicIsland = false, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false, fishKinds = 3, season }: ReefV2WorldProps) {
+export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island, rockRadius, bare = false, rockColour, islandArch = true, islandLagoon = true, islandStones = true, rockMaterial, rockHeat, rockCreaseDeg = ISLAND_CREASE_DEG, volcanicIsland = false, seagrassScale = 1, islandWildlife = 1, rockName = '', calmSurround = false, fishKinds = 3, season, rockAttributes }: ReefV2WorldProps) {
   const palette = useMemo(() => (season ? seasonalReefPalette(REEF_PALETTES[theme], season, theme) : REEF_PALETTES[theme]), [season, theme]);
 
   const rock = useMemo(() => {
@@ -111,8 +113,9 @@ export function ReefV2World({ seed, geometry, scale, theme, reduceMotion, island
     const g = tonedGeometry(geometry.rock.positions, rockHeat ? { tone, heat: rockHeat } : { tone });
     // Плавне світло на скелі рифу й конусі вулкана; злами за 55° лишаються.
     g.setAttribute('normal', new THREE.BufferAttribute(softNormals(geometry.rock.positions, rockCreaseDeg), 3));
+    for (const [name, attribute] of Object.entries(rockAttributes ?? {})) g.setAttribute(name, attribute);
     return g;
-  }, [geometry, rockHeat, rockCreaseDeg]);
+  }, [geometry, rockHeat, rockCreaseDeg, rockAttributes]);
   const corals = useMemo(() => tonedGeometry(geometry.corals.positions, {
     tone: geometry.corals.tone, form: geometry.corals.form, hue: geometry.corals.hue, rise: geometry.corals.rise,
   }), [geometry]);
