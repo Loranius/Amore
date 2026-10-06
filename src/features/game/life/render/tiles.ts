@@ -9,7 +9,8 @@
 import type { Season } from '../sim/calendar';
 import { TILE, type GameMap, type Ground } from '../world/types';
 import { PALETTES, type SeasonPalette } from './palette';
-import { canvas, cellHash, ctx2d, mix, px, rect, shade, type Ctx } from './pixel';
+import { canvasAt, cellHash, densityOf, mix, px, rect, shade, type Ctx } from './pixel';
+import { bedHd, cobbleHd, dirtHd, earthHd, fenceHd, floorHd, grassHd, wallpaperHd } from './tilesHd';
 
 const SOFT: ReadonlySet<Ground> = new Set<Ground>(['d', 'c', 'p', 's', 'b', 'a', 'm', 'z', 'v']);
 const GRASSY: ReadonlySet<Ground> = new Set<Ground>(['g', 'G', 'h', 'F']);
@@ -53,6 +54,7 @@ function grassTile(g: Ctx, x: number, y: number, i: number, j: number, P: Season
     rect(g, x + (hh % 8), y + 6, 7, 3, '#ffffff');
     rect(g, x + (hh % 8) + 1, y + 9, 6, 1, P.grassDark);
   }
+  if (densityOf(g) > 1) grassHd(g, x, y, i, j, P, flowers);
 }
 
 function dirtTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
@@ -68,6 +70,7 @@ function dirtTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonP
     rect(g, x + (hh % 11) + 1, y + ((hh >> 3) % 11) + 2, 3, 2, shade(base, -0.25));
     px(g, x + (hh % 11) + 1, y + ((hh >> 3) % 11) + 2, shade(base, 0.2));
   }
+  if (densityOf(g) > 1) dirtHd(g, x, y, i, j, base);
 }
 
 /** Грядки городу: темний ґрунт борознами й рядки рослин за порою року. */
@@ -95,6 +98,7 @@ function bedTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPa
       if (big && hh % 3 === 0) px(g, x + c + 1, y + r + 1, '#e8576c');
     }
   }
+  if (densityOf(g) > 1) bedHd(g, x, y, i, j, soil, plant);
 }
 
 function cobbleTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
@@ -109,6 +113,7 @@ function cobbleTile(g: Ctx, x: number, y: number, i: number, j: number, P: Seaso
     rect(g, x + sx, y + sy, sw - 1, 1, shade(c, 0.15));
     rect(g, x + sx, y + sy + sh - 2, sw - 1, 1, shade(c, -0.15));
   });
+  if (densityOf(g) > 1) cobbleHd(g, x, y, i, j, stones);
 }
 
 function paveTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
@@ -182,6 +187,7 @@ function fenceTile(g: Ctx, x: number, y: number, i: number, j: number, P: Season
     if (P.snow) rect(g, x + pxl, y + 1, 3, 2, '#ffffff');
   }
   rect(g, x, y + 14, TILE, 1, 'rgba(20,30,20,0.25)');
+  if (densityOf(g) > 1) fenceHd(g, x, y, wood);
 }
 
 function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f' | 't' | 'k'): void {
@@ -195,6 +201,7 @@ function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f'
       const seam = (cellHash(i, j, r) % 12) + 2;
       rect(g, x + seam, y + r * 4, 1, 3, shade(base, -0.2));
     }
+    if (densityOf(g) > 1) floorHd(g, x, y, i, j, base);
   } else if (kind === 't') {
     const a = (i + j) % 2 === 0 ? '#e9e3d6' : '#b9c7d6';
     rect(g, x, y, TILE, TILE, a);
@@ -215,7 +222,8 @@ function wallTile(g: Ctx, x: number, y: number, i: number, j: number, map: GameM
   for (let k = 0; k < 16; k += 4) {
     rect(g, x + k + 1, y, 1, TILE, '#ddc9a2');
   }
-  if ((i + j) % 2 === 0) { px(g, x + 3, y + 6, '#d98a8a'); px(g, x + 11, y + 12, '#8ab0d9'); }
+  if (densityOf(g) > 1) wallpaperHd(g, x, y, i, j);
+  else if ((i + j) % 2 === 0) { px(g, x + 3, y + 6, '#d98a8a'); px(g, x + 11, y + 12, '#8ab0d9'); }
   if (below && below !== 'W' && below !== 'x') {
     rect(g, x, y + 12, TILE, 4, '#8a5a34');
     rect(g, x, y + 12, TILE, 1, '#b07a4a');
@@ -232,6 +240,7 @@ function earthTile(g: Ctx, x: number, y: number, i: number, j: number, map: Game
     px(g, x + (h % 16), y + ((h >>> 4) % 16), k % 3 === 0 ? shade(base, 0.16) : shade(base, -0.12));
   }
   if (cellHash(i, j, 5) % 4 === 0) rect(g, x + (cellHash(i, j, 6) % 12), y + (cellHash(i, j, 7) % 12), 3, 2, '#8a7c6c');
+  if (densityOf(g) > 1) earthHd(g, x, y, i, j, base);
   // Тінь від стіни над клітинкою.
   if (map.ground[j - 1]?.[i] === 'S') rect(g, x, y, TILE, 4, 'rgba(20,12,10,0.35)');
 }
@@ -287,13 +296,12 @@ function grassFringe(g: Ctx, map: GameMap, P: SeasonPalette): void {
 const groundCache = new Map<string, HTMLCanvasElement>();
 
 /** Нерухома земля мапи на цю пору року (кешується). */
-export function groundCanvas(map: GameMap, season: Season): HTMLCanvasElement {
-  const key = `${map.id}|${season}`;
+export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCanvasElement {
+  const key = `${map.id}|${season}|${density}`;
   const hit = groundCache.get(key);
   if (hit) return hit;
   const P = PALETTES[map.interior ? 'summer' : season];
-  const c = canvas(map.w * TILE, map.h * TILE);
-  const g = ctx2d(c);
+  const { c, g } = canvasAt(map.w * TILE, map.h * TILE, density);
   for (let j = 0; j < map.h; j += 1) {
     for (let i = 0; i < map.w; i += 1) {
       const t = map.ground[j]![i]!;

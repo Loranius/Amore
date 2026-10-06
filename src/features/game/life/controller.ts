@@ -45,7 +45,7 @@ import { dayPlan, friendsGame, makeGame, type PlannedGame } from './games/day';
 import { Kit, type MiniGame } from './games/kit';
 import { lenaLook } from './look';
 import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
-import { artFor, hasArt2d, readArt, saveArt, type Art } from './render/art';
+import { artFor, hasHd, readArt, saveArt, type Art } from './render/art';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
 import { colliderFor, tileFeet, zoneAt } from './world/collide';
@@ -919,6 +919,9 @@ export class GameController {
     // занадто дрібним»): раніше камера вміщала всю ширину хати, і люди з
     // меблями ставали вдвічі меншими, ніж на вулиці.
     const tilesWide = w > h ? 24 : 14;
+    // У 32×32 піксель малюнка — пів світового: масштаб парний, інакше
+    // пікселі вийдуть різного розміру.
+    if (artFor(this.ui.art, this.map.id) === 'hd') return Math.max(2, 2 * Math.round(w / (tilesWide * TILE * 2)));
     return Math.max(2, Math.round(w / (tilesWide * TILE)));
   }
 
@@ -1432,14 +1435,14 @@ export class GameController {
   }
 
   /** Для HUD: де Лєна зараз. */
-  /** Чи є для цього місця 2D-стиль (поки — садиба в Жилинцях). */
+  /** Чи є для цього місця 32×32 (поки — садиба в Жилинцях). */
   canSwitchArt(): boolean {
-    return hasArt2d(this.map.id);
+    return hasHd(this.map.id);
   }
 
-  /** Перемкнути пікселі ↔ 2D; вибір пам'ятається між візитами. */
+  /** Перемкнути 16×16 ↔ 32×32; вибір пам'ятається між візитами. */
   toggleArt(): void {
-    const art: Art = this.ui.art === '2d' ? 'pixel' : '2d';
+    const art: Art = this.ui.art === 'hd' ? 'pixel' : 'hd';
     saveArt(art);
     this.ui = { ...this.ui, art };
     this.emit();

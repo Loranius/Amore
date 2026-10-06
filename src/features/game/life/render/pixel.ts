@@ -8,11 +8,54 @@
 
 export type Ctx = CanvasRenderingContext2D;
 
+// ------------------------------------------------------------
+// Щільність (власник, 2026-10-06: «більш деталізований піксельний
+// варіант, 32×32»). Світ міряється, як і раніше, світовими пікселями
+// (клітинка = 16), а малюнок може мати 2 пікселі на світовий піксель —
+// тоді клітинка має 32×32 пікселі малюнка. Щільність — властивість
+// полотна й контексту (не глобальний стан): `rect` вирівнює до сітки
+// пікселів малюнка, `dot` ставить один такий піксель.
+// ------------------------------------------------------------
+const ctxDensity = new WeakMap<Ctx, number>();
+const canvasDensity = new WeakMap<HTMLCanvasElement, number>();
+
+/** Скільки пікселів малюнка на світовий піксель у цьому контексті. */
+export function densityOf(g: Ctx): number {
+  return ctxDensity.get(g) ?? 1;
+}
+
+/** Задати щільність контексту (сцена у 32×32 — 2). */
+export function setDensity(g: Ctx, d: number): void {
+  ctxDensity.set(g, d);
+}
+
+/** Розмір полотна у світових пікселях (з урахуванням щільності). */
+export function worldSize(c: HTMLCanvasElement): { w: number; h: number } {
+  const d = canvasDensity.get(c) ?? 1;
+  return { w: c.width / d, h: c.height / d };
+}
+
+/** Намалювати спрайт у світових пікселях, хоч би якою була його щільність. */
+export function drawSprite(g: Ctx, c: HTMLCanvasElement, x: number, y: number): void {
+  const { w, h } = worldSize(c);
+  g.drawImage(c, x, y, w, h);
+}
+
 export function canvas(w: number, h: number): HTMLCanvasElement {
   const c = document.createElement('canvas');
   c.width = Math.max(1, Math.ceil(w));
   c.height = Math.max(1, Math.ceil(h));
   return c;
+}
+
+/** Полотно `w×h` світових пікселів щільності `d`; контекст уже масштабований. */
+export function canvasAt(w: number, h: number, d: number): { c: HTMLCanvasElement; g: Ctx } {
+  const c = canvas(w * d, h * d);
+  canvasDensity.set(c, d);
+  const g = ctx2d(c);
+  g.scale(d, d);
+  setDensity(g, d);
+  return { c, g };
 }
 
 export function ctx2d(c: HTMLCanvasElement): Ctx {
@@ -22,31 +65,48 @@ export function ctx2d(c: HTMLCanvasElement): Ctx {
   return g;
 }
 
+/** Вирівняти до сітки пікселів малюнка. */
+function snap(v: number, d: number): number {
+  return Math.round(v * d) / d;
+}
+
 export function rect(g: Ctx, x: number, y: number, w: number, h: number, color: string): void {
+  const d = densityOf(g);
   g.fillStyle = color;
-  g.fillRect(Math.round(x), Math.round(y), Math.round(w), Math.round(h));
+  g.fillRect(snap(x, d), snap(y, d), snap(w, d), snap(h, d));
 }
 
+/** Один світовий піксель (у 32×32 — квадрат 2×2 пікселі малюнка). */
 export function px(g: Ctx, x: number, y: number, color: string): void {
+  const d = densityOf(g);
   g.fillStyle = color;
-  g.fillRect(Math.round(x), Math.round(y), 1, 1);
+  g.fillRect(snap(x, d), snap(y, d), 1, 1);
 }
 
-/** Піксельне коло (заповнене) — без згладжування. */
-export function disc(g: Ctx, cx: number, cy: number, r: number, color: string): void {
+/** Один піксель малюнка — найдрібніша деталь за цієї щільності. */
+export function dot(g: Ctx, x: number, y: number, color: string): void {
+  const d = densityOf(g);
   g.fillStyle = color;
-  for (let y = -r; y <= r; y += 1) {
-    const half = Math.floor(Math.sqrt(Math.max(0, r * r - y * y)) + 0.35);
-    g.fillRect(Math.round(cx - half), Math.round(cy + y), half * 2 + 1, 1);
+  g.fillRect(snap(x, d), snap(y, d), 1 / d, 1 / d);
+}
+
+/** Піксельне коло (заповнене) — без згладжування, рядками пікселів малюнка. */
+export function disc(g: Ctx, cx: number, cy: number, r: number, color: string): void {
+  const d = densityOf(g);
+  g.fillStyle = color;
+  for (let y = -r; y <= r; y += 1 / d) {
+    const half = Math.floor((Math.sqrt(Math.max(0, r * r - y * y)) + 0.35 / d) * d) / d;
+    g.fillRect(snap(cx - half, d), snap(cy + y, d), half * 2 + 1 / d, 1 / d);
   }
 }
 
 /** Піксельний еліпс. */
 export function ellipse(g: Ctx, cx: number, cy: number, rx: number, ry: number, color: string): void {
+  const d = densityOf(g);
   g.fillStyle = color;
-  for (let y = -ry; y <= ry; y += 1) {
-    const half = Math.floor(rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))) + 0.35);
-    g.fillRect(Math.round(cx - half), Math.round(cy + y), half * 2 + 1, 1);
+  for (let y = -ry; y <= ry; y += 1 / d) {
+    const half = Math.floor((rx * Math.sqrt(Math.max(0, 1 - (y * y) / (ry * ry))) + 0.35 / d) * d) / d;
+    g.fillRect(snap(cx - half, d), snap(cy + y, d), half * 2 + 1 / d, 1 / d);
   }
 }
 
@@ -142,6 +202,8 @@ export function mix(a: string, b: string, t: number): string {
  */
 export function outline(src: HTMLCanvasElement, color = '#1c1419'): HTMLCanvasElement {
   const out = canvas(src.width + 2, src.height + 2);
+  const dens = canvasDensity.get(src);
+  if (dens) canvasDensity.set(out, dens);
   const g = ctx2d(out);
   g.drawImage(src, 1, 1);
   const data = g.getImageData(0, 0, out.width, out.height);
@@ -250,6 +312,8 @@ function rampDark(c: [number, number, number], palette: [number, number, number]
 
 export function flipX(src: HTMLCanvasElement): HTMLCanvasElement {
   const out = canvas(src.width, src.height);
+  const dens = canvasDensity.get(src);
+  if (dens) canvasDensity.set(out, dens);
   const g = ctx2d(out);
   g.translate(src.width, 0);
   g.scale(-1, 1);

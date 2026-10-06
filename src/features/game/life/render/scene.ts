@@ -12,19 +12,13 @@ import { buildingSprite, drawBuildingShadow } from './buildings';
 import { drawLeafLitter, drawTreeShadow, treeSprite, TREE_BASE } from './nature';
 import { ambientAt, lightsOn } from './palette';
 import { sheetFor, walkFrame, type Dir, type Look } from './people';
-import { cellHash, ellipse, rect, shade, type Ctx } from './pixel';
+import { cellHash, drawSprite, ellipse, rect, setDensity, shade, worldSize, type Ctx } from './pixel';
+import type { Art } from './art';
+import { drawPersonHd, hasHdLook } from './peopleHd';
 import { drawProp, propBase, propLight } from './props';
 import { drawWater, groundCanvas } from './tiles';
 import { drawBitmap } from './icons';
 import { drawDog } from './dog';
-import type { Art } from './art';
-import { resFor } from './v2d/kit';
-import { groundCanvas2d } from './v2d/ground';
-import { buildingSprite2d, drawBuildingShadow2d } from './v2d/buildings';
-import { drawTreeShadow2d, treeSprite2d } from './v2d/trees';
-import { drawProp2d } from './v2d/props';
-import { drawEmote2d, drawPerson2d } from './v2d/people';
-import { drawDog2d } from './v2d/dog';
 
 export type Weather = 'clear' | 'rain' | 'snow' | 'leaves' | 'petals';
 
@@ -62,7 +56,7 @@ export interface SceneEnv {
   minute: number;
   time: number;
   weather: Weather;
-  /** Стиль малювання цієї мапи (`art.ts`); без нього — пікселі. */
+  /** Деталізація цієї мапи (`art.ts`): 'hd' — 32×32 на клітинку; без неї — 16×16. */
   art?: Art;
 }
 
@@ -111,9 +105,9 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
   const { scale, camX, camY } = view;
   const season = env.season;
   const lit = map.interior ? true : lightsOn(env.minute);
-  const v2 = env.art === '2d';
-  const res = resFor(scale);
-  g.imageSmoothingEnabled = v2;
+  const d = env.art === 'hd' ? 2 : 1;
+  setDensity(g, d);
+  g.imageSmoothingEnabled = false;
   g.fillStyle = map.interior ? '#1b1420' : '#2a3a2a';
   g.fillRect(0, 0, view.w, view.h);
 
@@ -124,20 +118,18 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
   // Земля.
   const vw = view.w / scale;
   const vh = view.h / scale;
-  if (v2) g.drawImage(groundCanvas2d(map, season, res), 0, 0, map.w * TILE, map.h * TILE);
-  else g.drawImage(groundCanvas(map, season), 0, 0);
+  drawSprite(g, groundCanvas(map, season, d), 0, 0);
   const i0 = Math.max(0, Math.floor(camX / TILE));
   const j0 = Math.max(0, Math.floor(camY / TILE));
   const i1 = Math.min(map.w - 1, Math.ceil((camX + vw) / TILE));
   const j1 = Math.min(map.h - 1, Math.ceil((camY + vh) / TILE));
-  if (!v2) drawWater(g, map, season, env.time, i0, j0, i1, j1);
+  drawWater(g, map, season, env.time, i0, j0, i1, j1);
 
   // Тіні й опале листя — на землі, під усім.
-  for (const b of map.buildings) (v2 ? drawBuildingShadow2d : drawBuildingShadow)(g, b);
+  for (const b of map.buildings) drawBuildingShadow(g, b);
   for (const t of map.trees) {
     const bx = t.x * TILE + 8;
     const by = t.y * TILE + 14;
-    if (v2) { drawTreeShadow2d(g, bx, by, t.kind); continue; }
     drawTreeShadow(g, bx, by, t.kind);
     drawLeafLitter(g, bx, by, season, t.kind, cellHash(t.x, t.y));
   }
@@ -156,16 +148,15 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
   const windowsLit: { x: number; y: number; w: number; h: number }[] = [];
   const smokes: { x: number; y: number }[] = [];
   for (const b of map.buildings) {
-    const s = v2 ? buildingSprite2d(b, season, res) : { ...buildingSprite(b, season), w: 0, h: 0 };
-    const sw = v2 ? s.w : s.img.width;
-    const sh = v2 ? s.h : s.img.height;
+    const s = buildingSprite(b, season, d);
+    const sz = worldSize(s.img);
     const x = b.x * TILE + s.ox;
     const y = b.y * TILE + s.oy;
-    if (x > camX + vw + 40 || x + sw < camX - 40 || y > camY + vh + 40 || y + sh < camY - 60) continue;
+    if (x > camX + vw + 40 || x + sz.w < camX - 40 || y > camY + vh + 40 || y + sz.h < camY - 60) continue;
     items.push({
       y: (b.y + b.h) * TILE,
       draw: () => {
-        g.drawImage(s.img, x, y, sw, sh);
+        drawSprite(g, s.img, x, y);
         if (lit && !map.interior) {
           g.fillStyle = 'rgba(255,214,120,0.82)';
           for (const w of s.windows) g.fillRect(x + w.x, y + w.y, w.w, w.h);
@@ -176,31 +167,24 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     if (s.smoke && (season === 'winter' || season === 'autumn' || lit)) smokes.push({ x: x + s.smoke.x, y: y + s.smoke.y });
   }
   for (const t of map.trees) {
-    if (v2) {
-      const s = treeSprite2d(t, season, res);
-      const x = t.x * TILE + 8 - s.ax;
-      const y = t.y * TILE + 15 - s.ay;
-      if (x > camX + vw || x + s.w < camX || y > camY + vh || y + s.h < camY) continue;
-      const sway = Math.sin(env.time * 1.3 + t.x * 0.7) * 0.6;
-      items.push({ y: t.y * TILE + 14, draw: () => g.drawImage(s.img, x + sway, y, s.w, s.h) });
-      continue;
-    }
-    const img = treeSprite(t, season);
-    const x = t.x * TILE + 8 - TREE_BASE.x - 1;
-    const y = t.y * TILE + 15 - TREE_BASE.y - 1;
-    if (x > camX + vw || x + img.width < camX || y > camY + vh || y + img.height < camY) continue;
+    const img = treeSprite(t, season, d);
+    const isz = worldSize(img);
+    // Обвідка додає піксель малюнка з кожного боку.
+    const x = t.x * TILE + 8 - TREE_BASE.x - 1 / d;
+    const y = t.y * TILE + 15 - TREE_BASE.y - 1 / d;
+    if (x > camX + vw || x + isz.w < camX || y > camY + vh || y + isz.h < camY) continue;
     // Легке погойдування крони вітром.
     const sway = Math.sin(env.time * 1.3 + t.x * 0.7) > 0.85 ? 1 : 0;
-    items.push({ y: t.y * TILE + 14, draw: () => g.drawImage(img, x + sway, y) });
+    items.push({ y: t.y * TILE + 14, draw: () => drawSprite(g, img, x + sway, y) });
   }
   for (const p of map.props) {
     if (p.type === 'gull') continue;
     if ((p.x + 4) * TILE < camX || (p.x - 4) * TILE > camX + vw || (p.y + 4) * TILE < camY || (p.y - 4) * TILE > camY + vh) continue;
-    items.push({ y: propBase(p), draw: () => { if (!v2 || !drawProp2d(g, p, season, env.time)) drawProp(g, p, season, env.time); } });
+    items.push({ y: propBase(p), draw: () => drawProp(g, p, season, env.time) });
   }
   for (const a of actors) {
-    if (v2) {
-      items.push({ y: a.y, draw: () => drawActor2d(g, a, env.time) });
+    if (d > 1 && hasHdLook(a.look)) {
+      items.push({ y: a.y, draw: () => drawActorHd(g, a, env.time) });
       continue;
     }
     const sheet = sheetFor(a.look);
@@ -251,11 +235,6 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     items.push({
       y: pet.y,
       draw: () => {
-        if (v2) {
-          drawDog2d(g, pet.x, pet.y, pet.dir, pet.moving, pet.t);
-          if (pet.happy && pet.happy > 0) drawEmote2d(g, 'heart', pet.x, pet.y - 24 + Math.sin(env.time * 6) * 1.5);
-          return;
-        }
         ellipse(g, pet.x, pet.y, 7, 2, 'rgba(28,20,40,0.28)');
         drawDog(g, pet.x, pet.y, pet.dir, pet.moving, pet.t);
         if (pet.happy && pet.happy > 0) {
@@ -350,30 +329,24 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
   }
 
   drawLabels(g, map, actors, view, opts);
+  setDensity(g, 1);
 }
 
-/** Людина у 2D-стилі: стоїть, іде, лежить у ліжку чи падає. */
-function drawActor2d(g: Ctx, a: Actor, time: number): void {
-  const H = a.look.kid ? 26 : 31;
+/** Людина у 32×32 — аркуш із PixelLab: стоїть, іде, лежить у ліжку чи падає. */
+function drawActorHd(g: Ctx, a: Actor, time: number): void {
+  ellipse(g, a.x, a.y, a.look.kid ? 4.5 : 5.5, 1.5, 'rgba(28,20,40,0.28)');
   if (a.inBed) {
-    // Голова на подушці, решта — під ковдрою.
-    // Голова на подушці: людину зсунуто вниз, видно лише голову.
+    // Голова на подушці: видно лише верх аркуша, решта — під ковдрою.
     g.save();
     g.beginPath();
-    g.rect(a.x - 12, a.y - 30, 24, 24);
+    g.rect(a.x - 12, a.y - 22, 24, 15);
     g.clip();
-    drawPerson2d(g, a.look, a.x, a.y + 13, 0, false, time, false);
+    drawPersonHd(g, a.look, a.x, a.y + 8, 0, false, time);
     g.restore();
-    g.beginPath();
-    g.roundRect(a.x - 9, a.y - 7.5, 18, 17.5, 2.4);
-    g.fillStyle = a.inBed;
-    g.fill();
-    g.strokeStyle = 'rgba(59,42,46,0.6)';
-    g.lineWidth = 0.6;
-    g.stroke();
-    g.fillStyle = 'rgba(255,255,255,0.25)';
-    g.fillRect(a.x - 9, a.y - 7.5, 18, 2.4);
-    if (a.emote === 'sleep') drawEmote2d(g, 'sleep', a.x + 8, a.y - 26 + Math.sin(time * 3) * 1.5);
+    rect(g, a.x - 9, a.y - 7, 18, 17, a.inBed);
+    rect(g, a.x - 9, a.y - 7, 18, 2, shade(a.inBed, 0.3));
+    rect(g, a.x - 9, a.y + 8, 18, 2, shade(a.inBed, -0.3));
+    if (a.emote === 'sleep') drawBitmap(g, 'sleep', Math.round(a.x + 4), Math.round(a.y - 30 + Math.sin(time * 3) * 1.5));
     return;
   }
   if (a.fall != null) {
@@ -381,19 +354,22 @@ function drawActor2d(g: Ctx, a: Actor, time: number): void {
     g.save();
     g.translate(a.x, a.y);
     g.rotate(ang);
-    drawPerson2d(g, a.look, 0, 0, a.fallDir === -1 ? 1 : 2, false, time, false);
+    drawPersonHd(g, a.look, 0, 0, a.fallDir === -1 ? 1 : 2, false, time);
     g.restore();
-    const hh = H - 8;
+    const hh = (a.look.kid ? 26 : 31) - 8;
     const hx = a.x + Math.sin(ang) * hh;
     const hy = a.y - Math.cos(ang) * hh - 6;
     for (let k = 0; k < 3; k += 1) {
       const s = time * 7 + (k * Math.PI * 2) / 3;
-      drawEmote2d(g, 'star', hx + Math.cos(s) * 8, hy + Math.sin(s) * 3);
+      drawBitmap(g, 'star', Math.round(hx + Math.cos(s) * 8 - 3), Math.round(hy + Math.sin(s) * 3 - 3));
     }
     return;
   }
-  drawPerson2d(g, a.look, a.x, a.y, a.dir, a.moving, a.t);
-  if (a.emote) drawEmote2d(g, a.emote === 'heart' ? 'heart' : a.emote === 'sleep' ? 'sleep' : 'star', a.x, a.y - H - 6 + Math.sin(time * 5) * 1.5);
+  drawPersonHd(g, a.look, a.x, a.y, a.dir, a.moving, a.t);
+  if (a.emote) {
+    const top = a.look.kid ? 26 : 31;
+    drawBitmap(g, a.emote === 'heart' ? 'heart' : a.emote === 'sleep' ? 'sleep' : 'star', Math.round(a.x - 3), Math.round(a.y - top - 8 + Math.sin(time * 5) * 1.5));
+  }
 }
 
 function drawWeather(g: Ctx, env: SceneEnv, view: View): void {

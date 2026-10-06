@@ -7,7 +7,7 @@
 import type { Season } from '../sim/calendar';
 import type { Tree, TreeKind } from '../world/types';
 import { PALETTES } from './palette';
-import { canvas, cellHash, ctx2d, disc, ellipse, outline, px, rect, shade, type Ctx } from './pixel';
+import { canvasAt, cellHash, densityOf, dot, disc, ellipse, outline, px, rect, shade, type Ctx } from './pixel';
 
 const TW = 34;
 const TH = 48;
@@ -25,6 +25,14 @@ function trunk(g: Ctx, kind: TreeKind, top: number): void {
   px(g, 22, TREE_BASE.y - 1, shade(bark, -0.2));
   if (kind === 'birch') for (let y = top + 2; y < TREE_BASE.y - 2; y += 4) rect(g, 15 + (y % 3), y, 2, 1, '#2b2b2b');
   else for (let y = top + 3; y < TREE_BASE.y - 2; y += 5) px(g, 17, y, shade(bark, -0.25));
+  if (densityOf(g) > 1) {
+    // 32×32: кора борознами — вертикальні рисочки пів-пікселя.
+    for (let y = top + 1; y < TREE_BASE.y - 2; y += 1) {
+      const h = cellHash(y, top, 13) % 4;
+      dot(g, 16 + h * 0.5, y + 0.5, shade(bark, -0.22));
+      if (h === 0) dot(g, 18.5, y, shade(bark, 0.1));
+    }
+  }
 }
 
 function canopy(g: Ctx, blobs: readonly [number, number, number][], dark: string, mid: string, light: string, seed: number): void {
@@ -38,6 +46,21 @@ function canopy(g: Ctx, blobs: readonly [number, number, number][], dark: string
     const ang = ((h >> 4) % 360) * (Math.PI / 180);
     const rr = ((h >> 12) % 100) / 100 * (br - 1);
     px(g, bx + Math.cos(ang) * rr, by + Math.sin(ang) * rr, (h >> 20) % 2 ? light : dark);
+  }
+  if (densityOf(g) > 1) {
+    // 32×32: крона з окремих листочків — пари пів-пікселів (лист і його
+    // тінь), густіше на освітленому верхньому лівому боці.
+    for (let k = 0; k < 140; k += 1) {
+      const h = cellHash(k, seed, 31);
+      const [bx, by, br] = blobs[h % blobs.length]!;
+      const ang = ((h >> 4) % 360) * (Math.PI / 180);
+      const rr = (((h >> 12) % 100) / 100) * (br - 0.5);
+      const x = Math.round((bx + Math.cos(ang) * rr) * 2) / 2;
+      const y = Math.round((by + Math.sin(ang) * rr) * 2) / 2;
+      const litSide = Math.cos(ang) < 0 && Math.sin(ang) < 0;
+      dot(g, x, y, litSide ? light : (h >> 22) % 3 === 0 ? dark : mid);
+      dot(g, x + 0.5, y + 0.5, shade((h >> 22) % 2 ? mid : dark, -0.12));
+    }
   }
 }
 
@@ -72,14 +95,14 @@ function bareBranches(g: Ctx, seed: number, snow: boolean): void {
 
 const cache = new Map<string, HTMLCanvasElement>();
 
-export function treeSprite(tree: Tree, season: Season): HTMLCanvasElement {
+/** Спрайт дерева; `density` 2 — малюнок 32×32 на клітинку. */
+export function treeSprite(tree: Tree, season: Season, density = 1): HTMLCanvasElement {
   const seed = cellHash(Math.round(tree.x * 7), Math.round(tree.y * 7), 3);
   const variant = seed % 3;
-  const key = `${tree.kind}|${season}|${variant}`;
+  const key = `${tree.kind}|${season}|${variant}|${density}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const c = canvas(TW, TH);
-  const g = ctx2d(c);
+  const { c, g } = canvasAt(TW, TH, density);
   const P = PALETTES[season];
   const kind = tree.kind;
 
