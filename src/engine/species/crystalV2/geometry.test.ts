@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildCrystalV2Geometry, monarchProfile } from './geometry';
+import { buildCrystalV2Geometry, monarchProfile, monarchSplits } from './geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from './model';
 
 // ============================================================
@@ -54,26 +54,43 @@ describe('кристал v2: геометрія', () => {
     expect(pairs).toBeGreaterThan(5);
   });
 
-  it('бічні грані не тягнуться рівною смугою від основи до плеча (ADR-0245, еталон low_poly_dirt_crystals)', () => {
-    // Еталон: у кристала з 32–48 трикутників 26–39 різних площин і 9–17
-    // висот вершин. Рівна смуга дала б 6 бічних площин і 2 висоти.
+  it('бічні грані різної довжини: межі граней на багатьох висотах (ADR-0245, еталон low_poly_dirt_crystals)', () => {
+    // Еталон: вершини кристала на 9–17 висотах. Рівна смуга дала б 2–4.
     for (const name of ['busy', 'empty']) {
       const model = buildCrystalV2Model(fixture(name));
-      const { positions, triangles } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const { positions } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
       const shoulder = model.monarch.height - model.monarch.tierHeights.reduce((sum, h) => sum + h, 0);
       const heights = new Set<string>();
-      const planes: V3[] = [];
-      for (let t = 0; t < triangles; t += 1) {
-        const [a, b, c] = [point(positions, t * 3), point(positions, t * 3 + 1), point(positions, t * 3 + 2)];
-        if (Math.max(a[1], b[1], c[1]) > shoulder || Math.min(a[1], b[1], c[1]) < 0) continue;
-        for (const q of [a, b, c]) heights.add(q[1].toFixed(4));
-        const n = cross(sub(b, a), sub(c, a));
-        const l = norm(n);
-        const u: V3 = [n[0] / l, n[1] / l, n[2] / l];
-        if (!planes.some((v) => Math.abs(v[0] * u[0] + v[1] * u[1] + v[2] * u[2]) > 0.9995)) planes.push(u);
+      for (let v = 0; v < positions.length / 3; v += 1) {
+        const y = positions[v * 3 + 1]!;
+        if (y > 0 && y < shoulder) heights.add(y.toFixed(4));
       }
       expect(heights.size).toBeGreaterThanOrEqual(12);
-      expect(planes.length).toBeGreaterThanOrEqual(30);
+    }
+  });
+
+  it('бік монарха прямий — без дуги й бочки (власник, 2026-10-06)', () => {
+    // Кожна вершина стовбура — не далі від осі, ніж пряма від основи до плеча
+    // на тій самій висоті, плюс 4 % радіуса (злам грані ±2 %, ребро ±3 %).
+    for (const name of ['busy', 'empty', 'gifts_red', 'leap_day']) {
+      const model = buildCrystalV2Model(fixture(name));
+      const { positions } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const m = model.monarch;
+      const radius = Math.max(...m.sides.map((side) => side[1]));
+      const bury = 0.12 * m.height;
+      const shoulder = m.height - m.tierHeights.reduce((sum, h) => sum + h, 0);
+      const profile = monarchProfile(model.startDate);
+      const foot = profile[0]!;
+      const top = profile[profile.length - 1]!;
+      for (let v = 0; v < positions.length / 3; v += 1) {
+        const [x, y, z] = point(positions, v);
+        if (y < -bury + 1e-6 || y > shoulder - 0.08 * (shoulder + bury)) continue;
+        const t = (y + bury) / (shoulder + bury);
+        const ax = (foot.shift[0] + (top.shift[0] - foot.shift[0]) * t) * radius;
+        const az = (foot.shift[1] + (top.shift[1] - foot.shift[1]) * t) * radius;
+        const line = (foot.scale + (top.scale - foot.scale) * t) * radius * 1.05 * 1.03;
+        expect(Math.hypot(x - ax, z - az)).toBeLessThan(line * 1.04);
+      }
     }
   });
 
@@ -196,7 +213,7 @@ describe('кристал v2: геометрія', () => {
     expect(tones.size).toBeGreaterThan(sides);
   });
 
-  it('монарх — гранчастий кристал (ADR-0244, ADR-0245): 12 граней у три пояси, вершина у два яруси', () => {
+  it('монарх — гранчастий кристал (ADR-0244, ADR-0245): широкі й вузькі грані у три пояси, вершина у два яруси', () => {
     const alone = buildCrystalV2Geometry({ ...busy, children: [] });
     const { positions, triangles } = alone.crystals;
     const tip = busy.monarch.tierHeights.reduce((sum, h) => sum + h, 0);
@@ -215,8 +232,11 @@ describe('кристал v2: геометрія', () => {
       else crown += 1;
     }
     const sides = busy.monarch.sides.length;
-    expect(shaft).toBe(3 * (2 * sides) * 2); // 3 пояси × 12 граней × 2 трикутники
-    expect(belt).toBe(3 * sides); // 18 граней поясу вершини
+    const splits = monarchSplits(busy.startDate, busy.monarch.sides).filter(Boolean).length;
+    expect(splits).toBeGreaterThanOrEqual(2);
+    expect(splits).toBeLessThan(sides);
+    expect(shaft).toBe(3 * (sides + splits) * 2); // 3 пояси × грані × 2 трикутники
+    expect(belt).toBe(2 * sides + splits); // пояс вершини: 2 грані на сторону, 3 — де є ребро
     expect(crown).toBeGreaterThanOrEqual(sides);
     expect(top).toBeCloseTo(busy.monarch.height, 5);
   });

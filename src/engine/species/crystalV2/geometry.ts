@@ -25,24 +25,14 @@ interface Tri {
   face: number;
   edges: [boolean, boolean, boolean];
   /**
-   * Тонова група (ADR-0245): два майже співплощинні трикутники зламаної
-   * грані мають один тон і діагональ без канта — око читає їх однією
-   * гранню з легким зламом. Кожен трикутник лишається пласким. Без поля —
+   * Тонова група (ADR-0245): два трикутники чотирикутника стовбура мають
+   * один тон і діагональ без канта — одна грань із ледь помітним зламом
+   * (до ±2 % від прямої). Кожен трикутник лишається пласким. Без поля —
    * тон за `face`.
    */
   shade?: number;
 }
 
-/** Злам між трикутниками чотирикутника, менший за цей кут, — одна грань. */
-const MERGE_DEG = 10;
-
-function normalOf(a: V3, b: V3, c: V3): V3 {
-  const e1: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-  const e2: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-  const n: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-  const l = Math.hypot(n[0], n[1], n[2]) || 1;
-  return [n[0] / l, n[1] / l, n[2] / l];
-}
 
 const TRI: [boolean, boolean, boolean] = [true, true, true];
 
@@ -205,12 +195,17 @@ export interface ProfileRing {
  */
 export function monarchProfile(seed: string): ProfileRing[] {
   const jitter = (key: string, span: number) => (unit(seed, `monarch:profile:${key}`) - 0.5) * span;
-  return [
-    { at: 0, scale: 0.86, shift: [0, 0] },
-    { at: 0.32 + jitter('belly:at', 0.08), scale: 1.05, shift: [jitter('belly:x', 0.06), jitter('belly:z', 0.06)] },
-    { at: 0.68 + jitter('upper:at', 0.06), scale: 1.01, shift: [jitter('upper:x', 0.1), jitter('upper:z', 0.1)] },
-    { at: 1, scale: 0.97, shift: [jitter('shoulder:x', 0.14), jitter('shoulder:z', 0.14)] },
-  ];
+  // Бік — ПРЯМА від основи до плеча (власник, 2026-10-06: «кристал не має
+  // скручувати дугою»): проміжні кільця лежать на прямій, пояса-бочки
+  // немає. Асиметрія — у зсуві плеча й нахилі осі, не у вигині.
+  const foot = { at: 0, scale: 0.86, shift: [0, 0] as [number, number] };
+  const shoulder = { at: 1, scale: 0.97, shift: [jitter('shoulder:x', 0.14), jitter('shoulder:z', 0.14)] as [number, number] };
+  const on = (at: number): ProfileRing => ({
+    at,
+    scale: foot.scale + (shoulder.scale - foot.scale) * at,
+    shift: [shoulder.shift[0] * at, shoulder.shift[1] * at],
+  });
+  return [foot, on(0.32 + jitter('belly:at', 0.08)), on(0.68 + jitter('upper:at', 0.06)), shoulder];
 }
 
 /**
@@ -240,48 +235,76 @@ function brokenShaft(
 ): { tris: Tri[]; rings: V3[][]; face: number } {
   const n = base.length;
   const last = profile.length - 1;
-  const rings = profile.map((r, k) => {
-    const gap = (y1 - y0) * (k === last ? r.at - profile[k - 1]!.at : k === 0 ? 0 : Math.min(r.at - profile[k - 1]!.at, profile[k + 1]!.at - r.at));
-    return base.map((p, i): V3 => {
-      const key = `${tag}:ring${k}:${i}`;
-      const out = k === 0 ? 1 : 1 + 0.12 * (unit(seed, `${key}:r`) - 0.5);
-      const lift = k === 0 ? 0 : (unit(seed, `${key}:y`) - 0.5) * gap * (k === last ? 0.12 : 0.5);
-      return [p[0] * r.scale * out + r.shift[0] * radius, y0 + (y1 - y0) * r.at + lift, p[2] * r.scale * out + r.shift[1] * radius];
-    });
+  const foot = profile[0]!;
+  const top = profile[last]!;
+  const span = y1 - y0;
+  // Основа рівна (вона в жеоді); плече — кожна вершина на ±6 % проміжку й ±3 %
+  // від осі: ребра стовбура різної довжини й нахилу, але кожне — пряме.
+  const lastGap = span * (top.at - profile[last - 1]!.at);
+  const footRing = base.map((p): V3 => [p[0] * foot.scale + foot.shift[0] * radius, y0, p[2] * foot.scale + foot.shift[1] * radius]);
+  const topRing = base.map((p, i): V3 => {
+    const key = `${tag}:ring${last}:${i}`;
+    const out = 1 + 0.06 * (unit(seed, `${key}:r`) - 0.5);
+    const lift = (unit(seed, `${key}:y`) - 0.5) * lastGap * 0.12;
+    return [p[0] * top.scale * out + top.shift[0] * radius, y1 + lift, p[2] * top.scale * out + top.shift[1] * radius];
   });
+  /*
+   * Проміжні вершини лежать НА ПРЯМОМУ ребрі від основи до плеча, кожна на
+   * своїй висоті (±35 % проміжку), і лише на ±2 % відступають від осі.
+   * Тому силует прямий — жодної дуги чи бочки (власник, 2026-10-06), — а
+   * межі граней по довжині стоять на різній висоті: грані різної довжини.
+   */
+  const rings: V3[][] = [footRing];
+  for (let k = 1; k < last; k += 1) {
+    const r = profile[k]!;
+    const room = Math.min(r.at - profile[k - 1]!.at, profile[k + 1]!.at - r.at);
+    rings.push(base.map((_, i): V3 => {
+      const key = `${tag}:ring${k}:${i}`;
+      const t = r.at + (unit(seed, `${key}:y`) - 0.5) * room * 0.7;
+      const f = footRing[i]!;
+      const u = topRing[i]!;
+      const p: V3 = [f[0] + (u[0] - f[0]) * t, f[1] + (u[1] - f[1]) * t, f[2] + (u[2] - f[2]) * t];
+      const ax = (foot.shift[0] + (top.shift[0] - foot.shift[0]) * t) * radius;
+      const az = (foot.shift[1] + (top.shift[1] - foot.shift[1]) * t) * radius;
+      const out = 1 + 0.04 * (unit(seed, `${key}:r`) - 0.5);
+      return [ax + (p[0] - ax) * out, p[1], az + (p[2] - az) * out];
+    }));
+  }
+  rings.push(topRing);
+  /*
+   * Грань — чотирикутник між двома кільцями: два трикутники з одним тоном,
+   * діагональ без канта. Межа між ярусами — кант і інший тон. Тон іде
+   * 3-циклом по кільцю й зсувається на ярус, тож сусіди і збоку, і згори
+   * різні (крок яруса не кратний трьом).
+   */
+  const lift = n + (n % 3 === 2 ? 2 : 1);
   const tris: Tri[] = [];
   let face = firstFace;
-  let shade = firstFace;
   for (let k = 0; k < last; k += 1) {
     const lower = rings[k]!;
     const upper = rings[k + 1]!;
     for (let i = 0; i < n; i += 1) {
       const j = (i + 1) % n;
       const [li, lj, ui, uj] = [lower[i]!, lower[j]!, upper[i]!, upper[j]!];
+      const shade = firstFace + k * lift + i;
       // Діагональ — то в один, то в інший бік; ребра: [навпроти кута 0, 1, 2].
-      const split = unit(seed, `${tag}:diag${k}:${i}`) < 0.5;
-      const a: [V3, V3, V3] = split ? [li, lj, uj] : [li, lj, ui];
-      const b: [V3, V3, V3] = split ? [li, uj, ui] : [lj, uj, ui];
-      const na = normalOf(...a);
-      const nb = normalOf(...b);
-      const bend = (Math.acos(Math.min(1, Math.max(-1, na[0] * nb[0] + na[1] * nb[1] + na[2] * nb[2]))) * 180) / Math.PI;
-      const merged = bend < MERGE_DEG;
-      const ea: [boolean, boolean, boolean] = split ? [true, !merged, true] : [!merged, true, true];
-      const eb: [boolean, boolean, boolean] = split ? [true, true, !merged] : [true, !merged, true];
-      tris.push({ ...outward(...a, face, ea), shade });
-      if (!merged) shade += 1;
-      tris.push({ ...outward(...b, face + 1, eb), shade });
-      shade += 1;
+      if (unit(seed, `${tag}:diag${k}:${i}`) < 0.5) {
+        tris.push({ ...outward(li, lj, uj, face, [true, false, true]), shade });
+        tris.push({ ...outward(li, uj, ui, face + 1, [true, true, false]), shade });
+      } else {
+        tris.push({ ...outward(li, lj, ui, face, [false, true, true]), shade });
+        tris.push({ ...outward(lj, uj, ui, face + 1, [true, false, true]), shade });
+      }
       face += 2;
     }
   }
-  return { tris, rings, face };
+  return { tris, rings, face: Math.max(face, firstFace + last * lift) };
 }
 
 /** Кристал року: основа, ледь ширший пояс посередині й плече. */
 const CHILD_PROFILE: readonly ProfileRing[] = [
   { at: 0, scale: FOOT, shift: [0, 0] },
-  { at: 0.5, scale: (FOOT + 1) / 2 + 0.03, shift: [0, 0] },
+  { at: 0.5, scale: (FOOT + 1) / 2, shift: [0, 0] },
   { at: 1, scale: 1, shift: [0, 0] },
 ];
 
@@ -337,6 +360,25 @@ function body(
  *   * Кант лише на поздовжніх ребрах, ребрі плеча й вершині: горизонтальний
  *     злам поясу без канта, бо смуги поперек призми власник відкинув.
  */
+/**
+ * На яких сторонах монарха стоїть додаткове поздовжнє ребро (ADR-0245):
+ * половина сторін із хешу дати, але щонайменше дві й не всі — тоді поруч
+ * завжди є і широкі, і вузькі грані.
+ */
+export function monarchSplits(seed: string, sides: readonly (readonly [number, number])[]): boolean[] {
+  const flags = sides.map((_, i) => unit(seed, `monarch:split${i}:on`) < 0.5);
+  const order = sides.map((_, i) => i).sort((a, b) => unit(seed, `monarch:split${a}:rank`) - unit(seed, `monarch:split${b}:rank`));
+  for (const i of order) {
+    if (flags.filter(Boolean).length >= 2) break;
+    flags[i] = true;
+  }
+  for (const i of order) {
+    if (flags.filter(Boolean).length < sides.length) break;
+    flags[i] = false;
+  }
+  return flags;
+}
+
 function monarchBody(
   seed: string,
   sides: readonly (readonly [number, number])[],
@@ -348,15 +390,27 @@ function monarchBody(
 ): Tri[] {
   const corners = ring(sides);
   const n = corners.length;
+  // Додаткове ребро — лише на частині сторін і в різних місцях: поруч стоять
+  // широкі й вузькі грані, а переріз лишається гранчастим, а не круглим
+  // (12 винесених ребер робили монарх майже циліндром — власник, 2026-10-06).
+  const splits = monarchSplits(seed, sides);
   const ring12: V3[] = [];
+  const cornerAt: number[] = [];
+  const splitAt: number[] = [];
   for (let i = 0; i < n; i += 1) {
     const a = corners[i]!;
     const b = corners[(i + 1) % n]!;
-    const t = 0.35 + 0.3 * unit(seed, `monarch:split${i}:t`);
-    const bulge = 1.06 + 0.08 * unit(seed, `monarch:split${i}:b`);
-    ring12.push(a, [(a[0] + (b[0] - a[0]) * t) * bulge, 0, (a[2] + (b[2] - a[2]) * t) * bulge]);
+    cornerAt.push(ring12.length);
+    ring12.push(a);
+    if (splits[i]) {
+      const t = 0.25 + 0.5 * unit(seed, `monarch:split${i}:t`);
+      const bulge = 1.02 + 0.03 * unit(seed, `monarch:split${i}:b`);
+      splitAt.push(ring12.length);
+      ring12.push([(a[0] + (b[0] - a[0]) * t) * bulge, 0, (a[2] + (b[2] - a[2]) * t) * bulge]);
+    } else {
+      splitAt.push(-1);
+    }
   }
-  const m = ring12.length;
   const y0 = -bury;
   const y1 = height - tip;
   const radius = Math.max(...corners.map((p) => Math.hypot(p[0], p[2])));
@@ -375,7 +429,10 @@ function monarchBody(
   const midHeight = tip * 0.42;
   const mid: V3[] = [];
   for (let i = 0; i < n; i += 1) {
-    const s = shoulder[2 * i + 1]!;
+    // Над ребром сторони, а без ребра — над серединою сторони.
+    const c0 = shoulder[cornerAt[i]!]!;
+    const c1 = shoulder[cornerAt[(i + 1) % n]!]!;
+    const s = splitAt[i]! >= 0 ? shoulder[splitAt[i]!]! : ([(c0[0] + c1[0]) / 2, 0, (c0[2] + c1[2]) / 2] as V3);
     const a = Math.atan2(s[2] - sz, s[0] - sx);
     const r = radius * last.scale * 0.5 * (0.95 + 0.1 * unit(seed, `monarch:mid${i}:r`));
     const y = shoulderTop + midHeight * (0.95 + 0.1 * unit(seed, `monarch:mid${i}:y`));
@@ -390,12 +447,13 @@ function monarchBody(
     return nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2] >= 0 ? [a, b, c] : [a, c, b];
   };
   for (let i = 0; i < n; i += 1) {
-    const c0 = shoulder[2 * i]!;
-    const s = shoulder[2 * i + 1]!;
-    const c1 = shoulder[(2 * i + 2) % m]!;
+    const c0 = shoulder[cornerAt[i]!]!;
+    const c1 = shoulder[cornerAt[(i + 1) % n]!]!;
     const m0 = mid[i]!;
     const m1 = mid[(i + 1) % n]!;
-    for (const points of [facing(c0, s, m0), facing(s, c1, m0), facing(c1, m1, m0)]) {
+    const s = splitAt[i]! >= 0 ? shoulder[splitAt[i]!]! : null;
+    const belt = s ? [facing(c0, s, m0), facing(s, c1, m0), facing(c1, m1, m0)] : [facing(c0, c1, m0), facing(c1, m1, m0)];
+    for (const points of belt) {
       tris.push({ points, face, edges: TRI });
       face += 1;
     }
