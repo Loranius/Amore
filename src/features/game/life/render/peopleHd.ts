@@ -10,8 +10,9 @@
 // піксельний стиль — `hasHdLook` тоді каже «ні».
 // ============================================================
 import lenaKidUrl from './assets/hd/lena-kid.png';
+import dimaUrl from './assets/hd/dima.png';
 import momUrl from './assets/hd/mom.png';
-import { LENA_KID, MOM, type Dir, type Look } from './people';
+import { DIMA, LENA_KID, MOM, type Dir, type Look } from './people';
 
 interface HdSheet {
   url: string;
@@ -32,6 +33,8 @@ const SHEETS: HdSheet[] = [
   { url: lenaKidUrl, cell: 68, frames: 4, footX: 34, footY: 56, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
   // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).
   { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
+  // Персонаж PixelLab «Діма HD» (ff0178ab-…), власник 2026-10-06: «Діму давай далі».
+  { url: dimaUrl, cell: 92, frames: 0, footX: 46, footY: 75, match: (l) => l.hairStyle === DIMA.hairStyle && l.top === DIMA.top && !!l.hoodie },
 ];
 
 function sheetOf(look: Look): HdSheet | null {
