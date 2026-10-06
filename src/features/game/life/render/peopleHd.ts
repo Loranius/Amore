@@ -31,7 +31,7 @@ const SHEETS: HdSheet[] = [
   // Персонаж PixelLab «Лєна мала HD (48)» (a046bd5b-…).
   { url: lenaKidUrl, cell: 68, frames: 4, footX: 34, footY: 56, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
   // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).
-  { url: momUrl, cell: 92, frames: 0, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
+  { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
 ];
 
 function sheetOf(look: Look): HdSheet | null {
