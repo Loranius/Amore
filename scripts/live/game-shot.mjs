@@ -47,7 +47,8 @@ for (const sc of scenarios) {
     await page.mouse.click(size.width / 2, size.height * 0.75);
   }
   await page.waitForTimeout(2500);
-  await shot(sc.replace(/:/g, '_'));
+  // Ім'я файлу — з початку сценарію (довгі сценарії перевищують межу ФС).
+  await shot(sc.replace(/:/g, '_').replace(/[\/]/g, '_').slice(0, 90));
 }
 await browser.close();
 try { process.kill(-vite.pid); } catch {}

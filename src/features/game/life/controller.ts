@@ -45,6 +45,7 @@ import { dayPlan, friendsGame, makeGame, type PlannedGame } from './games/day';
 import { Kit, type MiniGame } from './games/kit';
 import { lenaLook } from './look';
 import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
+import { artFor, hasArt2d, readArt, saveArt, type Art } from './render/art';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
 import { colliderFor, tileFeet, zoneAt } from './world/collide';
@@ -109,6 +110,8 @@ export interface UiState {
   saveProblem: string | null;
   /** Скільки сердець і подяк летить над екраном (після пропозиції). */
   celebrate: boolean;
+  /** Стиль малювання, який обрав гравець (`render/art.ts`). */
+  art: Art;
 }
 
 /** Хвилин гри за секунду ходіння: день 7:00–2:00 ≈ 12 хвилин гри. */
@@ -122,7 +125,7 @@ interface Walker extends Actor {
 
 export class GameController {
   life: LifeState | null = null;
-  ui: UiState = { screen: 'title', panel: null, dialog: null, card: null, toasts: [], near: null, activity: null, ask: false, saveProblem: null, celebrate: false };
+  ui: UiState = { screen: 'title', panel: null, dialog: null, card: null, toasts: [], near: null, activity: null, ask: false, saveProblem: null, celebrate: false, art: readArt() };
   /** Збережене життя, якщо є (для «Продовжити»), або проблема з ним. */
   saved: { state: LifeState | null; problem: string | null } = { state: null, problem: null };
 
@@ -940,6 +943,7 @@ export class GameController {
       minute: life?.minute ?? 11 * 60,
       time: this.time,
       weather: this.map.interior ? 'clear' : this.weather(life?.seed ?? 0, info.day, info.season),
+      art: artFor(this.ui.art, this.map.id),
     }, { w, h, scale, camX: this.cameraX, camY: this.cameraY, dpr }, {
       target: this.ui.screen === 'world' ? this.targetZone() : null,
       near: this.ui.screen === 'world' ? this.ui.near : null,
@@ -1428,6 +1432,19 @@ export class GameController {
   }
 
   /** Для HUD: де Лєна зараз. */
+  /** Чи є для цього місця 2D-стиль (поки — садиба в Жилинцях). */
+  canSwitchArt(): boolean {
+    return hasArt2d(this.map.id);
+  }
+
+  /** Перемкнути пікселі ↔ 2D; вибір пам'ятається між візитами. */
+  toggleArt(): void {
+    const art: Art = this.ui.art === '2d' ? 'pixel' : '2d';
+    saveArt(art);
+    this.ui = { ...this.ui, art };
+    this.emit();
+  }
+
   placeName(): string {
     return this.map.interior && this.map.id !== KITCHEN_ID && this.map.id !== CELLAR_ID ? this.life?.homeName ?? '' : this.map.name;
   }

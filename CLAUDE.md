@@ -82,6 +82,8 @@ A task is not complete until the relevant checklist passes and the implementatio
 
 **Живі.** Мама — розклад `sim/mom.ts`, рух `updateMom` (ліжко в хаті / подвір'я / кухня). Бася — `sim/dog.ts` (5 с бігає, 3 с за Лєною, 30% перечепитись, 1 с лежить), спрайт `render/assets/basia.png` із PixelLab (персонаж «Бася (мала)»). Випадковість у грі — лише `rngFor(seed, 'причина', …)`.
 
+**Два стилі.** Пікселі (`render/*.ts`) і тестовий 2D (`render/v2d/`, власник 2026-10-06): поки лише садиба в Жилинцях, вмикається `?art=2d` або кнопкою «2D» у грі (`render/art.ts`). Нова мапа чи предмет у садибі — малюй в обох стилях: `art.test.ts` не пропустить предмет без 2D. У живому кадрі: `c.ui={...c.ui,art:'2d'}`.
+
 **Малювання.** `render/pixel.ts`: тіні зсуваються по тону (`shade`), обвідка з рампи (`outline`), близькі кольори зливаються (`mergeNearDuplicates`). Дахи прив'язані до світу, щоб будівля з частин не виглядала порізаною. Референси власника (зокрема тайлсети Stardew) — лише для прийомів; пікселі не копіюй.
 
 **Перевірка наживо.** `node scripts/live/game-shot.mjs wide "village||js:c.life={...c.life,home:'zhylyntsi'}; c.enterCellar(); c.worldFrame=function(){}"` — `c` це `window.__lifeGame`, кадри в `.live/game/`. Подивись кадр через Read, перш ніж казати «готово». GitHub Pages кешує ~10 хв; iframe гри отримує URL збірки (`gameSrc.ts`, `__BUILD_ID__` у `vite.config.ts` і `vitest.config.ts`).

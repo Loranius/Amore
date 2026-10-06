@@ -93,6 +93,7 @@ body { color: var(--lg-ink); -webkit-user-select: none; user-select: none; -webk
 }
 .lg-menu { position: absolute; right: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); display: grid; gap: 8px; }
 .lg-menu .lg-btn { width: 52px; height: 52px; padding: 0; display: grid; place-items: center; }
+.lg-menu .lg-art { font-size: 14px; font-weight: 900; letter-spacing: 0.02em; }
 .lg-action {
   position: absolute; left: 50%; transform: translateX(-50%); bottom: calc(16px + env(safe-area-inset-bottom));
   font-size: 17px; padding: 12px 20px; max-width: 70vw; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
