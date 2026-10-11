@@ -7,6 +7,9 @@
 //   блимав кожен четвертий крок, поки його не перегенерували;
 // - PixelLab малює Лєні блакитні очі, навіть коли просиш карі
 //   (`build_sheet.py`, крок `eyes`);
+// - у перемальованого підлітка очі були різні в кожному кадрі: відблиск
+//   стрибав, а в одному кадрі око лишилось без білого зовсім; тепер очі
+//   поставлені за шаблоном (`build_sheet.py`, крок `face`);
 // - у ході «угору» перемальованого підлітка хвіст був лише в одному кадрі
 //   з чотирьох і блимав — ці кадри взято з `skeleton-v3`, що рухає готовий
 //   малюнок, а не малює заново;
@@ -126,6 +129,46 @@ describe('Аркуші людей 32×32', () => {
     for (let col = 1; col < 5; col += 1) {
       const n = nape.get(col) ?? 0;
       expect(n, `${name}, кадр ${col} «угору»: ${n} пікселів волосся на потилиці проти ${idle}`).toBeGreaterThanOrEqual(idle * 0.55);
+    }
+  });
+
+  // Очі їдуть разом із головою, тож тут висота — від маківки кадру, а не
+  // від стоп: у ході стопи стрибають на кілька пікселів.
+  it.each(PEOPLE.slice(0, 3))('$name: у кожному кадрі з обличчям кожне око має біле', ({ name, cell }) => {
+    const sheet = load(name);
+    const { width, data } = sheet;
+    const isWhite = (i) => {
+      const [, s, v] = hsv(data[i], data[i + 1], data[i + 2]);
+      return data[i + 3] > 0 && s < 0.12 && v > 0.75;
+    };
+    for (let row = 0; row < NORTH; row += 1) {
+      for (let col = 0; col < 5; col += 1) {
+        let top = -1, left = cell, right = -1;
+        for (let y = 0; y < cell; y += 1) {
+          for (let x = 0; x < cell; x += 1) {
+            if (data[((row * cell + y) * width + col * cell + x) * 4 + 3] === 0) continue;
+            if (top < 0) top = y;
+            left = Math.min(left, x);
+            right = Math.max(right, x);
+          }
+        }
+        const mid = (left + right + 1) / 2;
+        let leftEye = 0, rightEye = 0;
+        for (let y = top + 9; y <= top + 16; y += 1) {
+          for (let x = left; x <= right; x += 1) {
+            if (!isWhite(((row * cell + y) * width + col * cell + x) * 4)) continue;
+            if (x < mid) leftEye += 1;
+            else rightEye += 1;
+          }
+        }
+        const where = `${name}, рядок ${row}, кадр ${col}: біле ${leftEye} ліворуч і ${rightEye} праворуч`;
+        if (row === SOUTH) {
+          expect(leftEye, where).toBeGreaterThan(0);
+          expect(rightEye, where).toBeGreaterThan(0);
+        } else {
+          expect(leftEye + rightEye, where).toBeGreaterThan(0);
+        }
+      }
     }
   });
 

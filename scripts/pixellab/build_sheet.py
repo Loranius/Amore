@@ -24,6 +24,15 @@ spec.json: {"cell": 92, "rotations": {"south": url, ...},
 центром полотна, а по висоті — так, щоб стопи першого кадру стояли там
 само, де в позі «стоїть» того напряму; погойдування ходи лишається.
 
+"face" необов'язкове: очі, перемальовані вручну за шаблоном. PixelLab
+малює дрібні очі по-різному в кожному кадрі — у підлітка відблиск стрибав,
+то зникав, під очима були темні риски, а збоку око розсипалось на два білі
+пікселі. Для кожного напряму: `erase` — прямокутники [x0, y0, x1, y1]
+(включно), де все, що не шкіра, стає кольору `skin`; `eyes` — шаблони
+[x, y, "left" | "right" | "profile"]. `y` відміряні від маківки кадру,
+тож око йде за головою, коли та підстрибує в ході. Кольори: `lid` —
+повіко й зіниця, `white` — біле ока, `iris` — райдужка.
+
 "eyes" необов'язкове: PixelLab малює блакитні очі навіть тоді, коли просиш
 карі. У смузі обличчя (частки висоти силуету кадру, відлік від маківки)
 кожен синій піксель стає кольору `color`, трохи темнішим (карі темніші за
@@ -68,6 +77,51 @@ def recolor_eyes(img: Image.Image, band: list, color: str) -> Image.Image:
     return out
 
 
+# Шаблони ока, як у малої й дорослої: зверху темне повіко, з зовнішнього
+# боку — біле, з боку носа — карий зіниця. L — повіко й зіниця, W — біле,
+# I — райдужка. «profile» дивиться праворуч; ліворуч — дзеркало аркуша.
+EYE_STAMPS = {
+    'left': ['LLL', 'WIL', 'WII'],
+    'right': ['LLL', 'LIW', 'IIW'],
+    'profile': ['LL', 'WL', 'WI'],
+}
+
+
+def hex_rgb(color: str) -> tuple:
+    return tuple(int(color[i:i + 2], 16) for i in (1, 3, 5))
+
+
+def is_skin(r: int, g: int, b: int) -> bool:
+    h, s, v = colorsys.rgb_to_hsv(r / 255, g / 255, b / 255)
+    return h <= 0.1 and 0.15 <= s <= 0.5 and v >= 0.75
+
+
+def paint_face(img: Image.Image, face: dict, direction: str) -> Image.Image:
+    """Стирає старі очі до кольору шкіри й ставить нові з шаблону."""
+    plan = face.get(direction)
+    if not plan:
+        return img
+    out = img.copy()
+    px = out.load()
+    box = out.getchannel('A').getbbox()
+    if not box:
+        raise ValueError('порожній кадр')
+    top = box[1]
+    skin = hex_rgb(face['skin']) + (255,)
+    for x0, y0, x1, y1 in plan.get('erase', []):
+        for y in range(top + y0, top + y1 + 1):
+            for x in range(x0, x1 + 1):
+                r, g, b, a = px[x, y]
+                if a and not is_skin(r, g, b):
+                    px[x, y] = skin
+    colors = {'L': hex_rgb(face['lid']), 'W': hex_rgb(face['white']), 'I': hex_rgb(face['iris'])}
+    for x, y, kind in plan.get('eyes', []):
+        for dy, row in enumerate(EYE_STAMPS[kind]):
+            for dx, key in enumerate(row):
+                px[x + dx, top + y + dy] = colors[key] + (255,)
+    return out
+
+
 def bottom_of(img: Image.Image) -> int:
     """Нижній непрозорий рядок — стопи."""
     box = img.getchannel('A').getbbox()
@@ -104,6 +158,10 @@ def main() -> None:
         # Зі спини очей не видно — «угору» не чіпаємо.
         rot = {k: v if k == 'north' else recolor_eyes(v, eyes['band'], eyes['color']) for k, v in rot.items()}
         walk = {k: v if k == 'north' else [recolor_eyes(f, eyes['band'], eyes['color']) for f in v] for k, v in walk.items()}
+    face = spec.get('face')
+    if face:
+        rot = {k: paint_face(v, face, k) for k, v in rot.items()}
+        walk = {k: [paint_face(f, face, k) for f in v] for k, v in walk.items()}
     frames = max([len(v) for v in walk.values()] + [0])
     if 'west' not in walk and 'east' in walk:
         walk['west'] = [ImageOps.mirror(f) for f in walk['east']]
