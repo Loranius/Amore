@@ -47,12 +47,12 @@ export const KID_DRESS: readonly Garment[] = [
   { part: 'bottom', band: [0.62, 0.84], tones: KID_PINK },
 ];
 export const TEEN_CLOTHES: readonly Garment[] = [
-  // Біла футболка: світло й темна обвідка майже без барви, тінь — сіро-бузкова.
-  { part: 'top', band: [0.36, 0.68], tones: [{ maxS: 0.1, minV: 0.4 }, { hue: [0.55, 0.8], maxS: 0.3, minV: 0.45 }] },
-  // Блакитні комір і манжети з їхньою тінню; пояс джинсів — нижче смуги.
+  // Біла футболка: світло й сірі тіні майже без барви, тінь збоку — сіро-бузкова.
+  { part: 'top', band: [0.38, 0.65], tones: [{ maxS: 0.1, minV: 0.45 }, { hue: [0.55, 0.8], maxS: 0.3, minV: 0.45 }] },
+  // Блакитні комір і манжети з їхньою тінню; гумка на хвості — вище смуги.
   { part: 'accent', band: [0.36, 0.56], tones: [{ hue: [0.5, 0.64], minS: 0.3, minV: 0.4 }] },
-  // Сині джинси з поясом і темною обвідкою.
-  { part: 'bottom', band: [0.56, 0.97], tones: [{ hue: [0.58, 0.78], minS: 0.3, maxV: 0.65 }] },
+  // Сині джинси з поясом, світлішим підворотом і темною обвідкою; кросівки — нижче.
+  { part: 'bottom', band: [0.56, 0.93], tones: [{ hue: [0.55, 0.66], minS: 0.3, maxV: 0.75 }] },
 ];
 // Блакитна сукня з найсвітлішими, майже білими відблисками (у кадрах збоку
 // ними вкрита вся спина); чисто білі бретельки, поділ і туфлі — без барви,
@@ -66,8 +66,10 @@ export const ADULT_DRESS: readonly Garment[] = [
 const SHEETS: HdSheet[] = [
   // Персонаж PixelLab «Лєна мала HD (48)» (a046bd5b-…).
   { url: lenaKidUrl, cell: 68, frames: 4, footX: 34, footY: 56, outfit: { base: LENA_KID, garments: KID_DRESS }, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
-  // Персонаж PixelLab «Лєна підліток HD» (e7e9f230-…), власник 2026-10-06: «Лєна підліток».
-  { url: lenaTeenUrl, cell: 84, frames: 4, footX: 42, footY: 70, outfit: { base: LENA_TEEN, garments: TEEN_CLOTHES }, match: (l) => isLenaTeen(l) },
+  // Персонаж PixelLab «Лєна підліток HD (2)» (10065427-…), власник 2026-10-11:
+  // «дуже різниться між дитиною і дорослою, перемалюй» — кругле обличчя й
+  // великі очі, як у малої й дорослої, світло-каштанове волосся, зріст між ними.
+  { url: lenaTeenUrl, cell: 80, frames: 4, footX: 40, footY: 67, outfit: { base: LENA_TEEN, garments: TEEN_CLOTHES }, match: (l) => isLenaTeen(l) },
   // Персонаж PixelLab «Лєна доросла HD» (2ddf3605-…), власник 2026-10-06: «Доросла Лєна».
   { url: lenaAdultUrl, cell: 92, frames: 4, footX: 46, footY: 76, outfit: { base: LENA_ADULT, garments: ADULT_DRESS }, match: (l) => isLenaAdult(l) },
   // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).

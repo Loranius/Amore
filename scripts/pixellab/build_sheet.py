@@ -11,7 +11,18 @@
 
 spec.json: {"cell": 92, "rotations": {"south": url, ...},
             "walk": {"south": [url, ...], "east": [...], ...},
-            "eyes": {"band": [0.17, 0.31], "color": "#5a3a26"}}
+            "eyes": {"band": [0.17, 0.31], "color": "#5a3a26"},
+            "pick": {"south": [0, 1, 2, 1]}}
+
+"pick" необов'язкове: які кадри ходи брати для напряму. PixelLab іноді
+малює кадр ходи не тим боком — у підлітка двічі останній кадр «униз»
+вийшов спиною. Тоді цикл 0-1-2-1 (середній крок двічі) — звичний для
+піксельних ігор і не блимає потилицею.
+
+Кадри ходи бувають на більшому полотні, ніж повороти (`skeleton-v3`
+кладе людину на 96×96 замість 80×80). Такі кадри стають у клітинку за
+центром полотна, а по висоті — так, щоб стопи першого кадру стояли там
+само, де в позі «стоїть» того напряму; погойдування ходи лишається.
 
 "eyes" необов'язкове: PixelLab малює блакитні очі навіть тоді, коли просиш
 карі. У смузі обличчя (частки висоти силуету кадру, відлік від маківки)
@@ -57,12 +68,37 @@ def recolor_eyes(img: Image.Image, band: list, color: str) -> Image.Image:
     return out
 
 
+def bottom_of(img: Image.Image) -> int:
+    """Нижній непрозорий рядок — стопи."""
+    box = img.getchannel('A').getbbox()
+    if not box:
+        raise ValueError('порожній кадр')
+    return box[3]
+
+
+def fit(frames: list, idle: Image.Image, cell: int) -> list:
+    """Кадри на полотні іншого розміру — у клітинку `cell`, стопи до пози «стоїть»."""
+    if all(f.size == (cell, cell) for f in frames):
+        return frames
+    dy = bottom_of(frames[0]) - bottom_of(idle)
+    out = []
+    for f in frames:
+        dx = (f.width - cell) // 2
+        fitted = Image.new('RGBA', (cell, cell), (0, 0, 0, 0))
+        fitted.paste(f, (-dx, -dy))
+        out.append(fitted)
+    return out
+
+
 def main() -> None:
     spec = json.load(open(sys.argv[1]))
     out = sys.argv[2]
     cell = spec['cell']
     rot = {k: fetch(v) for k, v in spec['rotations'].items()}
     walk = {k: [fetch(u) for u in v] for k, v in spec.get('walk', {}).items()}
+    walk = {d: fit(v, rot[d], cell) for d, v in walk.items()}
+    for d, order in spec.get('pick', {}).items():
+        walk[d] = [walk[d][i] for i in order]
     eyes = spec.get('eyes')
     if eyes:
         # Зі спини очей не видно — «угору» не чіпаємо.

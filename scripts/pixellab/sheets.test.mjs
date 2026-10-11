@@ -7,6 +7,9 @@
 //   блимав кожен четвертий крок, поки його не перегенерували;
 // - PixelLab малює Лєні блакитні очі, навіть коли просиш карі
 //   (`build_sheet.py`, крок `eyes`);
+// - у ході «угору» перемальованого підлітка хвіст був лише в одному кадрі
+//   з чотирьох і блимав — ці кадри взято з `skeleton-v3`, що рухає готовий
+//   малюнок, а не малює заново;
 // - перевдягання (`outfitHd.ts`) мусить знайти одяг у КОЖНОМУ кадрі —
 //   збоку й зі спини теж — і не зачепити голову чи взуття.
 // ============================================================
@@ -23,7 +26,7 @@ const NORTH = 3;
 
 const PEOPLE = [
   { name: 'lena-kid', cell: 68 },
-  { name: 'lena-teen', cell: 84 },
+  { name: 'lena-teen', cell: 80 },
   { name: 'lena-adult', cell: 92 },
   { name: 'mom', cell: 92 },
   { name: 'dima', cell: 92 },
@@ -109,6 +112,23 @@ describe('Аркуші людей 32×32', () => {
     }
   });
 
+  // Лише Лєна: у неї одяг за кольором не схожий на волосся. У Діми червоний
+  // каптур на потилиці рахувався б волоссям.
+  it.each(PEOPLE.slice(0, 3))('$name: зі спини волосся видно в кожному кадрі ходи', ({ name, cell }) => {
+    const nape = new Map();
+    for (const p of pixels(load(name), cell)) {
+      const [h, s, v] = p.hsv;
+      if (p.row !== NORTH || p.rel < 0.28 || p.rel >= 0.5 || h > 0.1 || s < 0.3 || v > 0.75) continue;
+      nape.set(p.col, (nape.get(p.col) ?? 0) + 1);
+    }
+    const idle = nape.get(0) ?? 0;
+    expect(idle).toBeGreaterThan(20);
+    for (let col = 1; col < 5; col += 1) {
+      const n = nape.get(col) ?? 0;
+      expect(n, `${name}, кадр ${col} «угору»: ${n} пікселів волосся на потилиці проти ${idle}`).toBeGreaterThanOrEqual(idle * 0.55);
+    }
+  });
+
   it.each(PEOPLE.slice(0, 3))('$name: очі карі в кожному кадрі з обличчям', ({ name, cell }) => {
     const blue = [];
     for (const p of pixels(load(name), cell)) {
@@ -126,7 +146,7 @@ const PROBE = { top: '#2e8b57', bottom: '#7a4a2a', accent: '#d0309a' };
 const LENA = [
   // Що лишилося б від намальованого одягу, якби його не знайшли.
   { name: 'lena-kid', cell: 68, garments: KID_DRESS, band: [0.36, 0.84], original: ([h, s, v]) => h > 0.85 && h < 0.955 && s > 0.3 && v > 0.5 },
-  { name: 'lena-teen', cell: 84, garments: TEEN_CLOTHES, band: [0.4, 0.62], original: ([, s, v]) => s < 0.12 && v > 0.75 },
+  { name: 'lena-teen', cell: 80, garments: TEEN_CLOTHES, band: [0.4, 0.62], original: ([, s, v]) => s < 0.12 && v > 0.75 },
   { name: 'lena-adult', cell: 92, garments: ADULT_DRESS, band: [0.4, 0.93], original: ([h, s]) => h > 0.5 && h < 0.75 && s > 0.05 },
 ];
 
