@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
+import { BIRD_RANGE_X, BIRD_RANGE_Y } from '../sim/birds';
 import { ROOM_FLOOR } from '../sim/economy';
 import { newLife } from '../sim/life';
 import { propBase, propSolid } from '../render/props';
 import { isWallTop } from '../render/tiles';
-import { colliderFor, reachableTiles, tileFeet, zoneTiles } from './collide';
+import { birdCanStand, birdFeet, colliderFor, reachableTiles, tileFeet, zoneTiles } from './collide';
 import { HATA_DOORS, HATA_FLOORS, HATA_ROOMS, homeInterior } from './interior';
 import { cellarMap } from './cellar';
-import { MOM_SPOTS, YARD } from './yard';
+import { MOM_SPOTS, YARD, YARD_BIRDS } from './yard';
 import { summerKitchenMap } from './kitchen';
 import { ALL_CITY_IDS, cityMap, homeYard } from './maps';
 import { TILE, buildingParts, type GameMap } from './types';
@@ -49,6 +50,21 @@ describe('міста', () => {
     for (const city of ALL_CITY_IDS) {
       expect(cityMap(city).zones.some((z) => z.action.type === 'station' || z.action.type === 'walk'), city).toBe(true);
     }
+  });
+
+  // Власник, 2026-10-12: «зупинку в селі опусти нижче, виведи її за межі майданчика».
+  it('зупинка в Жилинцях — нижче майданчика, на узбіччі вулиці, і зона зупинки не заходить на майданчик', () => {
+    const v = cityMap('zhylyntsi');
+    const play = v.zones.find((z) => z.id === 'play')!;
+    const bus = v.zones.find((z) => z.id === 'bus')!;
+    const stop = v.props.find((p) => p.type === 'busStop')!;
+    const overlap = (a: { x: number; y: number; w: number; h: number }, b: typeof a) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    expect(overlap(play, bus)).toBe(false);
+    expect(stop.y).toBeGreaterThanOrEqual(play.y + play.h);
+    expect(v.ground[Math.floor(stop.y)]![Math.floor(stop.x)], 'навіс стоїть на траві узбіччя').toBe('g');
+    expect(v.ground[bus.y + bus.h - 1]![bus.x], 'зона зупинки доходить до вулиці').toBe('d');
+    const s = v.spawns.station!;
+    expect(s.x >= bus.x && s.x < bus.x + bus.w && s.y >= bus.y && s.y < bus.y + bus.h, 'з автобуса Лєна виходить біля зупинки').toBe(true);
   });
 
   it('усі мапи прямокутні й заповнені', () => {
@@ -148,10 +164,12 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
       for (const b of yard.buildings) for (const part of buildingParts(b)) expect(hit(r, { x: part.x * TILE, y: part.y * TILE, w: part.w * TILE, h: part.h * TILE }), `${t} × ${b.id}`).toBe(false);
       for (const tree of yard.trees) expect(hit(r, { x: tree.x * TILE + 4, y: tree.y * TILE + 8, w: 8, h: 8 }), `${t} × дерево ${tree.x},${tree.y}`).toBe(false);
       for (const [other, o] of solids) if (other !== t) expect(hit(r, o!), `${t} × ${other}`).toBe(false);
-      // Курка ходить ±10 px від свого місця; за повіткою чи будкою її не видно.
+      // На своєму місці курка не стоїть за повіткою чи будкою — її видно
+      // (спрайт ~8×14 над лапами; відійти й сховатись вона може, як у житті).
       const behind = { x: r.x, y: r.y - TILE, w: r.w, h: r.h + TILE };
-      for (const ch of yard.props.filter((p) => p.type === 'chicken')) {
-        expect(hit(behind, { x: ch.x * TILE - 6, y: ch.y * TILE + 5, w: 29, h: 10 }), `${t} × курка ${ch.x},${ch.y}`).toBe(false);
+      for (const b of yard.birds ?? []) {
+        const f = birdFeet(b);
+        expect(hit(behind, { x: f.x - 4, y: f.y - 14, w: 8, h: 14 }), `${t} × ${b.kind} ${b.x},${b.y}`).toBe(false);
       }
     }
     // Речі ставлять, щоб їх було видно: крона дерева, що стоїть нижче
@@ -177,6 +195,56 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     const reach = reachableTiles(yard, yard.spawns.gate!);
     expect(reach.has(`${boiler.x},${boiler.y}`)).toBe(true);
     expect(reach.has(`${YARD.porch.x},${YARD.porch.y + 1}`)).toBe(true);
+  });
+
+  it('кури й півень (власник, 2026-10-12): білі й коричневі кури та один півень; кожна птаха стоїть вільно й має де ходити, а з вигулу не вийде', () => {
+    const yard = homeYard();
+    const birds = yard.birds ?? [];
+    expect(birds).toEqual(YARD_BIRDS.map(([kind, x, y]) => ({ kind, x, y })));
+    expect(birds.filter((b) => b.kind === 'rooster')).toHaveLength(1);
+    expect(birds.some((b) => b.kind === 'white') && birds.some((b) => b.kind === 'brown')).toBe(true);
+    // Кругляшків-пропів більше немає ніде.
+    for (const m of [yard, ...ALL_CITY_IDS.map(cityMap)]) expect(m.props.map((p) => p.type as string)).not.toContain('chicken');
+    const withBirds = [yard, ...ALL_CITY_IDS.map(cityMap)].filter((m) => (m.birds ?? []).length > 0);
+    expect(withBirds.map((m) => m.id)).toEqual(expect.arrayContaining(['zhylyntsi:yard', 'zhylyntsi']));
+    for (const map of withBirds) {
+      const ok = birdCanStand(map);
+      for (const b of map.birds ?? []) {
+        const f = birdFeet(b);
+        const where = `${map.id}: ${b.kind} ${b.x},${b.y}`;
+        expect(ok(f.x, f.y), where).toBe(true);
+        // Довкола місця — простір для кількох кроків, а не одна клітинка.
+        let free = 0;
+        let all = 0;
+        for (let dx = -BIRD_RANGE_X; dx <= BIRD_RANGE_X; dx += BIRD_RANGE_X / 4) {
+          for (let dy = -BIRD_RANGE_Y; dy <= BIRD_RANGE_Y; dy += BIRD_RANGE_Y / 2) {
+            all += 1;
+            if (ok(f.x + dx, f.y + dy)) free += 1;
+          }
+        }
+        expect(free / all, where).toBeGreaterThan(0.3);
+      }
+    }
+    // Вигул замкнений: заливка по точках, де може стати курка, від місця
+    // кожної птахи у вигулі не виходить за тин (вигул — клітинки 19..23 × 11..12).
+    const ok = birdCanStand(yard);
+    for (const b of birds.slice(0, 3)) {
+      const f = birdFeet(b);
+      const start = [Math.round(f.x), Math.round(f.y)] as const;
+      const seen = new Set([start.join(',')]);
+      const queue: (readonly [number, number])[] = [start];
+      while (queue.length > 0) {
+        const [x, y] = queue.pop()!;
+        expect(x >= 19 * TILE && x < 24 * TILE && y >= 11 * TILE && y < 13 * TILE, `${b.kind} вийшла з вигулу в ${x},${y}`).toBe(true);
+        for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]] as const) {
+          const k = `${nx},${ny}`;
+          if (seen.has(k) || !ok(nx, ny)) continue;
+          seen.add(k);
+          queue.push([nx, ny]);
+        }
+      }
+      expect(seen.size, `${b.kind}: у вигулі є де ходити`).toBeGreaterThan(400);
+    }
   });
 
   it('розташування за планом: хлів, хлів, курник позаду хати; город за ними; майстерня над кухнею; сад за кухнею', () => {

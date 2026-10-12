@@ -3,9 +3,10 @@
 // дверима-зонами, дерева й пропи. Мапа — чисті дані, тож її можна
 // перевірити тестом (усі двері досяжні, жодна зона не в стіні).
 // ============================================================
+import type { BirdKind } from '../sim/birds';
 import type { CityId } from '../sim/content';
 import { cellHash } from './hash';
-import { buildingParts, type Building, type BuildingStyle, type CropKind, type CropPlot, type GameMap, type Ground, type Notch, type Prop, type PropType, type SignIcon, type Tree, type TreeKind, type Zone, type ZoneAction } from './types';
+import { buildingParts, type BirdHome, type Building, type BuildingStyle, type CropKind, type CropPlot, type GameMap, type Ground, type Notch, type Prop, type PropType, type SignIcon, type Tree, type TreeKind, type Zone, type ZoneAction } from './types';
 
 /** Меблі, що в домі малюються більшими (`Prop.scale`). */
 export const INTERIOR_FURNITURE: ReadonlySet<PropType> = new Set<PropType>([
@@ -52,6 +53,7 @@ export class MapBuilder {
   readonly zones: Zone[] = [];
   readonly spawns: Record<string, { x: number; y: number }> = {};
   readonly crops: CropPlot[] = [];
+  readonly birds: BirdHome[] = [];
   folk = 0;
   pondFreezes = false;
 
@@ -102,6 +104,12 @@ export class MapBuilder {
     this.crops.push({ x, y, w, h, kind });
     const tall = kind === 'corn' ? 'corn' : kind === 'tomato' ? 'tomatoes' : null;
     if (tall) for (let j = y; j < y + h; j += 1) for (let i = x; i < x + w; i += 1) this.props.push({ type: tall, x: i, y: j, solid: false });
+    return this;
+  }
+
+  /** Курка чи півень, що ходить довкола клітинки (x, y). */
+  bird(kind: BirdKind, x: number, y: number): this {
+    this.birds.push({ kind, x, y });
     return this;
   }
 
@@ -156,6 +164,7 @@ export class MapBuilder {
       folk: this.folk,
       pondFreezes: this.pondFreezes,
       ...(this.crops.length ? { crops: this.crops } : {}),
+      ...(this.birds.length ? { birds: this.birds } : {}),
     };
   }
 }

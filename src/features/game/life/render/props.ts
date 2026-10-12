@@ -468,20 +468,6 @@ export function drawProp(g: Ctx, p: Prop, season: Season, t: number): void {
       for (let k = 0; k < 6; k += 1) rect(g, x, y + k * 5, 48, 4, k % 2 ? '#d8d0c2' : '#e8e0d0');
       break;
     }
-    case 'chicken': {
-      const walk = Math.sin(t * 1.3 + seed) * 10;
-      const peck = Math.floor(t * 3 + seed) % 5 === 0 ? 1 : 0;
-      const cx = x + 8 + Math.round(walk);
-      shadow(g, cx, y + 14, 4, 1);
-      ellipse(g, cx, y + 10, 4, 3, '#f8f4ec');
-      disc(g, cx + 3, y + 7 + peck, 2, '#f8f4ec');
-      px(g, cx + 4, y + 6 + peck, '#d9534f');
-      px(g, cx + 5, y + 8 + peck, '#f6c14e');
-      px(g, cx + 3, y + 7 + peck, '#2b2b33');
-      rect(g, cx - 1, y + 13, 1, 2, '#f6c14e');
-      rect(g, cx + 1, y + 13, 1, 2, '#f6c14e');
-      break;
-    }
     case 'cat': {
       // Кіт спить калачиком; хвіст ворушиться.
       const tail = Math.round(Math.sin(t * 2) * 1.5);

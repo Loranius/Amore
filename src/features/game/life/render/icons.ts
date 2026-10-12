@@ -45,9 +45,18 @@ export const ICONS: Record<SignIcon | UiIcon, Bitmap> = {
   arrow: { rows: ['aaaaaaa', '.abbba.', '..aba..', '...a...'], palette: { a: '#a8741a', b: '#f6c14e' } },
   cross: { rows: ['a....a', '.a..a.', '..aa..', '..aa..', '.a..a.', 'a....a'], palette: { a: '#ffffff' } },
   ring: { rows: ['..bcb..', '...b...', '.aaaaa.', 'a.....a', 'a.....a', 'a.....a', '.aaaaa.'], palette: { a: '#e8b83a', b: '#bfe8ff', c: '#ffffff' } },
+  // Маркери взаємодій на мапі (`markers.ts`).
+  door: { rows: ['.aaaaa.', 'abbbbba', 'abcbcba', 'abcbcba', 'abbbbda', 'abcbcba', 'abcbcba', 'aaaaaaa'], palette: { a: '#5a3a24', b: '#b8844e', c: '#8a5a34', d: '#f6c14e' } },
+  eye: { rows: ['..aaa..', '.abbba.', 'abbcbba', '.abbba.', '..aaa..'], palette: { a: '#3a2a2a', b: '#ffffff', c: '#3a6fd8' } },
+  apple: { rows: ['...b...', '..bc...', '.aaaaa.', 'aaddaaa', 'aadaaaa', 'aaaaaaa', '.aaaaa.'], palette: { a: '#e8402e', b: '#5a3a24', c: '#5aa04a', d: '#ff9a8a' } },
+  sprout: { rows: ['.b...b.', 'bbb.bbb', '.bb.bb.', '...a...', '...a...', '.ccccc.', 'ccccccc'], palette: { a: '#3f8a43', b: '#7ed957', c: '#8a5a34' } },
+  fish: { rows: ['...aaa...', '.aaaaaa.b', 'acaaaaabb', '.aaaaaa.b', '...aaa...'], palette: { a: '#7fc0ec', b: '#3a6fd8', c: '#1b2b4a' } },
+  hammer: { rows: ['cccccc.', 'aaaaaa.', '..b....', '..b....', '..b....', '..b....'], palette: { a: '#8a8f96', b: '#8a5a34', c: '#c9ced8' } },
+  bubble: { rows: ['.aaaaaa.', 'abbbbbba', 'abcbcbca', 'abbbbbba', '.aaaaaa.', '..aa....', '..a.....'], palette: { a: '#5a3a24', b: '#ffffff', c: '#5a3a24' } },
 };
 
-export type UiIcon = 'coin' | 'bolt' | 'heart' | 'sun' | 'moon' | 'bag' | 'map' | 'album' | 'phone' | 'smile' | 'sleep' | 'arrow' | 'cross' | 'ring';
+export type UiIcon = 'coin' | 'bolt' | 'heart' | 'sun' | 'moon' | 'bag' | 'map' | 'album' | 'phone' | 'smile' | 'sleep' | 'arrow' | 'cross' | 'ring'
+  | 'door' | 'eye' | 'apple' | 'sprout' | 'fish' | 'hammer' | 'bubble';
 
 export function drawBitmap(g: CanvasRenderingContext2D, name: keyof typeof ICONS, x: number, y: number): void {
   const bm = ICONS[name];

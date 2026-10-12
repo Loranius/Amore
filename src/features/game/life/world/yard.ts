@@ -17,6 +17,7 @@
 //     стежки до хвіртки; хвіртка внизу, до села.
 // ============================================================
 import { MapBuilder } from './build';
+import type { BirdKind } from '../sim/birds';
 import type { MomSpot } from '../sim/mom';
 import type { CropKind, GameMap, TreeKind } from './types';
 import { cellHash } from './hash';
@@ -59,6 +60,12 @@ export const MOM_SPOTS: Record<Exclude<MomSpot, 'bed' | 'kitchen'>, readonly [nu
   chickens: [[21, 14.6], [23, 14.6], [19.5, 14.7]],
   bench: [[6.6, 26.9]],
 };
+
+/** Кури й півень садиби: хто й довкола якої клітинки ходить. */
+export const YARD_BIRDS: readonly (readonly [BirdKind, number, number])[] = [
+  ['white', 20.2, 11.2], ['rooster', 21.8, 11.6], ['brown', 23, 11],
+  ['brown', 16.6, 14.6], ['white', 20.8, 16.4], ['brown', 3.4, 14.2],
+];
 
 /** Куди мама заходить, коли йде з подвір'я: у хату чи в літню кухню. */
 export const MOM_DOORS = { bed: [RIGHT_WING.x + RIGHT_WING.w, 22] as [number, number], kitchen: [KITCHEN.x + 1, KITCHEN.y] as [number, number] };
@@ -119,8 +126,9 @@ export function yardMap(): GameMap {
   // Вигул: тин довкола, ґрунт усередині, кури.
   m.fill(19, 10, 6, 4, 'd');
   m.fill(19, 10, 6, 1, 'F').fill(24, 10, 1, 4, 'F').fill(19, 13, 5, 1, 'F');
-  for (const [x, y] of [[20.2, 11.2], [21.8, 11.6], [23, 11]] as const) m.prop('chicken', x, y, { solid: false });
-  for (const [x, y] of [[16.6, 14.6], [20.8, 16.4], [3.4, 14.2]] as const) m.prop('chicken', x, y, { solid: false });
+  // Білі й коричневі кури та один півень (власник, 2026-10-12): у вигулі
+  // з півнем — дві, ще три гуляють подвір'ям.
+  for (const [kind, x, y] of YARD_BIRDS) m.bird(kind, x, y);
   m.building({ id: 'sichkarnia', x: 26, y: 10, w: 4, h: 5, style: 'shed', label: 'Січкарня', doorX: 27, action: { type: 'info', text: 'Січкарня: тут рубають солому й буряк на корм худобі.' }, zoneLabel: 'Січкарня' });
 
   // ── Хата: два крила впритул, один дах ─────────────────────────

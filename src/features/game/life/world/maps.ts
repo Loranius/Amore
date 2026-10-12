@@ -17,6 +17,9 @@ import { yardMap } from './yard';
 
 const homeZone = { type: 'home' } as const;
 
+/** Автобусна зупинка в Жилинцях (клітинка, де стоїть навіс). */
+export const BUS_STOP = { x: 37, y: 13 } as const;
+
 function zhylyntsi(): GameMap {
   const m = new MapBuilder('zhylyntsi', 'zhylyntsi', 'с. Жилинці', 42, 30);
   m.folk = 4;
@@ -30,7 +33,7 @@ function zhylyntsi(): GameMap {
   m.fill(7, 11, 1, 3, 'd');
   for (let x = 2; x <= 12; x += 1) if (x !== 7) m.fill(x, 13, 1, 1, 'F');
   m.fill(2, 6, 1, 7, 'F').fill(12, 6, 1, 7, 'F');
-  m.prop('well', 10, 9).prop('chicken', 3.2, 11.2).prop('chicken', 9.5, 11.6, { solid: false }).prop('cat', 4.6, 10.6);
+  m.prop('well', 10, 9).bird('white', 3.2, 11.2).bird('brown', 9.5, 11.6).prop('cat', 4.6, 10.6);
   m.prop('sunflowers', 2, 3).prop('sunflowers', 4, 3).prop('sunflowers', 6, 2).prop('haystack', 9, 2);
   m.spawn('home', 7, 12).spawn('default', 7, 12);
 
@@ -62,9 +65,11 @@ function zhylyntsi(): GameMap {
 
   // Оголошення: у селі продається будинок (нерухомість, 2026-10-04).
   m.prop('board', 30, 11.4).zone('forSale', 29, 12, 3, 1, { type: 'realtor' }, 'Оголошення · продається будинок');
-  m.prop('busStop', 37, 11, { solid: false });
-  m.zone('bus', 36, 12, 4, 2, { type: 'station' }, 'Зупинка · автобус');
-  m.spawn('station', 37, 13);
+  // Зупинка — за майданчиком, на узбіччі вулиці (власник 2026-10-12:
+  // «зупинку в селі опусти нижче, виведи її за межі майданчика»).
+  m.prop('busStop', BUS_STOP.x, BUS_STOP.y, { solid: false });
+  m.zone('bus', 36, 13, 4, 2, { type: 'station' }, 'Зупинка · автобус');
+  m.spawn('station', 37, 14);
   m.zone('toPravdivka', 20, 28, 2, 2, { type: 'walk', to: 'pravdivka' }, 'Стежка до Правдівки');
   m.spawn('walk', 21, 27);
 
@@ -98,7 +103,7 @@ function pravdivka(): GameMap {
   m.fill(1, 15, 11, 8, 'G');
   for (let x = 1.5; x < 11; x += 2.2) for (let y = 15.5; y < 22; y += 2.4) m.prop('sunflowers', x, y);
   m.zone('field', 12, 16, 2, 4, { type: 'sight', sight: 'sunflowers' }, 'Соняшникове поле');
-  m.prop('haystack', 25, 17).prop('well', 27, 13.6).prop('chicken', 24, 9).prop('chicken', 29, 9.4);
+  m.prop('haystack', 25, 17).prop('well', 27, 13.6).bird('brown', 24, 9).bird('white', 29, 9.4);
   m.zone('mushrooms', 17, 3, 5, 1, { type: 'activity', id: 'mushrooms' }, 'Лісосмуга · по гриби');
   m.prop('signpost', 16.2, 13.4).prop('bench', 10, 9.6).prop('flowerBed', 22, 13.4).prop('cat', 8, 13.6, { tint: '#3a3a40' });
   m.scatterTrees(0, 0, 32, 3, ['oak', 'birch', 'poplar'], 0.4, 3);

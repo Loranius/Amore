@@ -6,6 +6,7 @@
 // ліхтарі, маяк, піч удома, ліхтарик біля самої Лєни. Так ніч темна, а
 // місто — живе.
 // ============================================================
+import type { Bird } from '../sim/birds';
 import type { Season } from '../sim/calendar';
 import { TILE, type GameMap, type Zone } from '../world/types';
 import { buildingSprite, drawBuildingShadow } from './buildings';
@@ -18,7 +19,9 @@ import { drawPersonHd, hasHdLook } from './peopleHd';
 import { drawProp, propBase, propLight } from './props';
 import { drawWater, groundCanvas } from './tiles';
 import { drawBitmap } from './icons';
+import { drawBird } from './birds';
 import { drawDog } from './dog';
+import { drawMarkers, markersFor } from './markers';
 
 export type Weather = 'clear' | 'rain' | 'snow' | 'leaves' | 'petals';
 
@@ -79,6 +82,10 @@ export interface SceneOptions {
   near: Zone | null;
   /** Тварини — Бася на подвір'ї. */
   pets?: readonly Pet[];
+  /** Кури й півень (`sim/birds.ts`). */
+  birds?: readonly Bird[];
+  /** З ким зараз можна поговорити (id акторів) — над ними значок розмови. */
+  talkable?: readonly string[];
 }
 
 /** Кут падіння (радіани): швидко вниз, полежати, підвестись. */
@@ -244,6 +251,10 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
       },
     });
   }
+  for (const b of opts.birds ?? []) {
+    if (b.x < camX - 16 || b.x > camX + vw + 16 || b.y < camY - 4 || b.y > camY + vh + 24) continue;
+    items.push({ y: b.y, draw: () => drawBird(g, b) });
+  }
   items.sort((a, b) => a.y - b.y);
   for (const it of items) it.draw();
 
@@ -326,6 +337,18 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     // Удома вночі — тепла напівтемрява.
     g.fillStyle = 'rgba(40,30,70,0.32)';
     g.fillRect(0, 0, view.w, view.h);
+  }
+
+  // Значки взаємодій — поверх темряви й погоди, під підписами. Лише коли
+  // Лєна на мапі: на титулі село — тло, а не місце, де щось робити.
+  const lena = actors.find((a) => a.id === 'lena');
+  if (lena) {
+    const talk = new Set(opts.talkable ?? []);
+    const people = [
+      ...actors.filter((a) => talk.has(a.id)).map((a) => ({ id: a.id, x: a.x, y: a.y, kind: 'talk' as const })),
+      ...(opts.pets ?? []).map((p) => ({ id: 'basia', x: p.x, y: p.y, kind: 'pet' as const })),
+    ];
+    drawMarkers(g, markersFor(map, { lena, near: opts.near, target: opts.target, people }), view, env.time);
   }
 
   drawLabels(g, map, actors, view, opts);

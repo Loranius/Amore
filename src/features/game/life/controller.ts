@@ -39,7 +39,7 @@ import {
   type LifeState,
   type Outcome,
 } from './sim/life';
-import { rngFor } from './sim/rng';
+import { hashString, rngFor } from './sim/rng';
 import { SAVE_KEY, SaveError, parseSave, serialize } from './sim/save';
 import { dayPlan, friendsGame, makeGame, type PlannedGame } from './games/day';
 import { Kit, type MiniGame } from './games/kit';
@@ -48,13 +48,14 @@ import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
 import { artFor, hasHd, readArt, saveArt, type Art } from './render/art';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
-import { colliderFor, tileFeet, zoneAt } from './world/collide';
+import { birdCanStand, birdFeet, colliderFor, tileFeet, zoneAt } from './world/collide';
 import { HATA_MOM_BED, homeInterior } from './world/interior';
 import { cityMap, homeYard } from './world/maps';
 import { MOM_DOORS, MOM_SPOTS, YARD_ID } from './world/yard';
 import { CELLAR_ID, cellarMap } from './world/cellar';
 import { KITCHEN_ID, KITCHEN_MOM_SPOTS, summerKitchenMap } from './world/kitchen';
 import { momPlan, type MomPlan } from './sim/mom';
+import { newBird, stepBird, type Bird } from './sim/birds';
 import { DOG_HAPPY_S, LENA_FALL_S, feedBasia, newDog, petBasia, stepDog, type Dog } from './sim/dog';
 
 /** Стеля щільності пікселів полотна гри (власник: «оптимізуй під айфони»). */
@@ -145,6 +146,10 @@ export class GameController {
   private extras: Actor[] = [];
   /** Бася — лише на подвір'ї; зберігається, поки Лєна там. */
   private dog: Dog | null = null;
+  /** Кури й півень цієї мапи (`map.birds`); нові щоразу, як Лєна приходить на мапу. */
+  private birds: Bird[] = [];
+  private birdsOf: GameMap | null = null;
+  private birdStand: (x: number, y: number) => boolean = () => false;
   /** Мама Лєни: ходить подвір'ям за розкладом або відпочиває у своїй кімнаті. */
   private momA: (Actor & { target: { x: number; y: number } | null; wait: number; stuck: number; leaving: boolean; plan: MomPlan }) | null = null;
   /** Скільки ще секунд Лєна лежить, перечепившись об Басю. */
@@ -618,6 +623,7 @@ export class GameController {
     this.player.x += dt * 9;
     if (this.player.x > (this.map.w - 8) * TILE) this.player.x = 8 * TILE;
     this.updateFolk(dt);
+    this.updateBirds(dt);
   }
 
   private worldFrame(dt: number): void {
@@ -627,6 +633,7 @@ export class GameController {
     this.updateFolk(dt);
     this.updateResidents(dt);
     this.updateDog(dt);
+    this.updateBirds(dt);
     this.updateMom(dt);
     if (!this.blocked()) {
       if (this.fallLeft > 0) { this.fallLeft = Math.max(0, this.fallLeft - dt); this.player.moving = false; }
@@ -769,6 +776,29 @@ export class GameController {
       this.fallDir = this.dog.x > this.player.x ? -1 : 1;
       sfx.oops();
     }
+  }
+
+  /**
+   * Кури й півень ходять довкола своїх місць і тікають від Лєни, Басі й
+   * перехожих; від мами, що їх годує, — ні. Зерно — від сейву, мапи, дня й
+   * номера птахи, тож той самий день той самий.
+   */
+  private updateBirds(dt: number): void {
+    if (this.birdsOf !== this.map) {
+      const map = this.map;
+      const seed = this.life?.seed ?? 0;
+      const day = this.life?.day ?? 0;
+      this.birdsOf = map;
+      this.birdStand = birdCanStand(map);
+      this.birds = (map.birds ?? []).map((h, k) => {
+        const f = birdFeet(h);
+        return newBird(h.kind, f.x, f.y, hashString(`bird|${seed}|${map.id}|${day}|${k}`));
+      });
+    }
+    if (this.birds.length === 0) return;
+    const scare = [...this.folk, ...this.residents, ...this.extras, ...(this.dima ? [this.dima] : []), ...(this.dog ? [this.dog] : []), ...(this.ui.screen === 'world' ? [this.player] : [])];
+    const world = { scare, canStand: this.birdStand };
+    this.birds = this.birds.map((b) => stepBird(b, dt, world));
   }
 
   /**
@@ -951,6 +981,11 @@ export class GameController {
       target: this.ui.screen === 'world' ? this.targetZone() : null,
       near: this.ui.screen === 'world' ? this.ui.near : null,
       pets: this.dog && this.ui.screen === 'world' ? [this.dog] : [],
+      birds: this.birds,
+      // Ті самі, кого `checkZone` пропонує для розмови.
+      talkable: this.ui.screen === 'world'
+        ? [...(this.momA ? ['mom'] : []), ...(this.dima && this.dimaRole !== 'arriving' && this.life?.flags.metDima ? ['dima'] : []), ...this.residents.map((r) => r.id)]
+        : [],
     });
     if (this.joy) {
       const r = this.canvas!.getBoundingClientRect();

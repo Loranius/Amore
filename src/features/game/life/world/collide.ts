@@ -3,7 +3,7 @@
 // тверді пропи. Чисте — тестується без браузера.
 // ============================================================
 import { propSolid } from '../render/props';
-import { SOLID_GROUND, TILE, buildingParts, type GameMap, type Rect, type Zone } from './types';
+import { SOLID_GROUND, TILE, buildingParts, type BirdHome, type GameMap, type Rect, type Zone } from './types';
 
 export interface Collider {
   blocked(px: number, py: number): boolean;
@@ -38,6 +38,28 @@ export function colliderFor(map: GameMap): Collider {
   };
   colliders.set(map, c);
   return c;
+}
+
+/** Лапи птахи на її місці: внизу посередині клітинки, як стояла курка-проп. */
+export function birdFeet(h: BirdHome): { x: number; y: number } {
+  return { x: h.x * TILE + 8, y: h.y * TILE + 14 };
+}
+
+/**
+ * Де може стати курка: лапи 6×3 — вужчі за людські, тож вона пролазить
+ * упритул до тину. Будівля для неї — уся, до самого верху стіни: Лєна
+ * підходить до стіни на 4 px (`colliderFor`), а курка в цю щілину між
+ * курником і тином вигулу пролізла б геть із вигулу. На грядки не
+ * заходить — звідти її мама виганяє.
+ */
+export function birdCanStand(map: GameMap): (x: number, y: number) => boolean {
+  const c = colliderFor(map);
+  const walls = map.buildings.flatMap((b) => buildingParts(b).map((r) => ({ x: r.x * TILE, y: r.y * TILE, w: r.w * TILE, h: r.h * TILE })));
+  const bad = (px: number, py: number): boolean =>
+    c.blocked(px, py)
+    || map.ground[Math.floor(py / TILE)]![Math.floor(px / TILE)] === 'v'
+    || walls.some((r) => px >= r.x && px < r.x + r.w && py >= r.y && py < r.y + r.h);
+  return (x, y) => !bad(x - 3, y - 2) && !bad(x + 2, y - 2) && !bad(x - 3, y) && !bad(x + 2, y);
 }
 
 /** Точка, куди ставити Лєну в клітинці (стопи внизу клітинки). */

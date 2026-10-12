@@ -1,6 +1,7 @@
 // ============================================================
 // Мапи «Дєвочка в городі» (ADR-0239): дані, які малює `render/scene.ts`.
 // ============================================================
+import type { BirdKind } from '../sim/birds';
 import type { CityId, ShopId } from '../sim/content';
 
 export const TILE = 16;
@@ -127,7 +128,7 @@ export type PropType =
   | 'bench' | 'lamp' | 'well' | 'mailbox' | 'busStop' | 'fountain' | 'bigFountain' | 'stall' | 'car' | 'bike'
   | 'bin' | 'planter' | 'pot' | 'sunflowers' | 'haystack' | 'swing' | 'slide' | 'sandbox' | 'goal' | 'flagpole'
   | 'umbrella' | 'lounger' | 'yellowStone' | 'boat' | 'lighthouse' | 'cafeTable' | 'signpost' | 'board' | 'bush'
-  | 'flowerBed' | 'rock' | 'chicken' | 'cat' | 'duck' | 'gull' | 'pier' | 'stairs' | 'statue' | 'tram' | 'clock' | 'photo'
+  | 'flowerBed' | 'rock' | 'cat' | 'duck' | 'gull' | 'pier' | 'stairs' | 'statue' | 'tram' | 'clock' | 'photo'
   // кімната
   | 'bed' | 'rug' | 'plant' | 'floorLamp' | 'poster' | 'shelf' | 'tv' | 'pet' | 'table' | 'stove' | 'window' | 'wardrobe'
   | 'desk' | 'sofa' | 'fridge' | 'rushnyk' | 'door'
@@ -200,6 +201,18 @@ export interface GameMap {
   pondFreezes?: boolean;
   /** Ділянки городу з культурами; поза ними грядки — просто сходи. */
   crops?: readonly CropPlot[];
+  /** Кури й півень (`sim/birds.ts`): кожна птаха ходить довкола свого місця. */
+  birds?: readonly BirdHome[];
+}
+
+/**
+ * Місце птахи — клітинка, як у пропа (дробова); лапи — внизу посередині
+ * клітинки (`birdFeet`).
+ */
+export interface BirdHome {
+  kind: BirdKind;
+  x: number;
+  y: number;
 }
 
 export interface Rect {
