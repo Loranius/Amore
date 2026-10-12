@@ -38,3 +38,5 @@ __pycache__/
 .github/skills/impeccable/scripts/bin/
 # Особисті налаштування Claude Code (тут — хуки Impeccable), не для всіх сесій.
 .claude/settings.local.json
+# Impeccable: журнал жеребу concept-seed — робочий стан сесії, не артефакт.
+.impeccable/questions/
