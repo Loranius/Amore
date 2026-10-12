@@ -29,7 +29,10 @@ import { PhotoLightbox } from './PhotoLightbox';
 import { albumColumns, photoAspect } from './momentStyle';
 import { placeLabel } from './momentPlace';
 import { formatMemoryDate } from './memoriesDate';
-import { threadNeighbors, type ThreadNeighbor } from './memoryThread';
+import { THREAD_FRAME_CSS_WIDTH, threadNeighbors, type ThreadNeighbor } from './memoryThread';
+import { markCoverMorphSource } from './coverMorph';
+import { thumbUrl } from '@/lib/imageCdn';
+import type { CSSProperties } from 'react';
 import { useMomentMutations, useMoments, type Moment } from './useMoments';
 import './memories.css';
 import { useWorldModule } from '@/features/world/useWorldModule';
@@ -105,8 +108,14 @@ export function MomentPage() {
         {moment.cover && (
           // Обкладинка теж відкривається на повний екран: інакше спогад з
           // одним знімком не мав би жодного способу його роздивитись.
+          // `key` — спогад: гортаючи сусідів, обкладинка монтується заново й
+          // повертає собі ім'я переходу, яке стара віддала (`coverMorph.ts`).
+          // Підложка — той самий кадр, що на нитці: він уже в кеші, тож
+          // перехід виростає з фото, а не з порожнього прямокутника.
           <button
+            key={moment.id}
             type="button" className="mm-hero-shot"
+            style={{ '--mm-hero-thumb': `url("${thumbUrl(moment.cover.photo_url, THREAD_FRAME_CSS_WIDTH)}")` } as CSSProperties}
             onClick={() => setLightbox(moment.cover!.id)} aria-label="Відкрити фото"
           >
             <Photo src={moment.cover.photo_url} cssWidth={HERO_CSS_WIDTH} alt="" decoding="async" />
@@ -219,8 +228,12 @@ export function MomentPage() {
   );
 }
 
-/** Мініатюра сусіда — кадр 64 CSS-пікселі. */
-const NEIGHBOR_CSS_WIDTH = 64;
+/**
+ * Мініатюра сусіда просить ту саму ширину, що й кадр на нитці: один URL
+ * з обкладинкою-підложкою, тож перехід до сусіда виростає з уже
+ * завантаженого фото.
+ */
+const NEIGHBOR_CSS_WIDTH = THREAD_FRAME_CSS_WIDTH;
 
 /**
  * Шматок нитки: новіший спогад угорі, цей посередині, старіший унизу —
@@ -254,6 +267,8 @@ function NeighborLink({ neighbor, side }: { neighbor: ThreadNeighbor<Moment>; si
       className={`mm-thread-link mm-thread-link--${side}`}
       aria-label={`${title}, ${label}`}
       replace
+      viewTransition
+      onClick={(e) => markCoverMorphSource(e.currentTarget.querySelector('.mm-thread-shot'))}
     >
       <span className="mm-thread-shot" aria-hidden="true">
         {moment.cover

@@ -25,7 +25,9 @@ import { Photo } from '@/components/ui/Photo';
 import { pluralUA } from '@/lib/utils';
 import { formatMemoryDate } from './memoriesDate';
 import { placeLabel } from './momentPlace';
+import { markCoverMorphSource } from './coverMorph';
 import {
+  THREAD_FRAME_CSS_WIDTH,
   buildThread,
   frameWidth,
   threadFan,
@@ -34,13 +36,7 @@ import {
 } from './memoryThread';
 import type { Moment } from './useMoments';
 
-/**
- * Ширина кадру на екрані в CSS-пікселях.
- *
- * Колонка вузла на телефоні 412px — 144px із повзунком років і 169px без
- * нього; кадр без віяла — 0.9 колонки. Беремо найширший випадок.
- */
-const FRAME_CSS_WIDTH = 152;
+const FRAME_CSS_WIDTH = THREAD_FRAME_CSS_WIDTH;
 /** Лист віяла видно смужкою під затемненням — повна якість тут марна. */
 const LEAF_CSS_WIDTH = 96;
 const LEAF_QUALITY = 55;
@@ -237,6 +233,8 @@ function ThreadNode({
           на кожному вузлі. */}
       <Link
         to={`/memories/${moment.id}`}
+        viewTransition
+        onClick={(e) => markCoverMorphSource(e.currentTarget.querySelector('.mt-frame'))}
         className="mt-link"
         aria-label={[title || date, title ? date : '', isUnseen ? 'нове від партнера' : ''].filter(Boolean).join(', ')}
       >

@@ -779,6 +779,9 @@
 }
 
 .mm-hero-shot {
+  /* Обкладинка завжди носить ім'я переходу: у неї виростає кадр, якого
+     торкнулись на нитці чи серед сусідів (`coverMorph.ts`). */
+  view-transition-name: mm-cover;
   display: block;
   width: 100%;
   border: 0;
@@ -805,8 +808,11 @@
   aspect-ratio: 4 / 5;
   max-height: 54vh;
   object-fit: cover;
-  /* Видно, поки кадр іде: порожнеча замість фото читалась би як діра. */
-  background: var(--surface-2);
+  /* Поки повний кадр іде — той самий кадр із нитки, уже в кеші
+     (`--mm-hero-thumb`, ADR-0253), а під ним колір: порожнеча замість фото
+     читалась би як діра. Колір — останній шар, інакше браузер викинув би
+     весь фон. */
+  background: var(--mm-hero-thumb, none) center / cover no-repeat, var(--surface-2);
   border-radius: 0 0 var(--mm-hero-round) var(--mm-hero-round);
 }
 
@@ -1326,4 +1332,62 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mm-thread-shot { transition: none; }
+}
+
+/* ── Кадр стає спогадом (ADR-0253) ──────────────────────────────
+
+   Єдиний авторський рух модуля, і він має причину: нитка й спогад — одна
+   річ у двох масштабах. Кадр, якого торкнулись, ВИРОСТАЄ в обкладинку,
+   а решта сторінки лише коротко перетікає.
+
+   380 мс з упевненим гальмуванням — це перехід між видами (300…500 мс),
+   а не відгук на дотик. Знімки заповнюють рамку по `cover`: кадр на нитці
+   квадратний, обкладинка 4:5, і без цього фото розтягувалось би. */
+::view-transition-group(mm-cover) {
+  animation-duration: 380ms;
+  animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+::view-transition-old(mm-cover),
+::view-transition-new(mm-cover) {
+  height: 100%;
+  object-fit: cover;
+  overflow: clip;
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 200ms;
+}
+
+/* ── Нове від партнера: одне кільце, один раз ───────────────────
+
+   Вузол, що світиться акцентом, при появі один раз розходиться кільцем —
+   щоб око знайшло його серед каменю. Не петля: те, що блимає весь час,
+   за хвилину перестають бачити, а на телефоні воно ще й їсть батарею.
+   Кільце — контур, що розширюється й гасне, а не сяйво під вузлом. */
+.mt-node.is-unseen .mt-dot::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--accent);
+  opacity: 0;
+  animation: mt-unseen-ring 900ms cubic-bezier(0.16, 1, 0.3, 1) 240ms 1;
+}
+
+@keyframes mt-unseen-ring {
+  from { opacity: 0.9; scale: 1; }
+  to { opacity: 0; scale: 2.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* Без руху — і без переходу: спогад відкривається одразу. Колір вузла
+     «нове» лишається, бо він несе стан, а не рух. */
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
+  .mt-node.is-unseen .mt-dot::after { animation: none; }
 }
