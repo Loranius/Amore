@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { PLAN_CATEGORIES } from './planConstants';
-import { waitingSince } from './PlanFocusHero';
+import { formatDateUA } from '@/features/_shared/month';
 import type { PlanRow } from '@/types';
 import {
   DECK_DRAG_SLOP,
@@ -22,7 +22,7 @@ import {
 //
 // ЧОМУ КОЛОДА, А НЕ СПИСОК. Список із п'яти однакових карток просить
 // вибрати; колода показує ОДИН і питає про нього. Порядок не випадковий:
-// `ideaQueue` кладе першим той, що лежить найдовше (`Гончарство` — від
+// `stageIdeas` кладе першим той, що лежить найдовше (`Гончарство` — від
 // 29 липня). Тобто екран сам піднімає найзанедбаніше, а не те, що згори.
 //
 // ЧОМУ НАТИВНИЙ `input[type=date]`, А НЕ ВЛАСНИЙ КАЛЕНДАР. Той самий
@@ -49,6 +49,11 @@ import {
  * Клавіатура не втрачає нічого: картка фокусується, ↓ — наступний, ↑ —
  * попередній, а лічильник оголошує, де ти.
  */
+/** Відколи задум чекає — для підпису в колоді. */
+function waitingSince(createdAt: string): string {
+  return formatDateUA(createdAt.slice(0, 10));
+}
+
 type DeckPhase =
   | { kind: 'idle' }
   | { kind: 'drag'; offset: number }

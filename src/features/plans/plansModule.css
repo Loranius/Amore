@@ -101,183 +101,12 @@
   color: var(--muted);
 }
 
-/* ── Плитки планів: два стовпці ──────────────────────────── */
+/* ── Сітка скелета: два стовпці ──────────────────────────── */
 
 .plans-module .pm-tiles {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 10px;
-}
-
-.plans-module .pm-tile {
-  position: relative;
-  overflow: hidden;
-  /* Сітка, а не стовпчик: стрілка стоїть ОКРЕМОЮ колонкою праворуч, і текст
-     їй нічого не винен. Перша спроба тримала стрілку накладкою поверх
-     стовпчика — і на живому екрані дата ламалась на три рядки («31 / грудня /
-     2026»), бо тулилась у залишок ширини. */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 28px;
-  grid-template-rows: auto auto 1fr;
-  column-gap: 6px;
-  row-gap: 3px;
-  /* Розміри з референсу: картка нижча, поля тісніші, шрифти на крок менші.
-     Виміряно на знімку власника — там у ту саму висоту екрана входять дві
-     секції по дві картки й ще «Завершені» з кнопкою. */
-  min-height: 92px;
-  padding: 9px 9px 9px 17px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  /* Колір категорії заливає картку зліва й гасне до середини — саме так на
-     референсі відрізняються «Побачення» від «Іншого». */
-  /* Колір категорії ослаблено з 26% до 15% і його спад скорочено.
-     Виміряно на живому екрані: на всю ширину картки заливка читалась не як
-     «ребро категорії», а як «картка пофарбована», і три сусідні картки
-     давали три кольорові плити поспіль. Роль кольору тут — назвати
-     категорію, а не оздобити поверхню. */
-  background:
-    linear-gradient(100deg,
-      color-mix(in srgb, var(--plan-color, var(--accent)) 15%, transparent) 0%,
-      color-mix(in srgb, var(--plan-color, var(--accent)) 4%, transparent) 34%,
-      transparent 58%),
-    var(--glass-read);
-  box-shadow: var(--glass-edge), var(--shadow-md);
-}
-
-/* Грань — окремий елемент (`PlanCrystalEdge`), а не псевдоелемент: огранка
-   складається з площин, і намалювати їх однією смужкою неможливо. У правому
-   верхньому кутку не малюється нічого — власник прибрав звідти і кристал, і
-   пісочний годинник. */
-.plans-module .pm-tile-edge {
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 12px;
-  color: var(--plan-color, var(--accent));
-  /* Сяйво тримається всередині картки: `drop-shadow` світив і за її межі, і
-     на знімку це читалось як біла пляма в кутку, а не як грань. */
-  /* Насиченість піднята навмисно: половина категорій має приглушені кольори
-     (`Інше` — сіро-рожевий, `Для дому` — сіро-синій), і під білими накладками
-     огранки вони сідали в сірий. Виміряно на живому екрані — грань «Іншого»
-     не відрізнялась від скла картки. */
-  filter:
-    saturate(1.45)
-    drop-shadow(1px 0 7px color-mix(in srgb, var(--plan-color, var(--accent)) 45%, transparent));
-  pointer-events: none;
-}
-
-.plans-module .pm-tile-edge svg {
-  display: block;
-  width: 100%;
-  height: 100%;
-}
-
-.plans-module .pm-tile--closed { opacity: 0.62; }
-
-/* Відкриття — накладка-кнопка на всю плитку, а не onClick по контейнеру:
-   інакше плитку не сфокусувати з клавіатури й читалка не знає, що вона
-   клікабельна. */
-.plans-module .pm-tile-open {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
-  border-radius: inherit;
-}
-
-.plans-module .pm-tile-open:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: -2px;
-}
-
-.plans-module .pm-tile-cat {
-  grid-column: 1;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--plan-color, var(--accent));
-  font-size: 11.5px;
-  font-weight: 700;
-}
-
-.plans-module .pm-tile-title {
-  grid-column: 1;
-  margin: 0;
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.22;
-  color: var(--text);
-}
-
-.plans-module .pm-tile-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  grid-column: 1;
-  gap: 3px 7px;
-  align-self: end;
-  font-size: 11.5px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.plans-module .pm-tile-meta > * { white-space: nowrap; }
-.plans-module .pm-tile-someday { font-style: italic; }
-.plans-module .pm-tile-when { color: var(--muted); }
-
-/* Прострочене — єдиний стан, який на референсі отримує пігулку: він просить
-   уваги, а не просто повідомляє дату. */
-.plans-module .pm-tile-overdue {
-  padding: 1px 8px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--danger) 20%, transparent);
-  color: var(--danger);
-  font-weight: 700;
-}
-
-.plans-module .pm-tile-status { display: inline-flex; align-items: center; gap: 4px; }
-
-/* Кругла стрілка праворуч — те, що на референсі стоїть у кожної картки.
-   Своя колонка сітки на всю висоту картки, по центру. */
-.plans-module .pm-tile-go {
-  grid-column: 2;
-  grid-row: 1 / -1;
-  align-self: center;
-  width: 24px;
-  height: 24px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.05);
-  background-image: var(--control-sheen);
-  color: var(--muted);
-  box-shadow: var(--control-top), var(--control-lip-press);
-  pointer-events: none;
-}
-
-.plans-module .pm-tile-confirm { grid-column: 1; justify-self: start; }
-
-.plans-module .pm-tile-confirm {
-  position: relative;
-  z-index: 2;
-  margin-top: 2px;
-  padding: 6px 12px;
-  border: 1px solid var(--world-border-active);
-  border-radius: var(--radius-pill);
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 700;
-  cursor: pointer;
-  box-shadow: var(--control-top), var(--control-lip-press);
-  transition: translate 90ms ease, box-shadow 90ms ease;
-}
-
-.plans-module .pm-tile-confirm:active {
-  translate: 0 1px;
-  box-shadow: var(--control-top);
 }
 
 /* ── «Завершені» ─────────────────────────────────────────── */
@@ -502,7 +331,6 @@
    звичайні токени порталу — структура та сама, шкіра інша. Гама та сама в
    обох випадках, темна чи світла (ADR-0040): портал лишається одним світом
    із двома шкірами, а не двома окремими темами. */
-.plans-module:not([data-world='true']) .pm-tile,
 .plans-module:not([data-world='true']) .cal-month {
   background: var(--surface);
 }
@@ -513,8 +341,7 @@
   /* Осідання кнопки лишається — воно і є відповіддю на дотик. Прибирається
      лише його плавність. */
   .plans-module .pm-section-toggle,
-  .plans-module .cal-nav-btn,
-  .plans-module .pm-tile-confirm { transition-duration: 1ms; }
+  .plans-module .cal-nav-btn { transition-duration: 1ms; }
 }
 
 /* ── Сторінка плану — той самий модуль, лише глибше ──────
