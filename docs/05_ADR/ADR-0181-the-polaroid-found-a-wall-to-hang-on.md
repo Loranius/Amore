@@ -1,6 +1,7 @@
 # ADR-0181 — Полароїд знайшов стіну, на якій висіти
 
-- **Статус:** Accepted
+- **Статус:** Superseded by ADR-0248 (2026-10-12): полароїд прибрано, грань
+  «Фотографії» живлять фото спогадів
 - **Дата:** 2026-09-14
 - **Зачіпає:** `features/polaroid/**` (новий), `features/memories/MemoriesPage.tsx`,
   `features/memories/memories.css`, `features/profile/profileEntry.test.ts`,

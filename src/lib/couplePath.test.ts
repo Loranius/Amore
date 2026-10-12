@@ -27,7 +27,6 @@ describe('шлях файлу пари', () => {
 describe('кожне завантаження йде через couplePath (регресія: файли двох пар в одному шляху)', () => {
   const files = [
     'features/plans/usePlans.ts',
-    'features/polaroid/usePolaroid.ts',
     'features/profile/useProfile.ts',
     'features/media/useMedia.ts',
     'features/memories/useMoments.ts',

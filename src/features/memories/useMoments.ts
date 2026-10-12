@@ -233,7 +233,12 @@ async function uploadPhotos(
 export function useMomentMutations() {
   const client = useQueryClient();
   const toast = useToast();
-  const invalidate = () => void client.invalidateQueries({ queryKey: qk.moments() });
+  // Фото спогадів живлять кристал (ADR-0248), тож разом з архівом
+  // скидається й пул фото — інакше грань «Фотографії» чекала б десять хвилин.
+  const invalidate = () => {
+    void client.invalidateQueries({ queryKey: qk.moments() });
+    void client.invalidateQueries({ queryKey: qk.photos() });
+  };
 
   /**
    * Створення йде у два кроки: спершу момент, потім фото.

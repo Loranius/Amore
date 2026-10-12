@@ -25,10 +25,9 @@ const read = (relative: string): string =>
 
 const IMAGES = read('./images.ts');
 
-/** Три місця, де портал кладе фото в сховище. */
+/** Два місця, де портал кладе фото в сховище (полароїд прибрано, ADR-0248). */
 const UPLOADERS: ReadonlyArray<readonly [string, string]> = [
   ['спогади', read('../features/memories/useMemories.ts')],
-  ['полароїд', read('../features/polaroid/usePolaroid.ts')],
   ['мітки на карті', read('../features/memories/useMapPins.ts')],
 ];
 
@@ -98,7 +97,7 @@ describe('жоден шлях завантаження не ллє оригін�
   });
 
   it('мітка на карті більше не ковтає помилку мовчки', () => {
-    const pins = UPLOADERS[2]![1];
+    const pins = UPLOADERS.find(([name]) => name === 'мітки на карті')![1];
     /*
      * Тут було три проковтнуті помилки поспіль, і всі три віддавали
      * `null`: невдалий HEIC, невдале стиснення, невдале завантаження.

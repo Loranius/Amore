@@ -4,13 +4,11 @@
    Модуль не заводить власної палітри: усе — з токенів порталу
    (`--surface-*`, `--glass-*`, `--shadow-*`).
 
-   Дві геометричні речі рахуються НЕ тут, а в `momentStyle.ts`: кути
-   віяла й пропорція кадру в альбомі.
+   Дві геометричні речі рахуються НЕ тут: розкладка нитки й віяло вузла —
+   у `memoryThread.ts`, пропорція кадру в альбомі — у `momentStyle.ts`.
 
-   Віяло — бо його найбільший кут упирається в ширину поля збоку
-   клітинки, і цю пару чисел мусить стерегти тест: наїзд на сусідню
-   картку помітний лише на певній ширині екрана й лише на спогадах із
-   чотирма фото.
+   Віяло — бо його найбільший кут упирається в поле збоку кадру, і цю
+   пару чисел мусить стерегти тест.
 
    Пропорція кадру — бо вона мусить бути однакова при кожному
    перемальовуванні, а CSS такого не вміє: `:nth-child` прив'язався б до
@@ -25,106 +23,143 @@
    двері для всіх модулів (ADR-0046). Розмір 25px і `tabular-nums`
    переїхали туди дослівно: саме «Спогади» були найближчі до правила. */
 
-/* ── Галерея ───────────────────────────────────────────────── */
+/* ── Нитка часу ────────────────────────────────────────────── */
 
-/* Дві колонки на телефоні, три — коли ширини справді вистачає.
+/* Галерея — «нитка часу» (ADR-0249): лінія посередині, вузли обабіч,
+   відстань між ними — час між спогадами (`memoryThread.ts`).
 
-   `--mm-fan-room` — поле з кожного боку клітинки, у яке виїжджають листи
-   віяла. Головний кадр займає решту, тобто 68% клітинки. Число не
-   декоративне: під нього порахований найбільший кут повороту в
-   `momentStyle.ts`, і міняти одне без іншого не можна — віяло почне
-   налазити на сусідню картку. Тест `momentStyle.test.ts` стереже пару. */
-.mm-grid {
-  --mm-fan-room: 16%;
+   Лінію малює КОЖЕН пункт списку своїм `::before`, а не список один раз.
+   Причина — пауза: там нитка стає пунктиром, а суцільну лінію під нею
+   нічим перекрити, бо під модулем живе сцена, а не плаский колір.
+   Відступ між вузлами тому — `padding-top`, а не `margin`: лінія мусить
+   іти й через нього. */
+.mt {
+  --mt-line: color-mix(in srgb, var(--text) 18%, transparent);
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 20px 8px;
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 720px;
+  margin-inline: auto;
 }
 
-@media (min-width: 720px) {
-  .mm-grid { grid-template-columns: repeat(3, 1fr); gap: 24px 12px; }
+.mt[data-rail='true'] {
+  grid-template-columns: minmax(0, 1fr) 44px;
+  column-gap: 6px;
 }
 
-.mm-card {
-  display: block;
+.mt-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.mt-list > li,
+.mt-list > div {
+  position: relative;
+  padding-top: var(--mt-gap, 0px);
+}
+
+.mt-list > li::before,
+.mt-list > div::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--mt-line);
+}
+
+/* Нитка починається з першої зарубки й кінчається на останньому вузлі:
+   лінія, що тягнеться в порожнечу нижче, обіцяла б спогади, яких немає. */
+.mt-list > :first-child::before { top: 18px; }
+.mt-list > .mt-node:last-child::before { bottom: 50%; }
+
+/* ── Вузол ── */
+
+.mt-link {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr);
+  align-items: center;
+  column-gap: 10px;
   color: inherit;
   text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.mt-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+
+.mt-node--left .mt-stack { grid-column: 1; justify-self: end; }
+.mt-node--left .mt-caption { grid-column: 3; text-align: left; }
+.mt-node--right .mt-stack { grid-column: 3; grid-row: 1; justify-self: start; }
+.mt-node--right .mt-caption { grid-column: 1; grid-row: 1; text-align: right; }
+.mt-dot { grid-column: 2; grid-row: 1; }
+
+/* Кадр притиснутий до нитки, а решта колонки — поле під віяло.
+   Частку (`--mt-frame`) задає `memoryThread.ts::FRAME_WIDTH`; тест там
+   стереже, що найдальший лист уміщається в це поле. */
+.mt-stack {
+  position: relative;
+  display: block;
+  width: calc(var(--mt-frame, 0.7) * 100%);
   transition: translate 120ms ease;
 }
 
-.mm-card:active { translate: 0 2px; }
-.mm-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 5px; border-radius: var(--radius-sm); }
+.mt-link:active .mt-stack { translate: 0 2px; }
 
-/* Стопка: головний кадр у потоці, листи віяла — за ним.
-   Поля з боків і є тим місцем, куди листи виїжджають. */
-.mm-card-stack {
-  position: relative;
-  display: block;
-  padding: 0 var(--mm-fan-room);
-}
-
-/* Лист віяла крутиться навколо НИЖНЬОГО краю — як карта в руці: низи
-   сходяться в точку, а вбік листи розходяться тим більше, чим вище.
-   Точка (50%, 100%) і кути в `momentStyle.ts` — одна домовленість. */
-.mm-fan-leaf {
-  position: absolute;
-  top: 0;
-  left: var(--mm-fan-room);
-  right: var(--mm-fan-room);
-  aspect-ratio: 1;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  transform-origin: 50% 100%;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), var(--shadow-sm);
-}
-
-.mm-fan-leaf img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-/* Затемнення накладкою, а не `filter: brightness()`.
-   Фільтр змусив би браузер тримати окремий шар композиції на КОЖЕН лист;
-   на сітці з 37 спогадів це чотири зайві шари на картку. Напівпрозорий
-   прямокутник — звичайне зафарбовування, і коштує рівно нічого. */
-.mm-fan-leaf::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: rgba(10, 7, 17, 0.38);
-}
-
-.mm-card-frame {
+.mt-frame {
   position: relative;
   display: block;
   aspect-ratio: 1;
   overflow: hidden;
   border-radius: var(--radius-md);
   /* Темніше за ґрунт: фото з білим небом інакше зливається з тлом
-     сторінки, і картка читається як порожня діра. */
+     сторінки, і кадр читається як порожня діра. */
   background: #201b28;
   box-shadow: var(--shadow-md);
 }
 
-.mm-card-frame img {
+/* Найбільший кадр — вертикальний: чотири й більше фото — це вже подія,
+   і висота відрізняє її від буденного знімка на тій самій нитці. */
+.mt-frame--l { aspect-ratio: 4 / 5; }
+
+.mt-frame img,
+.mt-leaf img {
   display: block;
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.mm-card-blank {
+/* Лист віяла крутиться навколо НИЖНЬОГО краю — як карта в руці — і лише
+   назовні від нитки (`threadFan`). */
+.mt-leaf {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  transform-origin: 50% 100%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14), var(--shadow-sm);
+}
+
+/* Затемнення накладкою, а не `filter: brightness()`: фільтр тримав би
+   окремий шар композиції на кожен лист. */
+.mt-leaf::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 7, 17, 0.38);
+}
+
+.mt-blank {
   display: block;
   width: 100%;
   height: 100%;
   background: repeating-linear-gradient(45deg, #2a2432 0 8px, #241f2c 8px 16px);
 }
 
-/* Лічильник кадрів. Не «+3», а просте число: пара читає його як «скільки
-   тут фото», і арифметика зі знаком тільки заважає. */
-.mm-card-count {
+/* Лічильник кадрів: просте число, не «+3». */
+.mt-count {
   position: absolute;
   right: 7px;
   top: 7px;
@@ -141,33 +176,177 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Підпис лежить на тлі сторінки, а не на картці — тому кольори тут
-   портальні, а не власні світлі. */
-.mm-card-foot {
-  display: block;
-  padding: 10px var(--mm-fan-room) 0;
+/* Вузол на нитці. Колір тут — стан, а не прикраса (The Rare Colour Rule):
+   залитий акцентом лише найсвіжіший спогад, решта — камінь. */
+.mt-dot {
+  position: relative;
+  justify-self: center;
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  border: 2px solid color-mix(in srgb, var(--text) 34%, transparent);
 }
 
-.mm-card-foot b {
-  font-size: 14px;
-  font-weight: 700;
-  line-height: 1.3;
-  color: var(--text);
-  /* Рівно два рядки: довша назва в сітці 2×N однаково не читається, а
-     картка від неї росла б удвічі проти сусідів. */
+.mt-node.is-freshest .mt-dot {
+  width: 14px;
+  height: 14px;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.mt-caption {
+  display: block;
+  min-width: 0;
+}
+
+.mt-caption b {
   display: -webkit-box;
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  /* Два рядки: довша назва однаково не читається поруч із кадром. */
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
-.mm-card-foot i {
+.mt-caption i {
   display: block;
-  margin-top: 3px;
+  margin-top: 4px;
   font-style: normal;
   font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
+}
+
+.mt-caption i:empty { display: none; }
+
+.mt-caption q {
+  display: block;
+  margin-top: 6px;
+  font-size: 14px;
+  line-height: 1.4;
+  color: color-mix(in srgb, var(--text) 74%, transparent);
+  quotes: '«' '»';
+}
+
+/* ── Зарубка року ── */
+
+.mt-year {
+  display: flex;
+  justify-content: center;
+  padding-bottom: 14px;
+}
+
+.mt-year:not(:first-child) { padding-top: calc(var(--mt-gap, 0px) + 22px); }
+
+.mt-year h2 {
+  position: relative;
+  margin: 0;
+  padding: 3px 14px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-sm);
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.3;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Пауза ── */
+
+/* Довга перерва: нитка стає пунктиром, а час сказаний словом. Висота
+   стала навмисно — пауза в рік не має бути вдесятеро довшою за паузу в
+   два місяці, інакше пара гортала б порожнечу. */
+.mt-pause {
+  height: 72px;
+}
+
+.mt-list > .mt-pause::before {
+  background: repeating-linear-gradient(to bottom, var(--mt-line) 0 4px, transparent 4px 10px);
+}
+
+.mt-pause span {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 14px);
+  translate: 0 -50%;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* ── Повзунок років ── */
+
+.mt-rail {
+  position: sticky;
+  top: 12px;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: calc(100dvh - 220px);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+
+.mt-rail-year {
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color 160ms ease, background-color 160ms ease;
+}
+
+.mt-rail-year[aria-current='true'] {
+  color: var(--accent);
+  font-weight: 800;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+}
+
+.mt-rail-year:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ── Скелет ── */
+
+.mt-list--skeleton .mt-node { padding-top: 28px; }
+.mt-list--skeleton .mt-frame { aspect-ratio: 1; box-shadow: none; }
+
+/* ── Новий спогад підіймається на своє місце ── */
+
+/* Один рух на весь екран (ADR-0249): з'являється лише те, що пара щойно
+   склала. Старт із уже видимого стану — кадр трохи нижче й менший, а не
+   з нуля прозорості. */
+.mt-node.is-new .mt-stack { animation: mt-rise 260ms cubic-bezier(0.16, 1, 0.3, 1); }
+.mt-node.is-new .mt-dot { animation: mt-dot 260ms cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes mt-rise {
+  from { translate: 0 12px; scale: 0.96; opacity: 0.55; }
+}
+
+@keyframes mt-dot {
+  from { scale: 0.4; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mt-node.is-new .mt-stack,
+  .mt-node.is-new .mt-dot { animation: none; }
+  .mt-stack,
+  .mt-rail-year { transition: none; }
 }
 
 .mm-skeleton {
@@ -944,4 +1123,3 @@
 /* Вхід у полароїд — дія заголовка. Значок і слово в один рядок, як у
    «Замірах»: обидва відкривають щось поверх сторінки, і читатись вони
    мусять однаково. */
-.mm-polaroid-open { display: inline-flex; align-items: center; gap: 6px; }
