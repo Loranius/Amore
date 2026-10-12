@@ -174,7 +174,18 @@
 .pf-week-dot { inline-size: 5px; block-size: 5px; border-radius: 50%; background: var(--accent); }
 .pf-week-dot[data-kind='event'] { background: var(--plan-cat-date); }
 .pf-week-day[aria-current='date'] .pf-week-dot { background: #fff; }
-.pf-week-month { padding: 0 8px 8px; }
+.pf-week-month { padding: 0 6px 6px; }
+/* Розгорнутий місяць — це вміст смуги, а не друга картка в картці:
+   власна рамка, скло й тінь сітки тут знімаються. Назву місяця вже
+   каже навігація сітки, тож у шапці смуги лишається тільки «Згорнути». */
+.plans-module .pf-week-month .cal-month {
+  padding: 0 6px 4px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.pf-week[data-open='true'] .pf-week-head b { visibility: hidden; }
+.pf-week[data-open='true'] .pf-week-toggle { padding-bottom: 4px; }
 
 /* ── Список планів ───────────────────────────────────────── */
 .pf-list {
@@ -248,7 +259,9 @@
   gap: 8px;
   margin-top: 18px;
   min-block-size: 48px;
-  padding: 0 6px;
+  /* Справа лишається місце під круглу кнопку дії: на широкому екрані
+     вона стоїть рівно над кінцем цього рядка й закривала число. */
+  padding: 0 72px 0 6px;
   border: 0;
   background: none;
   color: var(--muted);
