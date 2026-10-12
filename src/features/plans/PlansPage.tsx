@@ -21,6 +21,12 @@
 // **редирект сюди**: іншого місяця в порталі немає. Викинути сітку
 // означало б забрати в пари єдиний календар. Тому вона спустилась у свій
 // лічильник, а `/calendar` веде на `?view=calendar` і розкриває її одразу.
+//
+// ADR-0256 (власник: «модуль дуже великий і важкий»). Під шапкою —
+// смуга тижня, що розгортається в той самий місяць; колода лишилась як є;
+// велику картку плану й три рядки-лічильники замінив один список
+// «Заплановано» за датою й тихий рядок «Прожито разом». Станів три —
+// Задум / Заплановано / Прожито (`planStage.ts`).
 // ============================================================
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -36,11 +42,10 @@ import { CalendarMonthView } from '@/features/calendar/CalendarViews';
 import { AddEventModal } from '@/features/calendar/AddEventModal';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { AddPlanModal } from './AddPlanModal';
-import { PlanTile } from './PlanTile';
-import { PlanFocusEmpty, PlanFocusHero } from './PlanFocusHero';
 import { PlanIdeaDeck } from './PlanIdeaDeck';
-import { focusPlan, ideaQueue, scheduledPlans } from './planFocus';
-import { isClosed } from './planModel';
+import { PlanStageList } from './PlanStageList';
+import { PlanWeekStrip } from './PlanWeekStrip';
+import { stageIdeas, stageLived, stageScheduled, weekDays } from './planStage';
 import { usePlanMutations, usePlans } from './usePlans';
 import '@/features/world/worldDim.css';
 import './plans.css';
@@ -56,8 +61,8 @@ type EventModal = {
   type: EventKind;
 } | null;
 
-/** Які тихі лічильники відкриті. Календар приходить із рядка запиту. */
-type OpenSection = 'scheduled' | 'closed' | 'calendar';
+/** Що розгорнуто: місяць у смузі тижня й список прожитого. Календар приходить із рядка запиту. */
+type OpenSection = 'lived' | 'calendar';
 
 export function PlansPage() {
   const navigate = useNavigate();
@@ -71,7 +76,6 @@ export function PlansPage() {
 
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
   const [addingPlan, setAddingPlan] = useState(false);
-  const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
   const [eventModal, setEventModal] = useState<EventModal>(null);
   const [open, setOpen] = useState<Set<OpenSection>>(() => new Set());
 
@@ -122,10 +126,10 @@ export function PlansPage() {
     [calendarEvents],
   );
 
-  const hero = useMemo(() => focusPlan(plans), [plans]);
-  const ideas = useMemo(() => ideaQueue(plans), [plans]);
-  const scheduled = useMemo(() => scheduledPlans(plans, new Date(), hero), [plans, hero]);
-  const closed = useMemo(() => plans.filter(isClosed), [plans]);
+  const ideas = useMemo(() => stageIdeas(plans), [plans]);
+  const scheduled = useMemo(() => stageScheduled(plans), [plans]);
+  const lived = useMemo(() => stageLived(plans), [plans]);
+  const week = useMemo(() => weekDays(plans, calendarEvents), [plans, calendarEvents]);
 
   const toggle = (section: OpenSection) => setOpen((current) => {
     const next = new Set(current);
@@ -155,7 +159,6 @@ export function PlansPage() {
   const closeAddPlan = () => {
     if (addPlan.isPending) return;
     setAddingPlan(false);
-    setCreatedPlanId(null);
   };
 
   const busy = plansQuery.isPending || eventsQuery.isPending;
@@ -171,7 +174,7 @@ export function PlansPage() {
       className="plans-module"
       data-world={worldVisible ? 'true' : undefined}
     >
-      <PageHeader title="Плани" eyebrow="Календар і задуми" />
+      <PageHeader title="Плани" />
       {failed ? (
         <div className="empty-state pm-error" role="alert">
           <p>Не вдалося завантажити плани й події.</p>
@@ -195,64 +198,7 @@ export function PlansPage() {
         </div>
       ) : busy ? null : (
         <div className="pm-sheet">
-          {hero !== null
-            ? <PlanFocusHero plan={hero} />
-            : <PlanFocusEmpty ideas={ideas.length} />}
-
-          {ideas.length > 0 && (
-            <>
-              <div className="pm-section-head">
-                <h2>Що наступне?</h2>
-              </div>
-              <PlanIdeaDeck
-                ideas={ideas}
-                busy={updatePlan.isPending}
-                /*
-                 * `date_precision: 'day'` разом зі `start_date` — саме та
-                 * пара, якої чекає `hasPreciseDate`. Без неї задум дістав
-                 * би дату й однаково лишився б поза сіткою й поза
-                 * відліком, тобто дія виглядала б зробленою й не була б.
-                 */
-                onPickDate={(id, iso) => updatePlan.mutate({
-                  id,
-                  patch: { start_date: iso, end_date: null, date_precision: 'day' },
-                })}
-              />
-            </>
-          )}
-
-          <QuietSection
-            label="Заплановано"
-            count={scheduled.length}
-            open={open.has('scheduled')}
-            onToggle={() => toggle('scheduled')}
-          >
-            <div className="pm-tiles">
-              {scheduled.map((plan) => (
-                <PlanTile key={plan.id} plan={plan} onConfirm={(id) => confirmPlan.mutate(id)} />
-              ))}
-            </div>
-          </QuietSection>
-
-          {/* Акордеону «Задуми без дати» немає: колода «Що наступне?» вище
-              показує ті самі задуми й веде до кожного (власник: дублює). */}
-
-          <QuietSection
-            label="Прожито разом"
-            count={closed.length}
-            open={open.has('closed')}
-            onToggle={() => toggle('closed')}
-          >
-            <div className="pm-tiles">
-              {closed.map((plan) => <PlanTile key={plan.id} plan={plan} />)}
-            </div>
-          </QuietSection>
-
-          <QuietSection
-            label="Календар"
-            open={open.has('calendar')}
-            onToggle={() => toggle('calendar')}
-          >
+          <PlanWeekStrip days={week} open={open.has('calendar')} onToggle={() => toggle('calendar')}>
             <CalendarMonthView
               events={calendarEvents}
               plans={plans}
@@ -269,7 +215,71 @@ export function PlansPage() {
               )}
               onOpenPlan={(id) => navigate(`/plans/${id}`)}
             />
-          </QuietSection>
+          </PlanWeekStrip>
+
+          {ideas.length > 0 && (
+            <>
+              <div className="pm-section-head">
+                <h2>Що наступне?</h2>
+              </div>
+              <PlanIdeaDeck
+                ideas={ideas}
+                busy={updatePlan.isPending}
+                /*
+                 * `date_precision: 'day'` разом зі `start_date` — саме та
+                 * пара, якої чекає `hasPreciseDate`. Без неї задум дістав
+                 * би дату й однаково лишився б поза сіткою й поза
+                 * відліком, тобто дія виглядала б зробленою й не була б.
+                 * Відкладений задум із датою повертається з відкладених:
+                 * нова дата — це рішення його робити.
+                 */
+                onPickDate={(id, iso) => updatePlan.mutate({
+                  id,
+                  patch: {
+                    start_date: iso,
+                    end_date: null,
+                    date_precision: 'day',
+                    ...(plans.find((plan) => plan.id === id)?.status === 'postponed'
+                      ? { status: 'planning' as const }
+                      : {}),
+                  },
+                })}
+              />
+            </>
+          )}
+
+          {scheduled.length > 0 && (
+            <>
+              <div className="pm-section-head">
+                <h2>Заплановано</h2>
+              </div>
+              <PlanStageList plans={scheduled} onConfirm={(id) => confirmPlan.mutate(id)} />
+            </>
+          )}
+
+          {ideas.length === 0 && scheduled.length === 0 && (
+            <p className="pf-empty">
+              {lived.length > 0
+                ? 'Усе задумане прожите. Запишіть новий задум — кнопка «+» унизу.'
+                : 'Тут житимуть ваші задуми й плани. Почніть із першого — кнопка «+» унизу.'}
+            </p>
+          )}
+
+          {lived.length > 0 && (
+            <>
+              <button
+                type="button"
+                className="pf-lived"
+                aria-expanded={open.has('lived')}
+                onClick={() => toggle('lived')}
+              >
+                <span>Прожито разом</span>
+                <b>{lived.length}</b>
+                <ChevronRightIcon size={15} />
+              </button>
+              {open.has('lived') && <PlanStageList plans={lived} lived />}
+            </>
+          )}
         </div>
       )}
 
@@ -287,12 +297,12 @@ export function PlansPage() {
       {addingPlan && (
         <AddPlanModal
           busy={addPlan.isPending}
-          createdPlanId={createdPlanId}
           onClose={closeAddPlan}
+          // Екрана успіху більше немає: новий задум з'являється в колоді,
+          // новий план — у списку «Заплановано», і саме це є підтвердженням.
           onSubmit={(input) => addPlan.mutate(input, {
-            onSuccess: (plan) => setCreatedPlanId(plan.id),
+            onSuccess: () => setAddingPlan(false),
           })}
-          onContinue={(id) => { closeAddPlan(); navigate(`/plans/${id}`); }}
         />
       )}
 
@@ -309,45 +319,6 @@ export function PlansPage() {
         />
       )}
     </section>
-  );
-}
-
-/**
- * Тихий лічильник, який розкривається на місці.
- *
- * ЦЕ ВІДПОВІДЬ НА НАЗВАНУ ЦІНУ ВАРІАНТА C: «список як список зникає».
- * Зникнути він не має права — кожен запис мусить мати двері, — але й
- * займати перший екран теж. Тому рядок каже ЧИСЛО (це вже інформація:
- * «прожито разом 12»), а вміст приходить на дотик.
- *
- * Порожній розділ не показується взагалі: рядок «Заплановано 0» — це
- * шум, який ще й читається як несправність. Календар — виняток, у нього
- * лічильника немає, бо місяць не рахується.
- */
-function QuietSection({ label, count, open, onToggle, children }: {
-  label: string;
-  count?: number;
-  open: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-}) {
-  if (count === 0) return null;
-  return (
-    <>
-      <button
-        type="button"
-        className="pf-quiet"
-        aria-expanded={open}
-        onClick={onToggle}
-      >
-        <span className="pf-quiet-label">{label}</span>
-        {count !== undefined && <b className="pf-quiet-count">{count}</b>}
-        {/* Той самий кружок зі стрілкою, що й на картці плану: рядок — такий
-            самий предмет модуля, як картка, а не службова смуга. */}
-        <span className="pf-quiet-go" aria-hidden="true"><ChevronRightIcon size={15} /></span>
-      </button>
-      {open && <div className="pf-quiet-body">{children}</div>}
-    </>
   );
 }
 

@@ -11,9 +11,13 @@
 //
 // Альбом показує ВСІ знімки, включно з обкладинкою. Інакше з неї не можна
 // було б потрапити у повний екран свайпом із сусідніх кадрів.
+//
+// Унизу — шматок нитки (ADR-0250): попередній і наступний спогади й те,
+// скільки між ними минуло. Сторінка спогаду тепер не тупик, з якого треба
+// повертатись у галерею: гортати спогад за спогадом можна й звідси.
 // ============================================================
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Photo } from '@/components/ui/Photo';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -25,7 +29,11 @@ import { PhotoLightbox } from './PhotoLightbox';
 import { albumColumns, photoAspect } from './momentStyle';
 import { placeLabel } from './momentPlace';
 import { formatMemoryDate } from './memoriesDate';
-import { useMomentMutations, useMoments } from './useMoments';
+import { currentFrameCssWidth, threadNeighbors, type ThreadNeighbor } from './memoryThread';
+import { markCoverMorphSource } from './coverMorph';
+import { thumbUrl } from '@/lib/imageCdn';
+import type { CSSProperties } from 'react';
+import { useMomentMutations, useMoments, type Moment } from './useMoments';
 import './memories.css';
 import { useWorldModule } from '@/features/world/useWorldModule';
 
@@ -44,6 +52,13 @@ import { useWorldModule } from '@/features/world/useWorldModule';
  * запасом; кадр альбому — це половина ширини мінус проміжок.
  */
 const HERO_CSS_WIDTH = 480;
+/**
+ * На широкому екрані сторінка спогаду стоїть колонкою 760px (ADR-0254) —
+ * обкладинка, попрошена на 480, там розмивалась би.
+ */
+const HERO_CSS_WIDTH_WIDE = 760;
+const heroCssWidth = () =>
+  (typeof window !== 'undefined' && window.innerWidth >= 900 ? HERO_CSS_WIDTH_WIDE : HERO_CSS_WIDTH);
 const ALBUM_CSS_WIDTH = 200;
 
 function useAlbumLanes(): number {
@@ -100,11 +115,17 @@ export function MomentPage() {
         {moment.cover && (
           // Обкладинка теж відкривається на повний екран: інакше спогад з
           // одним знімком не мав би жодного способу його роздивитись.
+          // `key` — спогад: гортаючи сусідів, обкладинка монтується заново й
+          // повертає собі ім'я переходу, яке стара віддала (`coverMorph.ts`).
+          // Підложка — той самий кадр, що на нитці: він уже в кеші, тож
+          // перехід виростає з фото, а не з порожнього прямокутника.
           <button
+            key={moment.id}
             type="button" className="mm-hero-shot"
+            style={{ '--mm-hero-thumb': `url("${thumbUrl(moment.cover.photo_url, currentFrameCssWidth())}")` } as CSSProperties}
             onClick={() => setLightbox(moment.cover!.id)} aria-label="Відкрити фото"
           >
-            <Photo src={moment.cover.photo_url} cssWidth={HERO_CSS_WIDTH} alt="" decoding="async" />
+            <Photo src={moment.cover.photo_url} cssWidth={heroCssWidth()} alt="" decoding="async" />
           </button>
         )}
         <div className="mm-hero-veil" aria-hidden="true" />
@@ -152,15 +173,15 @@ export function MomentPage() {
 
       <header className="mm-page-head">
         <h1>{moment.title.trim() || formatMemoryDate(moment.memory_date, 'day')}</h1>
-        <p className="mm-page-meta">
-          <span>{formatMemoryDate(moment.memory_date, 'day')}</span>
-          {place && (
-            <>
-              <em aria-hidden="true">•</em>
-              <span className="mm-page-place"><MapPinIcon size={14} />{place}</span>
-            </>
-          )}
-        </p>
+        {/* Без назви дата вже стоїть заголовком — удруге її не друкуємо,
+            як і на нитці. Рядок лишається лише заради місця. */}
+        {(moment.title.trim() || place) && (
+          <p className="mm-page-meta">
+            {moment.title.trim() && <span>{formatMemoryDate(moment.memory_date, 'day')}</span>}
+            {moment.title.trim() && place && <em aria-hidden="true">•</em>}
+            {place && <span className="mm-page-place"><MapPinIcon size={14} />{place}</span>}
+          </p>
+        )}
         {moment.note && <p className="mm-page-note">{moment.note}</p>}
       </header>
 
@@ -191,6 +212,8 @@ export function MomentPage() {
         </div>
       )}
 
+      <ThreadNeighbors moments={data?.moments ?? []} id={moment.id} />
+
       {lightbox !== null && (
         <PhotoLightbox
           photos={moment.photos}
@@ -203,10 +226,66 @@ export function MomentPage() {
         <MomentComposer
           userId={me.id}
           moment={moment}
+          moments={data?.moments ?? []}
           places={data?.places ?? []}
           onClose={() => setEditing(false)}
         />
       )}
     </section>
+  );
+}
+
+/**
+ * Мініатюра сусіда просить ту саму ширину, що й кадр на нитці: один URL
+ * з обкладинкою-підложкою, тож перехід до сусіда виростає з уже
+ * завантаженого фото.
+ */
+
+/**
+ * Шматок нитки: новіший спогад угорі, цей посередині, старіший унизу —
+ * у тому самому порядку й тій самій мові, що й нитка галереї: лінія по
+ * центру, кадр ліворуч у новішого й праворуч у старішого (чергування),
+ * між вузлами — скільки минуло, як підпис паузи.
+ */
+function ThreadNeighbors({ moments, id }: { moments: readonly Moment[]; id: number }) {
+  const { newer, older } = threadNeighbors(moments, id);
+  if (!newer && !older) return null;
+  return (
+    <nav className="mm-thread" aria-label="Сусіди на нитці">
+      {newer && <NeighborLink neighbor={newer} side="left" />}
+      {newer && <p className="mm-thread-gap">{newer.label}</p>}
+      <p className="mm-thread-here">
+        <i className="mm-thread-dot" aria-hidden="true" />
+        <span>цей спогад</span>
+      </p>
+      {older && <p className="mm-thread-gap">{older.label}</p>}
+      {older && <NeighborLink neighbor={older} side="right" />}
+    </nav>
+  );
+}
+
+function NeighborLink({ neighbor, side }: { neighbor: ThreadNeighbor<Moment>; side: 'left' | 'right' }) {
+  const { moment, label } = neighbor;
+  const title = moment.title.trim() || formatMemoryDate(moment.memory_date, 'day');
+  return (
+    <Link
+      to={`/memories/${moment.id}`}
+      className={`mm-thread-link mm-thread-link--${side}`}
+      aria-label={`${title}, ${label}`}
+      replace
+      viewTransition
+      onClick={(e) => markCoverMorphSource(e.currentTarget.querySelector('.mm-thread-shot'))}
+    >
+      <span className="mm-thread-shot" aria-hidden="true">
+        {moment.cover
+          ? <Photo src={moment.cover.photo_url} cssWidth={currentFrameCssWidth()} alt="" loading="lazy" decoding="async" />
+          : <span className="mt-blank" />}
+      </span>
+      <span className="mm-thread-dot mm-thread-dot--stone" aria-hidden="true" />
+      <span className="mm-thread-text" aria-hidden="true">
+        <b>{title}</b>
+        {moment.title.trim() && <i>{formatMemoryDate(moment.memory_date, 'day')}</i>}
+      </span>
+    </Link>
   );
 }

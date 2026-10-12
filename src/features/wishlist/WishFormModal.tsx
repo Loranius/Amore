@@ -3,6 +3,14 @@
 // ------------------------------------------------------------
 // Фото необов'язкове: воно може бути витягнуте з товарного посилання,
 // вставлене прямим URL або завантажене з пристрою.
+//
+// «Посилання першим» (ADR-0255, власник: «додавати довго», «форма як
+// анкета»). Нове бажання починається з ОДНОГО поля: вставили посилання —
+// розбір сам підтягує назву, фото й ціну, а нагорі виростає куля з
+// фото; написали слова — це й є назва, і бажання вже можна додати.
+// «Моє / Спільне» береться з вкладки, на якій стоїть пара, а все
+// необов'язкове — таємність, фото з пристрою, ціна й деталі — це ряд
+// дрібних перемикачів під полем, а не шість блоків анкети.
 // ============================================================
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
@@ -21,7 +29,6 @@ import {
 } from './wishFormDirtyState';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { TabBar } from '@/components/ui/TabBar';
 import { FilePickerButton } from '@/components/ui/FilePickerButton';
 import { WishlistPriorityPicker } from './WishlistPriorityPicker';
 import { WishlistProductVisual } from './WishlistProductVisual';
@@ -39,9 +46,7 @@ import {
 import type { WishlistImageDisplayMode } from './wishlistImageModes';
 import './wishlistFormSections.css';
 import './wishlistUnsavedChanges.css';
-import { TogetherIcon } from '@/components/icons/WishIcon';
 import {
-  ChevronDownIcon,
   CloseIcon,
   ExternalLinkIcon,
   ImageIcon,
@@ -49,7 +54,6 @@ import {
   LockIcon,
   RefreshIcon,
 } from '@/components/icons/UiIcon';
-import { HeartIcon } from '@/components/icons/NavIcon';
 
 /**
  * Для кого бажання.
@@ -107,11 +111,13 @@ export function WishFormModal({
   const toast = useToast();
   const queryClient = useQueryClient();
   const initialImagePreference = normalizeWishlistImagePreference(item?.image_preference);
-  const [scope, setScope] = useState<Scope>(defaultScope);
+  const [scope] = useState<Scope>(defaultScope);
   const [isSecret, setIsSecret] = useState(item?.is_secret ?? defaultSecret);
 
   const [title, setTitle] = useState(item?.title ?? '');
   const [link, setLink] = useState(item?.link ?? '');
+  /** Єдине поле нового бажання: посилання або назва (`onEntryChange`). */
+  const [entry, setEntry] = useState('');
   const [imgUrl, setImgUrl] = useState(item?.image_url ?? '');
   const [imagePreference, setImagePreference] = useState<WishlistImagePreference>(
     initialImagePreference,
@@ -427,6 +433,24 @@ export function WishFormModal({
     if (!value.trim()) lastFetchedLink.current = '';
   };
 
+  /**
+   * Одне поле — дві ролі. Посилання вмикає розбір сторінки (назва, фото,
+   * ціна підтягнуться самі); будь-що інше — це назва. Перейшли з
+   * посилання на слова — посилання прибирається, щоб не лишилось
+   * невидимим.
+   */
+  const onEntryChange = (value: string) => {
+    setEntry(value);
+    const trimmed = value.trim();
+    if (isHttpUrl(trimmed)) {
+      onLinkChange(trimmed);
+      return;
+    }
+    if (link) onLinkChange('');
+    setTitle(value);
+  };
+  const entryIsLink = !isEdit && isHttpUrl(entry.trim());
+
   const save = async () => {
     const normalizedTitle = title.trim();
     if (!normalizedTitle || saving || saveLock.current) return;
@@ -530,169 +554,202 @@ export function WishFormModal({
         <ModalClose onClose={requestClose} disabled={saving} />
 
         <div className="wm-form-heading">
-          <span className="wm-form-eyebrow">Wishlist</span>
           <h2 id="wish-modal-title" className="modal-title">
-            {isEdit ? 'Редагувати бажання' : 'Нове бажання'}
+            {isEdit ? 'Редагувати бажання' : scope === 'shared' ? 'Нове спільне бажання' : 'Нове бажання'}
           </h2>
-          <p id="wish-modal-description">
+          {/* Опис для читача екрана; оку він не потрібен — поле нижче
+              саме каже, що робити. */}
+          <p id="wish-modal-description" className="sr-only">
             {isEdit
               ? 'Зміни потрібне — решту можна залишити як є.'
-              : 'Додай головне зараз — деталі можна заповнити пізніше.'}
+              : 'Встав посилання на товар або напиши, що хочеш.'}
           </p>
         </div>
 
-        {!isEdit && (
-          <div className="form-field wm-scope-field">
-            <span>Для кого</span>
-            <TabBar<Scope>
-              value={scope}
-              onChange={(value) => {
-                if (saving) return;
-                setScope(value);
-                if (value !== 'me') setIsSecret(false);
+        {/* Куля з фото — той самий предмет, що з'явиться на дошці. Видно
+            її, щойно фото є: з посилання, з пристрою чи з прямої адреси. */}
+        {previewSrc && (
+          <div className="wm-sphere-preview">
+            <WishlistProductVisual
+              src={previewSrc}
+              alt={`Попередній перегляд: ${title || 'бажання'}`}
+              wishId={canPersistPreview ? item?.id : undefined}
+              processedSrc={canUseSavedProcessed ? processedPreviewSrc : null}
+              modeHint={canUseSavedProcessed ? processedPreviewMode : null}
+              preference={imagePreference}
+              processingRevision={imageProcessingRevision}
+              persistenceEnabled={canPersistPreview}
+              onActivate={() => onPhotoClick(previewSrc)}
+              onProcessingChange={canPersistPreview ? handleImageProcessingChange : undefined}
+              onPersisted={canPersistPreview ? handleImagePersisted : undefined}
+              onPersistenceError={canPersistPreview ? handleImagePersistenceError : undefined}
+              onError={() => {
+                if (!pendingFile) {
+                  setImgUrl('');
+                  setPreviewSrc(null);
+                  resetProcessedPreview();
+                }
               }}
-              items={[
-                { value: 'me', label: 'Моє', icon: <HeartIcon size={15} /> },
-                { value: 'shared', label: 'Спільне', icon: <TogetherIcon size={15} /> },
-              ]}
             />
           </div>
         )}
 
-        <label className="form-field wm-title-field">
-          <span>Назва бажання *</span>
-          <input
-            id="wish-title"
-            name="title"
-            type="text"
-            placeholder="Що хочеш додати?"
-            value={title}
-            disabled={saving}
-            onChange={(event) => setTitle(event.target.value)}
-            autoFocus
-            maxLength={160}
-          />
-        </label>
-
-        <div className="form-field wm-link-field">
-          <span>
-            Посилання <small className="wm-label-optional">(необов’язково)</small>
-          </span>
-          <div className="wm-link-inline">
+        {!isEdit && (
+          <label className="form-field wm-entry-field">
+            <span className="sr-only">Посилання або назва бажання</span>
             <input
-              id="wish-link"
-              name="link"
-              type="url"
-              inputMode="url"
-              placeholder="Встав URL товару"
-              value={link}
+              id="wish-entry"
+              name="entry"
+              type="text"
+              inputMode="text"
+              autoComplete="off"
+              placeholder="Встав посилання або напиши, що хочеш"
+              value={entry}
               disabled={saving}
-              onChange={(event) => onLinkChange(event.target.value)}
+              onChange={(event) => onEntryChange(event.target.value)}
+              autoFocus
+              maxLength={2000}
             />
-            <button
-              type="button"
-              className="wm-link-preview-button"
-              aria-label={linkPreviewStatus === 'loading'
-                ? 'Отримуємо дані з посилання'
-                : 'Отримати дані з посилання'}
-              aria-busy={linkPreviewStatus === 'loading'}
-              disabled={!isHttpUrl(link.trim()) || linkPreviewStatus === 'loading' || saving}
-              onClick={() => void loadLinkPreview(link, true)}
-            >
-              {linkPreviewStatus === 'loading'
-                ? <RefreshIcon size={19} className="wm-link-loading-icon" />
-                : <ExternalLinkIcon size={19} />}
-            </button>
-          </div>
+          </label>
+        )}
 
-          <div role="status" aria-live="polite">
-            {linkPreviewStatus === 'loading' && (
-              <small className="wm-link-status">Отримуємо назву, ціну та фото…</small>
-            )}
-            {linkPreviewStatus === 'success' && (
-              <small className="wm-link-status wm-link-status--success">
-                Дані підтягнуто{linkPreviewSite ? ` з ${linkPreviewSite}` : ''}.
-              </small>
-            )}
-            {linkPreviewStatus === 'empty' && (
-              <small className="wm-link-status">
-                Магазин не віддав дані. Бажання все одно можна зберегти без фото.
-              </small>
-            )}
-            {linkPreviewStatus === 'error' && (
-              <small className="wm-link-status wm-link-status--error">
-                Не вдалося відкрити сторінку. Перевір посилання або заповни поля вручну.
-              </small>
-            )}
+        {/* Назва окремим полем — коли є посилання (тоді її підтягує
+            розбір, а пара може виправити) і завжди при редагуванні. */}
+        {(isEdit || entryIsLink) && (
+          <label className="form-field wm-title-field">
+            <span>Назва</span>
+            <input
+              id="wish-title"
+              name="title"
+              type="text"
+              placeholder={linkPreviewStatus === 'loading' ? 'Підтягуємо назву…' : 'Що це?'}
+              value={title}
+              disabled={saving}
+              onChange={(event) => setTitle(event.target.value)}
+              autoFocus={isEdit}
+              maxLength={160}
+            />
+          </label>
+        )}
+
+        {isEdit && (
+          <div className="form-field wm-link-field">
+            <span>Посилання</span>
+            <div className="wm-link-inline">
+              <input
+                id="wish-link"
+                name="link"
+                type="url"
+                inputMode="url"
+                placeholder="Встав URL товару"
+                value={link}
+                disabled={saving}
+                onChange={(event) => onLinkChange(event.target.value)}
+              />
+              <button
+                type="button"
+                className="wm-link-preview-button"
+                aria-label={linkPreviewStatus === 'loading'
+                  ? 'Отримуємо дані з посилання'
+                  : 'Отримати дані з посилання'}
+                aria-busy={linkPreviewStatus === 'loading'}
+                disabled={!isHttpUrl(link.trim()) || linkPreviewStatus === 'loading' || saving}
+                onClick={() => void loadLinkPreview(link, true)}
+              >
+                {linkPreviewStatus === 'loading'
+                  ? <RefreshIcon size={19} className="wm-link-loading-icon" />
+                  : <ExternalLinkIcon size={19} />}
+              </button>
+            </div>
           </div>
+        )}
+
+        <div role="status" aria-live="polite" className="wm-link-status-row">
+          {linkPreviewStatus === 'loading' && (
+            <small className="wm-link-status">Підтягуємо назву, ціну та фото…</small>
+          )}
+          {linkPreviewStatus === 'success' && (
+            <small className="wm-link-status wm-link-status--success">
+              Підтягнуто{linkPreviewSite ? ` з ${linkPreviewSite}` : ''}
+              {price.trim() ? ` · ${Number(price).toLocaleString('uk-UA')} ₴` : ''}
+            </small>
+          )}
+          {linkPreviewStatus === 'empty' && (
+            <small className="wm-link-status">
+              Магазин не віддав дані — назву напиши сам, фото можна додати нижче.
+            </small>
+          )}
+          {linkPreviewStatus === 'error' && (
+            <small className="wm-link-status wm-link-status--error">
+              Не вдалося відкрити сторінку. Перевір посилання або напиши назву сам.
+            </small>
+          )}
         </div>
 
-        <div className="wm-photo-disclosure">
+        {/* Ряд дрібних перемикачів замість блоків анкети. Кожен —
+            стан (`aria-pressed`) або розгортач (`aria-expanded`). */}
+        <div className="wm-quick-row" role="group" aria-label="Необов'язкове">
+          {!isEdit && scope === 'me' && (
+            <button
+              type="button"
+              className="wm-quick-chip"
+              aria-pressed={isSecret}
+              disabled={saving}
+              onClick={() => setIsSecret((value) => !value)}
+            >
+              <LockIcon size={15} /> Таємне
+            </button>
+          )}
           <button
             type="button"
-            className="wm-photo-summary"
+            className="wm-quick-chip"
             aria-expanded={photoOpen}
             aria-controls="wish-photo-panel"
             disabled={saving}
             onClick={() => setPhotoOpen((open) => !open)}
           >
-            <span className="wm-photo-summary-visual" aria-hidden="true">
-              {previewSrc ? <img src={previewSrc} alt="" /> : <ImageIcon size={25} />}
-            </span>
-            <span className="wm-disclosure-copy">
-              <strong>{previewSrc ? 'Фото додано' : 'Додати фото'}</strong>
-              <small>{previewSrc ? 'Змінити або налаштувати зображення' : 'З пристрою або з посилання товару'}</small>
-            </span>
-            <ChevronDownIcon size={20} className="wm-disclosure-chevron" />
+            <ImageIcon size={15} /> {previewSrc ? 'Фото' : 'Додати фото'}
           </button>
+          <button
+            type="button"
+            className="wm-quick-chip"
+            aria-expanded={detailsOpen}
+            aria-controls="wish-details-panel"
+            disabled={saving}
+            onClick={() => setDetailsOpen((open) => !open)}
+          >
+            <LayersIcon size={15} /> Ціна й деталі
+          </button>
+        </div>
 
-          {photoOpen && (
+        {!isEdit && scope === 'me' && isSecret && (
+          <small className="wm-visibility-hint">Таємне бажання бачитимеш лише ти.</small>
+        )}
+
+        {isEdit && item.is_secret && (
+          <div className="wm-secret-status" role="status">
+            <LockIcon size={17} />
+            <span><strong>Таємне бажання</strong> — його бачиш лише ти.</span>
+          </div>
+        )}
+
+        {photoOpen && (
+          <div className="wm-photo-disclosure">
             <div id="wish-photo-panel" className="wm-photo-panel">
-              <div className="wm-photo-picker">
-                <div className="wm-photo-preview">
-                  {previewSrc ? (
-                    <WishlistProductVisual
-                      src={previewSrc}
-                      alt={`Попередній перегляд: ${title || 'бажання'}`}
-                      wishId={canPersistPreview ? item?.id : undefined}
-                      processedSrc={canUseSavedProcessed ? processedPreviewSrc : null}
-                      modeHint={canUseSavedProcessed ? processedPreviewMode : null}
-                      preference={imagePreference}
-                      processingRevision={imageProcessingRevision}
-                      persistenceEnabled={canPersistPreview}
-                      onActivate={() => onPhotoClick(previewSrc)}
-                      onProcessingChange={canPersistPreview ? handleImageProcessingChange : undefined}
-                      onPersisted={canPersistPreview ? handleImagePersisted : undefined}
-                      onPersistenceError={canPersistPreview ? handleImagePersistenceError : undefined}
-                      onError={() => {
-                        if (!pendingFile) {
-                          setImgUrl('');
-                          setPreviewSrc(null);
-                          resetProcessedPreview();
-                        }
-                      }}
-                    />
-                  ) : (
-                    <span className="wm-photo-placeholder" aria-hidden="true">
-                      <ImageIcon size={30} />
-                    </span>
-                  )}
-                </div>
-                <div className="wm-photo-actions">
-                  <FilePickerButton
-                    id="wish-photo-file"
-                    className="btn-secondary wm-photo-file-button"
-                    disabled={saving}
-                    onPick={(file) => void pickFile(file)}
-                  >
-                    <ImageIcon size={15} /> {previewSrc ? 'Змінити фото' : 'Обрати фото'}
-                  </FilePickerButton>
-                  {previewSrc && (
-                    <button type="button" className="btn-secondary" onClick={clearPhoto} disabled={saving}>
-                      <CloseIcon size={14} /> Прибрати
-                    </button>
-                  )}
-                </div>
+              <div className="wm-photo-actions">
+                <FilePickerButton
+                  id="wish-photo-file"
+                  className="btn-secondary wm-photo-file-button"
+                  disabled={saving}
+                  onPick={(file) => void pickFile(file)}
+                >
+                  <ImageIcon size={15} /> {previewSrc ? 'Змінити фото' : 'Обрати фото'}
+                </FilePickerButton>
+                {previewSrc && (
+                  <button type="button" className="btn-secondary" onClick={clearPhoto} disabled={saving}>
+                    <CloseIcon size={14} /> Прибрати
+                  </button>
+                )}
               </div>
               <input
                 id="wish-image-url"
@@ -718,61 +775,11 @@ export function WishFormModal({
                 />
               )}
             </div>
-          )}
-        </div>
-
-        {!isEdit && scope === 'me' && (
-          <div className="form-field wm-visibility-field">
-            <span>Видимість</span>
-            {/* Той самий сегментний перемикач, що й «Для кого» вище.
-                Тут стояв власний: дві картки заввишки 74px із рамками й
-                власним тлом. Два різні перемикачі в одній модалці
-                читаються як дві різні системи, а не як одна форма — і
-                вищий із них ще й додавав їй пів екрана. */}
-            <TabBar<'open' | 'secret'>
-              value={isSecret ? 'secret' : 'open'}
-              onChange={(value) => {
-                if (saving) return;
-                setIsSecret(value === 'secret');
-              }}
-              items={[
-                { value: 'open', label: 'Видиме партнеру', icon: <HeartIcon size={15} /> },
-                { value: 'secret', label: 'Таємне', icon: <LockIcon size={15} /> },
-              ]}
-            />
-            <small className="wm-visibility-hint">
-              {isSecret
-                ? 'Таємне бажання бачитимеш лише ти.'
-                : 'Партнер побачить бажання у твоєму списку.'}
-            </small>
           </div>
         )}
 
-        {isEdit && item.is_secret && (
-          <div className="wm-secret-status" role="status">
-            <LockIcon size={17} />
-            <span><strong>Таємне бажання</strong> — його бачиш лише ти.</span>
-          </div>
-        )}
-
-        <div className="wm-details-disclosure">
-          <button
-            type="button"
-            className="wm-details-summary"
-            aria-expanded={detailsOpen}
-            aria-controls="wish-details-panel"
-            disabled={saving}
-            onClick={() => setDetailsOpen((open) => !open)}
-          >
-            <span className="wm-details-icon" aria-hidden="true"><LayersIcon size={21} /></span>
-            <span className="wm-disclosure-copy">
-              <strong>Додаткові деталі</strong>
-              <small>Ціна, пріоритет і коментар</small>
-            </span>
-            <ChevronDownIcon size={20} className="wm-disclosure-chevron" />
-          </button>
-
-          {detailsOpen && (
+        {detailsOpen && (
+          <div className="wm-details-disclosure">
             <div id="wish-details-panel" className="wm-details-panel">
               <div className="wm-form-detail-grid">
                 <label className="form-field">
@@ -814,8 +821,8 @@ export function WishFormModal({
                 />
               </label>
             </div>
-          )}
-        </div>
+          </div>
+        )}
 
         <p className="sr-only" role="status" aria-live="polite">
           {saving ? 'Зберігаємо бажання. Не закривай сторінку.' : ''}
@@ -840,7 +847,7 @@ export function WishFormModal({
             onClick={() => void save()}
             disabled={!title.trim() || saving}
           >
-            {saving ? 'Зберігаємо…' : isEdit ? 'Зберегти зміни' : 'Створити бажання'}
+            {saving ? 'Зберігаємо…' : isEdit ? 'Зберегти зміни' : 'Додати бажання'}
           </button>
         </div>
       </div>

@@ -1,8 +1,8 @@
 /* ============================================================
    Фокус модуля «Плани» — варіант C (ADR-0207).
    ------------------------------------------------------------
-   Один активний план зверху, колода задумів під ним, тихі лічильники
-   внизу. Тут немає жодного нового токена, жодного нового радіуса й
+   Смуга тижня зверху, колода задумів під нею, список запланованого й
+   тихий рядок прожитого (ADR-0256). Тут немає жодного нового токена, жодного нового радіуса й
    жодної нової тривалості: усе з `index.css` і зі шкали 90·160·180·
    220·260 мс (`amore-visual-direction`).
 
@@ -16,99 +16,6 @@
    плаский колір за ціну щокадрової роботи.
    ============================================================ */
 
-/* ── Герой ───────────────────────────────────────────────── */
-.pf-hero {
-  position: relative;
-  border-radius: var(--radius-lg);
-  padding: 16px 16px 14px;
-  background:
-    linear-gradient(
-      158deg,
-      color-mix(in srgb, var(--plan-color, var(--accent)) 18%, var(--surface)) 0%,
-      var(--surface) 64%
-    );
-  border: 1px solid color-mix(in srgb, var(--plan-color, var(--accent)) 30%, var(--border));
-  box-shadow: var(--shadow-md);
-}
-
-/* Уся картка веде на план — одним посиланням поверх, а не стрілкою в
-   кутку. Стрілок у модулі було п'ять на екран, і всі однакові. */
-.pf-hero-open {
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  z-index: 1;
-}
-.pf-hero-open:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-.pf-hero-cat {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.03em;
-  /* Підпис на кольоровій поверхні тонується ВІД ЦЬОГО Ж відтінку, а не
-     сіріє: сіре на фіолетовому — найчастіший спосіб здешевити портал. */
-  color: color-mix(in srgb, var(--plan-color, var(--accent)) 62%, var(--text));
-}
-
-.pf-hero-title {
-  margin: 7px 0 2px;
-  font-size: 25px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  line-height: 1.16;
-}
-
-.pf-hero-date {
-  margin: 0;
-  font-size: 13.5px;
-  color: color-mix(in srgb, var(--plan-color, var(--accent)) 38%, var(--muted));
-}
-
-.pf-hero-bar {
-  margin-top: 13px;
-  block-size: 7px;
-  border-radius: var(--radius-pill);
-  /* Доріжка тоном ВІД ЧОРНИЛА, а не жорстким чорним: у світлій темі
-     34% чорного дали б смугу, темнішу за сам текст. `--text` у кожній
-     темі свій, тож ця заливка тримається обох. */
-  background: color-mix(in srgb, var(--text) 16%, transparent);
-  overflow: hidden;
-}
-.pf-hero-bar i {
-  display: block;
-  block-size: 100%;
-  border-radius: var(--radius-pill);
-  background: linear-gradient(
-    90deg,
-    var(--plan-color, var(--accent)),
-    color-mix(in srgb, var(--plan-color, var(--accent)) 55%, var(--accent))
-  );
-  transform-origin: left center;
-}
-
-.pf-hero-nums {
-  display: flex;
-  justify-content: space-between;
-  margin: 7px 0 0;
-  font-size: 12px;
-  font-weight: 700;
-  color: color-mix(in srgb, var(--plan-color, var(--accent)) 34%, var(--muted));
-}
-
-.pf-hero--empty {
-  background: var(--surface);
-  border-color: var(--border);
-  box-shadow: none;
-}
-.pf-hero--empty .pf-hero-title { font-size: 21px; }
-
-/* ── Колода задумів ──────────────────────────────────────── */
 .pf-deck {
   position: relative;
   margin-top: 18px;
@@ -227,73 +134,155 @@
   color: var(--muted);
 }
 
-/* ── Тихі лічильники ─────────────────────────────────────── */
-.pf-quiet {
-  /* Рядок розділу — тіло тієї самої мови, що й картка плану:
-     скло, кант, тінь, радіус картки. Власник: сірі напівпрозорі смуги
-     «виглядають пережитком минулого дизайну» поруч із картками. */
-  inline-size: 100%;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 28px;
-  align-items: center;
-  gap: 10px;
-  margin-top: 12px;
-  padding: 12px 12px 12px 17px;
-  min-block-size: 56px;
+/* ── Смуга тижня (ADR-0256) ──────────────────────────────── */
+.pf-week {
   border: 1px solid var(--border);
   border-radius: var(--radius-card);
   background: var(--glass-read);
   box-shadow: var(--glass-edge), var(--shadow-md);
+}
+.pf-week-toggle {
+  inline-size: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 12px 12px 10px;
+  border: 0;
+  border-radius: inherit;
+  background: none;
   color: var(--text);
   font: inherit;
   text-align: start;
   cursor: pointer;
-  transition: translate var(--dur-press, 120ms) ease-out, box-shadow var(--dur-press, 120ms) ease-out;
 }
-.pf-quiet:active { translate: 0 2px; box-shadow: var(--glass-edge), var(--shadow-sm); }
-.pf-quiet-label {
-  font-size: 15px;
+.pf-week-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pf-week-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.pf-week-head b { font-size: 16px; font-weight: 800; }
+.pf-week-head small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.pf-week-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; }
+.pf-week-day {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  padding: 5px 0 6px;
+  border-radius: var(--radius-sm);
+}
+.pf-week-day i { font-style: normal; font-size: 12px; font-weight: 700; color: var(--muted); }
+.pf-week-day b { font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pf-week-day[aria-current='date'] { background: var(--accent-strong); color: #fff; }
+.pf-week-day[aria-current='date'] i { color: rgba(255, 255, 255, 0.82); }
+.pf-week-dots { display: flex; gap: 3px; block-size: 5px; }
+.pf-week-dot { inline-size: 5px; block-size: 5px; border-radius: 50%; background: var(--accent); }
+.pf-week-dot[data-kind='event'] { background: var(--plan-cat-date); }
+.pf-week-day[aria-current='date'] .pf-week-dot { background: #fff; }
+.pf-week-month { padding: 0 6px 6px; }
+/* Розгорнутий місяць — це вміст смуги, а не друга картка в картці:
+   власна рамка, скло й тінь сітки тут знімаються. Назву місяця вже
+   каже навігація сітки, тож у шапці смуги лишається тільки «Згорнути». */
+.plans-module .pf-week-month .cal-month {
+  padding: 0 6px 4px;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+.pf-week[data-open='true'] .pf-week-head b { visibility: hidden; }
+.pf-week[data-open='true'] .pf-week-toggle { padding-bottom: 4px; }
+
+/* ── Список планів ───────────────────────────────────────── */
+.pf-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--glass-read);
+  box-shadow: var(--glass-edge), var(--shadow-md);
+  overflow: hidden;
+}
+.pf-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-block-size: 60px;
+  padding: 10px 14px;
+}
+.pf-row + .pf-row { border-top: 1px solid var(--border); }
+/* Увесь рядок — одне посилання поверх; кнопка «Підтвердити» стоїть вище. */
+.pf-row-open { position: absolute; inset: 0; z-index: 1; }
+.pf-row-open:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.pf-row-when { display: grid; justify-items: center; line-height: 1.05; color: var(--muted); }
+.pf-row-when b { color: var(--text); font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pf-row-when i { font-style: normal; font-size: 12px; font-weight: 700; }
+.pf-row-text { display: grid; gap: 2px; min-inline-size: 0; }
+.pf-row-text b {
+  font-size: 16px;
   font-weight: 800;
-  letter-spacing: -0.005em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-/* Число — чип, як лічильники вкладок: читається одним поглядом. */
-.pf-quiet-count {
-  min-inline-size: 28px;
-  padding: 3px 9px;
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
-  font-size: 13px;
-  font-weight: 800;
-  text-align: center;
-  font-variant-numeric: tabular-nums;
-}
-.pf-quiet-go {
-  grid-column: 3;
-  inline-size: 24px;
-  block-size: 24px;
+.pf-row-text small { color: var(--muted); font-size: 12px; font-weight: 700; }
+.pf-row-text small[data-live='true'] { color: var(--accent); }
+.pf-row-cat {
+  inline-size: 32px;
+  block-size: 32px;
   display: grid;
   place-items: center;
-  border: 1px solid var(--border);
   border-radius: 50%;
-  background-color: rgba(255, 255, 255, 0.05);
-  background-image: var(--control-sheen);
-  color: var(--muted);
-  box-shadow: var(--control-top), var(--control-lip-press);
+  background: color-mix(in srgb, var(--plan-color, var(--accent)) 16%, transparent);
+  color: var(--plan-color, var(--accent));
 }
-.pf-quiet-go svg { transition: rotate 180ms ease-out; }
-.pf-quiet[aria-expanded='true'] .pf-quiet-go svg { rotate: 90deg; }
+.pf-row-confirm {
+  position: relative;
+  z-index: 2;
+  min-block-size: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pf-list[data-lived='true'] { margin-top: 8px; }
+.pf-list[data-lived='true'] .pf-row-text b { color: var(--muted); }
 
-.pf-quiet-body { margin-top: 8px; }
+/* ── Прожито разом ───────────────────────────────────────── */
+.pf-lived {
+  inline-size: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 20px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 18px;
+  min-block-size: 48px;
+  /* Справа лишається місце під круглу кнопку дії: на широкому екрані
+     вона стоїть рівно над кінцем цього рядка й закривала число. */
+  padding: 0 72px 0 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+}
+.pf-lived b { color: var(--text); font-size: 16px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.pf-lived svg { transition: rotate 180ms ease-out; }
+.pf-lived[aria-expanded='true'] svg { rotate: 90deg; }
+.pf-lived:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--radius-sm); }
 
-/* ── Один авторський момент ──────────────────────────────── */
-@media (prefers-reduced-motion: no-preference) {
-  /* Смуга поступу виростає з нуля рівно раз, на появі героя. Це єдина
-     авторська анімація екрана: решта — зворотний зв'язок на дотик. */
-  .pf-hero-bar i { animation: pf-grow 620ms cubic-bezier(0.22, 0.61, 0.36, 1) both; }
-  @keyframes pf-grow { from { transform: scaleX(0); } }
+.pf-empty {
+  margin: 18px 4px 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pf-quiet-go svg, .pf-quiet { transition: none; }
+  .pf-lived svg { transition: none; }
 }

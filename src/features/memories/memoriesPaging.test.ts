@@ -5,6 +5,9 @@ import {
   hasMoreMemories,
   initialMemoriesCount,
   nextMemoriesCount,
+  readGalleryPlace,
+  restoredShown,
+  writeGalleryPlace,
 } from './memoriesPaging';
 
 describe('нарощування галереї спогадів', () => {
@@ -57,5 +60,35 @@ describe('нарощування галереї спогадів', () => {
     // Обмеження розміром архіву сильніше за крок: −5 + 24 = 19, але
     // спогадів лише 10, тож і показати можна щонайбільше 10.
     expect(nextMemoriesCount(-5, 10)).toBe(10);
+  });
+});
+
+describe('місце на нитці після «назад» (ADR-0251)', () => {
+  const memory = () => {
+    const data = new Map<string, string>();
+    return { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => { data.set(k, v); } };
+  };
+
+  it('намальовано стільки, скільки було, але не більше за архів', () => {
+    expect(restoredShown(100, { top: 900, shown: 72 })).toBe(72);
+    expect(restoredShown(50, { top: 900, shown: 72 })).toBe(50);
+  });
+
+  it('без збереженого місця — звичайна перша пачка', () => {
+    expect(restoredShown(100, null)).toBe(initialMemoriesCount(100));
+  });
+
+  it('збережене читається назад тим самим', () => {
+    const storage = memory();
+    writeGalleryPlace(storage, { top: 1234, shown: 48 });
+    expect(readGalleryPlace(storage)).toEqual({ top: 1234, shown: 48 });
+  });
+
+  it('зіпсований запис чи відсутнє сховище — місця немає, а не падіння', () => {
+    const storage = memory();
+    storage.setItem('amore:memories-place', '{не json');
+    expect(readGalleryPlace(storage)).toBeNull();
+    expect(readGalleryPlace(null)).toBeNull();
+    expect(() => writeGalleryPlace(null, { top: 1, shown: 1 })).not.toThrow();
   });
 });

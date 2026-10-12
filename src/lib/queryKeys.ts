@@ -91,7 +91,8 @@ export const realtimeInvalidation: Record<
   photo_calendar: [['photoCalendar']],
   // Фото належать обом архівам (старому за фотографіями, новому за
   // спогадами), тож зміна `memories` мусить скинути обидва ключі.
-  memories: [qk.memories(), qk.moments()],
+  // І третій: фото спогадів живлять грань «Фотографії» кристала (ADR-0248).
+  memories: [qk.memories(), qk.moments(), qk.photos()],
   memory_moments: [qk.moments()],
   memory_links: [qk.memories()],
   memory_days: [qk.memories()],

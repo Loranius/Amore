@@ -173,31 +173,6 @@ body.wl-cloud-sheet-open .bottom-nav {
   padding-top: 0;
 }
 
-.wl-cloud-sheet-actions {
-  position: relative;
-  z-index: 2;
-  grid-template-columns: repeat(auto-fit, minmax(76px, 1fr));
-  gap: 6px;
-  margin-top: 0;
-  padding: 12px 0 0;
-  background: linear-gradient(
-    to bottom,
-    transparent,
-    color-mix(in srgb, var(--surface) 93%, transparent) 28%
-  );
-}
-
-.wl-cloud-sheet-action {
-  min-height: 72px;
-  gap: 5px;
-  padding-block: 6px;
-}
-
-.wl-cloud-sheet-action > span {
-  width: 44px;
-  height: 44px;
-}
-
 @media (max-width: 370px) {
   .wl-cloud-sheet-content {
     padding-inline: 14px;
@@ -276,10 +251,6 @@ body.wl-cloud-sheet-open .bottom-nav {
   .wl-cloud-sheet-description {
     font-size: 15px;
     line-height: 1.55;
-  }
-
-  .wl-cloud-sheet-actions {
-    grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   }
 }
 

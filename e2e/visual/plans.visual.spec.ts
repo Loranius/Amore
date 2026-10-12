@@ -40,18 +40,15 @@ test.describe('Plans mobile visual preview', () => {
      * герой присутній, місяця у першому вікні немає, але двері до нього
      * є. Цю перевірку не можна задовольнити, повернувши сітку вгору.
      */
-    await expect(page.locator('.pm-sheet')).toBeVisible();
-    await expect(page.locator('.pf-hero')).toBeVisible();
-    await expect(page.locator('.cal-month')).toHaveCount(0);
     /*
-     * Локатор звужений до лічильників навмисно. `getByRole` шукає назву
-     * ПІДРЯДКОМ, а в шапці модуля стоїть надпис «Календар і задуми»: варто
-     * комусь зробити його кнопкою — і `name: 'Календар'` дав би два збіги,
-     * тобто падіння строгого режиму замість перевірки дверей.
+     * ADR-0256 замінив героя смугою тижня. Рішення те саме з іншого боку:
+     * у першому вікні — тиждень, а не сітка місяця, і смуга сама є
+     * дверима до місяця.
      */
-    await expect(
-      page.locator('.pf-quiet').filter({ hasText: /^Календар$/ }),
-    ).toHaveCount(1);
+    await expect(page.locator('.pm-sheet')).toBeVisible();
+    await expect(page.locator('.pf-week')).toBeVisible();
+    await expect(page.locator('.cal-month')).toHaveCount(0);
+    await expect(page.locator('.pf-week-toggle')).toHaveCount(1);
 
     /*
      * Календар не видалений — він за своїм лічильником, і `/calendar`
@@ -95,7 +92,7 @@ test.describe('Plans mobile visual preview', () => {
     await page.evaluate(() => { window.location.hash = '/plans'; });
     await expect(page.locator('.cal-month')).toBeVisible();
 
-    await page.locator('.pf-quiet').filter({ hasText: /^Календар$/ }).click();
+    await page.locator('.pf-week-toggle').click();
     await expect(page.locator('.cal-month')).toHaveCount(0);
     await expect(page.locator('.pm-sheet')).toBeVisible();
 

@@ -275,6 +275,15 @@ export interface MediaReviewRow {
   updated_at: string;
 }
 
+/**
+ * Коли людина востаннє дивилась на нитку спогадів (ADR-0252). Один рядок
+ * на людину, лише свій: з нього нитка знає, що партнер склав відтоді.
+ */
+export interface MemoryVisitRow {
+  user_id: number;
+  seen_at: string;
+}
+
 /** Елемент вотчліста разом із відгуками людей пари. */
 export interface MediaItem extends MediaItemRow {
   reviews: MediaReviewRow[];
@@ -563,6 +572,7 @@ export interface Database {
       events:             TableDef<EventRow, 'title' | 'date', 'is_milestone'>;
       media_items:        TableDef<MediaItemRow, 'type' | 'title' | 'status'>;
       media_reviews:      TableDef<MediaReviewRow, 'media_id' | 'user_id'>;
+      memory_visits:      TableDef<MemoryVisitRow, 'user_id'>;
       swipe_votes:        TableDef<SwipeVoteRow, 'user_id' | 'tmdb_id' | 'title' | 'direction'>;
       shopping_items:     TableDef<ShoppingItemRow, 'title' | 'category'>;
       settings:           TableDef<SettingsRow, 'key' | 'value'>;

@@ -20,7 +20,6 @@ import './wishlistCloud.css';
 import './wishlistCloudModalFix.css';
 import { SparkIcon } from '@/components/icons/EventIcon';
 import {
-  BagIcon,
   CheckIcon,
   ExternalLinkIcon,
   GiftIcon,
@@ -29,6 +28,7 @@ import {
   TrashIcon,
 } from '@/components/icons/UiIcon';
 import { HeartIcon } from '@/components/icons/NavIcon';
+import { DotsIcon } from '@/components/icons/PlanIcon';
 
 export interface WishDetailsSheetProps {
   open: boolean;
@@ -64,6 +64,7 @@ export function WishDetailsSheet({
   onMove,
 }: WishDetailsSheetProps) {
   const [imageFailed, setImageFailed] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
   const usersMap = useUsersMap();
   const resolvedContext = resolveWishDetailsContext(item, isOwn, context);
   const creatorName = resolvedContext === 'shared' ? usersMap[item.owner] : null;
@@ -89,6 +90,10 @@ export function WishDetailsSheet({
   useEffect(() => {
     setImageFailed(false);
   }, [item.image_url]);
+
+  useEffect(() => {
+    setMenuOpen(false);
+  }, [item.id, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -120,6 +125,14 @@ export function WishDetailsSheet({
     action();
   };
 
+  // Одна головна дія на аркуш (ADR-0255). Раніше під кожною мрією стояли
+  // банер-підтвердження «додано» і ряд із чотирьох однакових кнопок —
+  // і пара щоразу вчитувалась, яка з них та сама. Тепер головна дія
+  // залежить від того, чия мрія: своя — «Редагувати», партнера — «Подарую»,
+  // спільна — «Здійснили». Решта — у меню «•••».
+  const editIsPrimary = isOwn && item.completion_mode !== 'shared' && item.can_edit
+    && !(canManageReservation && item.reserved);
+
   const lifecycleControls = (): ReactNode => {
     if (item.completion_mode === 'shared') {
       return item.can_complete ? (
@@ -130,11 +143,9 @@ export function WishDetailsSheet({
           onClick={() => closeAndRun(() => onFulfill(item))}
         >
           <SparkIcon size={15} />
-          Виконати разом
+          Здійснили
         </button>
-      ) : (
-        <span className="wl-cloud-sheet-hint">Спільна мрія для вас обох</span>
-      );
+      ) : null;
     }
 
     if (canManageReservation && item.reserved) {
@@ -177,21 +188,27 @@ export function WishDetailsSheet({
       }
     }
 
-    if (isOwn) {
+    if (editIsPrimary) {
       return (
-        <span className="wl-cloud-sheet-hint">
-          {item.reserved ? 'Цю мрію вже готуються здійснити' : 'Додано до твоєї хмари мрій'}
-        </span>
+        <button
+          type="button"
+          className="wl-cloud-sheet-primary"
+          disabled={busy}
+          onClick={() => closeAndRun(() => onEdit(item))}
+        >
+          <PencilIcon size={15} />
+          Редагувати
+        </button>
       );
     }
+
+    if (isOwn) return null;
 
     if (item.reserved) {
       return <span className="wl-cloud-sheet-hint">Цю мрію вже готуються здійснити</span>;
     }
 
-    if (!item.can_reserve) {
-      return <span className="wl-cloud-sheet-hint">Мрія партнера</span>;
-    }
+    if (!item.can_reserve) return null;
 
     return (
       <button
@@ -201,10 +218,17 @@ export function WishDetailsSheet({
         onClick={() => closeAndRun(() => onReserve(item.id, true))}
       >
         <GiftIcon size={15} />
-        Здійснити бажання
+        Подарую
       </button>
     );
   };
+
+  const menuItems = [
+    item.can_edit && !editIsPrimary ? 'edit' : null,
+    item.can_move ? 'move' : null,
+    item.can_delete ? 'delete' : null,
+  ].filter((entry): entry is 'edit' | 'move' | 'delete' => entry !== null);
+  const primary = lifecycleControls();
 
   if (!open || typeof document === 'undefined') return null;
 
@@ -297,57 +321,54 @@ export function WishDetailsSheet({
             </a>
           )}
 
-          <div className="wl-cloud-sheet-lifecycle">{lifecycleControls()}</div>
+          {/* Своя мрія, яку партнер уже готує, — це новина, а не дія. */}
+          {isOwn && item.reserved && item.completion_mode !== 'shared' && !canManageReservation && (
+            <span className="wl-cloud-sheet-hint">Цю мрію вже готуються здійснити</span>
+          )}
 
-          <div className="wl-cloud-sheet-actions">
-            {item.can_edit && (
-              <button
-                type="button"
-                className="wl-cloud-sheet-action"
-                disabled={busy}
-                onClick={() => closeAndRun(() => onEdit(item))}
-              >
-                <PencilIcon size={15} />
-                Редагувати
-              </button>
-            )}
+          {(primary || menuItems.length > 0) && (
+            <div className="wl-cloud-sheet-lifecycle">
+              {primary}
+              {menuItems.length > 0 && (
+                <button
+                  type="button"
+                  className="wl-cloud-sheet-more"
+                  aria-label="Інші дії з мрією"
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  onClick={() => setMenuOpen((value) => !value)}
+                >
+                  <DotsIcon size={20} />
+                </button>
+              )}
+            </div>
+          )}
 
-            {item.can_move && (
-              <button
-                type="button"
-                className="wl-cloud-sheet-action"
-                disabled={busy}
-                onClick={() => closeAndRun(() => onMove(item))}
-              >
-                <SwapIcon size={15} />
-                Перенести
-              </button>
-            )}
-
-            {item.can_delete && (
-              <button
-                type="button"
-                className="wl-cloud-sheet-action wl-cloud-sheet-action--danger"
-                disabled={busy}
-                onClick={() => closeAndRun(() => onDelete(item.id))}
-              >
-                <TrashIcon size={15} />
-                Видалити
-              </button>
-            )}
-
-            {item.link && (
-              <a
-                className="wl-cloud-sheet-action"
-                href={item.link}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                <BagIcon size={15} />
-                Купити
-              </a>
-            )}
-          </div>
+          {menuOpen && menuItems.length > 0 && (
+            <div className="wl-cloud-sheet-menu" role="menu" aria-label="Інші дії з мрією">
+              {menuItems.includes('edit') && (
+                <button type="button" role="menuitem" disabled={busy}
+                  onClick={() => closeAndRun(() => onEdit(item))}>
+                  <PencilIcon size={15} />
+                  Редагувати
+                </button>
+              )}
+              {menuItems.includes('move') && (
+                <button type="button" role="menuitem" disabled={busy}
+                  onClick={() => closeAndRun(() => onMove(item))}>
+                  <SwapIcon size={15} />
+                  Перенести
+                </button>
+              )}
+              {menuItems.includes('delete') && (
+                <button type="button" role="menuitem" className="is-danger" disabled={busy}
+                  onClick={() => closeAndRun(() => onDelete(item.id))}>
+                  <TrashIcon size={15} />
+                  Видалити
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </section>
     </div>,

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase, publicUrl } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
 import { listCoupleRoot } from '@/lib/couplePath';
+import { mergePhotoPool, type MemoryPhotoRow, type PhotoAsset } from './photoPool';
 
 const START_LS = 'amore:startDate';
 
@@ -83,30 +84,34 @@ export function useCrystalSeed(): { seed: string | null; isPending: boolean } {
   return { seed: query.data ?? cached, isPending: query.isPending && !cached };
 }
 
-/** Пул фото зі Storage (для грані «Фотографії» кристала). */
+/** Корінь цього бакета — полароїди, покладені до ADR-0248. */
 const PHOTO_BUCKET = 'family_photos';
 
-/** Фото з ДАТОЮ завантаження. Дата тут не косметика: без неї фото —
- *  недатований агрегат, і Evolution Engine не має права пускати їх у форму
- *  кристала (див. artifact/species/crystalConstraints.ts: недатований факт
- *  зрушив би всю вже відкладену масу й зламав append-only). Storage і так
- *  віддає `created_at` — раніше воно просто викидалось. */
-export interface PhotoAsset {
-  url: string;
-  /** ISO-дата (YYYY-MM-DD) завантаження; null, якщо Storage її не дав. */
-  date: string | null;
-}
+export type { PhotoAsset } from './photoPool';
 
+/**
+ * Пул фото для грані «Фотографії» кристала: фото спогадів разом із тим, що
+ * вже лежить у корені `family_photos` (`photoPool.ts`, ADR-0248).
+ *
+ * Ключ лишається `qk.photos()`: зміна `memories` скидає його і з
+ * realtime-підписки, і з мутацій спогадів, тож кристал бачить нове фото
+ * без перезавантаження.
+ */
 export function usePhotoPool() {
   return useQuery({
     queryKey: qk.photos(),
     staleTime: 10 * 60_000,
     queryFn: async (): Promise<PhotoAsset[]> => {
-      const files = await listCoupleRoot(PHOTO_BUCKET, 50);
-      return files.map((f) => ({
-        url: publicUrl(PHOTO_BUCKET, f.path),
-        date: f.created_at ? f.created_at.slice(0, 10) : null,
-      }));
+      const [files, memoriesRes] = await Promise.all([
+        listCoupleRoot(PHOTO_BUCKET, 50),
+        supabase.from('memories').select('photo_url,memory_date,moment_id')
+          .order('id', { ascending: true }),
+      ]);
+      if (memoriesRes.error) throw memoriesRes.error;
+      return mergePhotoPool(
+        files.map((f) => ({ url: publicUrl(PHOTO_BUCKET, f.path), created_at: f.created_at ?? null })),
+        (memoriesRes.data ?? []) as MemoryPhotoRow[],
+      );
     },
   });
 }

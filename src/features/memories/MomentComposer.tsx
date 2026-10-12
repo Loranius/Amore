@@ -10,6 +10,12 @@
 // підпис; місце й дату пара чіпає рідко, і в розкладці вони мусять коштувати
 // нуль висоти, поки їх не покликали.
 //
+// Нічого не губиться мовчки (ADR-0251): хрестик і системне «назад»
+// питають, перш ніж викинути змінену чернетку, а збережене фото, яке
+// пара прибрала, справді видаляється лише на «Готово». Раніше смітник
+// стирав знімок зі сховища одразу — і «закрити без збереження» вже нічого
+// не повертало.
+//
 // Один компонент на створення й редагування. Різниця між ними — три рядки
 // (початкові значення, текст кнопки і яка мутація виконується), а два
 // майже однакові екрани розійшлись би при першій же правці.
@@ -20,12 +26,15 @@ import { exifDay, readExifLocation, readExifTakenAt } from '@/lib/exif';
 import { reverseGeocode } from '@/lib/geo';
 import { Photo } from '@/components/ui/Photo';
 import { useToast } from '@/providers/ToastProvider';
-import { CalendarIcon, CloseIcon, ImageIcon, LayersIcon, StarIcon, TrashIcon } from '@/components/icons/UiIcon';
+import { useConfirm } from '@/providers/ConfirmProvider';
+import { CalendarIcon, CloseIcon, ImageIcon, StarIcon, TrashIcon } from '@/components/icons/UiIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
 import { PlaceSheet } from './PlaceSheet';
-import { draftIssue, ISSUE_HINT, NOTE_LIMIT, defaultMemoryDate } from './momentDraft';
+import { draftChanged, draftIssue, ISSUE_HINT, NOTE_LIMIT, defaultMemoryDate } from './momentDraft';
+import { useBackClose } from './useBackClose';
 import { placeLabel } from './momentPlace';
 import { formatMemoryDate } from './memoriesDate';
+import { landingLabel } from './memoryThread';
 import { useEnsurePlacePin, useMomentMutations } from './useMoments';
 import type { PlaceCandidate } from './momentPlace';
 import type { Moment, MomentPlace, NewPhoto } from './useMoments';
@@ -44,6 +53,8 @@ interface MomentComposerProps {
   moment?: Moment;
   /** Мітки карти для вибору місця. */
   places?: readonly MomentPlace[];
+  /** Увесь архів — щоб сказати, де на нитці ляже цей спогад (ADR-0250). */
+  moments?: readonly Moment[];
   /**
    * Місце, обране НЕ у формі, а на карті.
    *
@@ -64,11 +75,13 @@ export function MomentComposer({
   userId,
   moment,
   places = [],
+  moments = [],
   initialPlace,
   onClose,
   onSaved,
 }: MomentComposerProps) {
   const toast = useToast();
+  const confirm = useConfirm();
   const { create, update, addPhotos, setCover, removePhoto } = useMomentMutations();
   const ensurePin = useEnsurePlacePin();
 
@@ -93,7 +106,11 @@ export function MomentComposer({
 
   const [staged, setStaged] = useState<StagedPhoto[]>([]);
   const [saved, setSaved] = useState<MemoryRow[]>(moment?.photos ?? []);
+  /** Збережені фото, які пара прибрала. Зі сховища вони йдуть лише на «Готово». */
+  const [removed, setRemoved] = useState<MemoryRow[]>([]);
   const [coverId, setCoverId] = useState<number | null>(moment?.cover_photo_id ?? null);
+  /** Обкладинкою обрано ще не залите фото — його ключ у чернетці. */
+  const [stagedCoverKey, setStagedCoverKey] = useState<string | null>(null);
 
   const [menuOpen, setMenuOpen] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
@@ -110,7 +127,6 @@ export function MomentComposer({
   // Місце з карти — теж рішення пари, і EXIF не має права його перебити.
   const placeTouched = useRef(moment?.place != null || initialPlace !== undefined);
 
-  const oneRef = useRef<HTMLInputElement>(null);
   const manyRef = useRef<HTMLInputElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
 
@@ -138,6 +154,42 @@ export function MomentComposer({
 
   const photoCount = saved.length + staged.length;
   const issue = draftIssue({ title, note, memoryDate, photoCount });
+
+  const dirty =
+    staged.length > 0 ||
+    removed.length > 0 ||
+    stagedCoverKey !== null ||
+    coverId !== (moment?.cover_photo_id ?? null) ||
+    draftChanged(
+      { title, note, memoryDate, placePinId: place?.pinId ?? null },
+      {
+        title: moment?.title ?? '',
+        note: moment?.note ?? '',
+        memoryDate: moment?.memory_date ?? memoryDate,
+        placePinId: moment?.place?.id ?? null,
+      },
+    ) ||
+    // Нова точка з карти чи зі знімка ще не має мітки — це теж зміна.
+    (place !== null && place.pinId === null);
+
+  /**
+   * Закрити — хрестиком чи системним «назад». Змінену чернетку спершу
+   * питаємо: один випадковий дотик не має стирати написане.
+   */
+  async function requestClose() {
+    if (saving) return;
+    if (menuOpen) { setMenuOpen(false); return; }
+    if (sheet) { setSheet(null); return; }
+    if (dirty) {
+      const ok = await confirm(
+        moment ? 'Закрити без збереження? Зміни зникнуть.' : 'Закрити без збереження? Написане й додані фото зникнуть.',
+        { danger: true, confirmLabel: 'Закрити' },
+      );
+      if (!ok) return;
+    }
+    onClose();
+  }
+  useBackClose(() => { void requestClose(); });
 
   async function stageFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
@@ -182,6 +234,7 @@ export function MomentComposer({
   }
 
   function dropStaged(key: string) {
+    if (stagedCoverKey === key) setStagedCoverKey(null);
     setStaged((old) => {
       const gone = old.find((p) => p.key === key);
       if (gone) URL.revokeObjectURL(gone.url);
@@ -213,23 +266,43 @@ export function MomentComposer({
 
       if (moment) {
         await update.mutateAsync({ id: moment.id, draft });
+        let added: MemoryRow[] = [];
         if (staged.length > 0) {
           setProgress({ done: 0, total: staged.length });
-          await addPhotos.mutateAsync({
+          added = await addPhotos.mutateAsync({
             moment, photos: staged, userId,
             onProgress: (done, total) => setProgress({ done, total }),
           });
         }
-        if (coverId !== null && coverId !== moment.cover_photo_id) {
-          await setCover.mutateAsync({ momentId: moment.id, photoId: coverId });
+        // Обкладинка з нового фото: його id відомий лише після заливки.
+        const stagedIndex = staged.findIndex((p) => p.key === stagedCoverKey);
+        // Прибрали саму обкладинку й нової не обрали — нею стає перше з
+        // фото, що лишились, а не посилання на вже видалене.
+        const nextCover = stagedIndex >= 0
+          ? added[stagedIndex]?.id ?? null
+          : coverId ?? saved[0]?.id ?? added[0]?.id ?? null;
+        if (nextCover !== null && nextCover !== moment.cover_photo_id) {
+          await setCover.mutateAsync({ momentId: moment.id, photoId: nextCover });
+        }
+        // Прибрані фото йдуть зі сховища лише тепер, коли пара сказала «Готово».
+        for (const photo of removed) await removePhoto.mutateAsync(photo);
+        if (staged.length > 0) {
+          toast.show(`Кристал отримав ще ${staged.length} фото`, 'success');
         }
         onSaved?.(moment.id);
       } else {
-        setProgress({ done: 0, total: staged.length });
+        // Обране обкладинкою фото йде першим: перше залите стає обкладинкою.
+        const ordered = stagedCoverKey
+          ? [...staged.filter((p) => p.key === stagedCoverKey), ...staged.filter((p) => p.key !== stagedCoverKey)]
+          : staged;
+        setProgress({ done: 0, total: ordered.length });
         const created = await create.mutateAsync({
-          draft, photos: staged, userId,
+          draft, photos: ordered, userId,
           onProgress: (done, total) => setProgress({ done, total }),
         });
+        // Фото спогаду живлять кристал (ADR-0248) — і пара має це почути
+        // там, де сталась причина, а не здогадуватись на головній.
+        toast.show(`Спогад на нитці · кристал отримав ${ordered.length} фото`, 'success');
         onSaved?.(created.id);
       }
       onClose();
@@ -260,10 +333,19 @@ export function MomentComposer({
   return createPortal(
     <div className="mm-composer" role="dialog" aria-modal="true" aria-label="Спогад">
       <header className="mm-comp-bar">
-        <button type="button" className="mm-icon-btn" onClick={onClose} aria-label="Закрити" disabled={busy}>
+        <button type="button" className="mm-icon-btn" onClick={() => void requestClose()} aria-label="Закрити" disabled={busy}>
           <CloseIcon size={22} />
         </button>
-        <button type="button" className="mm-save" onClick={() => void save()} disabled={busy || issue !== null}>
+        {/* «Готово» не вимикається через чернетку: тап пояснює, чого
+            бракує (`ISSUE_HINT`). Вимкнена кнопка мовчала, і пара не знала,
+            що спогаду бракує саме фото. */}
+        <button
+          type="button"
+          className="mm-save"
+          onClick={() => void save()}
+          disabled={busy}
+          aria-disabled={issue !== null || undefined}
+        >
           {progress ? `${progress.done}/${progress.total}` : busy ? 'Зберігаю…' : 'Готово'}
         </button>
       </header>
@@ -320,6 +402,11 @@ export function MomentComposer({
           )}
         </div>
 
+        {/* Де спогад ляже на нитці — рахується від дати, тож міняється
+            разом із нею. Пара бачить спогад на своєму місці в історії ще
+            до того, як натисне «Готово» (ADR-0250). */}
+        <p className="mm-comp-landing">{landingLabel(moments, memoryDate, moment?.id)}</p>
+
         {photoCount > 0 && (
           <div className="mm-stage">
             {saved.map((photo) => (
@@ -335,18 +422,18 @@ export function MomentComposer({
                   <button
                     type="button"
                     aria-label="Зробити обкладинкою"
-                    aria-pressed={coverId === photo.id}
-                    onClick={() => setCoverId(photo.id)}
+                    aria-pressed={coverId === photo.id && stagedCoverKey === null}
+                    onClick={() => { setCoverId(photo.id); setStagedCoverKey(null); }}
                   >
-                    <StarIcon size={15} filled={coverId === photo.id} />
+                    <StarIcon size={15} filled={coverId === photo.id && stagedCoverKey === null} />
                   </button>
                   <button
                     type="button"
                     aria-label="Видалити фото"
                     onClick={() => {
                       setSaved((old) => old.filter((p) => p.id !== photo.id));
+                      setRemoved((old) => [...old, photo]);
                       if (coverId === photo.id) setCoverId(null);
-                      removePhoto.mutate(photo);
                     }}
                   >
                     <TrashIcon size={15} />
@@ -355,9 +442,20 @@ export function MomentComposer({
               </figure>
             ))}
             {staged.map((photo) => (
-              <figure key={photo.key} className="mm-stage-item mm-stage-item--new">
+              <figure
+                key={photo.key}
+                className={`mm-stage-item mm-stage-item--new${stagedCoverKey === photo.key ? ' is-cover' : ''}`}
+              >
                 <img src={photo.url} alt="" decoding="async" />
                 <figcaption>
+                  <button
+                    type="button"
+                    aria-label="Зробити обкладинкою"
+                    aria-pressed={stagedCoverKey === photo.key}
+                    onClick={() => setStagedCoverKey(photo.key)}
+                  >
+                    <StarIcon size={15} filled={stagedCoverKey === photo.key} />
+                  </button>
                   <button type="button" aria-label="Прибрати фото" onClick={() => dropStaged(photo.key)}>
                     <TrashIcon size={15} />
                   </button>
@@ -369,7 +467,7 @@ export function MomentComposer({
 
         {photoCount === 0 && (
           <p className="mm-comp-hint">
-            Натисни скріпку — і додай фото, місце чи дату.
+            Спершу фото — без нього спогад не ляже на нитку. Скріпка внизу праворуч.
           </p>
         )}
         </div>
@@ -382,8 +480,9 @@ export function MomentComposer({
       <div className={`mm-clip${menuOpen ? ' is-open' : ''}`}>
         <div className="mm-clip-menu" role="menu" aria-hidden={!menuOpen}>
           {[
-            { icon: <ImageIcon size={19} />, label: 'Фото', run: () => oneRef.current?.click() },
-            { icon: <LayersIcon size={19} />, label: 'Кілька фото', run: () => manyRef.current?.click() },
+            // Один пункт: вибір кількох уміє й одне. Два пункти поспіль
+            // змушували вирішувати, скільки фото, ще до того, як їх видно.
+            { icon: <ImageIcon size={19} />, label: 'Фото', run: () => manyRef.current?.click() },
             { icon: <MapPinIcon size={19} />, label: 'Місце', run: () => { setMenuOpen(false); setSheet('place'); } },
             {
               icon: <CalendarIcon size={19} />,
@@ -414,7 +513,9 @@ export function MomentComposer({
           aria-expanded={menuOpen}
           aria-label={menuOpen ? 'Згорнути' : 'Додати до спогаду'}
         >
-          <ClipIcon />
+          {/* Відкрите віяло закривається хрестиком, а не повернутою скріпкою:
+              нахилена скріпка не читається як «закрити». */}
+          {menuOpen ? <CloseIcon size={24} /> : <ClipIcon />}
         </button>
       </div>
 
@@ -435,10 +536,6 @@ export function MomentComposer({
       {/* Приховані входи. `capture` навмисно не ставиться: на телефоні він
           відкрив би камеру замість галереї, а спогад найчастіше збирають
           зі знятого раніше. */}
-      <input
-        ref={oneRef} type="file" accept="image/*" hidden
-        onChange={(e) => { void stageFiles(e.target.files); e.target.value = ''; }}
-      />
       <input
         ref={manyRef} type="file" accept="image/*" multiple hidden
         onChange={(e) => { void stageFiles(e.target.files); e.target.value = ''; }}

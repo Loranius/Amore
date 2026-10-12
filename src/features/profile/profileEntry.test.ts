@@ -37,7 +37,8 @@ describe('менеджер фото полароїда пішов із НАЛА�
    * налаштуваннях, — але назва казала більше, ніж вони перевіряють, і за
    * місяць читалась би як «фото завантажити нíяк».
    *
-   * Що полароїд має вхід, стереже `polaroid/polaroidEntry.test.ts`.
+   * Полароїд згодом прибрано зовсім (ADR-0248): нові фото в кристал
+   * несуть спогади, і це стереже `home/photoPool.test.ts`.
    */
   it('модалка налаштувань про нього не знає', () => {
     expect(settings).not.toContain('PhotosSection');
@@ -49,9 +50,9 @@ describe('менеджер фото полароїда пішов із НАЛА�
     // `useSettings.ts` після виносу «Замірів» і фото не тримав нічого,
     // крім цього менеджера. Файл, у якому лишились самі експорти, яких
     // ніхто не імпортує, — це запрошення повернути екран випадково.
-    // Самі хуки живі й переїхали в `features/polaroid/usePolaroid.ts`.
+    // Хуки переїхали в `features/polaroid/`, а з ADR-0248 пішли й звідти.
     expect(existsSync(join(SRC, 'features', 'settings', 'useSettings.ts'))).toBe(false);
-    expect(existsSync(join(SRC, 'features', 'polaroid', 'usePolaroid.ts'))).toBe(true);
+    expect(existsSync(join(SRC, 'features', 'polaroid'))).toBe(false);
   });
 
   it('стилі пішли разом із розміткою', () => {

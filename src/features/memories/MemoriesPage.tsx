@@ -7,8 +7,13 @@
 // інша: одиницею архіву було ФОТО, згруповане по днях.
 //
 // Тепер одиниця — СПОГАД: назва, дата, місце, кілька слів і альбом знімків.
-// Галерея показує його карткою з віялом фото, а все інше відкривається на
+// Галерея — «нитка часу» (ADR-0249): вузол із віялом фото на лінії, де
+// відстань між спогадами — це час між ними. Усе інше відкривається на
 // власній сторінці.
+//
+// Полароїда тут більше немає (ADR-0248): грань «Фотографії» кристала тепер
+// живлять фото самих спогадів, тож другий, безіменний шлях для фото став
+// зайвим.
 //
 // Знизу дві кнопки, дзеркально: «+» праворуч створює спогад із нуля,
 // значок карти ліворуч відкриває той самий архів у другому вимірі — на
@@ -18,21 +23,25 @@
 // «Спогади» — що вже було; «Наш шлях» — віхи; «Плани» — чого ще хочеться.
 // ============================================================
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useNavigationType } from 'react-router-dom';
+import { pluralUA } from '@/lib/utils';
 import { useSettledPending } from '@/lib/useSettledPending';
 import {
   hasMoreMemories,
-  initialMemoriesCount,
   nextMemoriesCount,
+  readGalleryPlace,
+  restoredShown,
+  writeGalleryPlace,
 } from './memoriesPaging';
+import { unseenFromPartner } from './memoryThread';
+import { useSeenSince } from './useSeenSince';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { FoldedMapIcon } from '@/components/icons/ViewIcon';
 import { PageHeader } from '@/components/ui/PageHeader';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { CameraIcon } from '@/components/icons/NavIcon';
-import { PolaroidSheet } from '@/features/polaroid/PolaroidSheet';
-import { MemoryCard } from './MemoryCard';
+import { MemoryThread } from './MemoryThread';
 import { MomentComposer } from './MomentComposer';
 import { useMoments } from './useMoments';
 import type { PlaceCandidate } from './momentPlace';
@@ -58,7 +67,6 @@ export function MemoriesPage() {
   const { data, isPending, isError, refetch, isFetching } = useMoments();
   const [composing, setComposing] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
-  const [polaroidOpen, setPolaroidOpen] = useState(false);
   /** Місце, з яким відкрити композер після вибору точки на карті. */
   const [fromMap, setFromMap] = useState<{ pinId: number | null; value: PlaceCandidate } | null>(null);
   // Хуки ДО ранніх виходів нижче: порядок виклику хуків між рендерами
@@ -66,13 +74,52 @@ export function MemoriesPage() {
   const skeletonVisible = useSettledPending(isPending);
 
   const total = data?.moments.length ?? 0;
-  const [shown, setShown] = useState(() => initialMemoriesCount(total));
+  /*
+   * Місце на нитці (ADR-0251). Повертаючись «назад» зі спогаду, пара
+   * опиняється там, де була, а не на початку року. Лише на «назад»
+   * (`POP`): відкриваючи «Спогади» з меню, нитка починається згори.
+   */
+  const navigationType = useNavigationType();
+  const [savedPlace] = useState(() => (
+    navigationType === 'POP' ? readGalleryPlace(sessionStorageOrNull()) : null
+  ));
+  const [shown, setShown] = useState(() => restoredShown(total, savedPlace));
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const placeRestored = useRef(false);
+  const seenSince = useSeenSince(me.id);
 
   // Архів приїхав (або змінився) — рахуємо першу пачку від його розміру.
   useEffect(() => {
-    setShown(initialMemoriesCount(total));
-  }, [total]);
+    setShown(restoredShown(total, savedPlace));
+  }, [total, savedPlace]);
+
+  // Прокрутка відстежується, поки нитка на екрані, а пишеться при виході:
+  // на момент прибирання новий маршрут уже змінив висоту вмісту, і читати
+  // `scrollTop` тоді означало б прочитати вже обрізане число.
+  useEffect(() => {
+    const content = sectionRef.current?.closest('.content');
+    if (!content || total === 0) return undefined;
+    let top = content.scrollTop;
+    const onScroll = () => { top = content.scrollTop; };
+    content.addEventListener('scroll', onScroll, { passive: true });
+
+    if (savedPlace && !placeRestored.current) {
+      placeRestored.current = true;
+      // Два кадри: `Layout` прокручує нагору у своєму ефекті після наших,
+      // а вузли нитки мусять встигнути отримати висоту.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        content.scrollTo({ top: savedPlace.top });
+      }));
+    }
+
+    return () => {
+      content.removeEventListener('scroll', onScroll);
+      writeGalleryPlace(sessionStorageOrNull(), { top, shown: shownRef.current });
+    };
+  }, [total, savedPlace]);
 
   // Пара догортала до позначки — додаємо наступну пачку.
   //
@@ -103,8 +150,17 @@ export function MemoriesPage() {
   if (skeletonVisible) {
     return (
       <section className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
-        <div className="mm-grid" aria-hidden="true">
-          {[0, 1, 2, 3].map((i) => <div key={i} className="mm-skeleton" />)}
+        <div className="mt-list mt-list--skeleton" aria-hidden="true">
+          {(['left', 'right', 'left'] as const).map((side, i) => (
+            <div key={i} className={`mt-node mt-node--${side}`}>
+              <span className="mt-link">
+                <span className="mt-slot">
+                  <span className="mt-stack"><span className="mt-frame mm-skeleton" /></span>
+                </span>
+                <span className="mt-dot" />
+              </span>
+            </div>
+          ))}
         </div>
       </section>
     );
@@ -130,42 +186,28 @@ export function MemoriesPage() {
   const earliest = moments[moments.length - 1]?.memory_date;
 
   return (
-    <section className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
-      {/* Полароїд входить ДІЄЮ ЗАГОЛОВКА, а не третьою плаваючою кнопкою.
-          Внизу їх рівно дві й вони дзеркальні — карта ліворуч, «+»
-          праворуч; третя зламала б саме ту симетрію, якою екран читається
-          з одного погляду. `PageHeader` тримає рівно одну дію, і в
-          «Спогадах» вона доти була вільна. */}
+    <section ref={sectionRef} className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
       <PageHeader
         title="Спогади"
         meta={moments.length === 0
           ? 'Тут буде ваш фотощоденник'
-          : `${moments.length} · ${data?.photoCount ?? 0} фото · від ${earliest?.slice(0, 4) ?? ''}`}
-        action={(
-          <button
-            type="button"
-            className="btn btn-ghost mm-polaroid-open"
-            onClick={() => setPolaroidOpen(true)}
-          >
-            <CameraIcon size={15} />
-            <span>Полароїд</span>
-          </button>
-        )}
+          : `${moments.length} ${pluralUA(moments.length, ['спогад', 'спогади', 'спогадів'])} · ${data?.photoCount ?? 0} фото · від ${earliest?.slice(0, 4) ?? ''}`}
       />
 
       {moments.length === 0 ? (
         <EmptyState
           icon={<CameraIcon size={26} />}
           title="Ще жодного спогаду"
-          hint="Фото, дата й кілька слів — цього досить. Спогади лягають у стрічку й живлять кристал на головній."
+          hint="Фото, дата й кілька слів — цього досить. Спогад ляже на нитку, а його фото живитимуть кристал на головній."
         />
       ) : (
         <>
-          <div className="mm-grid">
-            {moments.slice(0, shown).map((moment) => (
-              <MemoryCard key={moment.id} moment={moment} />
-            ))}
-          </div>
+          <MemoryThread
+            moments={moments}
+            shown={shown}
+            unseen={unseenFromPartner(moments, me.id, seenSince)}
+            onNeed={(count) => setShown((current) => Math.max(current, nextMemoriesCount(count - 1, total)))}
+          />
           {/* Позначка кінця списку. Порожня за призначенням: вона нічого
               не показує, лише повідомляє, що пара догортала — і тоді
               з'являється наступна пачка (`memoriesPaging.ts`). */}
@@ -195,8 +237,6 @@ export function MemoriesPage() {
         <PlusIcon size={26} />
       </button>
 
-      {polaroidOpen && <PolaroidSheet onClose={() => setPolaroidOpen(false)} />}
-
       {mapOpen && (
         <Suspense fallback={null}>
           <MemoriesMap
@@ -218,6 +258,7 @@ export function MemoriesPage() {
       {composing && (
         <MomentComposer
           userId={me.id}
+          moments={moments}
           places={data?.places ?? []}
           {...(fromMap ? { initialPlace: fromMap } : {})}
           onClose={() => { setComposing(false); setFromMap(null); }}
@@ -225,4 +266,13 @@ export function MemoriesPage() {
       )}
     </section>
   );
+}
+
+/** `sessionStorage`, якщо браузер його дає; приватний режим може кинути вже на доступі. */
+function sessionStorageOrNull(): Storage | null {
+  try {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage;
+  } catch {
+    return null;
+  }
 }
