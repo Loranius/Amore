@@ -137,6 +137,9 @@ export type PropType =
   | 'lava' | 'chest' | 'coatRack' | 'shoes' | 'ball'
   // город: високі культури, за якими можна сховатись
   | 'corn' | 'tomatoes'
+  // двір: мотузка з білизною, колода з сокирою, тачка, будка й миска Басі,
+  // глечики на тину, відро
+  | 'laundry' | 'chopBlock' | 'wheelbarrow' | 'dogHouse' | 'bowl' | 'jugs' | 'bucket'
   // літня кухня
   | 'clayOven' | 'chair' | 'crates'
   // погріб

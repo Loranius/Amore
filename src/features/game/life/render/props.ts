@@ -38,6 +38,7 @@ const SOLID: ReadonlySet<PropType> = new Set<PropType>([
   'bed', 'plant', 'floorLamp', 'shelf', 'tv', 'table', 'stove', 'wardrobe', 'desk', 'sofa', 'fridge',
   'woodpile', 'workbench', 'clayOven', 'chair', 'crates', 'jarShelf', 'zasik', 'partition',
   'lava', 'chest',
+  'chopBlock', 'wheelbarrow', 'dogHouse',
 ]);
 
 /** Тверда частина пропа (пікселі світу) або `null`, якщо крізь нього можна пройти. */
@@ -79,6 +80,9 @@ export function propSolid(p: Prop): Rect | null {
     case 'woodpile': return { x, y: y + 6, w: 28, h: 9 };
     case 'workbench': return { x, y: y + 6, w: 22, h: 9 };
     case 'lava': return { x, y: y + 6, w: 32, h: 8 };
+    case 'chopBlock': return { x: x + 2, y: y + 8, w: 12, h: 6 };
+    case 'wheelbarrow': return { x, y: y + 6, w: 22, h: 8 };
+    case 'dogHouse': return { x, y: y + 4, w: 20, h: 10 };
     case 'chest': return { x, y: y + 4, w: 24, h: 10 };
     case 'swing': return { x, y: y + 10, w: 26, h: 6 };
     case 'goal': return { x, y: y + 12, w: 4, h: 4 };
@@ -519,6 +523,138 @@ export function drawProp(g: Ctx, p: Prop, season: Season, t: number): void {
       disc(g, x + 10, y + 6, 1, '#3a2f28');
       rect(g, x + 5, y + 7, 2, 2, '#e98fb0');
       rect(g, x + 9, y + 7, 2, 2, '#3a6fd8');
+      break;
+    }
+    case 'laundry': {
+      // Мотузка з білизною між двома жердинами (5 клітинок): простирадло,
+      // сорочка, вишитий рушник, Лєнина сукенка, шкарпетки. Низ гойдається
+      // на вітрі; узимку білизни нема — лише мотузка.
+      for (const px0 of [x + 1, x + 77]) {
+        rect(g, px0, y - 18, 2, 32, '#7a5a3a');
+        rect(g, px0, y - 18, 1, 32, '#9a7a5a');
+        if (snow) rect(g, px0, y - 19, 2, 1, '#ffffff');
+      }
+      shadow(g, x + 2, y + 14, 3, 1);
+      shadow(g, x + 78, y + 14, 3, 1);
+      const sag = (k: number) => Math.round(Math.sin((k / 76) * Math.PI) * 3);
+      for (let k = 0; k <= 76; k += 1) px(g, x + 2 + k, y - 16 + sag(k), '#d8d0c0');
+      if (snow) break;
+      const items: readonly (readonly [number, number, number, string, 'sheet' | 'shirt' | 'towel' | 'dress' | 'socks'])[] = [
+        [5, 15, 16, '#f4f1ea', 'sheet'], [24, 10, 10, '#5aa7e0', 'shirt'], [38, 7, 13, '#f6f1e6', 'towel'], [49, 10, 11, '#e98fb0', 'dress'], [64, 3, 5, '#3a3a40', 'socks'], [69, 3, 5, '#c2494f', 'socks'],
+      ];
+      items.forEach(([kx, w, h, c, kind], n) => {
+        const top = y - 16 + sag(kx + w / 2) + 1;
+        const sway = Math.round(Math.sin(t * 2.2 + n * 1.3) * 1.2);
+        const half = Math.floor(h / 2);
+        if (kind === 'shirt') {
+          rect(g, x + kx - 2, top, w + 4, 3, c);
+          rect(g, x + kx, top + 3, w, h - 3, c);
+          rect(g, x + kx + sway, top + half, w, h - half, c);
+          rect(g, x + kx + Math.floor(w / 2), top + 1, 1, h - 2, shade(c, -0.18));
+        } else if (kind === 'dress') {
+          rect(g, x + kx + 2, top, w - 4, 4, c);
+          rect(g, x + kx + sway, top + 4, w, h - 4, c);
+          rect(g, x + kx + sway, top + h - 1, w, 1, shade(c, -0.2));
+        } else {
+          rect(g, x + kx, top, w, half, c);
+          rect(g, x + kx + sway, top + half, w, h - half, c);
+          rect(g, x + kx + sway, top + h - 1, w, 1, shade(c, -0.15));
+        }
+        if (kind === 'towel') for (let k = 0; k < w; k += 2) { px(g, x + kx + k + sway, top + h - 3, '#b8323a'); px(g, x + kx + k + 1 + sway, top + h - 4, '#b8323a'); }
+        if (kind === 'sheet') rect(g, x + kx + w - 2 + sway, top + half, 2, h - half, shade(c, -0.1));
+        px(g, x + kx, top - 1, '#c99a62');
+        px(g, x + kx + w - 1, top - 1, '#c99a62');
+      });
+      break;
+    }
+    case 'chopBlock': {
+      // Колода для дров із сокирою, тріски довкола.
+      shadow(g, x + 8, y + 14, 7);
+      rect(g, x + 2, y + 6, 12, 8, '#7a5230');
+      rect(g, x + 2, y + 6, 1, 8, '#9a6a3a');
+      rect(g, x + 13, y + 6, 1, 8, '#5a3a24');
+      ellipse(g, x + 8, y + 6, 6, 2.5, '#c99a62');
+      ellipse(g, x + 8, y + 6, 3.5, 1.4, '#b0844e');
+      px(g, x + 8, y + 6, '#c99a62');
+      rect(g, x + 7, y - 4, 1, 10, '#8a6a44');
+      rect(g, x + 8, y - 4, 1, 9, '#6e4a2a');
+      rect(g, x + 4, y + 3, 5, 3, '#8a8f96');
+      rect(g, x + 4, y + 3, 5, 1, '#c9ced8');
+      for (const [cx, cy] of [[1, 13], [14, 12], [11, 14]] as const) rect(g, x + cx, y + cy, 2, 1, '#d8b884');
+      if (snow) rect(g, x + 3, y + 4, 10, 1, '#ffffff');
+      break;
+    }
+    case 'wheelbarrow': {
+      // Тачка: колесо попереду, дві ручки. Восени — з гарбузами й картоплею,
+      // улітку — з травою для кролів, узимку — під снігом.
+      shadow(g, x + 11, y + 14, 11);
+      rect(g, x + 2, y + 3, 14, 7, '#5a7a8a');
+      rect(g, x + 2, y + 3, 14, 1, '#8aa4b0');
+      rect(g, x + 3, y + 10, 12, 1, '#3f5a66');
+      rect(g, x + 16, y + 6, 6, 1, '#8a6a44');
+      rect(g, x + 16, y + 9, 6, 1, '#8a6a44');
+      rect(g, x + 4, y + 11, 1, 3, '#3a3a40');
+      disc(g, x + 2, y + 11, 2.5, '#2b2b33');
+      px(g, x + 2, y + 11, '#8a8f96');
+      if (season === 'autumn') {
+        disc(g, x + 6, y + 3, 2.4, '#e8862a');
+        px(g, x + 6, y + 1, '#6e5a2a');
+        disc(g, x + 11, y + 3, 1.6, '#d8b884');
+        disc(g, x + 13, y + 4, 1.4, '#c9a46a');
+      } else if (season === 'summer') {
+        for (let k = 0; k < 12; k += 2) rect(g, x + 3 + k, y + 1 + (k % 4 === 0 ? 0 : 1), 2, 2, k % 4 ? '#4f9e3c' : '#73bd4c');
+      } else if (snow) {
+        rect(g, x + 2, y + 2, 14, 2, '#ffffff');
+      }
+      break;
+    }
+    case 'dogHouse': {
+      // Будка Басі: дощані стінки, дах, кругла діра; узимку сніг на даху.
+      shadow(g, x + 10, y + 15, 10);
+      rect(g, x + 1, y + 4, 18, 10, '#a8784a');
+      for (let k = 4; k < 14; k += 3) rect(g, x + 1, y + k, 18, 1, '#8a5a34');
+      rect(g, x + 1, y + 13, 18, 1, '#6e4a2a');
+      // Двосхилий дах ширшає донизу й трохи звисає з боків.
+      for (let r = 0; r < 6; r += 1) rect(g, x + 4 - r, y - 2 + r, 12 + r * 2, 1, r === 0 ? '#c86a4a' : '#a8483a');
+      rect(g, x, y + 3, 20, 2, '#7a3a2a');
+      disc(g, x + 10, y + 10, 3.2, '#2b1f1a');
+      rect(g, x + 7, y + 10, 7, 4, '#2b1f1a');
+      px(g, x + 9, y + 8, '#4a3a30');
+      if (snow) { rect(g, x + 2, y - 3, 16, 2, '#ffffff'); rect(g, x, y + 2, 20, 1, '#ffffff'); }
+      break;
+    }
+    case 'bowl': {
+      shadow(g, x + 8, y + 14, 4, 1);
+      ellipse(g, x + 8, y + 12, 4, 1.8, '#c2494f');
+      ellipse(g, x + 8, y + 11.5, 3, 1.1, '#8a5a34');
+      px(g, x + 7, y + 11, '#b0844e');
+      px(g, x + 9, y + 12, '#6e4a2a');
+      break;
+    }
+    case 'jugs': {
+      // Глечики на тину: догори дном на кілках, полива блищить.
+      for (const [jx, c] of [[2, '#b5653a'], [18, '#8a4a2a'], [34, '#c27a44']] as const) {
+        const cx = x + jx + 1;
+        ellipse(g, cx, y + 7, 3.5, 4, c);
+        rect(g, cx - 1, y + 11, 3, 2, shade(c, -0.15));
+        rect(g, cx - 2, y + 12, 5, 1, shade(c, -0.3));
+        px(g, cx - 2, y + 5, shade(c, 0.35));
+        px(g, cx - 1, y + 4, shade(c, 0.25));
+        rect(g, cx + 2, y + 5, 1, 4, shade(c, -0.25));
+        if (snow) rect(g, cx - 2, y + 3, 5, 1, '#ffffff');
+      }
+      break;
+    }
+    case 'bucket': {
+      // Відро біля криниці: оцинковане, з дужкою, повне води.
+      shadow(g, x + 8, y + 14, 4, 1);
+      rect(g, x + 5, y + 7, 7, 7, '#9aa4ae');
+      rect(g, x + 5, y + 7, 7, 1, '#c9d2dc');
+      rect(g, x + 11, y + 8, 1, 6, '#6e7880');
+      rect(g, x + 6, y + 8, 5, 1, snow ? '#e9eef6' : '#5aa7e0');
+      px(g, x + 5, y + 5, '#5a6068');
+      px(g, x + 11, y + 5, '#5a6068');
+      rect(g, x + 6, y + 4, 5, 1, '#5a6068');
       break;
     }
     case 'corn':

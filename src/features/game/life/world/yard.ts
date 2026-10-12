@@ -106,6 +106,8 @@ export function yardMap(): GameMap {
   m.fill(15, 1, 1, 8, 'd');
   m.zone('garden', 2, 9, 12, 1, { type: 'activity', id: 'garden' }, 'Город · допомогти мамі');
   for (const [x, y] of [[31, 2], [31.6, 3.8], [33, 1.6]] as const) m.prop('sunflowers', x, y);
+  // Тачка — на краю городу під полуницями, не під кроною яблуні.
+  m.prop('wheelbarrow', 29.8, 8.8);
   m.prop('haystack', 34.6, 2).prop('haystack', 36, 3.4);
 
   // ── Ряд за городом: туалет, хлів, хлів, курник, вигул, січкарня ─
@@ -118,7 +120,7 @@ export function yardMap(): GameMap {
   m.fill(19, 10, 6, 4, 'd');
   m.fill(19, 10, 6, 1, 'F').fill(24, 10, 1, 4, 'F').fill(19, 13, 5, 1, 'F');
   for (const [x, y] of [[20.2, 11.2], [21.8, 11.6], [23, 11]] as const) m.prop('chicken', x, y, { solid: false });
-  for (const [x, y] of [[16.6, 14.6], [18.4, 15.2], [3.4, 14.2]] as const) m.prop('chicken', x, y, { solid: false });
+  for (const [x, y] of [[16.6, 14.6], [20.8, 16.4], [3.4, 14.2]] as const) m.prop('chicken', x, y, { solid: false });
   m.building({ id: 'sichkarnia', x: 26, y: 10, w: 4, h: 5, style: 'shed', label: 'Січкарня', doorX: 27, action: { type: 'info', text: 'Січкарня: тут рубають солому й буряк на корм худобі.' }, zoneLabel: 'Січкарня' });
 
   // ── Хата: два крила впритул, один дах ─────────────────────────
@@ -137,6 +139,11 @@ export function yardMap(): GameMap {
   m.fill(RIGHT_WING.x + RIGHT_WING.w, 17, 1, 1, 'c');
   m.zone('boiler', RIGHT_WING.x + RIGHT_WING.w, 17, 1, 1, { type: 'info', text: 'Котельня: котел, вугілля й дрова на зиму. Вхід окремий, з подвір\'я.' }, 'Котельня');
   m.prop('bench', 5, 26.2).prop('bush', 1.2, 16.4).prop('cat', 13.4, 27.6);
+  // Двір навколо будівель (власник, 2026-10-12): біля котельні — повітка з
+  // дровами й колода з сокирою (до дверей котельні — вільний ряд); перед
+  // правим крилом, у куті біля лівого, — будка Басі з мискою.
+  m.prop('woodpile', 18.1, 16.0).prop('chopBlock', 18.4, 18.3);
+  m.prop('dogHouse', 10.2, 24.0).prop('bowl', 11.7, 24.6, { solid: false });
   m.prop('bike', 19.2, 25.2, { solid: false });
   m.tree(2, 22, 'cherry');
 
@@ -158,6 +165,8 @@ export function yardMap(): GameMap {
   // ── Фруктовий сад: увесь правий край ─────────────────────────
   // Верстак і дошки й літній душ стоять у саду; дерева їх оминають.
   m.prop('workbench', 30.2, 16.6).prop('planks', 30.1, 18.8);
+  // Мотузка з білизною — у саду під літнім душем, між деревами.
+  m.prop('laundry', 30.3, 22.3, { solid: false });
   m.building({ id: 'shower', x: 33, y: 19, w: 2, h: 2, style: 'shed', label: 'Літній душ', doorX: 33, action: { type: 'info', text: 'Літній душ: бочка на даху, вода гріється від сонця.' }, zoneLabel: 'Літній душ' });
   const busy = [{ x: 29, y: 15, w: 4, h: 5 }, { x: 32, y: 18, w: 4, h: 4 }, { x: 29, y: 22, w: 3, h: 6 }];
   const fruit: readonly TreeKind[] = ['apple', 'cherry', 'apple', 'cherry'];
@@ -173,7 +182,9 @@ export function yardMap(): GameMap {
   m.zone('orchard', 30, 24, 1, 3, { type: 'activity', id: 'orchard' }, 'Сад · збирати фрукти');
 
   // ── Криниця — у квітнику біля стежки до хвіртки ──────────────
-  m.prop('well', 17, 29.4);
+  m.prop('well', 17, 29.4).prop('bucket', 18.2, 29.9, { solid: false });
+  // Глечики на тину обабіч хвіртки.
+  m.prop('jugs', 16.9, 31.45, { solid: false }).prop('jugs', 22.9, 31.45, { solid: false });
   m.tree(15, 29, 'apple').tree(36, 31, 'oak').tree(2, 31, 'willow');
 
   m.spawn('gate', YARD.gate.x, H - 3).spawn('default', YARD.gate.x, H - 3);

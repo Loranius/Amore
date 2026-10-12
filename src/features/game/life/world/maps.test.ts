@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
 import { ROOM_FLOOR } from '../sim/economy';
 import { newLife } from '../sim/life';
-import { propSolid } from '../render/props';
+import { propBase, propSolid } from '../render/props';
 import { isWallTop } from '../render/tiles';
 import { colliderFor, reachableTiles, tileFeet, zoneTiles } from './collide';
 import { HATA_DOORS, HATA_FLOORS, HATA_ROOMS, homeInterior } from './interior';
 import { cellarMap } from './cellar';
-import { MOM_SPOTS } from './yard';
+import { MOM_SPOTS, YARD } from './yard';
 import { summerKitchenMap } from './kitchen';
 import { ALL_CITY_IDS, cityMap, homeYard } from './maps';
 import { TILE, buildingParts, type GameMap } from './types';
@@ -111,6 +111,72 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
       expect(props, plot.kind).toHaveLength(plot.w * plot.h);
       for (const p of props) expect(propSolid(p), `${p.type} ${p.x},${p.y}`).toBeNull();
     }
+  });
+
+  // Власник, 2026-10-12: «давай двір навколо будівель».
+  it('двір обжитий: дрова й колода біля котельні, будка Басі, білизна в саду, глечики на тину, відро біля криниці', () => {
+    const yard = homeYard();
+    const one = (t: string) => {
+      const found = yard.props.filter((p) => p.type === t);
+      expect(found.length, t).toBeGreaterThan(0);
+      return found[0]!;
+    };
+    const boiler = yard.zones.find((z) => z.id === 'boiler')!;
+    const near = (p: { x: number; y: number }, z: { x: number; y: number }, d: number) => Math.hypot(p.x - z.x, p.y - z.y) <= d;
+    expect(near(one('woodpile'), boiler, 2.5)).toBe(true);
+    expect(near(one('chopBlock'), boiler, 2.5)).toBe(true);
+    const well = one('well');
+    expect(near(one('bucket'), well, 2)).toBe(true);
+    const dog = one('dogHouse');
+    expect(near(one('bowl'), dog, 2)).toBe(true);
+    const shower = yard.buildings.find((b) => b.id === 'shower')!;
+    // Мотузка тягнеться на 5 клітинок — від її середини до душу.
+    const line = one('laundry');
+    expect(near({ x: line.x + 2.5, y: line.y }, shower, 4)).toBe(true);
+    // Глечики — на тину внизу, обабіч хвіртки.
+    const jugs = yard.props.filter((p) => p.type === 'jugs');
+    expect(jugs).toHaveLength(2);
+    for (const j of jugs) {
+      expect(yard.ground[Math.round(j.y + 0.6)]![Math.floor(j.x)], `${j.x},${j.y}`).toBe('F');
+      expect(Math.abs(j.x - YARD.gate.x), `${j.x}`).toBeLessThan(5);
+    }
+    // Тверді речі не налазять на будівлі, дерева й одна на одну.
+    const solids = yard.props.map((p) => [p.type, propSolid(p)] as const).filter(([, r]) => r);
+    const hit = (a: { x: number; y: number; w: number; h: number }, b: { x: number; y: number; w: number; h: number }) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
+    for (const t of ['woodpile', 'chopBlock', 'dogHouse', 'wheelbarrow']) {
+      const r = solids.find(([type]) => type === t)![1]!;
+      for (const b of yard.buildings) for (const part of buildingParts(b)) expect(hit(r, { x: part.x * TILE, y: part.y * TILE, w: part.w * TILE, h: part.h * TILE }), `${t} × ${b.id}`).toBe(false);
+      for (const tree of yard.trees) expect(hit(r, { x: tree.x * TILE + 4, y: tree.y * TILE + 8, w: 8, h: 8 }), `${t} × дерево ${tree.x},${tree.y}`).toBe(false);
+      for (const [other, o] of solids) if (other !== t) expect(hit(r, o!), `${t} × ${other}`).toBe(false);
+      // Курка ходить ±10 px від свого місця; за повіткою чи будкою її не видно.
+      const behind = { x: r.x, y: r.y - TILE, w: r.w, h: r.h + TILE };
+      for (const ch of yard.props.filter((p) => p.type === 'chicken')) {
+        expect(hit(behind, { x: ch.x * TILE - 6, y: ch.y * TILE + 5, w: 29, h: 10 }), `${t} × курка ${ch.x},${ch.y}`).toBe(false);
+      }
+    }
+    // Речі ставлять, щоб їх було видно: крона дерева, що стоїть нижче
+    // (малюється пізніше), їх не закриває. Рамки — те, що малює `props.ts`;
+    // у білизни — мотузка й верх речей (низ жердин за кроною — як у житті).
+    const drawn: Record<string, { dx: number; dy: number; w: number; h: number }> = {
+      woodpile: { dx: 0, dy: -4, w: 28, h: 18 }, chopBlock: { dx: 0, dy: -4, w: 16, h: 18 },
+      dogHouse: { dx: 0, dy: -3, w: 20, h: 17 }, wheelbarrow: { dx: 0, dy: 1, w: 22, h: 14 },
+      laundry: { dx: 0, dy: -17, w: 80, h: 14 }, bowl: { dx: 4, dy: 10, w: 8, h: 4 },
+      jugs: { dx: 0, dy: 3, w: 40, h: 10 }, bucket: { dx: 5, dy: 4, w: 8, h: 10 },
+    };
+    for (const p of yard.props) {
+      const f = drawn[p.type];
+      if (!f) continue;
+      const box = { x: p.x * TILE + f.dx, y: p.y * TILE + f.dy, w: f.w, h: f.h };
+      for (const tree of yard.trees) {
+        if (tree.y * TILE + 14 <= propBase(p)) continue;
+        const crown = { x: tree.x * TILE - 5, y: tree.y * TILE - 27, w: 26, h: 32 };
+        expect(hit(box, crown), `${p.type} ${p.x},${p.y} за деревом ${tree.x},${tree.y}`).toBe(false);
+      }
+    }
+    // До дверей котельні й до хати вільно.
+    const reach = reachableTiles(yard, yard.spawns.gate!);
+    expect(reach.has(`${boiler.x},${boiler.y}`)).toBe(true);
+    expect(reach.has(`${YARD.porch.x},${YARD.porch.y + 1}`)).toBe(true);
   });
 
   it('розташування за планом: хлів, хлів, курник позаду хати; город за ними; майстерня над кухнею; сад за кухнею', () => {

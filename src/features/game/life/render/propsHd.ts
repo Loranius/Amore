@@ -85,6 +85,43 @@ export function propHd(g: Ctx, p: Prop, x: number, y: number, t: number, season:
       dot(g, x + 9.5, y + 10, '#ffffff');
       dot(g, x + 8.5, y + 11.5, '#2b2b33');
       break;
+    case 'laundry': {
+      if (snow) break;
+      // Складки простирадла, ґудзики сорочки, вишивка рушника.
+      const sway = (n: number) => Math.round(Math.sin(t * 2.2 + n * 1.3) * 1.2);
+      for (const r of [-12, -8, -4]) dot(g, x + 9.5 + sway(0), y + r, '#dcd8cc');
+      for (const r of [-12, -9.5, -7]) dot(g, x + 29 + sway(1), y + r, '#f4f4f7');
+      for (let k = 0; k < 6; k += 2) dot(g, x + 39 + k + sway(2), y - 4.5, '#e05a4a');
+      dot(g, x + 53.5 + sway(3), y - 9, '#ffd1e0');
+      break;
+    }
+    case 'chopBlock':
+      for (const [rx, ry] of [[5, 5.5], [11, 6.5], [8, 7]] as const) dot(g, x + rx, y + ry, '#a8784a');
+      dot(g, x + 4.5, y + 3, '#eef2f6');
+      grain(g, x + 2, y + 7, 12, 6, '#7a5230', seed, 'v');
+      break;
+    case 'wheelbarrow':
+      dot(g, x + 3, y + 4, '#a8c0cc');
+      dot(g, x + 14.5, y + 4, '#a8c0cc');
+      dot(g, x + 1.5, y + 10.5, '#5a5a62');
+      dot(g, x + 2.5, y + 11.5, '#5a5a62');
+      break;
+    case 'dogHouse':
+      grain(g, x + 1, y + 4, 18, 9, '#a8784a', seed);
+      for (let k = 0; k < 10; k += 2) dot(g, x + 2 + k * 1.6, y + 1.5 + (k % 4 === 0 ? 0 : 1), '#c86a4a');
+      dot(g, x + 8.5, y + 8.5, '#3a2a24');
+      break;
+    case 'bowl':
+      dot(g, x + 7.5, y + 11, '#d8b884');
+      dot(g, x + 9, y + 11.5, '#c99a62');
+      break;
+    case 'jugs':
+      for (const jx of [2, 18, 34]) { dot(g, x + jx - 0.5, y + 4.5, '#ffd8b0'); dot(g, x + jx + 1.5, y + 9, '#6a2a1a'); }
+      break;
+    case 'bucket':
+      dot(g, x + 7, y + 8, snow ? '#ffffff' : '#a8d8f4');
+      dot(g, x + 6, y + 10, '#b8c2cc');
+      break;
     case 'well':
       for (let k = 0; k < 16; k += 4) dot(g, x + 3 + k, y + 7, '#c8c2b4');
       for (let r = 0; r < 12; r += 1) dot(g, x + 9.5, y - 5 + r, r % 2 ? '#a88a6a' : '#6a5a4a');
