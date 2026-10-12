@@ -7,10 +7,11 @@
 // полотно; щокадру домальовується лише вода.
 // ============================================================
 import type { Season } from '../sim/calendar';
-import { TILE, type GameMap, type Ground } from '../world/types';
+import { TILE, type CropKind, type GameMap, type Ground } from '../world/types';
+import { cropTile } from './crops';
 import { PALETTES, type SeasonPalette } from './palette';
 import { canvasAt, cellHash, densityOf, mix, px, rect, shade, type Ctx } from './pixel';
-import { bedHd, cobbleHd, dirtHd, earthHd, fenceHd, floorHd, grassHd, wallpaperHd } from './tilesHd';
+import { bedHd, clayFloorHd, cobbleHd, dirtHd, earthHd, fenceHd, floorHd, grassHd, paintedFloorHd, wallTopHd, wallpaperHd } from './tilesHd';
 
 const SOFT: ReadonlySet<Ground> = new Set<Ground>(['d', 'c', 'p', 's', 'b', 'a', 'm', 'z', 'v']);
 const GRASSY: ReadonlySet<Ground> = new Set<Ground>(['g', 'G', 'h', 'F']);
@@ -190,7 +191,7 @@ function fenceTile(g: Ctx, x: number, y: number, i: number, j: number, P: Season
   if (densityOf(g) > 1) fenceHd(g, x, y, wood);
 }
 
-function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f' | 't' | 'k'): void {
+function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f' | 't' | 'k' | 'o' | 'l'): void {
   if (kind === 'f') {
     const base = '#c9925a';
     rect(g, x, y, TILE, TILE, base);
@@ -202,6 +203,33 @@ function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f'
       rect(g, x + seam, y + r * 4, 1, 3, shade(base, -0.2));
     }
     if (densityOf(g) > 1) floorHd(g, x, y, i, j, base);
+  } else if (kind === 'o') {
+    // Веранда: дошки, пофарбовані червоно-брунатною фарбою; де ходять
+    // найбільше, фарба витерлась до дерева.
+    const base = '#9a4e3a';
+    rect(g, x, y, TILE, TILE, base);
+    for (let r = 0; r < 4; r += 1) {
+      rect(g, x, y + r * 4, TILE, 3, cellHash(i, j * 4 + r, 3) % 3 === 0 ? shade(base, 0.06) : base);
+      rect(g, x, y + r * 4 + 3, TILE, 1, shade(base, -0.3));
+      rect(g, x + (cellHash(i, j, r + 7) % 12) + 2, y + r * 4, 1, 3, shade(base, -0.22));
+    }
+    if (cellHash(i, j, 41) % 5 === 0) rect(g, x + (cellHash(i, j, 42) % 10) + 2, y + (cellHash(i, j, 43) % 3) * 4 + 1, 3, 1, '#b8845a');
+    if (densityOf(g) > 1) paintedFloorHd(g, x, y, i, j, base);
+  } else if (kind === 'l') {
+    // Глиняна долівка: рівна, мазана, з дугами від долоні й піщинками.
+    const base = '#c8a57a';
+    rect(g, x, y, TILE, TILE, base);
+    const h = cellHash(i, j, 51);
+    if (h % 3 === 0) rect(g, x + (h % 8), y + ((h >>> 4) % 8), 7, 5, shade(base, 0.05));
+    for (let k = 0; k < 3; k += 1) {
+      const hh = cellHash(i, j, k + 52);
+      const ax = x + (hh % 11) + 2;
+      const ay = y + ((hh >>> 4) % 11) + 3;
+      rect(g, ax, ay, 3, 1, shade(base, 0.1));
+      px(g, ax - 1, ay + 1, shade(base, 0.1));
+    }
+    for (let k = 0; k < 4; k += 1) px(g, x + (cellHash(i, j, k + 60) % 16), y + (cellHash(i, j, k + 64) % 16), shade(base, -0.14));
+    if (densityOf(g) > 1) clayFloorHd(g, x, y, i, j, base);
   } else if (kind === 't') {
     const a = (i + j) % 2 === 0 ? '#e9e3d6' : '#b9c7d6';
     rect(g, x, y, TILE, TILE, a);
@@ -229,6 +257,38 @@ function wallTile(g: Ctx, x: number, y: number, i: number, j: number, map: GameM
     rect(g, x, y + 12, TILE, 1, '#b07a4a');
   }
   if (j === 0) rect(g, x, y, TILE, 3, '#6e4a2a');
+}
+
+/** Усе, що всередині будинку є кімнатою: підлоги, стіни зі шпалерами, погріб. */
+const ROOM: ReadonlySet<Ground> = new Set<Ground>(['f', 't', 'k', 'o', 'l', 'W', 'e', 'S']);
+
+/**
+ * Верх стіни. Усередині порожнеча впритул до кімнати — це товща стіни між
+ * кімнатами (чи зовнішньої), а не провалля: темне дерево зверху й світла
+ * кромка з того боку, де кімната. Глибша порожнеча лишається темною.
+ */
+export function isWallTop(map: GameMap, i: number, j: number): boolean {
+  if (!map.interior || map.ground[j]?.[i] !== 'x') return false;
+  return [-1, 0, 1].some((dj) => [-1, 0, 1].some((di) => (di !== 0 || dj !== 0) && ROOM.has(map.ground[j + dj]?.[i + di] as Ground)));
+}
+
+function voidTile(g: Ctx, x: number, y: number, i: number, j: number, map: GameMap): void {
+  const room = (di: number, dj: number) => ROOM.has(map.ground[j + dj]?.[i + di] as Ground);
+  if (!isWallTop(map, i, j)) { rect(g, x, y, TILE, TILE, '#1b1420'); return; }
+  const base = '#4f3829';
+  rect(g, x, y, TILE, TILE, base);
+  // Дошки вздовж стіни: для стовпця — уздовж, для ряду — впоперек.
+  const vertical = room(-1, 0) || room(1, 0);
+  for (let k = 3; k < TILE; k += 5) {
+    if (vertical) rect(g, x, y + k, TILE, 1, shade(base, -0.11));
+    else rect(g, x + k, y, 1, TILE, shade(base, -0.11));
+  }
+  const rim = '#8a6446';
+  if (room(-1, 0)) { rect(g, x, y, 2, TILE, shade(base, 0.12)); rect(g, x, y, 1, TILE, rim); }
+  if (room(1, 0)) { rect(g, x + TILE - 2, y, 2, TILE, shade(base, 0.12)); rect(g, x + TILE - 1, y, 1, TILE, rim); }
+  if (room(0, -1)) { rect(g, x, y, TILE, 2, shade(base, 0.12)); rect(g, x, y, TILE, 1, rim); }
+  if (room(0, 1)) { rect(g, x, y + TILE - 2, TILE, 2, shade(base, 0.12)); rect(g, x, y + TILE - 1, TILE, 1, rim); }
+  if (densityOf(g) > 1) wallTopHd(g, x, y, i, j, base, vertical);
 }
 
 /** Погріб: утоптана земля з камінцями, темніша під стінами. */
@@ -302,6 +362,9 @@ export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCan
   if (hit) return hit;
   const P = PALETTES[map.interior ? 'summer' : season];
   const { c, g } = canvasAt(map.w * TILE, map.h * TILE, density);
+  // Яка культура на якій клітинці городу.
+  const crop = new Map<number, CropKind>();
+  for (const plot of map.crops ?? []) for (let j = plot.y; j < plot.y + plot.h; j += 1) for (let i = plot.x; i < plot.x + plot.w; i += 1) crop.set(j * map.w + i, plot.kind);
   for (let j = 0; j < map.h; j += 1) {
     for (let i = 0; i < map.w; i += 1) {
       const t = map.ground[j]![i]!;
@@ -311,7 +374,12 @@ export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCan
         case 'g': grassTile(g, x, y, i, j, P, cellHash(i, j, 77) % 11 === 0); break;
         case 'G': grassTile(g, x, y, i, j, P, true); break;
         case 'd': dirtTile(g, x, y, i, j, P); break;
-        case 'v': bedTile(g, x, y, i, j, P); break;
+        case 'v': {
+          const kind = crop.get(j * map.w + i);
+          if (kind) cropTile(g, x, y, i, j, kind, map.interior ? 'summer' : season);
+          else bedTile(g, x, y, i, j, P);
+          break;
+        }
         case 'c': cobbleTile(g, x, y, i, j, P); break;
         case 'p': paveTile(g, x, y, i, j, P); break;
         case 'a': case 'm': case 'z': asphaltTile(g, x, y, i, j, P, t); break;
@@ -320,12 +388,12 @@ export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCan
         case 'r': railTile(g, x, y, i, j); break;
         case 'h': hedgeTile(g, x, y, i, j, P); break;
         case 'F': fenceTile(g, x, y, i, j, P); break;
-        case 'f': case 't': case 'k': floorTile(g, x, y, i, j, t); break;
+        case 'f': case 't': case 'k': case 'o': case 'l': floorTile(g, x, y, i, j, t); break;
         case 'W': wallTile(g, x, y, i, j, map); break;
         case 'e': earthTile(g, x, y, i, j, map); break;
         case 'S': stoneWallTile(g, x, y, i, j, map); break;
         case 'w': rect(g, x, y, TILE, TILE, P.water); break;
-        case 'x': rect(g, x, y, TILE, TILE, '#1b1420'); break;
+        case 'x': voidTile(g, x, y, i, j, map); break;
       }
     }
   }

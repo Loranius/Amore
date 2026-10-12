@@ -9,6 +9,7 @@ import type { Season } from '../sim/calendar';
 import { TILE, type Prop, type PropType, type Rect } from '../world/types';
 import { PALETTES } from './palette';
 import { cellHash, densityOf, disc, ellipse, px, rect, shade, type Ctx } from './pixel';
+import { drawCorn, drawTomatoes } from './crops';
 import { propHd } from './propsHd';
 
 /** Довжина засіку й перегородки в погребі (пікселі): на всю глибину. */
@@ -20,6 +21,7 @@ export function propBase(p: Prop): number {
   const y = p.y * TILE;
   switch (p.type) {
     case 'rug': case 'sandbox': case 'flowerBed': case 'pier': case 'stairs': case 'poster': case 'window': case 'rushnyk': case 'clock': case 'photo': case 'cellarStairs':
+    case 'coatRack': case 'shoes': case 'ball':
       return y - 100; // лежить на землі чи висить на стіні — під усім
     case 'bigFountain': return y + 40;
     case 'lighthouse': return y + 30;
@@ -35,6 +37,7 @@ const SOLID: ReadonlySet<PropType> = new Set<PropType>([
   'swing', 'slide', 'goal', 'flagpole', 'yellowStone', 'boat', 'lighthouse', 'cafeTable', 'signpost', 'board', 'bush', 'rock', 'statue', 'tram',
   'bed', 'plant', 'floorLamp', 'shelf', 'tv', 'table', 'stove', 'wardrobe', 'desk', 'sofa', 'fridge',
   'woodpile', 'workbench', 'clayOven', 'chair', 'crates', 'jarShelf', 'zasik', 'partition',
+  'lava', 'chest',
 ]);
 
 /** Тверда частина пропа (пікселі світу) або `null`, якщо крізь нього можна пройти. */
@@ -75,6 +78,8 @@ export function propSolid(p: Prop): Rect | null {
     case 'partition': return { x, y, w: 8, h: PARTITION_H };
     case 'woodpile': return { x, y: y + 6, w: 28, h: 9 };
     case 'workbench': return { x, y: y + 6, w: 22, h: 9 };
+    case 'lava': return { x, y: y + 6, w: 32, h: 8 };
+    case 'chest': return { x, y: y + 4, w: 24, h: 10 };
     case 'swing': return { x, y: y + 10, w: 26, h: 6 };
     case 'goal': return { x, y: y + 12, w: 4, h: 4 };
     case 'lamp': case 'flagpole': case 'signpost': return { x: x + 6, y: y + 12, w: 4, h: 4 };
@@ -516,6 +521,12 @@ export function drawProp(g: Ctx, p: Prop, season: Season, t: number): void {
       rect(g, x + 9, y + 7, 2, 2, '#3a6fd8');
       break;
     }
+    case 'corn':
+      drawCorn(g, x, y, season, seed);
+      break;
+    case 'tomatoes':
+      drawTomatoes(g, x, y, season, seed);
+      break;
     case 'clock': {
       disc(g, x + 8, y + 6, 5, '#5a3a24');
       disc(g, x + 8, y + 6, 4, '#f8f4ec');
@@ -831,6 +842,95 @@ function drawFurniture(g: Ctx, p: Prop, x: number, y: number, t: number, season:
       rect(g, x + 48, y - 2, 2, 46, '#4a3222');
       // Денне світло з лядки.
       rect(g, x + 4, y + 26, 40, 16, 'rgba(255,236,180,0.18)');
+      break;
+    }
+    case 'lava': {
+      // Лава — довга дерев'яна, на козлах. Варіант 1: на ній два емальовані
+      // відра з водою, як у сінях.
+      shadow(g, x + 16, y + 14, 15);
+      rect(g, x + 3, y + 9, 3, 5, '#7a5230');
+      rect(g, x + 26, y + 9, 3, 5, '#7a5230');
+      rect(g, x + 5, y + 11, 22, 1, '#6e4a2a');
+      rect(g, x, y + 5, 32, 4, '#a8784a');
+      rect(g, x, y + 5, 32, 1, '#c99a62');
+      rect(g, x, y + 8, 32, 1, '#7a5230');
+      if (p.variant === 1) {
+        for (const bx of [x + 3, x + 12]) {
+          rect(g, bx, y - 2, 8, 7, '#e9eef4');
+          rect(g, bx + 1, y - 2, 6, 7, '#f6f8fb');
+          rect(g, bx, y - 2, 8, 1, '#3a6fd8');
+          rect(g, bx + 1, y - 2, 6, 1, '#7fb8e0');
+          rect(g, bx, y + 4, 8, 1, '#c9d2dc');
+          px(g, bx + 3, y - 4, '#5a6068');
+          px(g, bx + 4, y - 4, '#5a6068');
+          px(g, bx + 1, y - 3, '#5a6068');
+          px(g, bx + 6, y - 3, '#5a6068');
+        }
+      }
+      break;
+    }
+    case 'chest': {
+      // Скриня — розписана квітами, з кованими смугами й замочком.
+      const c = tint ?? '#2f6a5a';
+      shadow(g, x + 12, y + 15, 12);
+      rect(g, x, y + 4, 24, 10, c);
+      rect(g, x, y + 12, 24, 2, shade(c, -0.25));
+      rect(g, x - 1, y + 1, 26, 3, shade(c, 0.12));
+      rect(g, x - 1, y + 1, 26, 1, shade(c, 0.3));
+      rect(g, x - 1, y + 4, 26, 1, shade(c, -0.3));
+      rect(g, x + 3, y + 1, 2, 13, '#6a5a4a');
+      rect(g, x + 19, y + 1, 2, 13, '#6a5a4a');
+      rect(g, x + 11, y + 5, 2, 3, '#e0b84a');
+      for (const fx of [x + 8, x + 16]) {
+        px(g, fx, y + 8, '#e8576c');
+        px(g, fx - 1, y + 9, '#e8576c');
+        px(g, fx + 1, y + 9, '#e8576c');
+        px(g, fx, y + 10, '#e8576c');
+        px(g, fx, y + 9, '#f6d55c');
+        px(g, fx - 2, y + 11, '#8fbf6a');
+        px(g, fx + 2, y + 11, '#8fbf6a');
+      }
+      break;
+    }
+    case 'coatRack': {
+      // Вішак на стіні: дошка з кілочками, кожух, мамина куртка, бриль.
+      rect(g, x + 1, y + 2, 22, 3, '#8a5a34');
+      rect(g, x + 1, y + 2, 22, 1, '#a8784a');
+      for (const k of [4, 12, 20]) px(g, x + k, y + 5, '#5a3a24');
+      rect(g, x + 1, y + 5, 7, 12, '#7a5a3a');
+      rect(g, x + 2, y + 5, 2, 12, '#e8dcc4');
+      rect(g, x + 1, y + 16, 7, 1, shade('#7a5a3a', -0.3));
+      rect(g, x + 10, y + 6, 5, 9, '#b8323a');
+      rect(g, x + 10, y + 6, 5, 1, shade('#b8323a', 0.25));
+      rect(g, x + 12, y + 7, 1, 7, shade('#b8323a', -0.25));
+      rect(g, x + 17, y + 5, 7, 2, '#d9b26a');
+      rect(g, x + 18, y + 4, 5, 1, '#c99a52');
+      rect(g, x + 17, y + 6, 7, 1, '#b8323a');
+      break;
+    }
+    case 'shoes': {
+      // Килимок біля порога: мамині гумаки й Лєнині черевички.
+      rect(g, x, y + 9, 20, 5, '#8a6a4a');
+      for (let k = 1; k < 20; k += 3) rect(g, x + k, y + 9, 1, 5, '#7a5a3a');
+      rect(g, x, y + 9, 20, 1, '#a8845e');
+      for (const bx of [x + 2, x + 6]) {
+        rect(g, bx, y + 3, 3, 9, '#3f5a3a');
+        rect(g, bx, y + 3, 3, 1, '#5a7a50');
+        rect(g, bx, y + 11, 4, 1, '#2a3a28');
+      }
+      for (const sx of [x + 12, x + 16]) {
+        rect(g, sx, y + 9, 3, 2, '#c2494f');
+        px(g, sx, y + 9, shade('#c2494f', 0.3));
+      }
+      break;
+    }
+    case 'ball': {
+      shadow(g, x + 8, y + 14, 4, 1.5);
+      disc(g, x + 8, y + 11, 3, '#f8f4ec');
+      px(g, x + 8, y + 11, '#2b2b33');
+      px(g, x + 6, y + 10, '#2b2b33');
+      px(g, x + 10, y + 12, '#2b2b33');
+      px(g, x + 7, y + 13, '#2b2b33');
       break;
     }
     case 'door': {

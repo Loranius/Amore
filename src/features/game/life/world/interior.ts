@@ -8,7 +8,7 @@ import { ROOM_FLOOR, spotOf } from '../sim/economy';
 import type { LifeState } from '../sim/life';
 import { dayInfo, stageOfWeek } from '../sim/calendar';
 import { MapBuilder } from './build';
-import type { GameMap } from './types';
+import type { GameMap, Ground } from './types';
 
 export type HomeKind = 'hata' | 'dorm' | 'flat';
 
@@ -39,6 +39,13 @@ export const HATA_ROOMS = {
   ver: { x: 12, y: 5, w: 6, h: 5, wall: 2 },
   lena: { x: 0, y: 10, w: 12, h: 7, wall: 3 },
 } as const;
+
+/**
+ * Підлога кімнат, де вона не дерев'яна: веранда — дошки, пофарбовані
+ * червоно-брунатною фарбою, кухня з піччю — глиняна долівка. Прорізи
+ * дверей лишаються дерев'яним порогом.
+ */
+export const HATA_FLOORS: Partial<Record<keyof typeof HATA_ROOMS, Ground>> = { ver: 'o', up: 'l' };
 
 /** Прорізи дверей (клітинки підлоги в стіні) — там, де вони на плані. */
 export const HATA_DOORS = {
@@ -102,9 +109,9 @@ function hataInterior(state: LifeState): GameMap {
   const stage = stageOfWeek(dayInfo(state.day).week).stage;
   const brothersHome = stage === 'sadok' || stage === 'school';
   const m = new MapBuilder(`home:hata:${brothersHome ? 'b' : ''}:${Object.values(state.decor).join(',')}:${JSON.stringify(state.layout)}:${state.owned.includes('laptop') ? 'pc' : ''}`, null, state.homeName, W, H, 'x', true);
-  for (const r of Object.values(HATA_ROOMS)) {
+  for (const [id, r] of Object.entries(HATA_ROOMS)) {
     m.fill(r.x + 1, r.y, r.w - 1, r.wall, 'W');
-    m.fill(r.x + 1, r.y + r.wall, r.w - 1, r.h - r.wall, 'f');
+    m.fill(r.x + 1, r.y + r.wall, r.w - 1, r.h - r.wall, HATA_FLOORS[id as keyof typeof HATA_ROOMS] ?? 'f');
   }
   for (const d of Object.values(HATA_DOORS)) m.fill(d.x, d.y, d.w, d.h, 'f');
   const e = HATA_DOORS.entry;
@@ -153,8 +160,11 @@ function hataInterior(state: LifeState): GameMap {
 
   // ── Брати: Діма й Саша — поки Лєна в садочку й школі ──────
   m.prop('window', 9.6, 0.4);
+  // Стіл між ліжками під задньою стіною — до дверей лишається вільний ряд.
+  m.prop('desk', 7.6, 2.0);
   if (brothersHome) {
     m.prop('bed', 6.1, 2.1, { tint: '#6f9ad8' }).prop('bed', 10.3, 2.1, { tint: '#7fb86a' }).prop('poster', 7.4, 0.5, { tint: '#3a6fd8' });
+    m.prop('ball', 9.3, 3.8, { solid: false });
     m.zone('brothers', 7, 4, 3, 1, { type: 'info', text: 'Кімната братів: тут живуть Діма й Саша. Скрізь їхні машинки, м\'яч під ліжком.' }, 'Кімната братів');
   } else {
     m.prop('bed', 10.3, 2.1, { tint: '#9a9aa8' }).prop('shelf', 6.2, 2.1);
@@ -162,9 +172,14 @@ function hataInterior(state: LifeState): GameMap {
   }
   // ── Мама ─────────────────────────────────────────────────
   m.prop('bed', HATA_MOM_BED.x, HATA_MOM_BED.y, { tint: HATA_MOM_BED.tint }).prop('wardrobe', 3.2, 2.1).prop('window', 2.6, 0.4).prop('rushnyk', 1.3, 0.6);
+  // Скриня в ногах ліжка — з посагом і вишитими рушниками.
+  m.prop('chest', 1.1, 4.45);
   m.prop('rug', 2, 6, { tint: '#c98aa8' }).prop('plant', 1, 8.6);
   // ── Коридорчик і веранда ─────────────────────────────────
   m.prop('rug', 8, 8.2, { tint: '#b85a4a' }).prop('shelf', 9.8, 7).prop('clock', 7, 5.5).prop('plant', 13.1, 9);
+  // Веранда — сіни: вішак з одягом, лава з відрами води, взуття біля порога.
+  // Від коридорчика до виходу й до кухні над верандою — вільні два ряди.
+  m.prop('coatRack', 13.3, 5.2).prop('lava', 15.2, 8.9, { variant: 1 }).prop('shoes', 14.05, 8.95, { solid: false });
   // ── Кімната над верандою: кухня з піччю ──────────────────
   m.prop('stove', 13.1, 2.1).prop('table', 14.7, 3.1, { tint: '#c49a6c' }).prop('fridge', 16.6, 2.2).prop('window', 15.2, 0.4).prop('rushnyk', 13.6, 0.6);
   return m.build();

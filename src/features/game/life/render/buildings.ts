@@ -178,7 +178,11 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
     const band = Math.floor(ry / 4);
     let c = color;
     if (rule.roof === 'thatch') {
-      c = m6(ry, 3) === 0 ? shade(color, -0.12) : color;
+      // Стріха шарами по 6 рядків; межа шарів — темна, бо кінчики верхнього
+      // шару звисають на нижній. Тонів лише три (основа, тінь, світло) і
+      // вони далекі один від одного: близькі відтінки кожне крило хати
+      // зливає по-своєму (`disciplinePalette`), і на стику виходив шов.
+      if (m6(ry, 6) === 0) c = shade(color, -0.15);
     } else if (m6(ry, 4) === 3) c = shade(color, -0.28);
     else if (m6(ry, 4) === 0) c = shade(color, 0.14);
     const x0 = kl(k, r);
@@ -193,29 +197,41 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
       for (let x = x0; x < x1; x += 1) if (m6(at.x + x - 2, 5) === 0) px(g, x, top + r, shade(color, -0.12));
     }
     if (rule.roof === 'thatch') {
-      for (let x = x0; x < x1; x += 1) if (cellHash(at.x + x, ry, cs) % 5 === 0) px(g, x, top + r, shade(color, 0.18));
+      const course = m6(ry, 6);
+      for (let x = x0; x < x1; x += 1) {
+        const hh = cellHash(at.x + x, Math.floor(ry / 6), cs);
+        if (course === 1 && hh % 3 === 0) px(g, x, top + r, shade(color, -0.15));
+        else if (course === 5 && hh % 4 === 1) px(g, x, top + r, shade(color, 0.14));
+        else if (course !== 0 && cellHash(at.x + x, ry, cs) % 7 === 0) px(g, x, top + r, shade(color, 0.14));
+      }
     }
     if (densityOf(g) > 1) roofRowHd(g, rule.roof, c === color ? color : c, x0, x1, top + r, ry, at.x, cs);
     // Темні краї даху.
     if (fl(r) !== 'left') px(g, k, top + r, shade(color, -0.35));
     if (fl(r) !== 'right') px(g, W - k - 1, top + r, shade(color, -0.35));
   }
-  // Латки: стріху перекривали частинами, стара солома темніша й сіріша.
   if (rule.roof === 'thatch') {
-    for (let n = 0; n < Math.floor((W * H) / 900); n += 1) {
-      const hh = cellHash(n, seed, 21);
-      const ry = 3 + (hh % Math.max(1, H - 9));
-      const pw = 10 + ((hh >>> 6) % 14);
-      const k = Math.round((1 - ry / H) * inset);
-      const x0 = kl(k) + 2 + ((hh >>> 10) % Math.max(1, W - kl(k) - kr(k) - pw - 4));
-      rect(g, x0, top + ry, pw, 3 + ((hh >>> 16) % 3), mix(color, '#8a7a5a', 0.3));
-      rect(g, x0, top + ry, pw, 1, mix(color, '#8a7a5a', 0.45));
+    // Гребінь стріхи — грубий і заокруглений, притиснутий кізлами.
+    const rx0 = kl(inset);
+    const rx1 = W - kr(inset);
+    rect(g, rx0, top - 1, rx1 - rx0, 4, shade(color, -0.2));
+    rect(g, rx0, top - 1, rx1 - rx0, 1, shade(color, 0.04));
+    rect(g, rx0, top + 3, rx1 - rx0, 1, shade(color, -0.36));
+    for (let x = rx0; x < rx1; x += 1) if (cellHash(at.x + x, cs, 31) % 4 === 0) px(g, x, top, shade(color, -0.32));
+    // Звис: товстий підрізаний край — світлі зрізи стебел, під ними тінь.
+    rect(g, 0, bottom - 4, W, 3, mix(color, '#f2dc98', 0.3));
+    for (let x = 0; x < W; x += 1) {
+      const hh = cellHash(at.x + x, cs, 9);
+      if (hh % 3 === 0) px(g, x, bottom - 3 - (hh % 2), shade(color, -0.22));
+      else if (hh % 5 === 1) px(g, x, bottom - 4, mix(color, '#fff2c0', 0.5));
     }
+    rect(g, 0, bottom - 1, W, 1, shade(color, -0.45));
+  } else {
+    // Гребінь.
+    rect(g, kl(inset), top, W - kl(inset) - kr(inset), 2, shade(color, 0.3));
+    // Звис: темна смуга знизу.
+    rect(g, 0, bottom - 2, W, 2, shade(color, -0.42));
   }
-  // Гребінь.
-  rect(g, kl(inset), top, W - kl(inset) - kr(inset), 2, shade(color, rule.roof === 'thatch' ? -0.2 : 0.3));
-  // Звис: темна смуга знизу.
-  rect(g, 0, bottom - 2, W, 2, shade(color, -0.42));
   if (rule.roof === 'thatch' && season !== 'winter') {
     // Солом'яна стріха звисає нерівною бахромою.
     for (let x = 1; x < W - 1; x += 1) {
@@ -235,6 +251,20 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
       if (drip > 1) rect(g, x, top + snowH, 1, drip - 1, '#dfe9f6');
     }
     for (let x = 3; x < W - 3; x += 5 + (cellHash(x, seed, 2) % 4)) rect(g, x, bottom, 1, 2 + (cellHash(x, seed) % 3), '#cfe6f5');
+  }
+  if (rule.roof === 'thatch') {
+    // Кізли: пари жердин навхрест уздовж гребеня — крок за світом, тож у
+    // частин однієї хати вони не збиваються на стику.
+    const rx0 = kl(inset);
+    const rx1 = W - kr(inset);
+    for (let x = rx0 + 3; x < rx1 - 3; x += 1) {
+      if (m6(at.x + x, 14) !== 0) continue;
+      for (let d = 0; d < 4; d += 1) {
+        px(g, x - d, top + 1 - d, '#6e4a2a');
+        px(g, x + d, top + 1 - d, '#5a3a24');
+      }
+      px(g, x - 3, top - 2, '#8a6a44');
+    }
   }
 }
 

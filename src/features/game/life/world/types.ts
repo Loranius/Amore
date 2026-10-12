@@ -15,7 +15,9 @@ export const TILE = 16;
  */
 export type Ground = 'g' | 'G' | 'd' | 'c' | 'p' | 'a' | 'm' | 'z' | 's' | 'b' | 'w' | 'r' | 'h' | 'F' | 'f' | 't' | 'k' | 'W' | 'x' | 'v'
   // погріб: утоптана земля й бутова стіна
-  | 'e' | 'S';
+  | 'e' | 'S'
+  // хата: фарбовані дошки веранди й глиняна долівка кухні з піччю
+  | 'o' | 'l';
 
 export const SOLID_GROUND: ReadonlySet<Ground> = new Set<Ground>(['w', 'h', 'F', 'W', 'x', 'r', 'S']);
 
@@ -131,6 +133,10 @@ export type PropType =
   | 'desk' | 'sofa' | 'fridge' | 'rushnyk' | 'door'
   // садиба
   | 'woodpile' | 'workbench' | 'cellar' | 'planks'
+  // хата: лава (варіант 1 — з відрами води), скриня, вішак з одягом, взуття, м'яч
+  | 'lava' | 'chest' | 'coatRack' | 'shoes' | 'ball'
+  // город: високі культури, за якими можна сховатись
+  | 'corn' | 'tomatoes'
   // літня кухня
   | 'clayOven' | 'chair' | 'crates'
   // погріб
@@ -159,6 +165,18 @@ export interface Zone {
   label: string;
 }
 
+/** Культури городу (`render/crops.ts`). Кукурудза й помідори — високі, стоять пропами. */
+export type CropKind = 'potato' | 'cabbage' | 'beet' | 'onion' | 'carrot' | 'pumpkin' | 'cucumber' | 'strawberry' | 'corn' | 'tomato';
+
+/** Ділянка городу: прямокутник грядок однієї культури. */
+export interface CropPlot {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  kind: CropKind;
+}
+
 export interface GameMap {
   id: string;
   city: CityId | null;
@@ -177,6 +195,8 @@ export interface GameMap {
   folk: number;
   /** Чи замерзає ставок узимку (село). */
   pondFreezes?: boolean;
+  /** Ділянки городу з культурами; поза ними грядки — просто сходи. */
+  crops?: readonly CropPlot[];
 }
 
 export interface Rect {

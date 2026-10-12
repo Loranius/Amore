@@ -15,15 +15,18 @@ const m = (v: number, n: number) => ((v % n) + n) % n;
 /** Один ряд даху: `y` — рядок у спрайті, `ry` — у світі (шви тягнуться через стики крил). */
 export function roofRowHd(g: Ctx, kind: RoofKind, color: string, x0: number, x1: number, y: number, ry: number, atX: number, cs: number): void {
   if (kind === 'thatch') {
-    // Стебла соломи звисають пасмами: світлий кінчик і темна тінь під ним.
-    // Пасма йдуть рядами по 3 світові пікселі, як шари стріхи.
+    // Шари стріхи по 6 рядків (як у `buildings.ts`): під межею шару —
+    // тінь від кінчиків, над нею — світлі кінчики, посередині — окремі
+    // стебла пасмами вниз.
     const light = mix(color, '#f6e6a8', 0.45);
     const dark = shade(color, -0.24);
-    const layer = m(ry, 3);
+    const course = m(ry, 6);
     for (let x = x0; x < x1; x += 0.5) {
-      const hh = cellHash(Math.round((atX + x) * 2), Math.floor(ry / 3), cs) % 7;
-      if (hh === 0 || hh === 3) dot(g, x, y + (layer === 0 ? 0 : 0.5), layer === 2 ? dark : light);
-      else if (hh === 5 && layer !== 1) dot(g, x, y + 0.5, dark);
+      const hh = cellHash(Math.round((atX + x) * 2), Math.floor(ry / 6), cs) % 9;
+      if (course === 1 && (hh === 0 || hh === 4)) dot(g, x, y, dark);
+      else if (course === 5 && (hh === 2 || hh === 6)) dot(g, x, y + 0.5, light);
+      else if ((course === 2 || course === 3) && hh === 7) { dot(g, x, y, light); dot(g, x, y + 0.5, shade(light, -0.1)); }
+      else if (course === 4 && hh === 1) dot(g, x, y + 0.5, dark);
     }
   } else if (kind === 'tile') {
     const band = Math.floor(ry / 4);

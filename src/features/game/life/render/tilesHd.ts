@@ -147,3 +147,38 @@ export function wallpaperHd(g: Ctx, x: number, y: number, i: number, j: number):
 export function earthHd(g: Ctx, x: number, y: number, i: number, j: number, base: string): void {
   for (let k = 0; k < 10; k += 1) dot(g, x + Math.floor(h01(i, j, k) * 30) / 2, y + Math.floor(h01(i, j, k + 15) * 30) / 2, k % 3 ? shade(base, -0.14) : shade(base, 0.16));
 }
+
+/** Фарбовані дошки веранди: волокна крізь фарбу, подряпини до дерева. */
+export function paintedFloorHd(g: Ctx, x: number, y: number, i: number, j: number, base: string): void {
+  for (let r = 0; r < 4; r += 1) {
+    const by = y + r * 4;
+    for (let k = 0; k < 3; k += 1) {
+      const gx = x + Math.floor(h01(i, j * 4 + r, k + 30) * 26) / 2;
+      const gy = by + 1 + Math.floor(h01(i, j * 4 + r, k + 35) * 4) / 2;
+      dot(g, gx, gy, shade(base, -0.1));
+      dot(g, gx + 0.5, gy, shade(base, -0.1));
+    }
+    dot(g, x + 1, by + 0.5, shade(base, 0.12));
+    if (h01(i, j * 4 + r, 50) < 0.2) dot(g, x + 2 + Math.floor(h01(i, j * 4 + r, 51) * 22) / 2, by + 1.5, '#c99a6a');
+  }
+}
+
+/** Глиняна долівка: піщинки й світлі мазки, ніби від долоні. */
+export function clayFloorHd(g: Ctx, x: number, y: number, i: number, j: number, base: string): void {
+  for (let k = 0; k < 10; k += 1) dot(g, x + Math.floor(h01(i, j, k + 200) * 30) / 2, y + Math.floor(h01(i, j, k + 215) * 30) / 2, k % 3 ? shade(base, -0.1) : shade(base, 0.12));
+  for (let k = 0; k < 2; k += 1) {
+    const ax = x + 3 + Math.floor(h01(i, j, k + 230) * 18) / 2;
+    const ay = y + 3 + Math.floor(h01(i, j, k + 235) * 18) / 2;
+    for (let s = 0; s < 5; s += 1) dot(g, ax + s * 0.5, ay + Math.abs(s - 2) * 0.5, shade(base, 0.08));
+  }
+}
+
+/** Верх стіни: волокна вздовж дошок і темні цвяхи. */
+export function wallTopHd(g: Ctx, x: number, y: number, i: number, j: number, base: string, vertical: boolean): void {
+  for (let k = 0; k < 6; k += 1) {
+    const a = 2 + Math.floor(h01(i, j, k + 300) * 24) / 2;
+    const b = 1 + Math.floor(h01(i, j, k + 310) * 28) / 2;
+    if (vertical) { dot(g, x + a, y + b, shade(base, 0.1)); dot(g, x + a, y + b + 0.5, shade(base, 0.06)); }
+    else { dot(g, x + b, y + a, shade(base, 0.1)); dot(g, x + b + 0.5, y + a, shade(base, 0.06)); }
+  }
+}

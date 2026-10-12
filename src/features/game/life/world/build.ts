@@ -5,11 +5,12 @@
 // ============================================================
 import type { CityId } from '../sim/content';
 import { cellHash } from './hash';
-import { buildingParts, type Building, type BuildingStyle, type GameMap, type Ground, type Notch, type Prop, type PropType, type SignIcon, type Tree, type TreeKind, type Zone, type ZoneAction } from './types';
+import { buildingParts, type Building, type BuildingStyle, type CropKind, type CropPlot, type GameMap, type Ground, type Notch, type Prop, type PropType, type SignIcon, type Tree, type TreeKind, type Zone, type ZoneAction } from './types';
 
 /** Меблі, що в домі малюються більшими (`Prop.scale`). */
 export const INTERIOR_FURNITURE: ReadonlySet<PropType> = new Set<PropType>([
   'bed', 'wardrobe', 'table', 'desk', 'sofa', 'shelf', 'tv', 'fridge', 'stove', 'floorLamp', 'plant', 'rug', 'chair', 'crates',
+  'lava', 'chest',
 ]);
 export const INTERIOR_FURNITURE_SCALE = 1.25;
 
@@ -50,6 +51,7 @@ export class MapBuilder {
   readonly props: Prop[] = [];
   readonly zones: Zone[] = [];
   readonly spawns: Record<string, { x: number; y: number }> = {};
+  readonly crops: CropPlot[] = [];
   folk = 0;
   pondFreezes = false;
 
@@ -87,6 +89,19 @@ export class MapBuilder {
     // масштабі вулиці вони виглядали іграшковими (власник, 2026-10-05).
     const scale = this.interior && INTERIOR_FURNITURE.has(type) ? INTERIOR_FURNITURE_SCALE : undefined;
     this.props.push({ type, x, y, ...(scale ? { scale } : {}), ...extra });
+    return this;
+  }
+
+  /**
+   * Ділянка городу: грядки однієї культури. Високі культури (кукурудза,
+   * помідори на кілочках) ще й стають пропом на кожній клітинці — крізь них
+   * можна пройти, але Лєна й мама ховаються за ними.
+   */
+  crop(kind: CropKind, x: number, y: number, w: number, h: number): this {
+    this.fill(x, y, w, h, 'v');
+    this.crops.push({ x, y, w, h, kind });
+    const tall = kind === 'corn' ? 'corn' : kind === 'tomato' ? 'tomatoes' : null;
+    if (tall) for (let j = y; j < y + h; j += 1) for (let i = x; i < x + w; i += 1) this.props.push({ type: tall, x: i, y: j, solid: false });
     return this;
   }
 
@@ -140,6 +155,7 @@ export class MapBuilder {
       interior: this.interior,
       folk: this.folk,
       pondFreezes: this.pondFreezes,
+      ...(this.crops.length ? { crops: this.crops } : {}),
     };
   }
 }

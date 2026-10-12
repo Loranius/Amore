@@ -3,9 +3,11 @@ import { CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
 import { ROOM_FLOOR } from '../sim/economy';
 import { newLife } from '../sim/life';
 import { propSolid } from '../render/props';
+import { isWallTop } from '../render/tiles';
 import { colliderFor, reachableTiles, tileFeet, zoneTiles } from './collide';
-import { HATA_DOORS, HATA_ROOMS, homeInterior } from './interior';
+import { HATA_DOORS, HATA_FLOORS, HATA_ROOMS, homeInterior } from './interior';
 import { cellarMap } from './cellar';
+import { MOM_SPOTS } from './yard';
 import { summerKitchenMap } from './kitchen';
 import { ALL_CITY_IDS, cityMap, homeYard } from './maps';
 import { TILE, buildingParts, type GameMap } from './types';
@@ -74,6 +76,41 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(cityMap('zhylyntsi').zones.find((z) => z.id === 'home')?.action.type).toBe('yard');
     expect(yard.zones.some((z) => z.action.type === 'village')).toBe(true);
     expect(yard.zones.some((z) => z.action.type === 'home')).toBe(true);
+  });
+
+  // Власник, 2026-10-12: «покращення подвір'я» — город із різних культур
+  // замість одного поля однакових паростків.
+  it('город поділено на ділянки різних культур: кожна грядка — рівно в одній ділянці, стежка вільна', () => {
+    const yard = homeYard();
+    const plots = yard.crops ?? [];
+    expect(new Set(plots.map((p) => p.kind)).size).toBeGreaterThanOrEqual(8);
+    for (let y = 1; y <= 8; y += 1) {
+      for (let x = 1; x <= 30; x += 1) {
+        const owners = plots.filter((p) => x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h);
+        if (x === 15) {
+          expect(owners, `стежка ${x},${y}`).toHaveLength(0);
+          expect(yard.ground[y]![x], `стежка ${x},${y}`).toBe('d');
+        } else {
+          expect(owners, `${x},${y}`).toHaveLength(1);
+          expect(yard.ground[y]![x], `${x},${y}`).toBe('v');
+        }
+      }
+    }
+  });
+
+  it('мама порається лише на низьких культурах, а кукурудза й помідори — пропи на кожній клітинці, крізь які можна пройти', () => {
+    const yard = homeYard();
+    const tall = (yard.crops ?? []).filter((p) => p.kind === 'corn' || p.kind === 'tomato');
+    expect(tall.length).toBeGreaterThanOrEqual(2);
+    for (const [x, y] of MOM_SPOTS.garden) {
+      expect(tall.some((p) => x >= p.x && x < p.x + p.w && y >= p.y && y < p.y + p.h), `мама на ${x},${y}`).toBe(false);
+    }
+    for (const plot of tall) {
+      const type = plot.kind === 'corn' ? 'corn' : 'tomatoes';
+      const props = yard.props.filter((p) => p.type === type && p.x >= plot.x && p.x < plot.x + plot.w && p.y >= plot.y && p.y < plot.y + plot.h);
+      expect(props, plot.kind).toHaveLength(plot.w * plot.h);
+      for (const p of props) expect(propSolid(p), `${p.type} ${p.x},${p.y}`).toBeNull();
+    }
   });
 
   it('розташування за планом: хлів, хлів, курник позаду хати; город за ними; майстерня над кухнею; сад за кухнею', () => {
@@ -170,7 +207,8 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
       for (let y = r.y; y < r.y + r.h; y += 1) {
         for (let x = r.x + 1; x < r.x + r.w; x += 1) {
           const isDoor = Object.values(HATA_DOORS).some((d) => x >= d.x && x < d.x + d.w && y >= d.y && y < d.y + d.h);
-          expect(g(x, y), `${id} ${x},${y}`).toBe(y < r.y + r.wall && !isDoor ? 'W' : 'f');
+          const floor = isDoor ? 'f' : (HATA_FLOORS[id as keyof typeof HATA_ROOMS] ?? 'f');
+          expect(g(x, y), `${id} ${x},${y}`).toBe(y < r.y + r.wall && !isDoor ? 'W' : floor);
         }
       }
       expect(reach.has(`${r.x + 2},${r.y + r.h - 1}`), id).toBe(true);
@@ -198,6 +236,55 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     const brotherBeds = (m: typeof hata) => m.props.filter((p) => p.type === 'bed' && p.x > R.bro.x && p.x < R.up.x && p.y < R.bro.h);
     expect(brotherBeds(hata)).toHaveLength(2);
     expect(brotherBeds(homeInterior({ ...newLife(1, 'uni'), home: 'zhylyntsi' }))).toHaveLength(1);
+  });
+
+  // ADR-0239, власник 2026-10-12 «покращення хати всередині»: кімнати
+  // обжиті, а меблі не заступають одна одну й проходів.
+  it('хата обжита: на веранді вішак, лава з відрами й взуття, у мами скриня, у братів стіл', () => {
+    const R = HATA_ROOMS;
+    const inRoom = (m: ReturnType<typeof homeInterior>, t: string, r: { x: number; y: number; w: number; h: number }) =>
+      m.props.find((p) => p.type === t && p.x >= r.x && p.x < r.x + r.w && p.y >= r.y && p.y < r.y + r.h);
+    for (const stage of ['sadok', 'uni'] as const) {
+      const hata = homeInterior({ ...newLife(1, stage), home: 'zhylyntsi' });
+      expect(inRoom(hata, 'coatRack', R.ver), stage).toBeDefined();
+      expect(inRoom(hata, 'lava', R.ver)?.variant, stage).toBe(1);
+      expect(inRoom(hata, 'shoes', R.ver), stage).toBeDefined();
+      expect(inRoom(hata, 'chest', R.mom), stage).toBeDefined();
+      expect(inRoom(hata, 'desk', R.bro), stage).toBeDefined();
+      // Тверді меблі всієї хати не налазять одна на одну.
+      const solids = hata.props.map((p) => [p.type, propSolid(p)] as const).filter(([, r]) => r);
+      for (const [i, [ta, a]] of solids.entries()) {
+        for (const [tb, b] of solids.slice(i + 1)) {
+          const hit = a!.x < b!.x + b!.w && b!.x < a!.x + a!.w && a!.y < b!.y + b!.h && b!.y < a!.y + a!.h;
+          expect(hit, `${stage}: ${ta} × ${tb}`).toBe(false);
+        }
+      }
+      // З веранди можна пройти і в коридорчик, і на вулицю, і в кухню з піччю.
+      const reach = reachableTiles(hata, hata.spawns.door!);
+      for (const [x, y] of [[R.ver.x + 1, 7], [R.ver.x + R.ver.w - 1, 8], [HATA_DOORS.verUp.x, R.up.y + R.up.h - 1]] as const) expect(reach.has(`${x},${y}`), `${stage}: ${x},${y}`).toBe(true);
+    }
+    // М'яч на підлозі — лише поки брати живуть удома.
+    expect(inRoom(homeInterior({ ...newLife(1, 'sadok'), home: 'zhylyntsi' }), 'ball', R.bro)).toBeDefined();
+    expect(inRoom(homeInterior({ ...newLife(1, 'uni'), home: 'zhylyntsi' }), 'ball', R.bro)).toBeUndefined();
+  });
+
+  // Порожнеча між кімнатами — це товща стіни, а не провалля (власник,
+  // 2026-10-12): чорним лишається тільки те, що поза хатою.
+  it('у хаті порожнеча впритул до кімнати малюється стіною, а поза хатою — темрявою', () => {
+    const hata = homeInterior({ ...newLife(1, 'sadok'), home: 'zhylyntsi' });
+    const R = HATA_ROOMS;
+    // Перегородки: мама | брати й коридорчик, брати й коридорчик | кухня й веранда.
+    for (const [x, y] of [[R.bro.x, 3], [R.hall.x, R.hall.y + R.hall.h - 1], [R.up.x, 3], [R.ver.x, R.ver.y + R.ver.h - 1]] as const) {
+      expect(hata.ground[y]![x], `${x},${y}`).toBe('x');
+      expect(isWallTop(hata, x, y), `${x},${y}`).toBe(true);
+    }
+    // Під кімнатою Лєни — зовнішня стіна.
+    expect(isWallTop(hata, R.lena.x + 3, R.lena.y + R.lena.h)).toBe(true);
+    // Праворуч від кімнати Лєни й під верандою, далі від стін, — двір поза хатою.
+    expect(isWallTop(hata, hata.w - 2, hata.h - 2)).toBe(false);
+    // Надворі порожнечі як стін немає взагалі.
+    const yard = homeYard();
+    for (let j = 0; j < yard.h; j += 1) for (let i = 0; i < yard.w; i += 1) expect(isWallTop(yard, i, j)).toBe(false);
   });
 
   it('кімната Лєни (власник, 2026-10-05): шафа праворуч від ліжка, стіл унизу посередині, двері на клітинку лівіше', () => {

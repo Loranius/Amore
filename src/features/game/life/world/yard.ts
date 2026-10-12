@@ -18,10 +18,25 @@
 // ============================================================
 import { MapBuilder } from './build';
 import type { MomSpot } from '../sim/mom';
-import type { GameMap, TreeKind } from './types';
+import type { CropKind, GameMap, TreeKind } from './types';
 import { cellHash } from './hash';
 
 export const YARD_ID = 'zhylyntsi:yard';
+
+/** Ділянки городу (x1–30, y1–8; стежка — x15): культура, x, y, w, h. */
+export const GARDEN: readonly (readonly [CropKind, number, number, number, number])[] = [
+  ['potato', 1, 1, 9, 5],
+  ['cabbage', 10, 1, 5, 3],
+  ['beet', 10, 4, 5, 2],
+  ['onion', 1, 6, 4, 3],
+  ['carrot', 5, 6, 5, 3],
+  ['cucumber', 10, 6, 5, 3],
+  ['corn', 16, 1, 6, 4],
+  ['potato', 22, 1, 9, 4],
+  ['pumpkin', 16, 5, 6, 4],
+  ['tomato', 22, 5, 5, 4],
+  ['strawberry', 27, 5, 4, 4],
+];
 
 /**
  * Хата з двох крил, що стоять упритул, але з різною глибиною (план власника,
@@ -84,7 +99,10 @@ export function yardMap(): GameMap {
   m.fill(22, 23, 5, 2, 'd'); // під кухнею, до погреба
 
   // ── Великий город ────────────────────────────────────────────
-  m.fill(1, 1, 30, 8, 'v');
+  // Ділянки різних культур (власник, 2026-10-12: «покращення подвір'я»).
+  // Ліворуч від стежки, де порається мама, — лише низькі культури;
+  // кукурудза й помідори на кілочках — праворуч.
+  for (const [kind, x, y, w, h] of GARDEN) m.crop(kind, x, y, w, h);
   m.fill(15, 1, 1, 8, 'd');
   m.zone('garden', 2, 9, 12, 1, { type: 'activity', id: 'garden' }, 'Город · допомогти мамі');
   for (const [x, y] of [[31, 2], [31.6, 3.8], [33, 1.6]] as const) m.prop('sunflowers', x, y);

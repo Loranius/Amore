@@ -45,6 +45,46 @@ export function propHd(g: Ctx, p: Prop, x: number, y: number, t: number, season:
       grain(g, x + 1, y + 4, 16, 2, '#9a6a3a', seed);
       grain(g, x + 1, y + 8, 16, 2, '#9a6a3a', seed + 1);
       break;
+    case 'lava':
+      grain(g, x, y + 5.5, 32, 2.5, '#a8784a', seed);
+      if (p.variant === 1) {
+        for (const bx of [x + 3, x + 12]) {
+          dot(g, bx + 1.5, y - 1, '#ffffff');
+          dot(g, bx + 1.5, y - 0.5, '#ffffff');
+          dot(g, bx + 5, y - 1.5, '#cfe8f7');
+          dot(g, bx + 6.5, y + 2.5, '#3a6fd8');
+          dot(g, bx + 2, y + 3, '#c9d2dc');
+        }
+      }
+      break;
+    case 'chest':
+      for (const fx of [x + 8, x + 16]) {
+        dot(g, fx + 0.5, y + 8.5, '#ff9aa8');
+        dot(g, fx - 2.5, y + 10.5, '#b6dc8a');
+        dot(g, fx + 2.5, y + 10.5, '#b6dc8a');
+      }
+      for (const bx of [x + 3, x + 19]) for (const ry of [2, 6.5, 11]) dot(g, bx + 0.5, y + ry, '#a8a094');
+      dot(g, x + 11.5, y + 5.5, '#fff1a8');
+      grain(g, x, y + 1.5, 24, 2, '#2f6a5a', seed + 2);
+      break;
+    case 'coatRack':
+      for (let r = 7; r < 16; r += 3) dot(g, x + 6.5, y + r, '#c9b48e');
+      dot(g, x + 11, y + 8, '#ff8a8a');
+      dot(g, x + 13.5, y + 9, '#f6d55c');
+      dot(g, x + 13.5, y + 11.5, '#f6d55c');
+      for (let k = 0; k < 7; k += 2) dot(g, x + 17.5 + k * 0.5, y + 4.5, '#e8c886');
+      break;
+    case 'shoes':
+      dot(g, x + 2.5, y + 4, '#7a9a6a');
+      dot(g, x + 6.5, y + 4, '#7a9a6a');
+      dot(g, x + 13, y + 9.5, '#f8f4ec');
+      dot(g, x + 17, y + 9.5, '#f8f4ec');
+      break;
+    case 'ball':
+      dot(g, x + 9, y + 9.5, '#ffffff');
+      dot(g, x + 9.5, y + 10, '#ffffff');
+      dot(g, x + 8.5, y + 11.5, '#2b2b33');
+      break;
     case 'well':
       for (let k = 0; k < 16; k += 4) dot(g, x + 3 + k, y + 7, '#c8c2b4');
       for (let r = 0; r < 12; r += 1) dot(g, x + 9.5, y - 5 + r, r % 2 ? '#a88a6a' : '#6a5a4a');
