@@ -482,13 +482,25 @@
 
 /* Поля без рамок: це нотатник, а не анкета. Рамка навколо назви робить із
    екрана форму, і вся ідея «пара просто пише» зникає. */
+/* Подвоєні класи — не помилка. Світ порталу малює кожне поле рамкою,
+   заливкою й внутрішньою тінню (`worldSurface.css`:
+   `[data-portal-scene] input:not([type=checkbox]):not([type=radio])` —
+   специфічність 0,3,1), і на живому знімку 412×915 блокнот став анкетою з
+   двома коробками. `.mm-composer.mm-composer .x.x` — 0,4,0 — повертає
+   нотатнику голий аркуш, не чіпаючи поля решти порталу. */
+.mm-composer.mm-composer .mm-title-input.mm-title-input,
+.mm-composer.mm-composer .mm-note-input.mm-note-input {
+  box-shadow: none;
+  border-radius: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+}
+
 .mm-title-input,
 .mm-note-input {
   display: block;
   width: 100%;
-  border: 0;
-  background: none;
-  color: var(--text);
   font: inherit;
   padding: 0;
 }
@@ -515,7 +527,10 @@
 }
 .mm-title-input::placeholder { color: color-mix(in srgb, var(--muted) 55%, transparent); }
 .mm-note-input::placeholder { color: color-mix(in srgb, var(--muted) 55%, transparent); }
-.mm-title-input:focus, .mm-note-input:focus { outline: none; }
+/* Каретка — і є фокус аркуша; рамку фокуса світу тут прибрано тією ж
+   специфічністю, що й саму рамку. */
+.mm-composer.mm-composer .mm-title-input.mm-title-input:focus,
+.mm-composer.mm-composer .mm-note-input.mm-note-input:focus { outline: none; }
 
 /* Підвал на всю ширину. Перша редакція тримала праворуч 74px під
    скріпку на ВСІЙ висоті підвалу, і сітка фото стискалась до плиток по
@@ -1440,4 +1455,11 @@
     padding-right: max(18px, calc((100% - var(--mm-sheet)) / 2));
   }
   .mm-clip { right: max(18px, calc((100vw - var(--mm-sheet)) / 2 + 18px)); }
+}
+
+/* На десктопі ліворуч стоїть бічна панель (240px), і кнопка карти
+   (`.fab--left`, 16px від краю вікна) лягала поверх неї — живий знімок
+   1280×800: x 16…74 усередині панелі 0…240. */
+@media (min-width: 900px) {
+  .memories .fab--left { left: calc(240px + 16px); }
 }
