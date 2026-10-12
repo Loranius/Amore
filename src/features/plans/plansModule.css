@@ -228,6 +228,30 @@
   transition: translate 90ms ease, box-shadow 90ms ease;
 }
 
+/* «Сьогодні» — слово, а не значок: квадрат 38×38 від стрілок був йому
+   вузький, і текст вилазив на стрілку вперед (знімок власника, вересень
+   2026). Та сама висота й поверхня, але ширина — від слова, форма —
+   пігулка, колір тексту — акцент: це дія «повернутись», а не крок. */
+.plans-module .cal-today-btn {
+  width: auto;
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 0 14px;
+  border-radius: var(--radius-pill);
+  color: var(--accent);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.plans-module .cal-today-btn:focus-visible,
+.plans-module .cal-nav-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .plans-module .cal-nav-btn:active,
 .plans-module .cal-today-btn:active {
   translate: 0 1px;

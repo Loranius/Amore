@@ -215,3 +215,16 @@ describe('задуми без дати живуть лише в колоді (AD
     expect(page).not.toContain('label="Задуми без дати"');
   });
 });
+
+describe('кнопка «Сьогодні» в місяці не стискається до квадрата стрілки', () => {
+  // Знімок власника: «Сьогодні» в квадраті 38×38 вилазило на стрілку вперед.
+  const css = read('plansModule.css');
+  const rule = css.slice(css.indexOf('*/\n.plans-module .cal-today-btn {'));
+  const body = rule.slice(0, rule.indexOf('}'));
+
+  it('ширина — від слова, а не від стрілки', () => {
+    expect(body).toContain('width: auto');
+    expect(body).toContain('white-space: nowrap');
+    expect(body).toMatch(/padding: 0 \d+px/);
+  });
+});
