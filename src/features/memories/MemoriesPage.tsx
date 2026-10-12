@@ -23,13 +23,18 @@
 // «Спогади» — що вже було; «Наш шлях» — віхи; «Плани» — чого ще хочеться.
 // ============================================================
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useNavigationType } from 'react-router-dom';
+import { pluralUA } from '@/lib/utils';
 import { useSettledPending } from '@/lib/useSettledPending';
 import {
   hasMoreMemories,
-  initialMemoriesCount,
   nextMemoriesCount,
+  readGalleryPlace,
+  restoredShown,
+  writeGalleryPlace,
 } from './memoriesPaging';
+import { unseenFromPartner } from './memoryThread';
+import { useSeenSince } from './useSeenSince';
 import { useCurrentUser } from '@/providers/AuthProvider';
 import { PlusIcon } from '@/components/icons/UiIcon';
 import { FoldedMapIcon } from '@/components/icons/ViewIcon';
@@ -69,13 +74,52 @@ export function MemoriesPage() {
   const skeletonVisible = useSettledPending(isPending);
 
   const total = data?.moments.length ?? 0;
-  const [shown, setShown] = useState(() => initialMemoriesCount(total));
+  /*
+   * Місце на нитці (ADR-0251). Повертаючись «назад» зі спогаду, пара
+   * опиняється там, де була, а не на початку року. Лише на «назад»
+   * (`POP`): відкриваючи «Спогади» з меню, нитка починається згори.
+   */
+  const navigationType = useNavigationType();
+  const [savedPlace] = useState(() => (
+    navigationType === 'POP' ? readGalleryPlace(sessionStorageOrNull()) : null
+  ));
+  const [shown, setShown] = useState(() => restoredShown(total, savedPlace));
+  const shownRef = useRef(shown);
+  shownRef.current = shown;
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
+  const placeRestored = useRef(false);
+  const seenSince = useSeenSince(me.id);
 
   // Архів приїхав (або змінився) — рахуємо першу пачку від його розміру.
   useEffect(() => {
-    setShown(initialMemoriesCount(total));
-  }, [total]);
+    setShown(restoredShown(total, savedPlace));
+  }, [total, savedPlace]);
+
+  // Прокрутка відстежується, поки нитка на екрані, а пишеться при виході:
+  // на момент прибирання новий маршрут уже змінив висоту вмісту, і читати
+  // `scrollTop` тоді означало б прочитати вже обрізане число.
+  useEffect(() => {
+    const content = sectionRef.current?.closest('.content');
+    if (!content || total === 0) return undefined;
+    let top = content.scrollTop;
+    const onScroll = () => { top = content.scrollTop; };
+    content.addEventListener('scroll', onScroll, { passive: true });
+
+    if (savedPlace && !placeRestored.current) {
+      placeRestored.current = true;
+      // Два кадри: `Layout` прокручує нагору у своєму ефекті після наших,
+      // а вузли нитки мусять встигнути отримати висоту.
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        content.scrollTo({ top: savedPlace.top });
+      }));
+    }
+
+    return () => {
+      content.removeEventListener('scroll', onScroll);
+      writeGalleryPlace(sessionStorageOrNull(), { top, shown: shownRef.current });
+    };
+  }, [total, savedPlace]);
 
   // Пара догортала до позначки — додаємо наступну пачку.
   //
@@ -110,7 +154,9 @@ export function MemoriesPage() {
           {(['left', 'right', 'left'] as const).map((side, i) => (
             <div key={i} className={`mt-node mt-node--${side}`}>
               <span className="mt-link">
-                <span className="mt-stack"><span className="mt-frame mm-skeleton" /></span>
+                <span className="mt-slot">
+                  <span className="mt-stack"><span className="mt-frame mm-skeleton" /></span>
+                </span>
                 <span className="mt-dot" />
               </span>
             </div>
@@ -140,12 +186,12 @@ export function MemoriesPage() {
   const earliest = moments[moments.length - 1]?.memory_date;
 
   return (
-    <section className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
+    <section ref={sectionRef} className="memories world-module" data-world={worldVisible ? 'true' : undefined}>
       <PageHeader
         title="Спогади"
         meta={moments.length === 0
           ? 'Тут буде ваш фотощоденник'
-          : `${moments.length} · ${data?.photoCount ?? 0} фото · від ${earliest?.slice(0, 4) ?? ''}`}
+          : `${moments.length} ${pluralUA(moments.length, ['спогад', 'спогади', 'спогадів'])} · ${data?.photoCount ?? 0} фото · від ${earliest?.slice(0, 4) ?? ''}`}
       />
 
       {moments.length === 0 ? (
@@ -159,6 +205,7 @@ export function MemoriesPage() {
           <MemoryThread
             moments={moments}
             shown={shown}
+            unseen={unseenFromPartner(moments, me.id, seenSince)}
             onNeed={(count) => setShown((current) => Math.max(current, nextMemoriesCount(count - 1, total)))}
           />
           {/* Позначка кінця списку. Порожня за призначенням: вона нічого
@@ -219,4 +266,13 @@ export function MemoriesPage() {
       )}
     </section>
   );
+}
+
+/** `sessionStorage`, якщо браузер його дає; приватний режим може кинути вже на доступі. */
+function sessionStorageOrNull(): Storage | null {
+  try {
+    return typeof sessionStorage === 'undefined' ? null : sessionStorage;
+  } catch {
+    return null;
+  }
 }

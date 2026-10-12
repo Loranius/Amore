@@ -89,19 +89,30 @@
 
 .mt-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
 
-.mt-node--left .mt-stack { grid-column: 1; justify-self: end; }
+.mt-node--left .mt-slot { grid-column: 1; justify-content: flex-end; }
 .mt-node--left .mt-caption { grid-column: 3; text-align: left; }
-.mt-node--right .mt-stack { grid-column: 3; grid-row: 1; justify-self: start; }
+.mt-node--right .mt-slot { grid-column: 3; grid-row: 1; justify-content: flex-start; }
 .mt-node--right .mt-caption { grid-column: 1; grid-row: 1; text-align: right; }
 .mt-dot { grid-column: 2; grid-row: 1; }
 
-/* Кадр притиснутий до нитки, а решта колонки — поле під віяло.
-   Частку (`--mt-frame`) задає `memoryThread.ts::FRAME_WIDTH`; тест там
-   стереже, що найдальший лист уміщається в це поле. */
+/* Слот кадру — сталої висоти (0.9 колонки) для КОЖНОГО вузла. Тоді крок
+   від вузла до вузла дорівнює слоту плюс відступ часу, і відстань на
+   нитці каже про час, а не про те, скільки фото було того дня
+   (критика 2026-10-12: кадри 86…144px важили більше за відступи 14…64px). */
+.mt-slot {
+  display: flex;
+  align-items: center;
+  aspect-ratio: 10 / 9;
+}
+
+/* Кадр притиснутий до нитки, а решта слота — поле під віяло. Частку
+   (`--mt-frame`) задає `memoryThread.ts::frameWidth` за кількістю листів;
+   тест там стереже, що найдальший лист уміщається в це поле. */
 .mt-stack {
   position: relative;
   display: block;
-  width: calc(var(--mt-frame, 0.7) * 100%);
+  flex: 0 0 auto;
+  width: calc(var(--mt-frame, 0.9) * 100%);
   transition: translate 120ms ease;
 }
 
@@ -113,15 +124,12 @@
   aspect-ratio: 1;
   overflow: hidden;
   border-radius: var(--radius-md);
-  /* Темніше за ґрунт: фото з білим небом інакше зливається з тлом
-     сторінки, і кадр читається як порожня діра. */
-  background: #201b28;
+  /* Підложка поки фото їде: `--surface-2`, а не число. Літерал #201b28
+     лишався темною дірою в денній темі (критика 2026-10-12), а токен
+     має значення в кожній темі й кожного виду. */
+  background: var(--surface-2);
   box-shadow: var(--shadow-md);
 }
-
-/* Найбільший кадр — вертикальний: чотири й більше фото — це вже подія,
-   і висота відрізняє її від буденного знімка на тій самій нитці. */
-.mt-frame--l { aspect-ratio: 4 / 5; }
 
 .mt-frame img,
 .mt-leaf img {
@@ -155,7 +163,11 @@
   display: block;
   width: 100%;
   height: 100%;
-  background: repeating-linear-gradient(45deg, #2a2432 0 8px, #241f2c 8px 16px);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--surface-2) 0 8px,
+    color-mix(in srgb, var(--surface-2) 88%, var(--text)) 8px 16px
+  );
 }
 
 /* Лічильник кадрів: просте число, не «+3». */
@@ -177,7 +189,8 @@
 }
 
 /* Вузол на нитці. Колір тут — стан, а не прикраса (The Rare Colour Rule):
-   залитий акцентом лише найсвіжіший спогад, решта — камінь. */
+   залиті акцентом лише спогади партнера, яких ти ще не бачив (ADR-0251),
+   решта — камінь. */
 .mt-dot {
   position: relative;
   justify-self: center;
@@ -188,11 +201,18 @@
   border: 2px solid color-mix(in srgb, var(--text) 34%, transparent);
 }
 
-.mt-node.is-freshest .mt-dot {
+.mt-node.is-unseen .mt-dot {
   width: 14px;
   height: 14px;
   background: var(--accent);
   border-color: var(--accent);
+}
+
+/* Слово поруч із вузлом: колір сам по собі невидимий частині людей. */
+.mt-node.is-unseen .mt-caption b::after {
+  content: ' · нове';
+  color: var(--accent);
+  font-weight: 800;
 }
 
 .mt-caption {
@@ -227,7 +247,14 @@
 .mt-caption i:empty { display: none; }
 
 .mt-caption q {
-  display: block;
+  display: -webkit-box;
+  /* Два рядки. Нотатка може мати дві тисячі символів, і без межі вузол
+     виростав на сотні пікселів поруч із кадром — відстань на нитці
+     переставала бути часом. Ціла нотатка — на сторінці спогаду. */
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
   margin-top: 6px;
   font-size: 14px;
   line-height: 1.4;
@@ -252,8 +279,9 @@
   border-radius: var(--radius-pill);
   background: var(--surface-2);
   border: 1px solid var(--border);
-  box-shadow: var(--shadow-sm);
-  font-size: 20px;
+  /* Title зі шкали, а не Headline: зарубка не має бути гучнішою за
+     назви спогадів, яких вона позначає (критика 2026-10-12). */
+  font-size: 16px;
   font-weight: 800;
   line-height: 1.3;
   color: var(--text);
@@ -408,12 +436,25 @@
   background-image: var(--control-fill);
   color: #fff;
   font: inherit;
-  font-size: 14.5px;
+  font-size: 14px;
   font-weight: 800;
   box-shadow: var(--control-top), var(--control-lip);
   cursor: pointer;
 }
-.mm-save:disabled { opacity: 0.45; box-shadow: none; cursor: default; }
+/* Вимкнений стан — канон `.btn:disabled` з DESIGN.md: пласка поверхня,
+   приглушений підпис, тонкий кант. Не прозорість на орхідеї: блідо-
+   бузкове тіло з сірим підписом виглядало несправним, а не вимкненим.
+   `aria-disabled` — чернетці бракує фото: кнопка виглядає вимкненою, але
+   тап пояснює, чого бракує. */
+.mm-save:disabled,
+.mm-save[aria-disabled='true'] {
+  border-color: transparent;
+  background-image: none;
+  background-color: var(--surface-2);
+  color: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+}
+.mm-save:disabled { cursor: default; }
 
 /* Композер — блокнот, а не анкета.
    ------------------------------------------------------------
@@ -430,7 +471,8 @@
   flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 20px);
+  /* 22px від низу до скріпки + 58px її висоти + 14px повітря. */
+  padding: 18px 18px calc(env(safe-area-inset-bottom, 0px) + 94px);
 }
 
 /* Поля без рамок: це нотатник, а не анкета. Рамка навколо назви робить із
@@ -446,7 +488,7 @@
   padding: 0;
 }
 .mm-title-input {
-  font-size: 24px;
+  font-size: 25px;
   font-weight: 800;
   letter-spacing: -0.01em;
   line-height: 1.25;
@@ -470,12 +512,14 @@
 .mm-note-input::placeholder { color: color-mix(in srgb, var(--muted) 55%, transparent); }
 .mm-title-input:focus, .mm-note-input:focus { outline: none; }
 
-/* Підвал не заповзає під скріпку: вона висить у правому нижньому куті
-   на 18px від краю, тож праворуч лишається її ширина плюс проміжок. */
+/* Підвал на всю ширину. Перша редакція тримала праворуч 74px під
+   скріпку на ВСІЙ висоті підвалу, і сітка фото стискалась до плиток по
+   ~95px, хоча скріпка висить лише в нижньому куті (критика 2026-10-12).
+   Тепер місце під неї дає нижній відступ тіла: догорнувши до кінця, і
+   останній ряд фото стоїть над скріпкою. */
 .mm-comp-foot {
   flex: 0 0 auto;
   margin-top: 18px;
-  padding-right: 74px;
 }
 
 .mm-meta-rows { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -490,7 +534,7 @@
   background: var(--surface-2);
   color: var(--text);
   font: inherit;
-  font-size: 13px;
+  font-size: 12px;
   cursor: pointer;
   box-shadow: var(--glass-stroke);
 }
@@ -518,7 +562,7 @@
    не звертання по центру екрана. */
 .mm-comp-hint {
   margin: 10px 0 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted);
   text-align: left;
 }
@@ -643,13 +687,13 @@
   color: #fff;
   box-shadow: var(--control-top), var(--control-lip), 0 14px 30px rgba(4, 2, 10, 0.55);
   cursor: pointer;
-  transition: rotate 200ms cubic-bezier(0.2, 0.9, 0.3, 1);
 }
-.mm-clip.is-open .mm-clip-btn { rotate: 135deg; }
+/* Відкрите віяло — хрестик у кнопці (`MomentComposer.tsx`), а не
+   повернута скріпка: нахилена скріпка не читається як «закрити». */
 .mm-clip-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 
 @media (prefers-reduced-motion: reduce) {
-  .mm-clip-item, .mm-clip-btn { transition: none; }
+  .mm-clip-item { transition: none; }
 }
 
 /* ── Аркуш вибору місця ────────────────────────────────────── */
@@ -685,7 +729,7 @@
 .mm-search svg { color: var(--muted); flex: 0 0 auto; }
 .mm-search input {
   flex: 1 1 auto;
-  border: 0; background: none; color: var(--text); font: inherit; font-size: 15px;
+  border: 0; background: none; color: var(--text); font: inherit; font-size: 16px;
 }
 .mm-search input:focus { outline: none; }
 
@@ -707,13 +751,13 @@
 }
 .mm-place-row:active { background: var(--surface-2); }
 .mm-place-row svg { color: var(--accent); flex: 0 0 auto; }
-.mm-place-row b { display: block; font-size: 14.5px; font-weight: 600; }
+.mm-place-row b { display: block; font-size: 14px; font-weight: 600; }
 .mm-place-row i {
-  display: block; font-style: normal; font-size: 11.5px; color: var(--muted);
+  display: block; font-style: normal; font-size: 12px; color: var(--muted);
 }
 .mm-place-row--exif i { color: var(--accent); }
 
-.mm-sheet-note { margin: 12px 4px; font-size: 13px; color: var(--muted); }
+.mm-sheet-note { margin: 12px 4px; font-size: 12px; color: var(--muted); }
 .mm-sheet-clear { width: 100%; }
 
 /* ============================================================
@@ -827,28 +871,28 @@
   padding: 11px 12px;
   border: 0; border-radius: var(--radius-sm);
   background: none; color: var(--text);
-  font: inherit; font-size: 14.5px; text-align: left; cursor: pointer;
+  font: inherit; font-size: 14px; text-align: left; cursor: pointer;
 }
 .mm-menu button:active { background: var(--surface-2); }
-.mm-menu button.is-danger { color: var(--danger, #f2708a); }
+.mm-menu button.is-danger { color: var(--danger); }
 
 /* Заголовок стоїть ПІД кадром, а не на ньому. Від'ємний відступ, який
    тут був, підтягував назву на градієнт — і на телефоні вона читалась
    обрізаною знизу фотографією. */
 .mm-page-head { margin-top: 16px; }
-.mm-page-head h1 { margin: 0; font-size: 26px; line-height: 1.2; letter-spacing: -0.015em; }
+.mm-page-head h1 { margin: 0; font-size: 25px; line-height: 1.2; letter-spacing: -0.015em; }
 
 .mm-page-meta {
   margin: 7px 0 0;
   display: flex; align-items: center; flex-wrap: wrap; gap: 7px;
-  font-size: 13px; color: var(--muted);
+  font-size: 12px; color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 .mm-page-meta em { font-style: normal; opacity: 0.55; }
 .mm-page-place { display: inline-flex; align-items: center; gap: 4px; }
 .mm-page-place svg { color: var(--accent); }
 
-.mm-page-note { margin: 12px 0 0; font-size: 15px; line-height: 1.5; }
+.mm-page-note { margin: 12px 0 0; font-size: 14px; line-height: 1.5; }
 
 /* ── Альбом ────────────────────────────────────────────────── */
 
@@ -1086,7 +1130,7 @@
 }
 
 .mm-map-sheet b { display: block; font-size: 16px; line-height: 1.3; }
-.mm-map-sheet p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.mm-map-sheet p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 
 .mm-map-sheet-photo {
   display: block;
@@ -1124,50 +1168,72 @@
    «Замірах»: обидва відкривають щось поверх сторінки, і читатись вони
    мусять однаково. */
 
-/* ── Шматок нитки на сторінці спогаду (ADR-0250) ─────────────── */
+/* ── Шматок нитки на сторінці спогаду (ADR-0250, ADR-0251) ─────── */
 
-/* Та сама нитка, що в галереї, тільки вертикально зліва й з трьома
-   вузлами: новіший угорі, цей посередині, старіший унизу. Лінію малює
-   кожен проміжок сам, через центр мініатюр (48px → 24px): так вона
-   з'єднує рівно ті вузли, які є, хай сусід один чи два. */
+/* Та сама мова, що й нитка галереї: лінія по центру, вузли обабіч,
+   проміжок — підписом праворуч від лінії, як пауза. Перша редакція
+   вела лінію зліва, і дві нитки одного модуля виглядали по-різному
+   (критика 2026-10-12). Лінію малює кожен рядок сам: перший — від свого
+   вузла вниз, останній — до свого вузла. */
 .mm-thread {
   --mm-thread-line: color-mix(in srgb, var(--text) 18%, transparent);
-  position: relative;
   display: flex;
   flex-direction: column;
-  margin-top: 36px;
+  margin-top: 40px;
   padding-bottom: 28px;
 }
 
-.mm-thread-link {
+.mm-thread > * {
   position: relative;
-  display: block;
+  margin: 0;
+}
+
+.mm-thread > *::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--mm-thread-line);
+}
+
+.mm-thread > :first-child::before { top: 50%; }
+.mm-thread > :last-child::before { bottom: 50%; }
+
+.mm-thread-link,
+.mm-thread-here {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 22px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: center;
+}
+
+.mm-thread-link {
   color: inherit;
   text-decoration: none;
   border-radius: var(--radius-sm);
 }
 
 .mm-thread-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
-.mm-thread-link:active .mm-thread-node { translate: 0 2px; }
+.mm-thread-link:active .mm-thread-shot { translate: 0 2px; }
 
-.mm-thread-node,
-.mm-thread-here {
-  display: grid;
-  grid-template-columns: 48px minmax(0, 1fr);
-  column-gap: 16px;
-  align-items: center;
-}
-
-.mm-thread-node { transition: translate 120ms ease; }
+.mm-thread-link--left .mm-thread-shot { grid-column: 1; justify-self: end; }
+.mm-thread-link--left .mm-thread-text { grid-column: 3; text-align: left; }
+.mm-thread-link--right .mm-thread-shot { grid-column: 3; grid-row: 1; justify-self: start; }
+.mm-thread-link--right .mm-thread-text { grid-column: 1; grid-row: 1; text-align: right; }
+.mm-thread-link .mm-thread-dot { grid-column: 2; grid-row: 1; }
 
 .mm-thread-shot {
   display: block;
-  width: 48px;
-  height: 48px;
+  width: 64px;
+  height: 64px;
   overflow: hidden;
   border-radius: var(--radius-sm);
-  background: #201b28;
+  background: var(--surface-2);
   box-shadow: var(--shadow-sm);
+  transition: translate 120ms ease;
 }
 
 .mm-thread-shot img {
@@ -1180,12 +1246,14 @@
 .mm-thread-text { min-width: 0; }
 
 .mm-thread-text b {
-  display: block;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 15px;
+  overflow-wrap: anywhere;
+  font-size: 14px;
   font-weight: 700;
+  line-height: 1.3;
   color: var(--text);
 }
 
@@ -1198,45 +1266,42 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Проміжок — скільки минуло між вузлами. Стоїть праворуч від лінії, як
-   підпис паузи в галереї. */
+/* Проміжок — скільки минуло між вузлами, праворуч від лінії. */
 .mm-thread-gap {
-  position: relative;
-  display: block;
-  padding: 12px 0 12px 64px;
-  font-style: normal;
+  padding: 14px 0 14px calc(50% + 14px);
   font-size: 12px;
   font-weight: 600;
   color: var(--muted);
   font-variant-numeric: tabular-nums;
 }
 
-.mm-thread-gap::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 23px;
-  width: 2px;
-  background: var(--mm-thread-line);
-}
-
-/* Цей спогад — залитий вузол: тут колір означає «ви тут». */
-.mm-thread-here {
-  position: relative;
-  min-height: 24px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--accent);
-}
-
 .mm-thread-dot {
+  position: relative;
   justify-self: center;
   width: 14px;
   height: 14px;
   border-radius: var(--radius-pill);
   background: var(--accent);
 }
+
+/* Сусід — камінь, як вузол нитки; залитий лише «цей спогад»: тут колір
+   означає «ви тут». */
+.mm-thread-dot--stone {
+  width: 12px;
+  height: 12px;
+  background: var(--surface);
+  border: 2px solid color-mix(in srgb, var(--text) 34%, transparent);
+}
+
+.mm-thread-here {
+  min-height: 24px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.mm-thread-here .mm-thread-dot { grid-column: 2; }
+.mm-thread-here span { grid-column: 3; }
 
 /* ── Де спогад ляже на нитці (композер, ADR-0250) ─────────────── */
 
@@ -1245,7 +1310,7 @@
   align-items: center;
   gap: 8px;
   margin: 10px 0 0;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.4;
   color: var(--muted);
 }
@@ -1260,5 +1325,5 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mm-thread-node { transition: none; }
+  .mm-thread-shot { transition: none; }
 }

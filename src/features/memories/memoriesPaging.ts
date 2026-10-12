@@ -62,3 +62,54 @@ export function nextMemoriesCount(
 export function hasMoreMemories(shown: number, total: number): boolean {
   return shown < total;
 }
+
+// ── Місце на нитці після «назад» (ADR-0251) ─────────────────
+
+/**
+ * Де пара була на нитці, коли відкрила спогад.
+ *
+ * Без цього кожне «назад» кидало на початок року: `Layout` прокручує
+ * вміст нагору при зміні маршруту, а галерея знову малювала лише першу
+ * пачку. Головна робота модуля — гортати й згадувати, і саме вона
+ * ламалась на кожному спогаді.
+ */
+export interface GalleryPlace {
+  top: number;
+  shown: number;
+}
+
+const PLACE_KEY = 'amore:memories-place';
+
+/**
+ * Скільки спогадів намалювати, повертаючись на нитку.
+ *
+ * Не менше, ніж було намальовано, — інакше прокрутка відновилась би в
+ * порожнечу під останньою пачкою; і не більше, ніж є в архіві.
+ */
+export function restoredShown(total: number, saved: GalleryPlace | null): number {
+  const first = initialMemoriesCount(total);
+  if (!saved) return first;
+  return Math.min(Math.max(0, total), Math.max(first, Math.trunc(saved.shown)));
+}
+
+/** Сховище може бути недоступне або зіпсоване — тоді місця просто немає. */
+export function readGalleryPlace(storage: Pick<Storage, 'getItem'> | null): GalleryPlace | null {
+  try {
+    const raw = storage?.getItem(PLACE_KEY);
+    if (!raw) return null;
+    const value = JSON.parse(raw) as Partial<GalleryPlace>;
+    return Number.isFinite(value.top) && Number.isFinite(value.shown)
+      ? { top: value.top as number, shown: value.shown as number }
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeGalleryPlace(storage: Pick<Storage, 'setItem'> | null, place: GalleryPlace): void {
+  try {
+    storage?.setItem(PLACE_KEY, JSON.stringify(place));
+  } catch {
+    // Повне чи заборонене сховище коштує лише відновлення місця.
+  }
+}

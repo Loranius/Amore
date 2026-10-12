@@ -157,15 +157,15 @@ export function MomentPage() {
 
       <header className="mm-page-head">
         <h1>{moment.title.trim() || formatMemoryDate(moment.memory_date, 'day')}</h1>
-        <p className="mm-page-meta">
-          <span>{formatMemoryDate(moment.memory_date, 'day')}</span>
-          {place && (
-            <>
-              <em aria-hidden="true">•</em>
-              <span className="mm-page-place"><MapPinIcon size={14} />{place}</span>
-            </>
-          )}
-        </p>
+        {/* Без назви дата вже стоїть заголовком — удруге її не друкуємо,
+            як і на нитці. Рядок лишається лише заради місця. */}
+        {(moment.title.trim() || place) && (
+          <p className="mm-page-meta">
+            {moment.title.trim() && <span>{formatMemoryDate(moment.memory_date, 'day')}</span>}
+            {moment.title.trim() && place && <em aria-hidden="true">•</em>}
+            {place && <span className="mm-page-place"><MapPinIcon size={14} />{place}</span>}
+          </p>
+        )}
         {moment.note && <p className="mm-page-note">{moment.note}</p>}
       </header>
 
@@ -219,48 +219,52 @@ export function MomentPage() {
   );
 }
 
-/** Мініатюра сусіда — кадр 48 CSS-пікселів. */
-const NEIGHBOR_CSS_WIDTH = 48;
+/** Мініатюра сусіда — кадр 64 CSS-пікселі. */
+const NEIGHBOR_CSS_WIDTH = 64;
 
 /**
  * Шматок нитки: новіший спогад угорі, цей посередині, старіший унизу —
- * у тому самому порядку, що й на нитці галереї. Між вузлами — скільки
- * минуло.
+ * у тому самому порядку й тій самій мові, що й нитка галереї: лінія по
+ * центру, кадр ліворуч у новішого й праворуч у старішого (чергування),
+ * між вузлами — скільки минуло, як підпис паузи.
  */
 function ThreadNeighbors({ moments, id }: { moments: readonly Moment[]; id: number }) {
   const { newer, older } = threadNeighbors(moments, id);
   if (!newer && !older) return null;
   return (
     <nav className="mm-thread" aria-label="Сусіди на нитці">
-      {newer && <NeighborLink neighbor={newer} above />}
-      <span className="mm-thread-here" aria-hidden="true">
-        <i className="mm-thread-dot" />
+      {newer && <NeighborLink neighbor={newer} side="left" />}
+      {newer && <p className="mm-thread-gap">{newer.label}</p>}
+      <p className="mm-thread-here">
+        <i className="mm-thread-dot" aria-hidden="true" />
         <span>цей спогад</span>
-      </span>
-      {older && <NeighborLink neighbor={older} />}
+      </p>
+      {older && <p className="mm-thread-gap">{older.label}</p>}
+      {older && <NeighborLink neighbor={older} side="right" />}
     </nav>
   );
 }
 
-/** `above` — сусід вище на нитці: тоді проміжок стоїть під ним, ближче до цього спогаду. */
-function NeighborLink({ neighbor, above = false }: { neighbor: ThreadNeighbor<Moment>; above?: boolean }) {
+function NeighborLink({ neighbor, side }: { neighbor: ThreadNeighbor<Moment>; side: 'left' | 'right' }) {
   const { moment, label } = neighbor;
   const title = moment.title.trim() || formatMemoryDate(moment.memory_date, 'day');
   return (
-    <Link to={`/memories/${moment.id}`} className="mm-thread-link" replace>
-      {!above && <em className="mm-thread-gap">{label}</em>}
-      <span className="mm-thread-node">
-        <span className="mm-thread-shot">
-          {moment.cover
-            ? <Photo src={moment.cover.photo_url} cssWidth={NEIGHBOR_CSS_WIDTH} alt="" loading="lazy" decoding="async" />
-            : <span className="mt-blank" aria-hidden="true" />}
-        </span>
-        <span className="mm-thread-text">
-          <b>{title}</b>
-          {moment.title.trim() && <i>{formatMemoryDate(moment.memory_date, 'day')}</i>}
-        </span>
+    <Link
+      to={`/memories/${moment.id}`}
+      className={`mm-thread-link mm-thread-link--${side}`}
+      aria-label={`${title}, ${label}`}
+      replace
+    >
+      <span className="mm-thread-shot" aria-hidden="true">
+        {moment.cover
+          ? <Photo src={moment.cover.photo_url} cssWidth={NEIGHBOR_CSS_WIDTH} alt="" loading="lazy" decoding="async" />
+          : <span className="mt-blank" />}
       </span>
-      {above && <em className="mm-thread-gap">{label}</em>}
+      <span className="mm-thread-dot mm-thread-dot--stone" aria-hidden="true" />
+      <span className="mm-thread-text" aria-hidden="true">
+        <b>{title}</b>
+        {moment.title.trim() && <i>{formatMemoryDate(moment.memory_date, 'day')}</i>}
+      </span>
     </Link>
   );
 }

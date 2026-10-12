@@ -14,6 +14,10 @@
 // поки екран відкритий, ПІДІЙМАЄТЬСЯ на своє місце нагорі нитки. Решта
 // не рухається — архів, який при кожному відкритті влітає, читається як
 // заставка, а не як власні спогади.
+//
+// Акцент на нитці один: спогади, які склав партнер, поки тебе тут не було
+// (ADR-0251). Раніше світився «найновіший» — тобто завжди верхній, і
+// він нічого не казав.
 // ============================================================
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactElement } from 'react';
 import { Link } from 'react-router-dom';
@@ -22,16 +26,21 @@ import { pluralUA } from '@/lib/utils';
 import { formatMemoryDate } from './memoriesDate';
 import { placeLabel } from './momentPlace';
 import {
-  FRAME_WIDTH,
   buildThread,
+  frameWidth,
   threadFan,
   threadYears,
   type ThreadItem,
 } from './memoryThread';
 import type { Moment } from './useMoments';
 
-/** Ширина кадру на екрані в CSS-пікселях: 0.8 від колонки ~170px. */
-const FRAME_CSS_WIDTH = 140;
+/**
+ * Ширина кадру на екрані в CSS-пікселях.
+ *
+ * Колонка вузла на телефоні 412px — 144px із повзунком років і 169px без
+ * нього; кадр без віяла — 0.9 колонки. Беремо найширший випадок.
+ */
+const FRAME_CSS_WIDTH = 152;
 /** Лист віяла видно смужкою під затемненням — повна якість тут марна. */
 const LEAF_CSS_WIDTH = 96;
 const LEAF_QUALITY = 55;
@@ -41,12 +50,15 @@ const yearAnchor = (year: number) => `mt-year-${year}`;
 export function MemoryThread({
   moments,
   shown,
+  unseen,
   onNeed,
 }: {
   /** Увесь архів, найновіший перший. Роки повзунка рахуються з нього. */
   moments: readonly Moment[];
   /** Скільки спогадів уже намальовано (пачками, `memoriesPaging.ts`). */
   shown: number;
+  /** Спогади партнера, складені після останнього візиту (`unseenFromPartner`). */
+  unseen: ReadonlySet<number>;
   /** Повзунок просить рік, до якого нитка ще не догорнута. */
   onNeed: (count: number) => void;
 }) {
@@ -60,7 +72,6 @@ export function MemoryThread({
     [moments],
   );
   const byId = useMemo(() => new Map(moments.map((m) => [m.id, m])), [moments]);
-  const freshestId = moments[0]?.id;
 
   // ── Новий спогад підіймається ─────────────────────────────
   // Перший набір id — це архів, з яким екран відкрився; рухатись має лише
@@ -115,7 +126,7 @@ export function MemoryThread({
   return (
     <div className="mt" data-rail={years.length > 1 ? 'true' : undefined}>
       <ol ref={listRef} className="mt-list">
-        {renderItems(items, byId, freshestId, new Set(fresh))}
+        {renderItems(items, byId, unseen, new Set(fresh))}
       </ol>
 
       {years.length > 1 && (
@@ -146,7 +157,7 @@ export function MemoryThread({
 function renderItems(
   items: readonly ThreadItem[],
   byId: ReadonlyMap<number, Moment>,
-  freshestId: number | undefined,
+  unseen: ReadonlySet<number>,
   fresh: ReadonlySet<number>,
 ) {
   const out: ReactElement[] = [];
@@ -178,9 +189,9 @@ function renderItems(
           key={item.id}
           moment={moment}
           side={item.side}
-          size={item.size}
+          leaves={item.leaves}
           year={item.year}
-          isFreshest={item.id === freshestId}
+          isUnseen={unseen.has(item.id)}
           isNew={fresh.has(item.id)}
           style={style}
         />,
@@ -193,17 +204,17 @@ function renderItems(
 function ThreadNode({
   moment,
   side,
-  size,
+  leaves: leafCount,
   year,
-  isFreshest,
+  isUnseen,
   isNew,
   style,
 }: {
   moment: Moment;
   side: 'left' | 'right';
-  size: 's' | 'm' | 'l';
+  leaves: number;
   year: number;
-  isFreshest: boolean;
+  isUnseen: boolean;
   isNew: boolean;
   style: CSSProperties | undefined;
 }) {
@@ -213,15 +224,23 @@ function ThreadNode({
   const note = moment.note?.trim() ?? '';
   // Обкладинка йде першою (`orderPhotos`), у віяло лягає решта.
   const rest = moment.photos.slice(1);
-  const leaves = threadFan(rest.length, side);
+  const leaves = threadFan(leafCount, side);
 
   return (
     <li
-      className={`mt-node mt-node--${side}${isNew ? ' is-new' : ''}${isFreshest ? ' is-freshest' : ''}`}
+      className={`mt-node mt-node--${side}${isNew ? ' is-new' : ''}${isUnseen ? ' is-unseen' : ''}`}
       data-year={year}
-      style={{ ...style, '--mt-frame': FRAME_WIDTH[size] } as CSSProperties}
+      style={{ ...style, '--mt-frame': frameWidth(leafCount) } as CSSProperties}
     >
-      <Link to={`/memories/${moment.id}`} className="mt-link">
+      {/* Назва посилання — назва й дата, а не весь підпис: нотатка може
+          мати дві тисячі символів, і читач екрана зачитував її цілком
+          на кожному вузлі. */}
+      <Link
+        to={`/memories/${moment.id}`}
+        className="mt-link"
+        aria-label={[title || date, title ? date : '', isUnseen ? 'нове від партнера' : ''].filter(Boolean).join(', ')}
+      >
+        <span className="mt-slot">
         <span className="mt-stack">
           {leaves.map((leaf, i) => {
             const photo = rest[i];
@@ -245,7 +264,7 @@ function ThreadNode({
               </span>
             );
           })}
-          <span className={`mt-frame mt-frame--${size}`}>
+          <span className="mt-frame">
             {moment.cover ? (
               <Photo
                 src={moment.cover.photo_url}
@@ -266,12 +285,13 @@ function ThreadNode({
             )}
           </span>
         </span>
+        </span>
 
         <span className="mt-dot" aria-hidden="true" />
 
         {/* Без назви дата підіймається на місце заголовка: два однакові
             рядки поспіль читались би як помилка, а не як «назви немає». */}
-        <span className="mt-caption">
+        <span className="mt-caption" aria-hidden="true">
           <b>{title || date}</b>
           <i>{[title ? date : '', place].filter(Boolean).join(' · ')}</i>
           {note && <q>{note}</q>}

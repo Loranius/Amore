@@ -320,6 +320,9 @@ export function useMomentMutations() {
         await supabase.from('memory_moments').update({ cover_photo_id: saved[0].id })
           .eq('id', v.moment.id);
       }
+      // Повертаються в порядку заливки: композер за ними ставить
+      // обкладинкою фото, обране ще до збереження.
+      return saved;
     },
     onSuccess: invalidate,
     onError: (e) => toast.show('Не вдалось додати фото: ' + (e as Error).message),

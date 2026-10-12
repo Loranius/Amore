@@ -31,15 +31,14 @@ export interface ThreadMoment {
   photoCount: number;
 }
 
-/** Розмір кадру. Більше фото — більший кадр, але не більший за пів нитки. */
-export type ThreadSize = 's' | 'm' | 'l';
 export type ThreadSide = 'left' | 'right';
 
 export type ThreadItem =
   | { kind: 'year'; year: number }
   | { kind: 'gap'; px: number }
   | { kind: 'pause'; days: number; label: string }
-  | { kind: 'node'; id: number; side: ThreadSide; size: ThreadSize; year: number };
+  /** `leaves` — скільки листів віяла має вузол (0…2); від цього ширина кадру. */
+  | { kind: 'node'; id: number; side: ThreadSide; leaves: number; year: number };
 
 /** Перерва, довша за це, згортається в підпис. Шість тижнів. */
 export const PAUSE_DAYS = 42;
@@ -96,11 +95,6 @@ export function pauseLabel(days: number): string {
   return durationLabel(days);
 }
 
-export function sizeFor(photoCount: number): ThreadSize {
-  if (photoCount >= 4) return 'l';
-  if (photoCount >= 2) return 'm';
-  return 's';
-}
 
 const yearOf = (iso: string) => Number(iso.slice(0, 4));
 
@@ -126,7 +120,7 @@ export function buildThread(moments: readonly ThreadMoment[]): ThreadItem[] {
       kind: 'node',
       id: moment.id,
       side: index % 2 === 0 ? 'left' : 'right',
-      size: sizeFor(moment.photoCount),
+      leaves: Math.min(Math.max(0, moment.photoCount - 1), THREAD_FAN_LEAVES),
       year,
     });
     previous = moment;
@@ -156,13 +150,24 @@ export function threadYears(moments: readonly ThreadMoment[]): ThreadYear[] {
 // ── Кадр і віяло ────────────────────────────────────────────
 
 /**
- * Ширина кадру як частка колонки вузла.
+ * Ширина кадру як частка колонки вузла — за кількістю листів віяла.
  *
- * Кадр притиснутий до нитки, а решта колонки — зовнішнє поле, у яке
- * розходиться віяло. Тому найбільший кадр не займає колонку цілком:
- * інакше віяло вилізло б за край екрана.
+ * Кадр притиснутий до нитки, а решта колонки — зовнішнє поле під віяло.
+ * Перша редакція міряла кадр кількістю фото (0.6 / 0.7 / 0.8), і спогад з
+ * одним фото — а таких більшість — діставав кадр у 86 px поруч із
+ * порожнім полем під віяло, якого в нього немає (критика 2026-10-12).
+ * Тепер поле лишається рівно під ті листи, що є: без віяла кадр займає
+ * майже всю колонку.
+ *
+ * Висоти кадрів від цього майже рівні (0.8…0.9 колонки), тож відстань між
+ * вузлами знову каже про час, а не про те, скільки фото того дня.
  */
-export const FRAME_WIDTH: Record<ThreadSize, number> = { s: 0.6, m: 0.7, l: 0.8 };
+export const FRAME_WIDTH_BY_LEAVES = [0.9, 0.88, 0.8] as const;
+
+export function frameWidth(leaves: number): number {
+  const i = Math.min(Math.max(0, Math.trunc(leaves)), FRAME_WIDTH_BY_LEAVES.length - 1);
+  return FRAME_WIDTH_BY_LEAVES[i]!;
+}
 
 /** Скільки листів віяла показує вузол нитки. */
 export const THREAD_FAN_LEAVES = 2;
@@ -269,4 +274,41 @@ export function landingLabel(
   }
   const newer = others.reduce((best, m) => (m.memory_date < best.memory_date ? m : best));
   return `Ляже на початок нитки, за ${durationLabel(daysApart(newer.memory_date, date))} до ${spoken(newer)}`;
+}
+
+// ── Нове від партнера ──────────────────────────────────────
+
+export interface ThreadAuthoredMoment {
+  id: number;
+  created_by: number | null;
+  /** ISO-мітка створення запису. */
+  created_at: string;
+}
+
+/**
+ * Спогади, які склав ПАРТНЕР після останнього візиту на нитку (ADR-0251).
+ *
+ * Це єдине, що на нитці світиться акцентом. «Найновіший» вузол світився
+ * завжди й тому нічого не казав: він просто верхній. А пара заходить
+ * асинхронно — один додає вдень, другий гортає ввечері, — і питання
+ * вечора саме таке: «що новенького поклав він/вона?».
+ *
+ * Свої спогади не світяться: свій ти бачив, бо сам його склав. Без мітки
+ * попереднього візиту (перший вхід на цьому пристрої) не світиться
+ * нічого — інакше весь архів спалахнув би «новим».
+ */
+export function unseenFromPartner(
+  moments: readonly ThreadAuthoredMoment[],
+  meId: number,
+  seenSince: string | null,
+): Set<number> {
+  // Порівнюються числа, а не рядки: база пише `+00:00`, браузер — `Z`, і
+  // рядкове порівняння двох записів однієї миті збрехало б.
+  const since = seenSince ? Date.parse(seenSince) : Number.NaN;
+  if (!Number.isFinite(since)) return new Set();
+  return new Set(
+    moments
+      .filter((m) => m.created_by !== null && m.created_by !== meId && Date.parse(m.created_at) > since)
+      .map((m) => m.id),
+  );
 }

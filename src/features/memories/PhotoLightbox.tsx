@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 import { Photo } from '@/components/ui/Photo';
 import { CloseIcon } from '@/components/icons/UiIcon';
 import type { MemoryRow } from '@/types';
+import { useBackClose } from './useBackClose';
 
 /** Скільки пікселів по горизонталі роблять рух свайпом. */
 const SWIPE_MIN_PX = 56;
@@ -43,6 +44,8 @@ export function PhotoLightbox({ photos, startId, onClose }: PhotoLightboxProps) 
   const startIndex = Math.max(0, photos.findIndex((p) => p.id === startId));
   const [index, setIndex] = useState(startIndex);
   const touch = useRef<{ x: number; y: number } | null>(null);
+  // Системне «назад» закриває повний екран, а не весь спогад (ADR-0251).
+  useBackClose(onClose);
 
   /*
    * Крок через функціональний `setIndex`, а не через поточний `index`.
@@ -105,6 +108,11 @@ export function PhotoLightbox({ photos, startId, onClose }: PhotoLightboxProps) 
       </button>
 
       <Photo key={photo.id} src={photo.photo_url} cssWidth={FULL_CSS_WIDTH} alt="" decoding="async" />
+
+      {/* Крапки — для ока; читачеві екрана позицію каже живий рядок. */}
+      {photos.length > 1 && (
+        <p className="sr-only" aria-live="polite">{`Фото ${index + 1} з ${photos.length}`}</p>
+      )}
 
       {photos.length > 1 && (
         <div className="mm-light-dots" aria-hidden="true">

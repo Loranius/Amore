@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  FRAME_WIDTH,
+  FRAME_WIDTH_BY_LEAVES,
+  frameWidth,
   GAP_MAX_PX,
   THREAD_FAN_LEAVES,
   GAP_MIN_PX,
@@ -12,9 +13,9 @@ import {
   threadNeighbors,
   gapPx,
   pauseLabel,
-  sizeFor,
   threadFan,
   threadYears,
+  unseenFromPartner,
   type ThreadMoment,
 } from './memoryThread';
 
@@ -86,9 +87,19 @@ describe('рік — зарубка на нитці, і повзунок чит�
   });
 });
 
-describe('кадр росте з кількістю фото', () => {
-  it('одне фото — малий, два-три — середній, чотири й більше — великий', () => {
-    expect([0, 1, 2, 3, 4, 12].map(sizeFor)).toEqual(['s', 's', 'm', 'm', 'l', 'l']);
+describe('кадр залишає поле рівно під своє віяло', () => {
+  it('без віяла — майже вся колонка, з двома листами — вужче', () => {
+    expect([0, 1, 2, 5].map(frameWidth)).toEqual([0.9, 0.88, 0.8, 0.8]);
+  });
+
+  it('кількість листів вузла береться з кількості фото, але не більше двох', () => {
+    const leaves = buildThread([m(1, '2025-01-03', 1), m(2, '2025-01-02', 2), m(3, '2025-01-01', 9)])
+      .flatMap((i) => (i.kind === 'node' ? [i.leaves] : []));
+    expect(leaves).toEqual([0, 1, 2]);
+  });
+
+  it('висоти кадрів майже рівні — відстань між вузлами каже про час, а не про кількість фото', () => {
+    expect(Math.max(...FRAME_WIDTH_BY_LEAVES) - Math.min(...FRAME_WIDTH_BY_LEAVES)).toBeLessThanOrEqual(0.1);
   });
 });
 
@@ -101,7 +112,7 @@ describe('межові архіви', () => {
   it('один спогад — зарубка року й один вузол, без відступів', () => {
     expect(buildThread([m(7, '2024-08-08', 3)])).toEqual([
       { kind: 'year', year: 2024 },
-      { kind: 'node', id: 7, side: 'left', size: 'm', year: 2024 },
+      { kind: 'node', id: 7, side: 'left', leaves: 2, year: 2024 },
     ]);
   });
 
@@ -123,12 +134,12 @@ describe('віяло вузла не перетинає нитку й не ви�
     expect(Math.abs(leaves[0]!.rotate)).toBeGreaterThan(Math.abs(leaves[1]!.rotate));
   });
 
-  it('виліт найбільшого листа вміщається в зовнішнє поле колонки для кожного розміру кадру', () => {
+  it('виліт найдальшого листа вміщається в зовнішнє поле колонки за будь-якої кількості листів', () => {
     // Лист крутиться навколо нижнього краю, тож верхній кут виїжджає на
     // (0.5·cos θ + sin θ − 0.5) власної ширини.
-    for (const size of ['s', 'm', 'l'] as const) {
-      const frame = FRAME_WIDTH[size];
-      for (const leaf of threadFan(THREAD_FAN_LEAVES, 'left')) {
+    for (let count = 0; count <= THREAD_FAN_LEAVES; count += 1) {
+      const frame = frameWidth(count);
+      for (const leaf of threadFan(count, 'left')) {
         const rad = (Math.abs(leaf.rotate) * Math.PI) / 180;
         const reach = (0.5 * Math.cos(rad) + Math.sin(rad) - 0.5) * frame * leaf.scale;
         expect(reach).toBeLessThanOrEqual(1 - frame);
@@ -202,5 +213,38 @@ describe('де ляже новий спогад', () => {
 
   it('спогад, який редагують, сам собі не сусід', () => {
     expect(landingLabel([thread[0]!], '2025-09-12', 3)).toBe('Перший спогад на нитці');
+  });
+});
+
+describe('акцент — нове від партнера (ADR-0251)', () => {
+  const moments = [
+    { id: 3, created_by: 2, created_at: '2026-10-12T09:00:00Z' },
+    { id: 2, created_by: 1, created_at: '2026-10-12T08:00:00Z' },
+    { id: 1, created_by: 2, created_at: '2026-10-01T08:00:00Z' },
+  ];
+
+  it('світиться лише складене партнером після останнього візиту', () => {
+    expect([...unseenFromPartner(moments, 1, '2026-10-10T00:00:00Z')]).toEqual([3]);
+  });
+
+  it('свої спогади не світяться ніколи', () => {
+    expect(unseenFromPartner(moments, 2, '2026-01-01T00:00:00Z').has(3)).toBe(false);
+  });
+
+  it('перший візит на пристрої — не світиться нічого, а не весь архів', () => {
+    expect(unseenFromPartner(moments, 1, null).size).toBe(0);
+  });
+});
+
+describe('мітка візиту в різних записах часу', () => {
+  it('«+00:00» з бази й «Z» з браузера порівнюються як час, а не як рядки', () => {
+    const moments = [{ id: 1, created_by: 2, created_at: '2026-10-12T09:00:00.500+00:00' }];
+    expect(unseenFromPartner(moments, 1, '2026-10-12T09:00:00.000Z').has(1)).toBe(true);
+    expect(unseenFromPartner(moments, 1, '2026-10-12T09:00:01.000Z').has(1)).toBe(false);
+  });
+
+  it('зіпсована мітка в сховищі — не світиться нічого', () => {
+    const moments = [{ id: 1, created_by: 2, created_at: '2026-10-12T09:00:00Z' }];
+    expect(unseenFromPartner(moments, 1, 'не дата').size).toBe(0);
   });
 });
