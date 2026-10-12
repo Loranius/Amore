@@ -1,8 +1,8 @@
 /* ============================================================
    «Плани» — швидке створення нової точки.
    ------------------------------------------------------------
-   Форма не схожа на анкету: велика думка, кілька легких підказок і
-   необов'язковий другий рівень. Після збереження — один простий вибір.
+   Одне поле й три тихі перемикачі: Тип, Дата, Фото (ADR-0256). Екрана
+   успіху немає — новий план з'являється в колоді чи в списку.
    ============================================================ */
 
 .plan-create-overlay {
@@ -26,11 +26,10 @@
   box-shadow: 0 24px 70px color-mix(in srgb, #000 30%, transparent);
 }
 
-.plan-create-form,
-.plan-create-success {
+.plan-create-form {
   display: grid;
-  gap: 20px;
-  padding: 24px 20px 20px;
+  gap: 14px;
+  padding: 22px 18px 18px;
 }
 
 /*
@@ -55,34 +54,12 @@
  * компактний перший екран лишається, а порядок читання стає правдивим.
  */
 
-.plan-create-head {
-  display: grid;
-  gap: 7px;
-}
-
-.plan-create-eyebrow {
-  font-size: 10.5px;
+.plan-create-heading {
+  margin: 0;
+  padding-right: 48px;
+  font-size: 25px;
   font-weight: 800;
-  letter-spacing: .11em;
-  text-transform: uppercase;
-  color: color-mix(in srgb, var(--plan-create-accent) 78%, var(--text));
-}
-
-.plan-create-head h2,
-.plan-create-success h2 {
-  margin: 0;
-  font-size: clamp(22px, 6vw, 29px);
-  line-height: 1.12;
-  letter-spacing: -.035em;
-}
-
-.plan-create-head p,
-.plan-create-success p {
-  margin: 0;
-  max-width: 42ch;
-  font-size: 13px;
-  line-height: 1.55;
-  color: var(--muted);
+  line-height: 1.15;
 }
 
 .plan-create-title-field {
@@ -95,16 +72,16 @@
   width: 100%;
   /* 76px — два рядки тексту плюс місце під лічильник. Було 108px, і
      саме розмір поля, а не його місце, з'їдав перший екран. */
-  min-height: 76px;
+  min-height: 60px;
   resize: none;
-  padding: 14px 16px 26px;
+  padding: 16px;
   border: 1px solid color-mix(in srgb, var(--plan-create-accent) 34%, transparent);
   border-radius: var(--radius-lg);
   outline: none;
   background: color-mix(in srgb, var(--plan-create-accent) 5%, var(--bg));
   color: var(--text);
   font: inherit;
-  font-size: 19px;
+  font-size: 16px;
   font-weight: 700;
   line-height: 1.35;
   transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
@@ -121,42 +98,6 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--plan-create-accent) 10%, transparent);
 }
 
-.plan-create-title-field small {
-  position: absolute;
-  right: 15px;
-  bottom: 11px;
-  font-size: 10.5px;
-  color: var(--muted);
-  font-variant-numeric: tabular-nums;
-}
-
-.plan-create-category.active {
-  border-color: color-mix(in srgb, var(--plan-create-accent) 48%, transparent);
-  background: color-mix(in srgb, var(--plan-create-accent) 12%, var(--surface));
-  color: color-mix(in srgb, var(--plan-create-accent) 82%, var(--text));
-  box-shadow: 0 8px 24px color-mix(in srgb, var(--plan-create-accent) 10%, transparent);
-}
-
-.plan-create-more-toggle.open svg {
-  transform: rotate(180deg);
-}
-
-.plan-create-extra-category.active {
-  border-color: color-mix(in srgb, var(--plan-create-accent) 44%, transparent);
-  background: color-mix(in srgb, var(--plan-create-accent) 11%, var(--surface));
-  color: color-mix(in srgb, var(--plan-create-accent) 78%, var(--text));
-  font-weight: 700;
-}
-
-.plan-create-note {
-  margin: 0;
-}
-
-.plan-create-note textarea {
-  min-height: 76px;
-  resize: vertical;
-}
-
 .plan-create-actions {
   display: flex;
   align-items: center;
@@ -165,53 +106,9 @@
   padding-top: 2px;
 }
 
-/* `.plan-create-cancel` жив тут; смуга дій переїхала на спільний канон
-   (`.modal-actions` + `.btn btn-ghost` + `.btn`). */
-.plan-create-success {
-  justify-items: center;
-  min-height: 390px;
-  align-content: center;
-  text-align: center;
-}
-
-.plan-create-success-mark {
-  display: grid;
-  place-items: center;
-  width: 76px;
-  height: 76px;
-  margin-bottom: 3px;
-  border-radius: var(--radius-xl);
-  background: color-mix(in srgb, var(--plan-create-accent) 14%, var(--surface));
-  color: var(--plan-create-accent);
-  box-shadow: 0 16px 42px color-mix(in srgb, var(--plan-create-accent) 16%, transparent);
-  animation: plan-create-mark .42s cubic-bezier(.2, .9, .2, 1.2) both;
-}
-
-.plan-create-success h2 {
-  max-width: 14ch;
-  overflow-wrap: anywhere;
-}
-
-/* Смуга дій екрана успіху — той самий канон (`.modal-actions`), лише
-   вирівняна по центру, бо весь екран успіху центрований. */
-.plan-create-success-actions {
-  justify-content: center;
-  width: min(100%, 340px);
-  margin-top: 6px;
-}
-
-.plan-create-done {
-  min-height: 40px;
-}
-
 @keyframes plan-create-reveal {
   from { opacity: 0; transform: translateY(-5px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-@keyframes plan-create-mark {
-  from { opacity: 0; transform: scale(.78) rotate(-8deg); }
-  to { opacity: 1; transform: scale(1) rotate(0); }
 }
 
 @media (min-width: 640px) {
@@ -235,13 +132,6 @@
     padding-top: 18px;
   }
 
-  .plan-create-head p {
-    display: none;
-  }
-
-  .plan-create-title-field textarea {
-    min-height: 86px;
-  }
 }
 
 @media (max-width: 380px) {
@@ -249,18 +139,98 @@
     border-radius: var(--radius-lg);
   }
 
-  .plan-create-form,
-  .plan-create-success {
+  .plan-create-form {
     padding-inline: 15px;
   }
 }
 
+/* ── Тихі перемикачі (ADR-0256) ─────────────────────────── */
+.plan-create-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.plan-create-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, border-color 160ms ease;
+}
+.plan-create-chip[data-set='true'] { color: var(--text); border-color: color-mix(in srgb, var(--plan-create-accent) 50%, var(--border)); }
+.plan-create-chip[aria-expanded='true'] { border-color: transparent; background: var(--accent-strong); color: #fff; }
+.plan-create-chip:focus-visible,
+.plan-create-type-option:focus-visible,
+.plan-create-date-kind button:focus-visible,
+.plan-create-date-clear:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.plan-create-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  animation: plan-create-reveal 180ms ease-out both;
+}
+.plan-create-type-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: start;
+  cursor: pointer;
+}
+.plan-create-type-option[aria-pressed='true'] {
+  border-color: color-mix(in srgb, var(--plan-create-accent) 50%, transparent);
+  color: var(--text);
+}
+
+.plan-create-date { display: grid; gap: 10px; animation: plan-create-reveal 180ms ease-out both; }
+.plan-create-date-kind { display: flex; gap: 6px; }
+.plan-create-date-kind button {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.plan-create-date-kind button[aria-pressed='true'] { color: var(--text); border-color: var(--accent); }
+.plan-create-date-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+.plan-create-date-fields .form-field { margin: 0; }
+.plan-create-date-clear {
+  justify-self: start;
+  min-height: 40px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .plan-create-category,
-  .plan-create-more-toggle svg,
-  .plan-create-more,
-  .plan-create-success-mark {
-    animation: none;
-    transition: none;
-  }
+  .plan-create-chip { transition: none; }
+  .plan-create-type-grid,
+  .plan-create-date { animation: none; }
 }

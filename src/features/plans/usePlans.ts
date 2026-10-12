@@ -23,6 +23,10 @@ export interface NewPlanInput {
   category: PlanCategory;
   description: string | null;
   coverFile: File | null;
+  /** Дата одразу з форми (ADR-0256); без неї план — задум. */
+  start_date?: string | null;
+  end_date?: string | null;
+  date_precision?: PlanDatePrecision;
 }
 
 export interface PlanPatch {
@@ -134,6 +138,9 @@ export function usePlanMutations() {
           category: input.category,
           description: input.description,
           cover_url: uploaded?.url ?? null,
+          start_date: input.start_date ?? null,
+          end_date: input.end_date ?? null,
+          date_precision: input.date_precision ?? 'none',
           status: 'idea',
           created_by: me.id,
         })

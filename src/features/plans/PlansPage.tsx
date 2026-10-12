@@ -76,7 +76,6 @@ export function PlansPage() {
 
   const [{ yr, mo }, setYm] = useState(currentYearMonth);
   const [addingPlan, setAddingPlan] = useState(false);
-  const [createdPlanId, setCreatedPlanId] = useState<number | null>(null);
   const [eventModal, setEventModal] = useState<EventModal>(null);
   const [open, setOpen] = useState<Set<OpenSection>>(() => new Set());
 
@@ -160,7 +159,6 @@ export function PlansPage() {
   const closeAddPlan = () => {
     if (addPlan.isPending) return;
     setAddingPlan(false);
-    setCreatedPlanId(null);
   };
 
   const busy = plansQuery.isPending || eventsQuery.isPending;
@@ -299,12 +297,12 @@ export function PlansPage() {
       {addingPlan && (
         <AddPlanModal
           busy={addPlan.isPending}
-          createdPlanId={createdPlanId}
           onClose={closeAddPlan}
+          // Екрана успіху більше немає: новий задум з'являється в колоді,
+          // новий план — у списку «Заплановано», і саме це є підтвердженням.
           onSubmit={(input) => addPlan.mutate(input, {
-            onSuccess: (plan) => setCreatedPlanId(plan.id),
+            onSuccess: () => setAddingPlan(false),
           })}
-          onContinue={(id) => { closeAddPlan(); navigate(`/plans/${id}`); }}
         />
       )}
 
