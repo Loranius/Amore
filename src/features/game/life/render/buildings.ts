@@ -8,7 +8,7 @@ import type { Season } from '../sim/calendar';
 import { TILE, buildingParts, type Building, type BuildingStyle, type Rect } from '../world/types';
 import { bitmapSize, drawBitmap } from './icons';
 import { canvasAt, cellHash, densityOf, disc, disciplinePalette, drawSprite, ellipse, mix, px, rect, shade, worldSize, type Ctx } from './pixel';
-import { doorHd, flowerBoxHd, mallowBloomHd, roofRowHd, snowCapHd, wallHd, windowHd } from './buildingsHd';
+import { awningHd, doorHd, flatRoofHd, flowerBoxHd, mallowBloomHd, roofRowHd, snowCapHd, wallHd, windowHd } from './buildingsHd';
 
 export interface BuildingSprite {
   img: HTMLCanvasElement;
@@ -161,6 +161,7 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
     rect(g, 1, top, W - 2, 2, shade(color, 0.25));
     rect(g, 1, bottom - 2, W - 2, 2, shade(color, -0.3));
     if (season === 'winter') rect(g, 2, top, W - 4, 2, '#ffffff');
+    if (densityOf(g) > 1) flatRoofHd(g, W, top, bottom, color, season, seed);
     return;
   }
   const inset = rule.roof === 'thatch' ? 10 : 8;
@@ -439,6 +440,7 @@ function awning(g: Ctx, x0: number, x1: number, y: number, color: string, season
   rect(g, x0, y, W, 1, shade(color, -0.3));
   rect(g, x0, y + 8, W, 1, 'rgba(0,0,0,0.18)');
   if (season === 'winter') rect(g, x0, y - 1, W, 2, '#ffffff');
+  if (densityOf(g) > 1) awningHd(g, x0, x1, y, color, season);
 }
 
 function signBoard(g: Ctx, cx: number, y: number, icon: Building['sign']): void {

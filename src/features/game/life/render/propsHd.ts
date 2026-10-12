@@ -7,6 +7,7 @@
 // ============================================================
 import type { Season } from '../sim/calendar';
 import type { Prop } from '../world/types';
+import { PALETTES } from './palette';
 import { cellHash, dot, mix, rect, shade, type Ctx } from './pixel';
 
 const h = (a: number, b: number, k: number) => cellHash(a, b, k + 700);
@@ -45,6 +46,159 @@ export function propHd(g: Ctx, p: Prop, x: number, y: number, t: number, season:
       grain(g, x + 1, y + 4, 16, 2, '#9a6a3a', seed);
       grain(g, x + 1, y + 8, 16, 2, '#9a6a3a', seed + 1);
       break;
+    // ── Село Жилинці (власник 2026-10-12: «перейдемо до Жилинців аналогічно»).
+    case 'sandbox': {
+      // Пісочниця: дошки рамки з волокнами, світла верхня кромка й тінь;
+      // пісок зернистий, тінь рамки на піску, відерце з дужкою, пасочка.
+      const wood = '#9a6a3a';
+      grain(g, x + 1, y + 0.5, 30, 1, wood, seed);
+      grain(g, x + 1, y + 22.5, 30, 1, wood, seed + 1);
+      grain(g, x + 0.5, y + 2, 1, 20, wood, seed + 2, 'v');
+      grain(g, x + 30.5, y + 2, 1, 20, wood, seed + 3, 'v');
+      rect(g, x, y, 32, 0.5, shade(wood, 0.25));
+      rect(g, x, y + 23.5, 32, 0.5, shade(wood, -0.3));
+      if (snow) break;
+      for (let k = 0; k < 40; k += 1) {
+        const r = h(k, seed, 40);
+        dot(g, x + 2.5 + (r % 54) / 2, y + 2.5 + ((r >>> 6) % 38) / 2, k % 3 ? '#d8c088' : '#f8e8b8');
+      }
+      rect(g, x + 2, y + 2, 28, 0.5, '#c8b078');
+      rect(g, x + 2, y + 2, 0.5, 20, '#c8b078');
+      dot(g, x + 8.5, y + 7, '#5a5a64');
+      rect(g, x + 9, y + 6.5, 2, 0.5, '#5a5a64');
+      dot(g, x + 11, y + 7, '#5a5a64');
+      rect(g, x + 8, y + 8, 4, 0.5, '#ff9a8a');
+      rect(g, x + 8, y + 8.5, 0.5, 2.5, '#ff7a6a');
+      rect(g, x + 11.5, y + 8.5, 0.5, 2.5, '#a82a20');
+      dot(g, x + 18.5, y + 12, '#f0d088');
+      dot(g, x + 19, y + 11.5, '#f0d088');
+      rect(g, x + 20.5, y + 15.5, 2, 0.5, '#b8943a');
+      rect(g, x + 24, y + 17, 3, 2, '#d9b45a');
+      rect(g, x + 24, y + 17, 3, 0.5, '#ecd08a');
+      rect(g, x + 26.5, y + 17, 0.5, 2, '#b8943a');
+      break;
+    }
+    case 'swing': {
+      // Гойдалка: стовпи з відблиском і тінню, ланцюги ланками, дошки сидінь.
+      const ang = Math.sin(t * 2) * 3;
+      for (const px0 of [x, x + 24]) {
+        rect(g, px0, y - 12, 0.5, 28, '#e8706a');
+        rect(g, px0 + 1.5, y - 12, 0.5, 28, '#962f36');
+      }
+      rect(g, x - 1, y - 13, 28, 0.5, '#f6d878');
+      rect(g, x - 1, y - 11.5, 28, 0.5, '#b8862a');
+      for (const sx of [6, 16]) {
+        for (const cx of [x + sx + ang, x + sx + 4 + ang]) for (let k = 0; k < 18; k += 1.5) dot(g, cx, y - 11 + k, '#a0a0aa');
+        grain(g, x + sx - 1 + ang, y + 7, 7, 2, '#8a5a34', seed + sx);
+        rect(g, x + sx - 1 + ang, y + 7, 7, 0.5, '#a8784a');
+      }
+      break;
+    }
+    case 'slide': {
+      // Гірка: блиск уздовж жолоба й тінь його нижнього краю, стовпи драбини з відблиском.
+      for (const px0 of [x + 2, x + 8]) {
+        rect(g, px0, y - 10, 0.5, 24, '#8ac4f0');
+        rect(g, px0 + 1.5, y - 10, 0.5, 24, '#3a7ac0');
+      }
+      for (let k = 0; k < 14; k += 1) {
+        dot(g, x + 11 + k, y - 10 + k, '#fff0a8');
+        dot(g, x + 11.5 + k, y - 10 + k, '#fff0a8');
+        dot(g, x + 13.5 + k, y - 8.5 + k, '#c89a2a');
+      }
+      break;
+    }
+    case 'busStop': {
+      // Зупинка: відблиски на склі навскіс, розклад, тінь під дахом, дошки лави.
+      for (const ax of [x + 5, x + 13]) for (let k = 0; k < 6; k += 1) dot(g, ax + k * 0.5, y - 1 - k, 'rgba(255,255,255,0.55)');
+      rect(g, x + 19.5, y - 5.5, 3.5, 4.5, '#f4f4f7');
+      for (let k = 0; k < 4; k += 1) rect(g, x + 20, y - 5 + k, k === 3 ? 1.5 : 2.5, 0.5, '#9a9aa4');
+      rect(g, x - 1, y - 7.5, 30, 0.5, '#2a52a8');
+      rect(g, x + 1, y - 8, 0.5, 23, '#8a92a0');
+      rect(g, x + 25, y - 8, 0.5, 23, '#8a92a0');
+      grain(g, x + 4, y + 7, 20, 3, '#8a6a4a', seed);
+      rect(g, x + 4, y + 7, 20, 0.5, '#a8886a');
+      rect(g, x + 28, y - 16, 7, 0.5, '#fbe08a');
+      break;
+    }
+    case 'board': {
+      // Дошка оголошень: рядки тексту, кнопки, загнутий кутик, волокна рамки.
+      grain(g, x, y - 10, 20, 1, '#9a6a3a', seed);
+      ([[x + 2, y - 8, '#e8402e'], [x + 11, y - 8, '#3a6fd8'], [x + 2, y - 2, '#3a9a5a'], [x + 11, y - 2, '#e8402e']] as const).forEach(([nx, ny, pin], k) => {
+        for (let r = 1.5; r < 4.5; r += 1) rect(g, nx + 1, ny + r, r > 3 ? 2.5 : 4.5 - (k % 2), 0.5, '#9a9aa4');
+        dot(g, nx + 3.5, ny + 0.5, pin);
+        dot(g, nx + 6.5, ny + 4.5, 'rgba(60,40,20,0.3)');
+      });
+      break;
+    }
+    case 'goal': {
+      // Ворота: сітка клітинками, тінь на стовпах.
+      for (let k = 1; k < 22; k += 3) rect(g, x + 2, y - 8 + k, 36, 0.5, 'rgba(255,255,255,0.3)');
+      rect(g, x + 1.5, y - 8, 0.5, 24, '#c8c8d0');
+      rect(g, x + 39.5, y - 8, 0.5, 24, '#c8c8d0');
+      rect(g, x + 2, y - 8.5, 36, 0.5, '#c8c8d0');
+      break;
+    }
+    case 'mailbox':
+      rect(g, x + 4, y + 0.5, 0.5, 6.5, '#7aa8f8');
+      rect(g, x + 11.5, y + 0.5, 0.5, 6.5, '#2a4a9a');
+      rect(g, x + 6, y + 4, 4, 0.5, '#7aa8f8');
+      rect(g, x + 7, y + 6, 0.5, 9, '#8a8a94');
+      break;
+    case 'rock': {
+      // Камінь: грані (світла верхня, темна праворуч унизу), тріщина, мох.
+      rect(g, x + 3, y + 10.5, 4, 0.5, '#9a9488');
+      rect(g, x + 9, y + 13, 4, 0.5, '#6e685e');
+      rect(g, x + 12.5, y + 10, 0.5, 3, '#6e685e');
+      for (let k = 0; k < 5; k += 1) dot(g, x + 8 + k * 0.5, y + 7.5 + k * 0.5 + (k % 2) * 0.5, '#5e5850');
+      if (snow) break;
+      dot(g, x + 3, y + 12, '#6f8a3a');
+      dot(g, x + 3.5, y + 12.5, '#8aa44a');
+      dot(g, x + 4, y + 12, '#6f8a3a');
+      break;
+    }
+    case 'bush': {
+      // Кущ: листя парами (лист і його тінь), як у кроні дерев; ягоди круглі.
+      if (snow) {
+        for (let k = 0; k < 6; k += 1) { const r = h(k, seed, 51); dot(g, x + 3 + (r % 20) / 2, y + 6 + ((r >>> 6) % 8) / 2, '#e2eaf4'); }
+        break;
+      }
+      const P = PALETTES[season];
+      for (let k = 0; k < 42; k += 1) {
+        const r = h(k, seed, 50);
+        const ang = ((r >>> 4) % 360) * (Math.PI / 180);
+        const rr = (((r >>> 12) % 100) / 100) * 6.2;
+        const lx = Math.round((x + 8 + Math.cos(ang) * rr) * 2) / 2;
+        const ly = Math.round((y + 9 + Math.sin(ang) * rr * 0.85) * 2) / 2;
+        const lit = Math.cos(ang) < 0 && Math.sin(ang) < 0;
+        dot(g, lx, ly, lit ? P.leafLight : (r >>> 22) % 3 === 0 ? P.leafDark : P.leaf);
+        dot(g, lx + 0.5, ly + 0.5, shade(P.leafDark, -0.12));
+      }
+      if (season === 'summer') {
+        for (const [bx, by] of [[x + 4, y + 10], [x + 12, y + 11]] as const) {
+          dot(g, bx + 0.5, by, '#e8402e');
+          dot(g, bx, by + 0.5, '#e8402e');
+          dot(g, bx + 0.5, by + 0.5, '#a82a20');
+          dot(g, bx, by, '#ff9a8a');
+        }
+      }
+      break;
+    }
+    case 'duck': {
+      // Качка: крило рискою, біле кільце на шиї, око, хвостик, кола на воді.
+      const base = cellHash(Math.round(p.x * 5), Math.round(p.y * 5), 1);
+      const swim = Math.sin(t * 0.6 + base) * 14;
+      const cx = x + 8 + Math.round(swim);
+      const f = Math.cos(t * 0.6 + base) > 0 ? 1 : -1;
+      rect(g, cx - 2.5, y + 9.5, 3, 0.5, '#d8d0c0');
+      dot(g, cx - 4.5 * f, y + 9, '#e8e0d0');
+      dot(g, cx + 2 * f, y + 8.5, '#ffffff');
+      dot(g, cx + 3.5 * f, y + 6.5, '#1b1b22');
+      dot(g, cx + 2.5 * f, y + 6, '#5aaa6a');
+      if (snow) break;
+      const ring = (t * 0.8 + base) % 2;
+      rect(g, cx - 5 - ring, y + 12.5, 11 + ring * 2, 0.5, `rgba(255,255,255,${(0.35 * (2 - ring) / 2).toFixed(2)})`);
+      break;
+    }
     case 'flowerBed': {
       // Клумба: земля грудочками (під снігом — лише нижче шапки), облямівка
       // з камінців згори й знизу, листя біля стебел, серединки квітів.

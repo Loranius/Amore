@@ -20,6 +20,7 @@ const m = (v: number, n: number) => ((v % n) + n) % n;
 export const PLANK_TONES = [-0.1, 0.09] as const;
 export const SHINGLE_TONES = [-0.12, 0.1] as const;
 export const PANEL_TONES = [-0.1, 0.08] as const;
+export const BRICK_TONES = [-0.1, 0.09] as const;
 
 /** Один ряд даху: `y` — рядок у спрайті, `ry` — у світі (шви тягнуться через стики крил). */
 export function roofRowHd(g: Ctx, kind: RoofKind, color: string, x0: number, x1: number, y: number, ry: number, atX: number, cs: number): void {
@@ -156,7 +157,31 @@ export function wallHd(g: Ctx, W: number, top: number, bottom: number, material:
       if (v % 3 === 0) dot(g, x + (v % 2) * 0.5, bottom - 3.5 - ((v >>> 3) % 2) * 0.5, mix(color, '#56603a', 0.45));
     }
   } else if (material === 'brick') {
-    for (let r = 0; r < H; r += 3) dot(g, 4 + (cellHash(r, seed, 5) % (W - 8)), top + r + 0.5, shade(color, 0.18));
+    // Цегла (школа, сільмаг): кожна свого тону, світлий верхній край і
+    // темний нижній кут; шов — на пів пікселя (у 16×16 на цілий, і в 32×32
+    // стіна читалась смугами); у нижніх рядах цегла частіше темніша.
+    const mortar = shade(color, -0.2);
+    for (let r = 0; r + 2 < H; r += 3) {
+      const y0 = top + r;
+      const off = (r / 3) % 2 === 0 ? 0 : 3;
+      const joints: number[] = [];
+      for (let x = 3 + off; x < W - 3; x += 6) if (x > 3) joints.push(x);
+      const edges = [3, ...joints, W - 3];
+      for (let k = 0; k + 1 < edges.length; k += 1) {
+        const a = edges[k]! + (k === 0 ? 0 : 0.5);
+        const b = edges[k + 1]!;
+        if (b - a < 1) continue;
+        const hh = cellHash(Math.round(a * 2), r, seed + 61);
+        const low = y0 > bottom - 10;
+        const tone = hh % 4 === 0 || (low && hh % 4 === 2) ? BRICK_TONES[0] : hh % 4 === 1 ? BRICK_TONES[1] : 0;
+        const c = tone ? shade(color, tone) : color;
+        rect(g, a, y0, b - a, 2.5, c);
+        rect(g, a, y0, Math.max(0.5, b - a - 1), 0.5, shade(c, 0.12));
+        dot(g, b - 0.5, y0 + 2, shade(c, -0.14));
+      }
+      for (const jx of joints) rect(g, jx, y0, 0.5, 2.5, mortar);
+      rect(g, 3, y0 + 2.5, W - 6, 0.5, mortar);
+    }
   }
 }
 
@@ -236,4 +261,50 @@ export function snowCapHd(g: Ctx, rows: readonly { x0: number; x1: number; y: nu
     dot(g, x, last.y + 1, '#dfe9f6');
     dot(g, x, last.y + 1.5, 'rgba(120,140,170,0.35)');
   }
+}
+
+/**
+ * Плаский дах (сільмаг): руберойд смугами зі швом і світлою кромкою,
+ * дрібний гравій, вентиляційна труба; узимку — шар снігу з блакитною
+ * кромкою й горбиками (у 16×16 сніг — смужка завтовшки два пікселі).
+ */
+export function flatRoofHd(g: Ctx, W: number, top: number, bottom: number, color: string, season: Season, seed: number): void {
+  const H = bottom - top;
+  for (let r = 4; r < H - 3; r += 4) {
+    rect(g, 1.5, top + r, W - 3, 0.5, shade(color, -0.18));
+    rect(g, 1.5, top + r + 0.5, W - 3, 0.5, shade(color, 0.1));
+  }
+  for (let k = 0; k < (W * H) / 8; k += 1) {
+    const q = cellHash(k, seed, 66);
+    dot(g, 2 + (q % Math.max(1, (W - 4) * 2)) / 2, top + 2 + ((q >>> 10) % Math.max(1, (H - 5) * 2)) / 2, (q >>> 20) % 2 ? shade(color, 0.16) : shade(color, -0.16));
+  }
+  const winter = season === 'winter';
+  if (winter) {
+    rect(g, 1.5, top, W - 3, H - 2.5, '#ffffff');
+    rect(g, 1.5, top + H - 3, W - 3, 0.5, '#dfe9f6');
+    for (let x = 2; x < W - 2; x += 0.5) if (cellHash(Math.round(x * 2), seed, 67) % 3 === 0) dot(g, x, top + H - 2.5, '#ffffff');
+  }
+  const vx = W - 14;
+  rect(g, vx, top + 2, 2, 3, '#8a8f96');
+  rect(g, vx - 0.5, top + 1.5, 3, 0.5, '#a8adb4');
+  rect(g, vx + 1.5, top + 2, 0.5, 3, '#6a6f76');
+  rect(g, vx, top + 5, 2.5, 0.5, winter ? '#c9d6e6' : 'rgba(20,20,30,0.3)');
+  if (winter) rect(g, vx - 0.5, top + 1, 3, 0.5, '#ffffff');
+}
+
+/**
+ * Маркіза (сільмаг): складки — світла ліва кромка й тінь праворуч кожної
+ * смуги, тінь під верхньою планкою, фестони округлі; узимку — сніг купками.
+ */
+export function awningHd(g: Ctx, x0: number, x1: number, y: number, color: string, season: Season): void {
+  const W = x1 - x0;
+  for (let k = 0; k < W; k += 4) {
+    const c = Math.floor(k / 4) % 2 === 0 ? color : '#f8f4ec';
+    rect(g, x0 + k, y + 1, 0.5, 5, shade(c, 0.12));
+    rect(g, x0 + k + 3.5, y + 1, 0.5, 5.5, shade(c, -0.16));
+    dot(g, x0 + k + 0.5, y + 7, c);
+    dot(g, x0 + k + 3, y + 7, shade(c, -0.16));
+  }
+  rect(g, x0, y + 1, W, 0.5, 'rgba(0,0,0,0.15)');
+  if (season === 'winter') for (let x = x0; x < x1; x += 0.5) if (cellHash(Math.round(x * 2), 3, 68) % 2 === 0) dot(g, x, y - 1.5, '#ffffff');
 }

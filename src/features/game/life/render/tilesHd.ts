@@ -132,6 +132,12 @@ export function lawnHd(g: Ctx, map: GameMap, P: SeasonPalette): void {
       const t = map.ground[j]![i]!;
       if (!LAWN.has(t)) continue;
       grassHd(g, i * TILE, j * TILE, i, j, P, t === 'G' || (t === 'g' && cellHash(i, j, 77) % 11 === 0), lawnField(i + 0.5, j + 0.5));
+      // Очерет на березі ставка — з того боку, де вода.
+      if (t === 'F') continue;
+      const W = (a: number, b: number) => map.ground[b]?.[a] === 'w';
+      if (W(i + 1, j)) reedsHd(g, i * TILE, j * TILE, i, j, 'right', P);
+      if (W(i - 1, j)) reedsHd(g, i * TILE, j * TILE, i, j, 'left', P);
+      if (W(i, j - 1)) reedsHd(g, i * TILE, j * TILE, i, j, 'top', P);
     }
   }
 }
@@ -458,5 +464,210 @@ export function wallTopHd(g: Ctx, x: number, y: number, i: number, j: number, ba
     const b = 1 + Math.floor(h01(i, j, k + 310) * 28) / 2;
     if (vertical) { dot(g, x + a, y + b, shade(base, 0.1)); dot(g, x + a, y + b + 0.5, shade(base, 0.06)); }
     else { dot(g, x + b, y + a, shade(base, 0.1)); dot(g, x + b + 0.5, y + a, shade(base, 0.06)); }
+  }
+}
+
+// ------------------------------------------------------------
+// Село Жилинці в 32×32 (власник 2026-10-12: «перейдемо до Жилинців
+// аналогічно»): паркан, що йде згори вниз, дороги з коліями, ставок.
+// ------------------------------------------------------------
+
+/**
+ * Паркан, що йде згори вниз. У 16×16 кожна його клітинка — той самий
+ * відрізок «збоку», і стовпчик із них читався драбинкою з коротких
+ * парканчиків. Тут — як у ракурсі «три чверті»: стовпчик посередині
+ * клітинки й жердина згори вниз, що з'єднує стовпчики сусідніх клітинок
+ * (дві жердини на різній висоті лягають в одну смугу). `up`/`down` — чи
+ * є паркан вище й нижче.
+ */
+export function fenceVerticalHd(g: Ctx, x: number, y: number, i: number, j: number, wood: string, P: SeasonPalette, up: boolean, down: boolean): void {
+  // Жердина завширшки 3: світла грань ліворуч, тінь праворуч і на землі.
+  const bx = x + 6.5;
+  const top = up ? y : y + 4;
+  const bot = down ? y + TILE : y + 12;
+  if (!P.snow) rect(g, bx + 3, top + 1, 1, bot - top - 1, 'rgba(20,30,20,0.2)');
+  rect(g, bx, top, 3, bot - top, wood);
+  rect(g, bx, top, 0.5, bot - top, shade(wood, 0.22));
+  rect(g, bx + 0.5, top, 0.5, bot - top, shade(wood, 0.08));
+  rect(g, bx + 2.5, top, 0.5, bot - top, shade(wood, -0.25));
+  const r = cellHash(i, j, 925);
+  rect(g, bx + 1.5, top + 1 + (r % 6) / 2, 0.5, 2.5 + (r % 3) * 0.5, shade(wood, -0.14));
+  if (P.snow) rect(g, bx, top, 3, 0.5, '#ffffff');
+  // Стовпчик ширший за жердину: відблиск, тінь, світлий зріз і округлі кути вгорі.
+  const px = x + 6;
+  const post = shade(wood, -0.1);
+  if (!P.snow) rect(g, px - 0.5, y + 13, 5, 0.5, 'rgba(20,30,20,0.25)');
+  rect(g, px, y + 2.5, 4, 10.5, post);
+  rect(g, px, y + 2.5, 0.5, 10.5, shade(wood, 0.15));
+  rect(g, px + 3.5, y + 2.5, 0.5, 10.5, shade(wood, -0.32));
+  rect(g, px + 0.5, y + 2.5, 3, 0.5, mix(wood, '#f0d6a8', 0.45));
+  rect(g, px + 1.5, y + 4.5 + (r % 4) * 0.5, 0.5, 3, shade(wood, -0.24));
+  dot(g, px + 2.5, y + 6, '#4a4a52');
+  dot(g, px + 2, y + 5.5, '#a0a0a8');
+  dot(g, px + 2.5, y + 10, '#4a4a52');
+  if (P.snow) rect(g, px, y + 1.5, 4, 1.5, '#ffffff');
+  else if (r % 3 === 0) {
+    dot(g, px + 0.5, y + 12.5, '#6f8a3a');
+    dot(g, px + 1, y + 12.5, '#8aa44a');
+  }
+}
+
+/**
+ * Колії ґрунтової дороги завширшки дві клітинки (32×32): дві борозни
+ * вздовж дороги (верхня стінка в тіні, нижня на сонці — світло згори
+ * ліворуч), між ними — трава гривкою, у колії подекуди калюжа. `axis` —
+ * куди йде дорога; `inner` — край клітинки, що дивиться на другу половину
+ * дороги (там гривка): для 'h' — 'bottom' чи 'top', для 'v' — 'right' чи 'left'.
+ */
+export function rutHd(g: Ctx, x: number, y: number, i: number, j: number, base: string, P: SeasonPalette, axis: 'h' | 'v', inner: 'top' | 'bottom' | 'left' | 'right'): void {
+  const dark = shade(base, -0.2);
+  const mid = shade(base, -0.1);
+  const lit = shade(base, 0.08);
+  for (let k = 0; k < TILE; k += 2) {
+    const wob = cellHash(i * 8 + k / 2, j * 8, 970) % 3 === 0 ? 0.5 : 0;
+    if (axis === 'h') {
+      rect(g, x + k, y + 7 + wob, 2, 0.5, dark);
+      rect(g, x + k, y + 7.5 + wob, 2, 0.5, mid);
+      rect(g, x + k, y + 8 + wob, 2, 0.5, lit);
+    } else {
+      const wv = cellHash(i * 8, j * 8 + k / 2, 970) % 3 === 0 ? 0.5 : 0;
+      rect(g, x + 7 + wv, y + k, 0.5, 2, dark);
+      rect(g, x + 7.5 + wv, y + k, 0.5, 2, mid);
+      rect(g, x + 8 + wv, y + k, 0.5, 2, lit);
+    }
+  }
+  // Калюжа в колії: навесні й восени частіше, влітку рідко, взимку — ні.
+  const often = P === PALETTES.spring || P === PALETTES.autumn ? 8 : 30;
+  if (!P.snow && cellHash(i, j, 975) % often === 0) {
+    const a = 2 + (cellHash(i, j, 976) % 9);
+    const water = mix(P.water, base, 0.3);
+    if (axis === 'h') {
+      rect(g, x + a, y + 7, 4, 1.5, water);
+      rect(g, x + a + 0.5, y + 6.5, 3, 0.5, water);
+      dot(g, x + a + 1, y + 7, mix(P.waterLight, '#ffffff', 0.4));
+    } else {
+      rect(g, x + 7, y + a, 1.5, 4, water);
+      dot(g, x + 7.5, y + a + 1, mix(P.waterLight, '#ffffff', 0.4));
+    }
+  }
+  // Трава гривкою посередині дороги — там, де не їздять колеса.
+  if (P.snow) return;
+  for (let k = 0; k < 2; k += 1) {
+    const q = cellHash(i, j, 977 + k);
+    if (q % 3 === 0) continue;
+    const along = 2 + (q % 24) / 2;
+    if (axis === 'h') tuft(g, x + along, inner === 'bottom' ? y + 14.5 : y + 1.5, q >>> 8, P);
+    else tuft(g, inner === 'right' ? x + 14.5 : x + 1.5, y + 2 + along * 0.9, q >>> 8, P);
+  }
+}
+
+/**
+ * Очерет на березі ставка (32×32) — на клітинці трави, бік `side` якої
+ * торкається води: стебла пучками, влітку й восени — коричневі качалки,
+ * узимку — сухі, зі снігом на кінчиках.
+ */
+export function reedsHd(g: Ctx, x: number, y: number, i: number, j: number, side: 'left' | 'right' | 'top' | 'bottom', P: SeasonPalette): void {
+  const winter = P.snow;
+  const autumn = P === PALETTES.autumn;
+  const stem = winter ? '#c8b48a' : autumn ? '#9a9a4a' : P.blade;
+  const stemLit = winter ? '#e0d0a8' : autumn ? '#b8b45a' : P.grassLight;
+  const heads = P === PALETTES.summer || autumn;
+  // Мокрий берег: темна смужка землі там, де трава сходить у воду.
+  const bank = winter ? '#c9d6e6' : '#5e5236';
+  if (side === 'right') rect(g, x + TILE - 1, y, 1, TILE, bank);
+  else if (side === 'left') rect(g, x, y, 1, TILE, bank);
+  else if (side === 'top') rect(g, x, y, TILE, 1, bank);
+  for (let k = 0; k < 8; k += 1) {
+    const q = cellHash(i, j, 985 + k);
+    const along = 1 + (q % 28) / 2;
+    const depth = 1 + ((q >>> 6) % 4) / 2;
+    const tall = 4 + ((q >>> 10) % 4);
+    // Стебло з качалкою лишається у своїй клітинці: не вилазить на дорогу.
+    const low = y + tall + 1 + ((q >>> 3) % Math.max(1, Math.floor((TILE - 1.5 - tall) * 2))) / 2;
+    const bx = side === 'right' ? x + TILE - depth : side === 'left' ? x + depth : x + along;
+    const by = side === 'bottom' ? y + TILE - 0.5 : low;
+    for (let s = 0; s < tall; s += 0.5) dot(g, bx + (s > tall - 1.5 && k % 2 ? 0.5 : 0), by - s, s < 1 ? shade(stem, -0.15) : s % 1 === 0 ? stem : stemLit);
+    if (heads && k % 2 === 0) {
+      rect(g, bx, by - tall - 0.5, 0.5, 2, '#6e4a2a');
+      dot(g, bx + 0.5, by - tall, '#8a5a34');
+    }
+    if (winter) dot(g, bx, by - tall, '#ffffff');
+  }
+}
+
+/**
+ * Вода ставка в 32×32 — щокадру, поверх кольору глибини: тонкі брижі,
+ * що з'являються й гаснуть (у 16×16 — грубі риски), іскри сонця, латаття
+ * з квіткою влітку. `edge` — чи це клітинка під берегом (там латаття нема).
+ */
+export function waterHd(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette, time: number, shore: { top: boolean; bottom: boolean; left: boolean; right: boolean }): void {
+  rect(g, x, y, TILE, TILE, P.water);
+  // Мілина: світліша смуга вздовж берега, біля самого берега — ще світліша.
+  const shallow = mix(P.water, P.waterLight, 0.3);
+  const edgeC = mix(P.water, P.waterLight, 0.55);
+  if (shore.left) { rect(g, x, y, 2.5, TILE, shallow); rect(g, x, y, 1, TILE, edgeC); }
+  if (shore.right) { rect(g, x + TILE - 2.5, y, 2.5, TILE, shallow); rect(g, x + TILE - 1, y, 1, TILE, edgeC); }
+  if (shore.bottom) { rect(g, x, y + TILE - 2.5, TILE, 2.5, shallow); rect(g, x, y + TILE - 1, TILE, 1, edgeC); }
+  if (shore.top) rect(g, x, y + 2, TILE, 3, shallow);
+  const edge = shore.top;
+  for (let k = 0; k < 2; k += 1) {
+    const q = cellHash(i, j, 960 + k);
+    const ph = (time * 0.7 + (q % 100) / 33) % 3;
+    if (ph > 2) continue;
+    const wx = x + 1 + (q % 20) / 2 + Math.floor(ph * 2) / 2;
+    const wy = y + 3 + ((q >>> 8) % 20) / 2;
+    const len = 2 + ((q >>> 16) % 3) * 0.5;
+    rect(g, wx + 0.5, wy, len - 1, 0.5, P.waterLight);
+    dot(g, wx, wy + 0.5, P.waterLight);
+    dot(g, wx + len - 0.5, wy + 0.5, P.waterLight);
+    rect(g, wx + 0.5, wy + 0.5, len - 1, 0.5, shade(P.water, -0.12));
+  }
+  if ((Math.floor(time * 3) + i * 7 + j * 3) % 23 === 0) {
+    const q = cellHash(i, j, 963);
+    dot(g, x + 3 + (q % 18) / 2, y + 3 + ((q >>> 6) % 18) / 2, '#ffffff');
+  }
+  const pad = cellHash(i, j, 980);
+  if (edge || P.snow || pad % 3 !== 0) return;
+  const lx = x + 3 + ((pad >>> 3) % 16) / 2;
+  const ly = y + 5 + ((pad >>> 9) % 12) / 2;
+  const leaf = '#4f8a3a';
+  rect(g, lx - 2, ly - 0.5, 4.5, 1.5, leaf);
+  rect(g, lx - 1.5, ly - 1, 3.5, 0.5, leaf);
+  rect(g, lx - 1.5, ly + 1, 3.5, 0.5, shade(leaf, -0.25));
+  rect(g, lx - 1.5, ly - 1, 1.5, 0.5, '#7ab858');
+  dot(g, lx + 1, ly - 0.5, P.water);
+  dot(g, lx + 1.5, ly - 1, P.water);
+  if (P === PALETTES.summer && (pad >>> 14) % 2 === 0) {
+    const c = (pad >>> 15) % 2 ? '#fbf2f5' : '#f6b8cc';
+    dot(g, lx - 0.5, ly - 1.5, c);
+    dot(g, lx, ly - 2, c);
+    dot(g, lx + 0.5, ly - 1.5, c);
+    dot(g, lx, ly - 1.5, '#f6d55c');
+  }
+}
+
+/** Лід на ставку (32×32): тріщини тонкими ламаними, латки снігу з блакитною тінню, відблиск. */
+export function iceHd(g: Ctx, x: number, y: number, i: number, j: number): void {
+  const q = cellHash(i, j, 990);
+  if (q % 2 === 0) {
+    let cx = x + 2 + (q % 10);
+    let cy = y + 3 + ((q >>> 5) % 9);
+    for (let s = 0; s < 9; s += 1) {
+      dot(g, cx, cy, '#9fc0dc');
+      if (s === 4) dot(g, cx + 0.5, cy + 0.5, '#b8d4ea');
+      cx += 0.5;
+      cy += ((cellHash(i, j, 991 + s) % 3) - 1) * 0.5;
+    }
+  }
+  if ((q >>> 8) % 3 === 0) {
+    const sx = x + 3 + ((q >>> 10) % 8);
+    const sy = y + 4 + ((q >>> 14) % 8);
+    rect(g, sx - 2, sy, 5, 1, '#ffffff');
+    rect(g, sx - 1, sy - 0.5, 3, 0.5, '#ffffff');
+    rect(g, sx - 1.5, sy + 1, 4, 0.5, '#d8e6f4');
+  }
+  if ((q >>> 18) % 4 === 0) {
+    rect(g, x + 4, y + 9, 2, 0.5, '#ffffff');
+    rect(g, x + 6, y + 8.5, 1.5, 0.5, '#ffffff');
   }
 }

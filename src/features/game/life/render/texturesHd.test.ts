@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { cellHash } from '../world/hash';
-import { homeYard } from '../world/maps';
+import { cityMap, homeYard } from '../world/maps';
 import { TILE, type Ground } from '../world/types';
 import { STYLES } from './buildings';
-import { PANEL_TONES, PLANK_TONES, SHINGLE_TONES } from './buildingsHd';
+import { BRICK_TONES, PANEL_TONES, PLANK_TONES, SHINGLE_TONES } from './buildingsHd';
 import { PALETTES } from './palette';
 import { hexToRgb, NEAR_DUPLICATE, setDensity, shade } from './pixel';
+import { fenceGoesDown, rutAt } from './tiles';
 import { lawnField, lawnFieldGrid, lawnHd, lawnLevel } from './tilesHd';
 
 // Власник 2026-10-12: «Переглянь текстури всього подвір'я, покращ їх в
@@ -62,8 +63,11 @@ describe('Трава подвір\'я в 32×32', () => {
     }
   });
 
-  it.each(['spring', 'summer', 'autumn', 'winter'] as const)('%s: латки, кущики й квіти не лізуть на стежку, город, бруківку й під будівлі', (season) => {
-    const yard = homeYard();
+  it.each([
+    ...(['spring', 'summer', 'autumn', 'winter'] as const).map((season) => ['подвір\'я', season] as const),
+    ...(['summer', 'winter'] as const).map((season) => ['село', season] as const),
+  ])('%s, %s: латки, кущики, квіти й очерет не лізуть на стежку, дорогу, город, воду й під будівлі', (where, season) => {
+    const yard = where === 'село' ? cityMap('zhylyntsi') : homeYard();
     const { g, rects } = recorder();
     lawnHd(g, yard, PALETTES[season]);
     expect(rects.length).toBeGreaterThan(1000);
@@ -89,14 +93,49 @@ describe('Будівлі подвір\'я в 32×32', () => {
       return Math.hypot(r1 - r2, g1 - g2, b1 - b2) >= NEAR_DUPLICATE;
     };
     const checked: string[] = [];
-    for (const b of homeYard().buildings) {
+    for (const b of [...homeYard().buildings, ...cityMap('zhylyntsi').buildings]) {
       const rule = STYLES[b.style];
       const wall = b.wall ?? rule.wall;
       const roof = b.roof ?? rule.roofColor;
       if (rule.material === 'wood') for (const t of PLANK_TONES) { expect(far(shade(wall, t), wall), `${b.id}: дошка ${t}`).toBe(true); checked.push(`${b.id} стіна`); }
+      if (rule.material === 'brick') for (const t of BRICK_TONES) { expect(far(shade(wall, t), wall), `${b.id}: цеглина ${t}`).toBe(true); checked.push(`${b.id} цегла`); }
       if (rule.roof === 'tile') for (const t of SHINGLE_TONES) { expect(far(shade(roof, t), roof), `${b.id}: черепиця ${t}`).toBe(true); checked.push(`${b.id} черепиця`); }
       if (rule.roof === 'metal') for (const t of PANEL_TONES) { expect(far(shade(roof, t), roof), `${b.id}: бляха ${t}`).toBe(true); checked.push(`${b.id} бляха`); }
     }
     expect(checked.length).toBeGreaterThan(10);
+    expect(checked.filter((c) => c.endsWith('цегла')).length, 'школа й сільмаг').toBeGreaterThanOrEqual(4);
+  });
+});
+
+// Власник 2026-10-12: «перейдемо до Жилинців аналогічно» — село в 32×32.
+describe('Село Жилинці в 32×32', () => {
+  it('колії — лише на вулицях завширшки дві клітинки: не на перехресті, не на стежці й не на майданчику', () => {
+    const v = cityMap('zhylyntsi');
+    expect(rutAt(v, 5, 14)).toEqual({ axis: 'h', inner: 'bottom' });
+    expect(rutAt(v, 5, 15)).toEqual({ axis: 'h', inner: 'top' });
+    expect(rutAt(v, 30, 25)).toEqual({ axis: 'h', inner: 'top' });
+    expect(rutAt(v, 20, 5)).toEqual({ axis: 'v', inner: 'right' });
+    expect(rutAt(v, 21, 5)).toEqual({ axis: 'v', inner: 'left' });
+    for (const [i, j] of [[20, 14], [21, 15], [20, 24]] as const) expect(rutAt(v, i, j), `перехрестя ${i},${j}`).toBeNull();
+    for (const [i, j] of [[7, 12], [27, 10], [32, 8]] as const) expect(rutAt(v, i, j), `стежка ${i},${j}`).toBeNull();
+    for (let j = 7; j < 13; j += 1) for (let i = 33; i < 41; i += 1) expect(rutAt(v, i, j), `майданчик ${i},${j}`).toBeNull();
+    // Уздовж вулиці колії всюди, крім перехресть і місць, де до неї виходить стежка.
+    let along = 0;
+    let ruts = 0;
+    for (let i = 0; i < v.w; i += 1) for (const j of [14, 15]) { if (v.ground[j]![i] !== 'd') continue; along += 1; if (rutAt(v, i, j)) ruts += 1; }
+    expect(ruts / along).toBeGreaterThan(0.75);
+  });
+
+  it('паркан обабіч рідної хати йде згори вниз, ряд перед хатою — вбік; на подвір\'ї згори вниз ідуть краї ліворуч і праворуч', () => {
+    const v = cityMap('zhylyntsi');
+    for (let j = 6; j < 13; j += 1) {
+      expect(fenceGoesDown(v, 2, j), `2,${j}`).toBe(true);
+      expect(fenceGoesDown(v, 12, j), `12,${j}`).toBe(true);
+    }
+    for (const i of [2, 3, 5, 9, 11, 12]) expect(fenceGoesDown(v, i, 13), `${i},13`).toBe(false);
+    const yard = homeYard();
+    expect(fenceGoesDown(yard, 0, 10)).toBe(true);
+    expect(fenceGoesDown(yard, yard.w - 1, 10)).toBe(true);
+    expect(fenceGoesDown(yard, 10, 0)).toBe(false);
   });
 });

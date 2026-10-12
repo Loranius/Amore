@@ -1,8 +1,9 @@
 // ============================================================
 // Деталізація гри (ADR-0239, власник 2026-10-06: «більш деталізований
 // піксельний варіант гри, 32×32»). Поки 32×32 — тестовий: вмикається
-// адресою `?art=hd` або кнопкою «HD» у грі й діє лише в садибі в
-// Жилинцях (подвір'я, хата, літня кухня, погріб). Деінде — 16×16.
+// адресою `?art=hd` або кнопкою «HD» у грі й діє в Жилинцях — у садибі
+// (подвір'я, хата, літня кухня, погріб) і в самому селі (власник
+// 2026-10-12: «перейдемо до Жилинців аналогічно»). Деінде — 16×16.
 // ============================================================
 import { CELLAR_ID } from '../world/cellar';
 import { KITCHEN_ID } from '../world/kitchen';
@@ -18,9 +19,12 @@ export function artFromSearch(search: string): Art | null {
   return v === 'hd' || v === 'pixel' ? v : null;
 }
 
-/** Мапи, які вже намальовано у 32×32. */
+/** Село Жилинці (`cityMap('zhylyntsi')`). */
+const VILLAGE_ID = 'zhylyntsi';
+
+/** Мапи, які вже намальовано у 32×32: садиба й село Жилинці. */
 export function hasHd(mapId: string): boolean {
-  return mapId === YARD_ID || mapId === KITCHEN_ID || mapId === CELLAR_ID || mapId.startsWith('home:hata');
+  return mapId === VILLAGE_ID || mapId === YARD_ID || mapId === KITCHEN_ID || mapId === CELLAR_ID || mapId.startsWith('home:hata');
 }
 
 /** Яким стилем малювати цю мапу за вибором гравця. */
