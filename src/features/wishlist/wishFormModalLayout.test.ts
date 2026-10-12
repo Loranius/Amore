@@ -19,15 +19,36 @@ const STYLES = readFileSync(join(__dirname, 'wishlistFormSections.css'), 'utf8')
 const MOBILE_STYLES = readFileSync(join(__dirname, 'wishlistV3.mobile.css'), 'utf8');
 
 describe('WishFormModal quick-create layout', () => {
-  it('keeps the frequent fields visible and optional work collapsed', () => {
-    expect(FORM).toContain('className="form-field wm-title-field"');
-    expect(FORM).toContain('className="form-field wm-link-field"');
-    expect(FORM).toContain('className="wm-photo-summary"');
+  it('нове бажання починається з одного поля: посилання або назва (ADR-0255)', () => {
+    /*
+     * Власник: «додавати довго», «форма як анкета». Було шість блоків —
+     * для кого, назва, посилання, фото, видимість, деталі — і на телефоні
+     * 412×915 вони не вміщались в екран. Тепер одне поле; посилання в
+     * ньому вмикає розбір, слова стають назвою.
+     */
+    expect(FORM).toContain('className="form-field wm-entry-field"');
+    expect(FORM).toContain('Встав посилання або напиши, що хочеш');
+    expect(FORM).toContain('if (isHttpUrl(trimmed))');
+    expect(FORM).toContain('setTitle(value)');
+    // Назва окремим полем — лише з посиланням або при редагуванні.
+    expect(FORM).toContain('{(isEdit || entryIsLink) && (');
+  });
+
+  it('необов\'язкове — ряд дрібних перемикачів, розгорнуте лише на вимогу', () => {
+    expect(FORM).toContain('className="wm-quick-row"');
+    expect(FORM).toContain('aria-pressed={isSecret}');
     expect(FORM).toContain('aria-expanded={photoOpen}');
-    expect(FORM).toContain('className="wm-details-summary"');
     expect(FORM).toContain('aria-expanded={detailsOpen}');
+    expect(FORM).toContain('{photoOpen && (');
     expect(FORM).toContain('{detailsOpen && (');
     expect(FORM).not.toContain('wm-form-section-index');
+    // Надзаголовок над назвою — заборона DESIGN.md, не смак.
+    expect(FORM).not.toContain('wm-form-eyebrow');
+  });
+
+  it('«Моє / Спільне» береться з вкладки, а не питається вдруге', () => {
+    expect(FORM).toContain('const [scope] = useState<Scope>(defaultScope)');
+    expect(FORM).not.toContain('<TabBar');
   });
 
   it('має канонічну смугу дій, як усі модалки порталу', () => {
@@ -53,7 +74,7 @@ describe('WishFormModal quick-create layout', () => {
     expect(actions?.match(/<button/g)).toHaveLength(2);
     expect(actions).toContain('btn btn-ghost');
     expect(actions).toContain('Скасувати');
-    expect(actions).toContain('Створити бажання');
+    expect(actions).toContain('Додати бажання');
     // Ширину й висоту задає канон в `index.css`, а не власне правило.
     expect(STYLES).not.toMatch(/\.wm-form-actions/);
   });
@@ -74,20 +95,9 @@ describe('WishFormModal quick-create layout', () => {
     expect(FORM).not.toContain("'partner'");
     expect(FORM).toContain('owner: item ? item.owner : me.id');
     expect(FORM).toContain("isSecret: scope === 'me' && isSecret");
-    expect(FORM).toContain('Видиме партнеру');
+    // Видиме партнеру — типовий стан; перемикач лише один: «Таємне».
     expect(FORM).toContain('Таємне');
-  });
-
-  it('обидва перемикачі модалки — той самий сегментний контрол', () => {
-    /*
-     * Було два різні: «Для кого» — пігулки `TabBar`, «Видимість» — дві
-     * власні картки заввишки 74px із рамками й окремим тлом. Два різні
-     * перемикачі в одній формі читаються як дві різні системи, а
-     * вищий із них ще й додавав модалці пів екрана.
-     */
-    const pickers = FORM.match(/<TabBar</g) ?? [];
-    expect(pickers).toHaveLength(2);
-    expect(STYLES).not.toMatch(/wm-visibility-(?:picker|option)/);
+    expect(FORM).toContain('Таємне бажання бачитимеш лише ти.');
   });
 
   it('keeps accordion cards content-sized inside the scrollable flex modal', () => {
