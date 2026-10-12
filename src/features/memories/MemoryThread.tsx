@@ -27,8 +27,8 @@ import { formatMemoryDate } from './memoriesDate';
 import { placeLabel } from './momentPlace';
 import { markCoverMorphSource } from './coverMorph';
 import {
-  THREAD_FRAME_CSS_WIDTH,
   buildThread,
+  currentFrameCssWidth,
   frameWidth,
   threadFan,
   threadYears,
@@ -36,7 +36,6 @@ import {
 } from './memoryThread';
 import type { Moment } from './useMoments';
 
-const FRAME_CSS_WIDTH = THREAD_FRAME_CSS_WIDTH;
 /** Лист віяла видно смужкою під затемненням — повна якість тут марна. */
 const LEAF_CSS_WIDTH = 96;
 const LEAF_QUALITY = 55;
@@ -266,7 +265,7 @@ function ThreadNode({
             {moment.cover ? (
               <Photo
                 src={moment.cover.photo_url}
-                cssWidth={FRAME_CSS_WIDTH}
+                cssWidth={currentFrameCssWidth()}
                 alt=""
                 loading="lazy"
                 decoding="async"

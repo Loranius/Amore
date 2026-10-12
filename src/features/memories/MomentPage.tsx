@@ -29,7 +29,7 @@ import { PhotoLightbox } from './PhotoLightbox';
 import { albumColumns, photoAspect } from './momentStyle';
 import { placeLabel } from './momentPlace';
 import { formatMemoryDate } from './memoriesDate';
-import { THREAD_FRAME_CSS_WIDTH, threadNeighbors, type ThreadNeighbor } from './memoryThread';
+import { currentFrameCssWidth, threadNeighbors, type ThreadNeighbor } from './memoryThread';
 import { markCoverMorphSource } from './coverMorph';
 import { thumbUrl } from '@/lib/imageCdn';
 import type { CSSProperties } from 'react';
@@ -52,6 +52,13 @@ import { useWorldModule } from '@/features/world/useWorldModule';
  * запасом; кадр альбому — це половина ширини мінус проміжок.
  */
 const HERO_CSS_WIDTH = 480;
+/**
+ * На широкому екрані сторінка спогаду стоїть колонкою 760px (ADR-0254) —
+ * обкладинка, попрошена на 480, там розмивалась би.
+ */
+const HERO_CSS_WIDTH_WIDE = 760;
+const heroCssWidth = () =>
+  (typeof window !== 'undefined' && window.innerWidth >= 900 ? HERO_CSS_WIDTH_WIDE : HERO_CSS_WIDTH);
 const ALBUM_CSS_WIDTH = 200;
 
 function useAlbumLanes(): number {
@@ -115,10 +122,10 @@ export function MomentPage() {
           <button
             key={moment.id}
             type="button" className="mm-hero-shot"
-            style={{ '--mm-hero-thumb': `url("${thumbUrl(moment.cover.photo_url, THREAD_FRAME_CSS_WIDTH)}")` } as CSSProperties}
+            style={{ '--mm-hero-thumb': `url("${thumbUrl(moment.cover.photo_url, currentFrameCssWidth())}")` } as CSSProperties}
             onClick={() => setLightbox(moment.cover!.id)} aria-label="Відкрити фото"
           >
-            <Photo src={moment.cover.photo_url} cssWidth={HERO_CSS_WIDTH} alt="" decoding="async" />
+            <Photo src={moment.cover.photo_url} cssWidth={heroCssWidth()} alt="" decoding="async" />
           </button>
         )}
         <div className="mm-hero-veil" aria-hidden="true" />
@@ -233,7 +240,6 @@ export function MomentPage() {
  * з обкладинкою-підложкою, тож перехід до сусіда виростає з уже
  * завантаженого фото.
  */
-const NEIGHBOR_CSS_WIDTH = THREAD_FRAME_CSS_WIDTH;
 
 /**
  * Шматок нитки: новіший спогад угорі, цей посередині, старіший унизу —
@@ -272,7 +278,7 @@ function NeighborLink({ neighbor, side }: { neighbor: ThreadNeighbor<Moment>; si
     >
       <span className="mm-thread-shot" aria-hidden="true">
         {moment.cover
-          ? <Photo src={moment.cover.photo_url} cssWidth={NEIGHBOR_CSS_WIDTH} alt="" loading="lazy" decoding="async" />
+          ? <Photo src={moment.cover.photo_url} cssWidth={currentFrameCssWidth()} alt="" loading="lazy" decoding="async" />
           : <span className="mt-blank" />}
       </span>
       <span className="mm-thread-dot mm-thread-dot--stone" aria-hidden="true" />

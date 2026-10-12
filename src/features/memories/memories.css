@@ -1391,3 +1391,48 @@
   }
   .mt-node.is-unseen .mt-dot::after { animation: none; }
 }
+
+/* ── Широкий екран і миша (ADR-0254) ───────────────────────────
+
+   Портал ведуть із телефона, але десктоп існує, і там «Спогади»
+   розтягувались: текст сторінки спогаду йшов рядками по сотні символів,
+   портретна обкладинка різалась у смугу, а повноекранний блокнот
+   композера ставав аркушем на всю ширину монітора, зі скріпкою в
+   дальньому куті. Тут — колонка, у якій це читається так само, як на
+   телефоні, і відгук на наведення, якого палець не потребує. */
+
+/* Наведення — лише там, де воно є (миша, тачпад). Тінь лягає глибше, а
+   назва бере акцент як текст (The Two Accents Rule): видно, що це
+   посилання, без жодного руху, що заважав би читати. */
+@media (hover: hover) {
+  .mt-link:hover .mt-frame { box-shadow: var(--shadow-lg); }
+  .mt-link:hover .mt-caption b,
+  .mm-thread-link:hover .mm-thread-text b { color: var(--accent); }
+  .mt-rail-year:hover:not([aria-current='true']) { color: var(--text); }
+}
+
+@media (min-width: 900px) {
+  /* Сторінка спогаду — колонка 760px по центру. Обкладинка в ній отримує
+     заокруглення з усіх боків: на телефоні її верх зливався з краєм
+     екрана, тут вона лежить на сторінці. */
+  .mm-page {
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .mm-page > *:not(.mm-hero) { padding-left: 0; padding-right: 0; }
+  .mm-hero { --mm-hero-round: var(--radius-lg); margin-top: 16px; }
+  .mm-hero-shot img { border-radius: var(--mm-hero-round); max-height: 62vh; }
+  .mm-hero-veil { display: none; }
+  .mm-page-note { max-width: 68ch; }
+
+  /* Композер — блокнот шириною в аркуш, а не в монітор. Поля дістають
+     бічний відступ, що звужує текст до 720px, а скріпка стоїть біля
+     краю аркуша, а не в дальньому куті екрана. */
+  .mm-composer { --mm-sheet: 720px; }
+  .mm-comp-bar,
+  .mm-comp-body {
+    padding-left: max(18px, calc((100% - var(--mm-sheet)) / 2));
+    padding-right: max(18px, calc((100% - var(--mm-sheet)) / 2));
+  }
+  .mm-clip { right: max(18px, calc((100vw - var(--mm-sheet)) / 2 + 18px)); }
+}

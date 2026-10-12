@@ -180,6 +180,24 @@ export function frameWidth(leaves: number): number {
  */
 export const THREAD_FRAME_CSS_WIDTH = 152;
 
+/**
+ * Та сама ширина, але від ширини вікна (ADR-0254).
+ *
+ * На широкому екрані нитка стоїть колонкою до 720px, і кадр без віяла
+ * сягає ~280px — кадр, попрошений на 152, там розтягувався й розмивався.
+ * Поріг той самий, що в альбомі сторінки спогаду (720px).
+ */
+export const THREAD_FRAME_CSS_WIDTH_WIDE = 260;
+
+export function threadFrameCssWidth(viewportWidth: number): number {
+  return viewportWidth >= 720 ? THREAD_FRAME_CSS_WIDTH_WIDE : THREAD_FRAME_CSS_WIDTH;
+}
+
+/** Ширина вікна там, де вікно є; без нього — телефонна. */
+export function currentFrameCssWidth(): number {
+  return threadFrameCssWidth(typeof window === 'undefined' ? 0 : window.innerWidth);
+}
+
 /** Скільки листів віяла показує вузол нитки. */
 export const THREAD_FAN_LEAVES = 2;
 /** Крок повороту листа, у градусах. */

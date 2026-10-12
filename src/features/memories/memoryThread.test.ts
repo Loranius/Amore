@@ -14,6 +14,7 @@ import {
   gapPx,
   pauseLabel,
   threadFan,
+  threadFrameCssWidth,
   threadYears,
   unseenFromPartner,
   type ThreadMoment,
@@ -246,5 +247,14 @@ describe('мітка візиту в різних записах часу', () =
   it('зіпсована мітка в сховищі — не світиться нічого', () => {
     const moments = [{ id: 1, created_by: 2, created_at: '2026-10-12T09:00:00Z' }];
     expect(unseenFromPartner(moments, 1, 'не дата').size).toBe(0);
+  });
+});
+
+describe('ширина кадру від вікна (ADR-0254)', () => {
+  it('телефон просить 152, широкий екран — 260, поріг 720 як в альбомі', () => {
+    expect(threadFrameCssWidth(412)).toBe(152);
+    expect(threadFrameCssWidth(719)).toBe(152);
+    expect(threadFrameCssWidth(720)).toBe(260);
+    expect(threadFrameCssWidth(1440)).toBe(260);
   });
 });
