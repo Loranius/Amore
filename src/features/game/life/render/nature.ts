@@ -65,6 +65,7 @@ function canopy(g: Ctx, blobs: readonly [number, number, number][], dark: string
 }
 
 function blossoms(g: Ctx, blobs: readonly [number, number, number][], color: string, seed: number, count: number): void {
+  const hd = densityOf(g) > 1;
   for (let k = 0; k < count; k += 1) {
     const h = cellHash(k, seed, 9);
     const [bx, by, br] = blobs[h % blobs.length]!;
@@ -72,9 +73,54 @@ function blossoms(g: Ctx, blobs: readonly [number, number, number][], color: str
     const rr = ((h >> 12) % 100) / 100 * br;
     const x = Math.round(bx + Math.cos(ang) * rr);
     const y = Math.round(by + Math.sin(ang) * rr);
+    if (hd) { bloomHd(g, x, y, color, k); continue; }
     px(g, x, y, color);
     if (k % 3 === 0) px(g, x + 1, y, shade(color, -0.1));
   }
+}
+
+/** Серединка квітки цвіту за кольором пелюсток. */
+const BLOOM_HEART: Record<string, string> = { '#fff4f8': '#f2a0b8', '#ffc4dc': '#f6e0a0', '#fff8e8': '#f0c060' };
+
+/**
+ * 32×32: яблуко — округле, з відблиском угорі ліворуч і тінню внизу,
+ * подекуди з хвостиком; вишні — парою на хвостиках; цвіт — чотири пелюстки
+ * зі серединкою. У 16×16 це квадратики пікселів, і в 32×32 вони такими й
+ * читались.
+ */
+function bloomHd(g: Ctx, x: number, y: number, c: string, k: number): void {
+  const hl = shade(c, 0.35);
+  const d1 = shade(c, -0.2);
+  const d2 = shade(c, -0.35);
+  if (c === '#e8402e') {
+    dot(g, x, y - 0.5, hl);
+    dot(g, x + 0.5, y - 0.5, c);
+    dot(g, x - 0.5, y, c);
+    dot(g, x, y, c);
+    dot(g, x + 0.5, y, c);
+    dot(g, x + 1, y, d1);
+    dot(g, x, y + 0.5, d1);
+    dot(g, x + 0.5, y + 0.5, d2);
+    if (k % 3 === 0) dot(g, x + 0.5, y - 1, '#5a3a24');
+    return;
+  }
+  if (c === '#c2283a') {
+    dot(g, x, y - 1, '#4a6a2a');
+    dot(g, x + 0.5, y - 1.5, '#4a6a2a');
+    dot(g, x + 1, y - 1, '#4a6a2a');
+    for (const [cx, cy] of [[x - 0.5, y - 0.5], [x + 1, y]] as const) {
+      dot(g, cx, cy, hl);
+      dot(g, cx + 0.5, cy, c);
+      dot(g, cx, cy + 0.5, d1);
+      dot(g, cx + 0.5, cy + 0.5, d2);
+    }
+    return;
+  }
+  dot(g, x, y - 0.5, c);
+  dot(g, x - 0.5, y, c);
+  dot(g, x + 0.5, y, c);
+  dot(g, x, y + 0.5, shade(c, -0.08));
+  dot(g, x, y, BLOOM_HEART[c] ?? '#f6d55c');
 }
 
 function bareBranches(g: Ctx, seed: number, snow: boolean): void {

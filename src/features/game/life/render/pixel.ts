@@ -291,7 +291,7 @@ export function disciplinePalette(c: HTMLCanvasElement): HTMLCanvasElement {
 }
 
 /** Відстань (RGB), ближче за яку два кольори вважаються одним. */
-const NEAR_DUPLICATE = 14;
+export const NEAR_DUPLICATE = 14;
 
 /**
  * Темний тон тієї ж рампи для контуру з освітленого боку: найближчий до

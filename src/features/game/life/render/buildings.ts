@@ -8,7 +8,7 @@ import type { Season } from '../sim/calendar';
 import { TILE, buildingParts, type Building, type BuildingStyle, type Rect } from '../world/types';
 import { bitmapSize, drawBitmap } from './icons';
 import { canvasAt, cellHash, densityOf, disc, disciplinePalette, drawSprite, ellipse, mix, px, rect, shade, worldSize, type Ctx } from './pixel';
-import { doorHd, flowerBoxHd, mallowBloomHd, roofRowHd, wallHd, windowHd } from './buildingsHd';
+import { doorHd, flowerBoxHd, mallowBloomHd, roofRowHd, snowCapHd, wallHd, windowHd } from './buildingsHd';
 
 export interface BuildingSprite {
   img: HTMLCanvasElement;
@@ -242,10 +242,13 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
   if (season === 'winter') {
     // Сніг: шапка до половини даху з рваним краєм і бурульки.
     const snowH = Math.round(H * 0.55);
+    const capRows: { x0: number; x1: number; y: number }[] = [];
     for (let r = 0; r < snowH; r += 1) {
       const k = Math.round((1 - r / H) * inset);
       rect(g, kl(k), top + r, W - kl(k) - kr(k), 1, r > snowH - 3 ? '#dfe9f6' : '#ffffff');
+      capRows.push({ x0: kl(k), x1: W - kr(k), y: top + r });
     }
+    if (densityOf(g) > 1) snowCapHd(g, capRows, seed);
     for (let x = inset; x < W - inset; x += 1) {
       const drip = cellHash(x, seed) % 4;
       if (drip > 1) rect(g, x, top + snowH, 1, drip - 1, '#dfe9f6');

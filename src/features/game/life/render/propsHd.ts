@@ -7,7 +7,7 @@
 // ============================================================
 import type { Season } from '../sim/calendar';
 import type { Prop } from '../world/types';
-import { cellHash, dot, mix, shade, type Ctx } from './pixel';
+import { cellHash, dot, mix, rect, shade, type Ctx } from './pixel';
 
 const h = (a: number, b: number, k: number) => cellHash(a, b, k + 700);
 
@@ -45,6 +45,34 @@ export function propHd(g: Ctx, p: Prop, x: number, y: number, t: number, season:
       grain(g, x + 1, y + 4, 16, 2, '#9a6a3a', seed);
       grain(g, x + 1, y + 8, 16, 2, '#9a6a3a', seed + 1);
       break;
+    case 'flowerBed': {
+      // Клумба: земля грудочками (під снігом — лише нижче шапки), облямівка
+      // з камінців згори й знизу, листя біля стебел, серединки квітів.
+      for (let k = 0; k < 12; k += 1) {
+        const r = h(k, seed, 30);
+        const cy = y + 4.5 + ((r >>> 6) % 18) / 2;
+        if (snow && cy < y + 8.5) continue;
+        dot(g, x + 0.5 + (r % 30) / 2, cy, k % 2 ? '#94704a' : '#5e4228');
+      }
+      for (const ey of [y + 3.5, y + 13.5]) {
+        for (let ex = x + (ey > y + 8 ? 0 : 1); ex < x + 15; ex += 2.5) {
+          rect(g, ex, ey, 1.5, 1, '#a8a090');
+          dot(g, ex, ey, snow ? '#ffffff' : '#d0c8b8');
+          dot(g, ex + 1, ey + 0.5, '#6e685e');
+        }
+      }
+      if (snow) break;
+      const base = cellHash(Math.round(p.x * 5), Math.round(p.y * 5), 1);
+      for (let k = 0; k < 6; k += 1) {
+        const fx = x + 2 + ((k * 5 + base) % 12);
+        const fy = y + 3 + ((k * 3) % 5);
+        dot(g, fx - 0.5, fy + 2, '#5aa04a');
+        dot(g, fx + 1, fy + 2.5, '#4a8a3a');
+        dot(g, fx - 0.5, fy - 0.5, 'rgba(255,255,255,0.45)');
+        dot(g, fx, fy, '#fff2a0');
+      }
+      break;
+    }
     case 'lava':
       grain(g, x, y + 5.5, 32, 2.5, '#a8784a', seed);
       if (p.variant === 1) {

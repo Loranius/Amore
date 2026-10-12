@@ -3,7 +3,7 @@
 // Кадри — у .live/game/ (не в git). Перед кадром заморожуй світ: c.worldFrame = function () {}.
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
-import { mkdirSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 const ROOT = fileURLToPath(new URL('../..', import.meta.url));
 const OUT = `${ROOT}.live/game`;
@@ -23,6 +23,27 @@ await shot('title');
 const scenarios = (process.argv[3] ?? 'village').split('||');
 const setup = async (fn, arg) => page.evaluate(([src, a]) => { const c = window.__lifeGame; return new Function('c', 'a', src)(c, a); }, [fn, arg]);
 for (const sc of scenarios) {
+  // png:<ім'я>:<пора року>[:hd|pixel] — уся поточна мапа одним PNG без
+  // людей: піксель малюнка — один піксель файлу. Екран вміщає лише ~20
+  // клітинок, а текстури треба порівнювати по всьому подвір'ю разом.
+  if (sc.startsWith('png:')) {
+    const [, name, season = 'summer', art = 'hd'] = sc.split(':');
+    const url = await page.evaluate(async ([season, art]) => {
+      const S = await import('/src/features/game/life/render/scene.ts');
+      const c = window.__lifeGame;
+      const d = art === 'hd' ? 2 : 1;
+      const W = c.map.w * 16 * d;
+      const H = c.map.h * 16 * d;
+      const cv = document.createElement('canvas');
+      cv.width = W;
+      cv.height = H;
+      S.renderScene(cv.getContext('2d'), c.map, [], { season, minute: 660, time: 0, weather: 'clear', art }, { w: W, h: H, scale: d, camX: 0, camY: 0, dpr: 1 }, { target: null, near: null, pets: [] });
+      return cv.toDataURL('image/png');
+    }, [season, art]);
+    writeFileSync(`${OUT}/${dev}-map-${name}.png`, Buffer.from(url.split(',')[1], 'base64'));
+    console.log('map', name);
+    continue;
+  }
   if (sc === 'village') await setup(`void c.newGame(7, 'sadok')`);
   await page.waitForTimeout(500);
   // Прогорнути вступні діалоги.

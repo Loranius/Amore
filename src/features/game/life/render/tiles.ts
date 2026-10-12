@@ -11,13 +11,22 @@ import { TILE, type CropKind, type GameMap, type Ground } from '../world/types';
 import { cropTile } from './crops';
 import { PALETTES, type SeasonPalette } from './palette';
 import { canvasAt, cellHash, densityOf, mix, px, rect, shade, type Ctx } from './pixel';
-import { bedHd, clayFloorHd, cobbleHd, dirtHd, earthHd, fenceHd, floorHd, grassHd, paintedFloorHd, wallTopHd, wallpaperHd } from './tilesHd';
+import { bedHd, clayFloorHd, cobbleHd, dirtHd, earthHd, fenceHd, floorHd, fringeTipHd, grassHd, lawnHd, paintedFloorHd, wallTopHd, wallpaperHd } from './tilesHd';
 
 const SOFT: ReadonlySet<Ground> = new Set<Ground>(['d', 'c', 'p', 's', 'b', 'a', 'm', 'z', 'v']);
 const GRASSY: ReadonlySet<Ground> = new Set<Ground>(['g', 'G', 'h', 'F']);
 
-function grassTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette, flowers: boolean): void {
+/**
+ * `lawn` — у 32×32 латки, кущики й квіти цієї клітинки малює `lawnHd`
+ * окремим проходом по всій мапі (латки переходять через межі клітинок),
+ * тож тут — лише колір трави.
+ */
+function grassTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette, flowers: boolean, lawn = false): void {
   rect(g, x, y, TILE, TILE, P.grass);
+  if (densityOf(g) > 1) {
+    if (!lawn) grassHd(g, x, y, i, j, P, flowers);
+    return;
+  }
   const h = cellHash(i, j);
   // Світлі й темні плями — трава нерівна.
   if (h % 5 === 0) rect(g, x + (h % 9), y + ((h >> 4) % 9), 6, 4, P.grassLight);
@@ -55,7 +64,6 @@ function grassTile(g: Ctx, x: number, y: number, i: number, j: number, P: Season
     rect(g, x + (hh % 8), y + 6, 7, 3, '#ffffff');
     rect(g, x + (hh % 8) + 1, y + 9, 6, 1, P.grassDark);
   }
-  if (densityOf(g) > 1) grassHd(g, x, y, i, j, P, flowers);
 }
 
 function dirtTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
@@ -71,7 +79,7 @@ function dirtTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonP
     rect(g, x + (hh % 11) + 1, y + ((hh >> 3) % 11) + 2, 3, 2, shade(base, -0.25));
     px(g, x + (hh % 11) + 1, y + ((hh >> 3) % 11) + 2, shade(base, 0.2));
   }
-  if (densityOf(g) > 1) dirtHd(g, x, y, i, j, base);
+  if (densityOf(g) > 1) dirtHd(g, x, y, i, j, base, P);
 }
 
 /** Грядки городу: темний ґрунт борознами й рядки рослин за порою року. */
@@ -114,7 +122,7 @@ function cobbleTile(g: Ctx, x: number, y: number, i: number, j: number, P: Seaso
     rect(g, x + sx, y + sy, sw - 1, 1, shade(c, 0.15));
     rect(g, x + sx, y + sy + sh - 2, sw - 1, 1, shade(c, -0.15));
   });
-  if (densityOf(g) > 1) cobbleHd(g, x, y, i, j, stones);
+  if (densityOf(g) > 1) cobbleHd(g, x, y, i, j, stones, mortar, P.snow);
 }
 
 function paveTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
@@ -178,6 +186,11 @@ function hedgeTile(g: Ctx, x: number, y: number, i: number, j: number, P: Season
 
 function fenceTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
   grassTile(g, x, y, i, j, P, false);
+  fenceBody(g, x, y, i, j, P);
+}
+
+/** Паркан без трави під ним (у 32×32 трава паркану — частина `lawnHd`). */
+function fenceBody(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
   const wood = '#a8784a';
   rect(g, x, y + 5, TILE, 2, wood);
   rect(g, x, y + 10, TILE, 2, wood);
@@ -188,7 +201,7 @@ function fenceTile(g: Ctx, x: number, y: number, i: number, j: number, P: Season
     if (P.snow) rect(g, x + pxl, y + 1, 3, 2, '#ffffff');
   }
   rect(g, x, y + 14, TILE, 1, 'rgba(20,30,20,0.25)');
-  if (densityOf(g) > 1) fenceHd(g, x, y, wood);
+  if (densityOf(g) > 1) fenceHd(g, x, y, i, j, wood, P);
 }
 
 function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f' | 't' | 'k' | 'o' | 'l'): void {
@@ -327,6 +340,7 @@ function stoneWallTile(g: Ctx, x: number, y: number, i: number, j: number, map: 
 
 /** Рваний край трави, що лягає на стежку: стежка «врізана» в траву. */
 function grassFringe(g: Ctx, map: GameMap, P: SeasonPalette): void {
+  const hd = densityOf(g) > 1;
   for (let j = 0; j < map.h; j += 1) {
     for (let i = 0; i < map.w; i += 1) {
       if (!GRASSY.has(map.ground[j]![i]!)) continue;
@@ -339,13 +353,18 @@ function grassFringe(g: Ctx, map: GameMap, P: SeasonPalette): void {
         for (let k = 0; k < TILE; k += 1) {
           const depth = 1 + (cellHash(i * 3 + di, j * 3 + dj, k) % 3);
           const len = depth;
+          // 32×32: через раз травинка ще на пів пікселя далі — край рваніший.
+          const tip = hd && cellHash(i * 5 + di, j * 5 + dj, k + 40) % 2 === 0;
+          const tk = k + (cellHash(i, j, k + 41) % 2) * 0.5;
           if (axis === 'h') {
             const yy = dj > 0 ? ey : ey - len;
             rect(g, ex + k, yy, 1, len, P.grass);
             if (dj > 0) px(g, ex + k, yy + len, 'rgba(40,30,20,0.18)');
+            if (tip) fringeTipHd(g, ex + tk, dj > 0 ? yy + len : yy - 0.5, P);
           } else {
             const xx = di > 0 ? ex : ex - len;
             rect(g, xx, ey + k, len, 1, P.grass);
+            if (tip) fringeTipHd(g, di > 0 ? xx + len : xx - 0.5, ey + tk, P);
           }
         }
       }
@@ -365,14 +384,17 @@ export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCan
   // Яка культура на якій клітинці городу.
   const crop = new Map<number, CropKind>();
   for (const plot of map.crops ?? []) for (let j = plot.y; j < plot.y + plot.h; j += 1) for (let i = plot.x; i < plot.x + plot.w; i += 1) crop.set(j * map.w + i, plot.kind);
+  // 32×32 надворі: трава (з травою під парканом) — окремим проходом `lawnHd`,
+  // паркан — уже поверх неї.
+  const lawn = density > 1 && !map.interior;
   for (let j = 0; j < map.h; j += 1) {
     for (let i = 0; i < map.w; i += 1) {
       const t = map.ground[j]![i]!;
       const x = i * TILE;
       const y = j * TILE;
       switch (t) {
-        case 'g': grassTile(g, x, y, i, j, P, cellHash(i, j, 77) % 11 === 0); break;
-        case 'G': grassTile(g, x, y, i, j, P, true); break;
+        case 'g': grassTile(g, x, y, i, j, P, cellHash(i, j, 77) % 11 === 0, lawn); break;
+        case 'G': grassTile(g, x, y, i, j, P, true, lawn); break;
         case 'd': dirtTile(g, x, y, i, j, P); break;
         case 'v': {
           const kind = crop.get(j * map.w + i);
@@ -387,7 +409,7 @@ export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCan
         case 'b': sandTile(g, x, y, i, j, true); break;
         case 'r': railTile(g, x, y, i, j); break;
         case 'h': hedgeTile(g, x, y, i, j, P); break;
-        case 'F': fenceTile(g, x, y, i, j, P); break;
+        case 'F': if (lawn) grassTile(g, x, y, i, j, P, false, true); else fenceTile(g, x, y, i, j, P); break;
         case 'f': case 't': case 'k': case 'o': case 'l': floorTile(g, x, y, i, j, t); break;
         case 'W': wallTile(g, x, y, i, j, map); break;
         case 'e': earthTile(g, x, y, i, j, map); break;
@@ -396,6 +418,10 @@ export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCan
         case 'x': voidTile(g, x, y, i, j, map); break;
       }
     }
+  }
+  if (lawn) {
+    lawnHd(g, map, P);
+    for (let j = 0; j < map.h; j += 1) for (let i = 0; i < map.w; i += 1) if (map.ground[j]![i] === 'F') fenceBody(g, i * TILE, j * TILE, i, j, P);
   }
   if (!map.interior) grassFringe(g, map, P);
   groundCache.set(key, c);
