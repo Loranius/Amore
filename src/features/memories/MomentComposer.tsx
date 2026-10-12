@@ -26,6 +26,7 @@ import { PlaceSheet } from './PlaceSheet';
 import { draftIssue, ISSUE_HINT, NOTE_LIMIT, defaultMemoryDate } from './momentDraft';
 import { placeLabel } from './momentPlace';
 import { formatMemoryDate } from './memoriesDate';
+import { landingLabel } from './memoryThread';
 import { useEnsurePlacePin, useMomentMutations } from './useMoments';
 import type { PlaceCandidate } from './momentPlace';
 import type { Moment, MomentPlace, NewPhoto } from './useMoments';
@@ -44,6 +45,8 @@ interface MomentComposerProps {
   moment?: Moment;
   /** Мітки карти для вибору місця. */
   places?: readonly MomentPlace[];
+  /** Увесь архів — щоб сказати, де на нитці ляже цей спогад (ADR-0250). */
+  moments?: readonly Moment[];
   /**
    * Місце, обране НЕ у формі, а на карті.
    *
@@ -64,6 +67,7 @@ export function MomentComposer({
   userId,
   moment,
   places = [],
+  moments = [],
   initialPlace,
   onClose,
   onSaved,
@@ -319,6 +323,11 @@ export function MomentComposer({
             </span>
           )}
         </div>
+
+        {/* Де спогад ляже на нитці — рахується від дати, тож міняється
+            разом із нею. Пара бачить спогад на своєму місці в історії ще
+            до того, як натисне «Готово» (ADR-0250). */}
+        <p className="mm-comp-landing">{landingLabel(moments, memoryDate, moment?.id)}</p>
 
         {photoCount > 0 && (
           <div className="mm-stage">

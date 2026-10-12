@@ -7,6 +7,9 @@ import {
   PAUSE_DAYS,
   buildThread,
   daysApart,
+  durationLabel,
+  landingLabel,
+  threadNeighbors,
   gapPx,
   pauseLabel,
   sizeFor,
@@ -135,5 +138,69 @@ describe('віяло вузла не перетинає нитку й не ви�
 
   it('спогад з одним фото віяла не має', () => {
     expect(threadFan(0, 'left')).toEqual([]);
+  });
+});
+
+// ── Сусіди й місце на нитці (ADR-0250) ─────────────────────
+
+describe('скільки минуло — словами, як кажуть', () => {
+  it('одиниця без числа, далі узгоджене число', () => {
+    expect(durationLabel(0)).toBe('');
+    expect(durationLabel(1)).toBe('день');
+    expect(durationLabel(3)).toBe('3 дні');
+    expect(durationLabel(5)).toBe('5 днів');
+    expect(durationLabel(7)).toBe('тиждень');
+    expect(durationLabel(21)).toBe('3 тижні');
+    expect(durationLabel(31 * 2)).toBe('2 місяці');
+    expect(durationLabel(30)).toBe('4 тижні');
+  });
+});
+
+describe('сусіди на нитці', () => {
+  const thread = [
+    { id: 3, memory_date: '2025-09-12', title: 'Карпати' },
+    { id: 2, memory_date: '2025-08-22', title: '' },
+    { id: 1, memory_date: '2025-08-22', title: 'Львів' },
+  ];
+
+  it('новіший — «через», старіший — «за … до того»', () => {
+    const { newer, older } = threadNeighbors(thread, 2);
+    expect(newer?.moment.id).toBe(3);
+    expect(newer?.label).toBe('через 3 тижні');
+    expect(older?.moment.id).toBe(1);
+    expect(older?.label).toBe('того ж дня');
+  });
+
+  it('на кінцях нитки сусід лише один', () => {
+    expect(threadNeighbors(thread, 3).newer).toBeNull();
+    expect(threadNeighbors(thread, 1).older).toBeNull();
+  });
+
+  it('чужий id — без сусідів', () => {
+    expect(threadNeighbors(thread, 99)).toEqual({ newer: null, older: null });
+  });
+});
+
+describe('де ляже новий спогад', () => {
+  const thread = [
+    { id: 3, memory_date: '2025-09-12', title: 'Карпати' },
+    { id: 1, memory_date: '2024-05-01', title: '' },
+  ];
+
+  it('від найближчого старшого спогаду', () => {
+    expect(landingLabel(thread, '2026-01-12')).toBe('Ляже на нитку через 4 місяці після «Карпати»');
+    expect(landingLabel(thread, '2025-09-12')).toBe('Ляже на нитку того ж дня, що й «Карпати»');
+  });
+
+  it('спогад без назви названо датою', () => {
+    expect(landingLabel(thread, '2024-05-15')).toBe('Ляже на нитку через 2 тижні після 01.05.2024');
+  });
+
+  it('раніше за все — на початок нитки', () => {
+    expect(landingLabel(thread, '2023-05-01')).toBe('Ляже на початок нитки, за рік до 01.05.2024');
+  });
+
+  it('спогад, який редагують, сам собі не сусід', () => {
+    expect(landingLabel([thread[0]!], '2025-09-12', 3)).toBe('Перший спогад на нитці');
   });
 });

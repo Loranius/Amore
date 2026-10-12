@@ -1123,3 +1123,142 @@
 /* Вхід у полароїд — дія заголовка. Значок і слово в один рядок, як у
    «Замірах»: обидва відкривають щось поверх сторінки, і читатись вони
    мусять однаково. */
+
+/* ── Шматок нитки на сторінці спогаду (ADR-0250) ─────────────── */
+
+/* Та сама нитка, що в галереї, тільки вертикально зліва й з трьома
+   вузлами: новіший угорі, цей посередині, старіший унизу. Лінію малює
+   кожен проміжок сам, через центр мініатюр (48px → 24px): так вона
+   з'єднує рівно ті вузли, які є, хай сусід один чи два. */
+.mm-thread {
+  --mm-thread-line: color-mix(in srgb, var(--text) 18%, transparent);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  margin-top: 36px;
+  padding-bottom: 28px;
+}
+
+.mm-thread-link {
+  position: relative;
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+}
+
+.mm-thread-link:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; }
+.mm-thread-link:active .mm-thread-node { translate: 0 2px; }
+
+.mm-thread-node,
+.mm-thread-here {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  column-gap: 16px;
+  align-items: center;
+}
+
+.mm-thread-node { transition: translate 120ms ease; }
+
+.mm-thread-shot {
+  display: block;
+  width: 48px;
+  height: 48px;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: #201b28;
+  box-shadow: var(--shadow-sm);
+}
+
+.mm-thread-shot img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.mm-thread-text { min-width: 0; }
+
+.mm-thread-text b {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mm-thread-text i {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Проміжок — скільки минуло між вузлами. Стоїть праворуч від лінії, як
+   підпис паузи в галереї. */
+.mm-thread-gap {
+  position: relative;
+  display: block;
+  padding: 12px 0 12px 64px;
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.mm-thread-gap::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 23px;
+  width: 2px;
+  background: var(--mm-thread-line);
+}
+
+/* Цей спогад — залитий вузол: тут колір означає «ви тут». */
+.mm-thread-here {
+  position: relative;
+  min-height: 24px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.mm-thread-dot {
+  justify-self: center;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-pill);
+  background: var(--accent);
+}
+
+/* ── Де спогад ляже на нитці (композер, ADR-0250) ─────────────── */
+
+.mm-comp-landing {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+.mm-comp-landing::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  border: 2px solid var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mm-thread-node { transition: none; }
+}

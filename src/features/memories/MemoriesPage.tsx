@@ -211,6 +211,7 @@ export function MemoriesPage() {
       {composing && (
         <MomentComposer
           userId={me.id}
+          moments={moments}
           places={data?.places ?? []}
           {...(fromMap ? { initialPlace: fromMap } : {})}
           onClose={() => { setComposing(false); setFromMap(null); }}

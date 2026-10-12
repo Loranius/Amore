@@ -68,23 +68,32 @@ export function gapPx(days: number): number {
 }
 
 /**
- * Підпис паузи: «7 тижнів», «4 місяці», «рік», «2 роки й 3 місяці».
+ * Скільки минуло, словами: «день», «5 днів», «тиждень», «7 тижнів»,
+ * «місяць», «4 місяці», «рік», «2 роки й 3 місяці». Нуль днів — порожньо:
+ * «того ж дня» каже викликач, бо це вже інше речення.
  *
  * Місяць тут — 30.44 дня, середній григоріанський. Підпис наближений
- * навмисно: пара читає «скільки минуло», а не рахує дні.
+ * навмисно: пара читає «скільки минуло», а не рахує дні. Одиниця без
+ * числа («тиждень», а не «1 тиждень») — бо так кажуть.
  */
-export function pauseLabel(days: number): string {
-  if (days < 61) {
-    const weeks = Math.round(days / 7);
-    return `${weeks} ${pluralUA(weeks, ['тиждень', 'тижні', 'тижнів'])}`;
-  }
+export function durationLabel(days: number): string {
+  const counted = (n: number, forms: readonly [string, string, string]) =>
+    (n === 1 ? forms[0] : `${n} ${pluralUA(n, forms)}`);
+  if (days <= 0) return '';
+  if (days < 7) return counted(days, ['день', 'дні', 'днів']);
+  if (days < 61) return counted(Math.round(days / 7), ['тиждень', 'тижні', 'тижнів']);
   const totalMonths = Math.round(days / 30.44);
   const years = Math.floor(totalMonths / 12);
   const months = totalMonths % 12;
-  const monthsWord = (n: number) => `${n} ${pluralUA(n, ['місяць', 'місяці', 'місяців'])}`;
-  if (years === 0) return monthsWord(months);
-  const yearsWord = years === 1 ? 'рік' : `${years} ${pluralUA(years, ['рік', 'роки', 'років'])}`;
-  return months === 0 ? yearsWord : `${yearsWord} й ${monthsWord(months)}`;
+  const monthsWord = counted(months, ['місяць', 'місяці', 'місяців']);
+  if (years === 0) return monthsWord;
+  const yearsWord = counted(years, ['рік', 'роки', 'років']);
+  return months === 0 ? yearsWord : `${yearsWord} й ${monthsWord}`;
+}
+
+/** Підпис паузи на нитці. Пауза завжди довша за шість тижнів. */
+export function pauseLabel(days: number): string {
+  return durationLabel(days);
 }
 
 export function sizeFor(photoCount: number): ThreadSize {
@@ -185,4 +194,79 @@ export function threadFan(extraPhotos: number, side: ThreadSide): ThreadFanLeaf[
     });
   }
   return leaves;
+}
+
+// ── Сусіди на нитці ─────────────────────────────────────────
+
+/** Те, що треба знати про спогад, щоб назвати його сусідом. */
+export interface ThreadNamedMoment {
+  id: number;
+  memory_date: string;
+  title: string;
+}
+
+/** Назва спогаду для речення: без назви — його дата цифрами. */
+function spoken(moment: ThreadNamedMoment): string {
+  const title = moment.title.trim();
+  if (title) return `«${title}»`;
+  const [y, m, d] = moment.memory_date.slice(0, 10).split('-');
+  return `${d}.${m}.${y}`;
+}
+
+export interface ThreadNeighbor<T> {
+  moment: T;
+  /** «через 3 тижні», «за місяць до того», «того ж дня». */
+  label: string;
+}
+
+/**
+ * Попередній і наступний спогади на нитці — для сторінки спогаду (ADR-0250).
+ *
+ * `moments` — у порядку нитки, найновіший перший. «Новіший» стоїть на
+ * нитці ВИЩЕ, тож у реченні він «через N», а старіший — «за N до того».
+ */
+export function threadNeighbors<T extends ThreadNamedMoment>(
+  moments: readonly T[],
+  id: number,
+): { newer: ThreadNeighbor<T> | null; older: ThreadNeighbor<T> | null } {
+  const index = moments.findIndex((m) => m.id === id);
+  if (index < 0) return { newer: null, older: null };
+  const here = moments[index]!;
+  const newer = moments[index - 1];
+  const older = moments[index + 1];
+  const after = (days: number) => (days === 0 ? 'того ж дня' : `через ${durationLabel(days)}`);
+  const before = (days: number) => (days === 0 ? 'того ж дня' : `за ${durationLabel(days)} до того`);
+  return {
+    newer: newer ? { moment: newer, label: after(daysApart(newer.memory_date, here.memory_date)) } : null,
+    older: older ? { moment: older, label: before(daysApart(here.memory_date, older.memory_date)) } : null,
+  };
+}
+
+/**
+ * Де ляже спогад із цією датою — рядок у композері (ADR-0250).
+ *
+ * Найближчий СТАРШИЙ спогад кращий за молодший: нитка читається з
+ * минулого, і «через 4 місяці після «Карпат»» каже про новий спогад
+ * більше, ніж «за рік до «Львова»». Спогад, який редагують, сам собі не
+ * сусід. Рівна дата рахується старшою: на нитці нове стає вище.
+ */
+export function landingLabel(
+  moments: readonly ThreadNamedMoment[],
+  memoryDate: string,
+  excludeId?: number,
+): string {
+  const others = moments.filter((m) => m.id !== excludeId);
+  if (others.length === 0) return 'Перший спогад на нитці';
+  const date = memoryDate.slice(0, 10);
+  const older = others
+    .filter((m) => m.memory_date.slice(0, 10) <= date)
+    .reduce<ThreadNamedMoment | null>((best, m) => (!best || m.memory_date > best.memory_date ? m : best), null);
+  if (older) {
+    const days = daysApart(date, older.memory_date);
+    return days === 0
+      ? `Ляже на нитку того ж дня, що й ${spoken(older)}`
+      : `Ляже на нитку через ${durationLabel(days)} після ${spoken(older)}`;
+  }
+  const newer = others.reduce((best, m) => (m.memory_date < best.memory_date ? m : best));
+  return `Ляже на початок нитки, за ${durationLabel(daysApart(newer.memory_date, date))} до ${spoken(newer)}`;
 }

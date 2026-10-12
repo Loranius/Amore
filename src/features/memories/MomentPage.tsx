@@ -11,9 +11,13 @@
 //
 // Альбом показує ВСІ знімки, включно з обкладинкою. Інакше з неї не можна
 // було б потрапити у повний екран свайпом із сусідніх кадрів.
+//
+// Унизу — шматок нитки (ADR-0250): попередній і наступний спогади й те,
+// скільки між ними минуло. Сторінка спогаду тепер не тупик, з якого треба
+// повертатись у галерею: гортати спогад за спогадом можна й звідси.
 // ============================================================
 import { useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { Photo } from '@/components/ui/Photo';
 import { useConfirm } from '@/providers/ConfirmProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
@@ -25,7 +29,8 @@ import { PhotoLightbox } from './PhotoLightbox';
 import { albumColumns, photoAspect } from './momentStyle';
 import { placeLabel } from './momentPlace';
 import { formatMemoryDate } from './memoriesDate';
-import { useMomentMutations, useMoments } from './useMoments';
+import { threadNeighbors, type ThreadNeighbor } from './memoryThread';
+import { useMomentMutations, useMoments, type Moment } from './useMoments';
 import './memories.css';
 import { useWorldModule } from '@/features/world/useWorldModule';
 
@@ -191,6 +196,8 @@ export function MomentPage() {
         </div>
       )}
 
+      <ThreadNeighbors moments={data?.moments ?? []} id={moment.id} />
+
       {lightbox !== null && (
         <PhotoLightbox
           photos={moment.photos}
@@ -203,10 +210,57 @@ export function MomentPage() {
         <MomentComposer
           userId={me.id}
           moment={moment}
+          moments={data?.moments ?? []}
           places={data?.places ?? []}
           onClose={() => setEditing(false)}
         />
       )}
     </section>
+  );
+}
+
+/** Мініатюра сусіда — кадр 48 CSS-пікселів. */
+const NEIGHBOR_CSS_WIDTH = 48;
+
+/**
+ * Шматок нитки: новіший спогад угорі, цей посередині, старіший унизу —
+ * у тому самому порядку, що й на нитці галереї. Між вузлами — скільки
+ * минуло.
+ */
+function ThreadNeighbors({ moments, id }: { moments: readonly Moment[]; id: number }) {
+  const { newer, older } = threadNeighbors(moments, id);
+  if (!newer && !older) return null;
+  return (
+    <nav className="mm-thread" aria-label="Сусіди на нитці">
+      {newer && <NeighborLink neighbor={newer} above />}
+      <span className="mm-thread-here" aria-hidden="true">
+        <i className="mm-thread-dot" />
+        <span>цей спогад</span>
+      </span>
+      {older && <NeighborLink neighbor={older} />}
+    </nav>
+  );
+}
+
+/** `above` — сусід вище на нитці: тоді проміжок стоїть під ним, ближче до цього спогаду. */
+function NeighborLink({ neighbor, above = false }: { neighbor: ThreadNeighbor<Moment>; above?: boolean }) {
+  const { moment, label } = neighbor;
+  const title = moment.title.trim() || formatMemoryDate(moment.memory_date, 'day');
+  return (
+    <Link to={`/memories/${moment.id}`} className="mm-thread-link" replace>
+      {!above && <em className="mm-thread-gap">{label}</em>}
+      <span className="mm-thread-node">
+        <span className="mm-thread-shot">
+          {moment.cover
+            ? <Photo src={moment.cover.photo_url} cssWidth={NEIGHBOR_CSS_WIDTH} alt="" loading="lazy" decoding="async" />
+            : <span className="mt-blank" aria-hidden="true" />}
+        </span>
+        <span className="mm-thread-text">
+          <b>{title}</b>
+          {moment.title.trim() && <i>{formatMemoryDate(moment.memory_date, 'day')}</i>}
+        </span>
+      </span>
+      {above && <em className="mm-thread-gap">{label}</em>}
+    </Link>
   );
 }
