@@ -1,14 +1,11 @@
 import { useId, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { LockIcon, PlusIcon } from '@/components/icons/UiIcon';
+import { ChevronDownIcon, LockIcon, PlusIcon } from '@/components/icons/UiIcon';
 import type { WishlistViewMode } from './wishlistBoardView';
 
 // ============================================================
 // Навігація вішліста у світі — accordion під перемикачем власника.
 // ------------------------------------------------------------
-// ADR-0255: розгортка більше не ручка на всю ширину під вкладками, а одна
-// кнопка-значок праворуч від вкладок-слів; аркуш падає під рядок.
-//
 // Accordion монтується порталом ПРЯМО всередину `.wl-wishlist-controls`.
 // Це робить DOM-порядок однозначним: TabBar -> Accordion. Окремий namespace
 // `wl-top-filter-*` не перетинається зі старими `.wl-world-nav-*` правилами,
@@ -90,19 +87,21 @@ export function WishlistWorldNav({
     <div
       className="wl-top-filter-accordion"
       data-open={open ? 'true' : 'false'}
+      style={{ width: '100%', margin: 0 }}
     >
       <button
         type="button"
         className="wl-top-filter-toggle"
         aria-expanded={open}
         aria-controls={panelId}
-        aria-label="Вигляд і виконані"
+        aria-label={open ? 'Згорнути фільтри вішліста' : 'Розгорнути фільтри вішліста'}
         onClick={(event) => {
           event.currentTarget.blur();
           setOpen((current) => !current);
         }}
       >
-        <FilterViewIcon />
+        <span className="wl-top-filter-grip" aria-hidden="true" />
+        <ChevronDownIcon size={21} />
       </button>
 
       {open && (

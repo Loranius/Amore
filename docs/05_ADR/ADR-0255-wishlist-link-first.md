@@ -1,14 +1,13 @@
 # ADR-0255 — Вішліст: посилання першим, одна дія на аркуші, вкладки словами
 
-- **Статус:** Accepted
+- **Статус:** Accepted (п. 3 «вкладки словами» відкочено — див. поправку)
 - **Дата:** 2026-10-12
 - **Спирається на:** ADR-0025…0028 (вішліст), PRODUCT.md, DESIGN.md
 - **Зачіпає:** `src/features/wishlist/WishFormModal.tsx`,
   `wishlistFormSections.css`, `WishDetailsSheet.tsx`, `wishlistCloud.css`,
   `wishlistCloudModalFix.css`, `WishlistWordTabs.tsx`, `WishlistWorldNav.tsx`,
   `WishlistPageBase.tsx`, `wishlistTopAccordion.css` і тести
-  `wishFormModalLayout.test.ts`, `WishDetailsSheet.test.ts`,
-  `wishlistWordTabs.test.ts`
+  `wishFormModalLayout.test.ts`, `WishDetailsSheet.test.ts`
 - **Не зачіпає:** кулі, фізику, переходи, список, архів, потоки резерву, дані
 - **Вказівка власника (2026-10-12):** `/impeccable shape` вішліста; бриф
   підтверджено словами «Поїхали все підходить».
@@ -45,3 +44,10 @@
 - Над сценою один рядок хрому замість двох.
 - Ризик: меню «•••» відкривається в потоці аркуша, а не поверх — на
   низьких екранах аркуш прокручується до нього.
+
+## Поправка 2026-10-12 — вкладки словами відкочено
+
+Власник: «вигляд верхньої панелі … раніше був ліпшим, поверни». Пункт 3
+відкочено повністю: у світі знову пігулка `TabBar` «Мої · <партнера> ·
+Спільні» з розгорткою-ручкою під нею; `WishlistWordTabs.tsx` і його тест
+видалені. Форма (п. 1) і аркуш (п. 2) лишаються.

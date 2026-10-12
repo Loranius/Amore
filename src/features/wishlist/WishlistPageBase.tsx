@@ -17,7 +17,6 @@ import {
   WishlistWorldNav,
   type WishlistVisibilityMode,
 } from './WishlistWorldNav';
-import { WishlistWordTabs } from './WishlistWordTabs';
 import { useDimmedWorld } from '@/features/world/worldDim';
 import { WishlistGridView } from './WishlistGridView';
 import { WishFormModal } from './WishFormModal';
@@ -479,10 +478,8 @@ export function WishlistPage() {
           власник попросив повернути його як було. У світі при ньому немає
           панелі виглядів: стан і вигляд живуть в аркуші (WishlistWorldNav),
           щоб не перекривати кристали двома рядами хрому. */}
-      <div className="wl-wishlist-controls" data-words={worldVisible ? 'true' : undefined}>
-        {worldVisible
-          ? <WishlistWordTabs<Tab> value={tab} onChange={changeTab} items={tabs} />
-          : <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />}
+      <div className="wl-wishlist-controls">
+        <TabBar<Tab> value={tab} onChange={changeTab} items={tabs} />
 
         {!worldVisible && isOwnTab && (secretItems.length > 0 || isSecretMode) && (
           <div className="wl-visibility-tabs">
