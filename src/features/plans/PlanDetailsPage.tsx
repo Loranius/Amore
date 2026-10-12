@@ -22,6 +22,13 @@
 // «Пов'язане» вже містило рядок «Місця N» — те саме число, що показував
 // сусідній блок. Карта витрачала на одну річ два з семи блоків при запасі
 // висоти 12 px із 739.
+//
+// ШІСТЬ → ТРИ (ADR-0256). Власник: «модуль великий і важкий». Назва
+// більше не блок у рамці, а заголовок сторінки. Під нею одна нитка й три
+// блоки: «Коли» (дата, стан і ОДНА дія — «Дати дату» чи «Прожили»),
+// «Підготовка» (кроки й бюджет рядком) і «Пов'язане». Окремого блоку
+// «Статус» немає: станів три й вони випливають із дати (`planStage.ts`).
+// Світний обід, плавання й нерівні кути прибрано — блоки лежать спокійно.
 // ============================================================
 import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
 import { ModalClose } from '@/components/ui/ModalClose';
@@ -38,22 +45,18 @@ import {
 } from '@/components/icons/UiIcon';
 import { CameraIcon, PiggyBankIcon } from '@/components/icons/NavIcon';
 import { MapPinIcon } from '@/components/icons/MapIcon';
-import { TargetIcon } from '@/components/icons/PlanIcon';
 import { fmtMoney } from '@/lib/money';
 import {
   PLAN_CATEGORIES,
   PLAN_PRECISION_LABEL,
-  PLAN_STATUSES,
-  PLAN_STATUS_ORDER,
 } from './planConstants';
 import {
-  isClosed,
-  nextActiveStatus,
   planCountdown,
   planDateLabel,
   readiness,
 } from './planModel';
 import { linksOfPlan } from './planLinkModel';
+import { PLAN_STAGE_LABEL, planStage } from './planStage';
 import { capped, VISIBLE_TASKS } from './planMapLayout';
 import { PlanMapThreads, type ThreadPair } from './PlanMapThreads';
 import { usePlanLinks } from './usePlanLinks';
@@ -65,7 +68,7 @@ import { PlanMemoriesBlock } from './PlanMemoriesBlock';
 import './plans.css';
 import './plansDetail.css';
 import './plansMemories.css';
-import type { PlanDatePrecision, PlanStatus } from '@/types';
+import type { PlanDatePrecision } from '@/types';
 import { useWorldVisibleRoute } from '@/features/world/useWorldVisibleRoute';
 import { useArtifactWorld } from '@/features/world/artifactWorldContext';
 import { useDimmedWorld } from '@/features/world/worldDim';
@@ -74,8 +77,6 @@ import './plansModule.css';
 import './plansMap.css';
 
 const PRECISIONS: PlanDatePrecision[] = ['none', 'day', 'range', 'month', 'season', 'year'];
-const ACTIVE_STATUSES = PLAN_STATUS_ORDER.filter((key) => !PLAN_STATUSES[key].closed);
-const CLOSED_STATUSES = PLAN_STATUS_ORDER.filter((key) => PLAN_STATUSES[key].closed);
 
 /**
  * Порядок ниток — це порядок, у якому план заповнюють.
@@ -85,23 +86,11 @@ const CLOSED_STATUSES = PLAN_STATUS_ORDER.filter((key) => PLAN_STATUSES[key].clo
  * малює). Ряд і так тримає їх поруч.
  */
 const PLAN_THREADS: readonly ThreadPair[] = [
-  ['hero', 'when'], ['hero', 'money'],
-  ['when', 'tasks'], ['money', 'links'],
-  ['tasks', 'status'], ['links', 'status'],
+  ['when', 'tasks'], ['tasks', 'links'],
 ];
 
-const STATUS_HELP: Record<PlanStatus, string> = {
-  idea: 'Зберегли задум, але ще нічого не вирішили',
-  planning: 'Уточнюєте дату, місце та формат',
-  preparing: 'Виконуєте кроки перед подією',
-  ready: 'Усе необхідне вже готово',
-  done: 'Цей момент уже став частиною вашої історії',
-  postponed: 'Повернетеся до нього пізніше',
-  cancelled: 'План більше не актуальний',
-};
-
 /** Який аркуш відкритий поверх карти. */
-type Sheet = 'date' | 'status' | 'tasks' | 'money' | 'links' | 'memories' | 'edit' | null;
+type Sheet = 'date' | 'tasks' | 'money' | 'links' | 'memories' | 'edit' | null;
 
 export function PlanDetailsPage() {
   // Сторінка плану — той самий модуль, лише глибше: та сама сцена позаду й та
@@ -136,18 +125,17 @@ export function PlanDetailsPage() {
   if (!plan) {
     return (
       <section className="plan-page plan-detail-page">
-        <Link className="plan-back" to="/plans"><ChevronLeftIcon size={16} /> Карта планів</Link>
+        <Link className="plan-back" to="/plans"><ChevronLeftIcon size={16} /> Плани</Link>
         <p className="empty-state">Такого плану немає. Можливо, його видалили.</p>
       </section>
     );
   }
 
   const cat = PLAN_CATEGORIES[plan.category];
-  const status = PLAN_STATUSES[plan.status];
   const date = planDateLabel(plan);
   const countdown = planCountdown(plan);
-  const closed = isClosed(plan);
-  const done = plan.status === 'done';
+  const stage = planStage(plan);
+  const done = stage === 'lived';
   const ready = readiness(tasks);
   const planLinks = linksOfPlan(plan, allLinks);
   const wishCount = planLinks.filter((link) => link.target_type === 'wish').length;
@@ -163,8 +151,10 @@ export function PlanDetailsPage() {
   ));
   const visible = capped(orderedTasks, VISIBLE_TASKS);
 
-  const statusStep = ACTIVE_STATUSES.indexOf(plan.status);
-  const next = nextActiveStatus(plan.status);
+  const markLived = () => setStatus.mutate(
+    { id: plan.id, status: 'done' },
+    { onSuccess: () => { setAddingMemory(false); setSheet('memories'); } },
+  );
 
   const remove = async () => {
     if (await confirmDialog(`Видалити план «${plan.title}» разом із завданнями?`)) {
@@ -180,229 +170,158 @@ export function PlanDetailsPage() {
   return (
     <section className="plan-page plan-detail-page plan-detail-page--map" style={detailStyle}>
       <Link className="plan-back plan-detail-back" to="/plans">
-        <ChevronLeftIcon size={16} /> Карта планів
+        <ChevronLeftIcon size={16} /> Плани
       </Link>
+
+      <header className="pmap-head-page">
+        <span className="pmap-category"><cat.Icon size={14} /> {cat.label}</span>
+        <h1>{plan.title}</h1>
+        {plan.description && <p>{plan.description}</p>}
+        <button
+          type="button"
+          className="pmap-edit"
+          aria-label="Змінити назву й опис"
+          onClick={() => setSheet('edit')}
+        >
+          <PencilIcon size={15} />
+        </button>
+      </header>
 
       <div className="plan-map" data-world={webglSupported ? 'true' : undefined} ref={setMapEl}>
         {mapEl && (
           <PlanMapThreads
             map={mapEl}
             pairs={PLAN_THREADS}
-            watch={`${plan.id}:${visible.shown.length}:${done}:${plan.title}`}
+            watch={`${plan.id}:${visible.shown.length}:${done}:${plan.title}:${plan.budget ?? ''}`}
           />
         )}
 
-        <article className="pmap-block pmap-hero" data-map-block="hero">
-          <button
-            type="button"
-            className="pmap-edit"
-            aria-label="Змінити назву й опис"
-            onClick={() => setSheet('edit')}
-          >
-            <PencilIcon size={15} />
+        {/* «Коли»: дата, стан і рівно одна дія — та, що веде план далі. */}
+        <article className="pmap-block" data-map-block="when">
+          <button type="button" className="pmap-tap" onClick={() => setSheet('date')} aria-label="Змінити дату">
+            <span className="pmap-head">
+              <span className="pmap-icon" aria-hidden="true"><CalendarIcon size={18} /></span>
+              <span className="pmap-title">Коли</span>
+            </span>
+            {date === null
+              ? <span className="pmap-value pmap-value--empty">Ще без дати</span>
+              : <span className="pmap-value">{date}</span>}
           </button>
-          <div className="pmap-hero-row">
-            <span className="pmap-icon" aria-hidden="true"><cat.Icon size={22} /></span>
-            <div className="pmap-hero-copy">
-              <span className="pmap-category">{cat.label}</span>
-              <h1>{plan.title}</h1>
-              {plan.description && <p>{plan.description}</p>}
-            </div>
-          </div>
+          <span className="pmap-stage" data-stage={stage}>
+            {stage === 'hidden' ? 'Скасовано' : PLAN_STAGE_LABEL[stage]}
+            {stage === 'scheduled' && countdown !== null && ` · ${countdown.label}`}
+            {stage === 'idea' && plan.status === 'postponed' && ' · відкладений'}
+          </span>
+          {stage === 'idea' && (
+            <button type="button" className="btn pmap-action" onClick={() => setSheet('date')}>
+              Дати дату
+            </button>
+          )}
+          {stage === 'scheduled' && (
+            <button
+              type="button"
+              className="btn btn-ghost pmap-action"
+              disabled={setStatus.isPending}
+              onClick={markLived}
+            >
+              <CheckIcon size={16} /> Прожили
+            </button>
+          )}
+          {stage === 'lived' && (
+            <button
+              type="button"
+              className="pmap-undo"
+              disabled={setStatus.isPending}
+              onClick={() => setStatus.mutate({ id: plan.id, status: 'planning' })}
+            >
+              Ще не прожили
+            </button>
+          )}
         </article>
 
-        <div className="pmap-row" style={{ '--pmap-split': '1.02fr 0.98fr', '--pmap-drop': '18px' } as CSSProperties}>
+        {done ? (
           <MapBlock
-            id="when"
-            title="Дата"
-            icon={<CalendarIcon size={18} />}
-            drift="-1.4s"
-            onOpen={() => setSheet('date')}
-            label="Змінити дату"
+            id="tasks"
+            title="Спогади"
+            icon={<CameraIcon size={18} />}
+            count={memoryCount > 0 ? String(memoryCount) : undefined}
+            onOpen={() => { setAddingMemory(memoryCount === 0); setSheet('memories'); }}
+            label="Відкрити спогади"
           >
-            {date === null ? (
-              <span className="pmap-ghost">Обрати дату</span>
-            ) : (
-              <>
-                <span className="pmap-value">{date}</span>
-                {countdown !== null && (
-                  <span
-                    className="pmap-pill"
-                    data-tone={
-                      closed ? 'past' : countdown.phase === 'past' ? 'overdue' : undefined
-                    }
-                  >
-                    {countdown.label}
-                  </span>
-                )}
-              </>
-            )}
-          </MapBlock>
-
-          <MapBlock
-            id="money"
-            title="Бюджет"
-            icon={<PiggyBankIcon size={18} />}
-            drift="-2.1s"
-            onOpen={() => setSheet('money')}
-            label="Відкрити бюджет"
-          >
-            {plan.budget === null ? (
-              <>
-                <span className="pmap-note">Ще не визначено</span>
-                <span className="pmap-ghost"><PlusIcon size={14} /> Додати бюджет</span>
-              </>
-            ) : (
-              /*
-               * Одне число, бо друге більше нічого не означає.
-               *
-               * Тут стояло кільце «N%» і рядок «зібрано N ₴». Обидва
-               * рахувались від `money.saved`, яке після видалення
-               * «Скарбнички» (ADR-0049) назавжди дорівнює нулю: кільце
-               * показувало 0% під будь-яким бюджетом, а підпис — «зібрано
-               * 0 ₴». Не порожньо, а неправдиво — а це гірше.
-               */
-              <div className="pmap-money">
-                <span className="pmap-money-copy">
-                  <span className="pmap-value">{fmtMoney(plan.budget)}</span>
-                  <span className="pmap-note">очікувана вартість</span>
-                </span>
-              </div>
-            )}
-          </MapBlock>
-        </div>
-
-        {/* Підготовка займає ряд ЦІЛКОМ. Це та частина карти, з якою
-            справді працюють — крок перемикається просто тут, — і вона ж
-            єдина, чий вміст обрізається стелею. Сусід, який ділив із нею
-            ряд, був другим входом у той самий аркуш. */}
-        <div className="pmap-row" style={{ '--pmap-split': '1fr', '--pmap-drop': '12px' } as CSSProperties}>
-          {done ? (
-            <MapBlock
-              id="tasks"
-              title="Спогади"
-              icon={<CameraIcon size={18} />}
-              drift="-2.8s"
-              count={memoryCount > 0 ? String(memoryCount) : undefined}
-              onOpen={() => { setAddingMemory(memoryCount === 0); setSheet('memories'); }}
-              label="Відкрити спогади"
-            >
-              {/* У виконаного плану блок підготовки більше нічого не значить:
-                  кроки вже пройдені. Його місце займає те, заради чого план і
-                  був, — фото цього моменту. */}
-              <span className="pmap-note">
-                {memoryCount > 0
-                  ? `${memoryCount} фото прикріплено`
-                  : 'Фото й підписи цього моменту'}
-              </span>
-              <span className="pmap-ghost"><PlusIcon size={14} /> Додати спогад</span>
-            </MapBlock>
-          ) : (
-            <article className="pmap-block" data-map-block="tasks" style={{ '--pmap-drift': '-2.8s' } as CSSProperties}>
-              <div className="pmap-head">
-                <span className="pmap-icon" aria-hidden="true"><CheckIcon size={18} /></span>
-                <span className="pmap-title">Підготовка</span>
-                {ready.total > 0 && (
-                  <span className="pmap-count">{ready.done} з {ready.total}</span>
-                )}
-              </div>
-
-              {visible.shown.length === 0 ? (
-                <span className="pmap-note">Додай перший крок, який наблизить цей план.</span>
-              ) : (
-                <div className="pmap-list">
-                  {visible.shown.map((task) => (
-                    // Крок перемикається просто на карті: заради «купити квіти
-                    // ✓» відкривати аркуш немає сенсу.
-                    <button
-                      key={task.id}
-                      type="button"
-                      className="pmap-line"
-                      data-done={task.done}
-                      aria-pressed={task.done}
-                      onClick={() => toggleTask.mutate({ task })}
-                    >
-                      <i className="pmap-check" aria-hidden="true" />
-                      <span>{task.title}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
-
-              {visible.hidden > 0 && <span className="pmap-more">ще {visible.hidden}</span>}
-
-              <button type="button" className="pmap-ghost" onClick={() => setSheet('tasks')}>
-                <PlusIcon size={14} /> Додати пункт
-              </button>
-            </article>
-          )}
-        </div>
-
-        <div className="pmap-row" style={{ '--pmap-split': '0.96fr 1.04fr', '--pmap-drop': '-8px' } as CSSProperties}>
-          <MapBlock
-            id="links"
-            title="Пов’язане"
-            icon={<GiftIcon size={18} />}
-            drift="-0.7s"
-            count={planLinks.length > 0 ? String(planLinks.length) : undefined}
-            onOpen={() => setSheet('links')}
-            label="Відкрити місця й пов’язане"
-          >
-            {/*
-              * НАЗВА МІСЦЯ СТОЇТЬ ПЕРШОЮ, і доти її тут не було взагалі.
-              *
-              * Вона жила в окремому блоці «Місця», який відкривав цей самий
-              * аркуш; у цьому блоці був лише РАХУНОК місць. Тобто карта
-              * тримала два блоки, і найконкретніший факт плану — куди саме
-              * ви йдете — стояв у тому, який менше нічого більше не робив.
-              */}
-            {plan.location_name && (
-              <span className="pmap-value pmap-place">{plan.location_name}</span>
-            )}
-            <div className="pmap-list">
-              <span className="pmap-line">
-                <GiftIcon size={14} /> <span>Бажання</span> <em>{wishCount || '—'}</em>
-              </span>
-              <span className="pmap-line">
-                <MapPinIcon size={14} /> <span>Місця</span> <em>{placeCount || '—'}</em>
-              </span>
-              <span className="pmap-line">
-                <CameraIcon size={14} /> <span>Спогади</span> <em>{memoryCount || '—'}</em>
-              </span>
-            </div>
-          </MapBlock>
-
-          <MapBlock
-            id="status"
-            title="Статус"
-            icon={<TargetIcon size={18} />}
-            drift="-1.9s"
-            onOpen={() => setSheet('status')}
-            label="Змінити стан плану"
-          >
-            <span className="pmap-status"><status.Icon size={15} /> {status.label}</span>
-            <span className="pmap-steps" aria-hidden="true">
-              {ACTIVE_STATUSES.map((key, index) => (
-                <span key={key} data-on={!closed && index <= statusStep} />
-              ))}
-            </span>
-            {/*
-              * РЯДОК КАЗАВ ТЕ САМЕ, ЩО КРАПКИ НАД НИМ.
-              *
-              * Було «N з M до готовності» — тобто третій спосіб сказати
-              * один стан після підпису й після крапок-кроків. Тепер він
-              * називає НАСТУПНИЙ стан: це те, чого з крапок не видно, і
-              * рівно те, по що сюди тапають.
-              */}
+            {/* У прожитого плану підготовка більше нічого не значить: кроки
+                пройдені. Його місце займає те, заради чого план і був. */}
             <span className="pmap-note">
-              {closed
-                ? STATUS_HELP[plan.status]
-                : next === null
-                  ? STATUS_HELP[plan.status]
-                  : `далі: ${PLAN_STATUSES[next].label}`}
+              {memoryCount > 0
+                ? `${memoryCount} фото прикріплено`
+                : 'Фото й підписи цього моменту'}
             </span>
+            <span className="pmap-ghost"><PlusIcon size={14} /> Додати спогад</span>
           </MapBlock>
-        </div>
+        ) : (
+          <article className="pmap-block" data-map-block="tasks">
+            <div className="pmap-head">
+              <span className="pmap-icon" aria-hidden="true"><CheckIcon size={18} /></span>
+              <span className="pmap-title">Підготовка</span>
+              {ready.total > 0 && (
+                <span className="pmap-count">{ready.done} з {ready.total}</span>
+              )}
+            </div>
+
+            {visible.shown.length === 0 ? (
+              <span className="pmap-note">Перший крок, який наблизить цей план.</span>
+            ) : (
+              <div className="pmap-list">
+                {visible.shown.map((task) => (
+                  // Крок перемикається просто на карті: заради «купити квіти
+                  // ✓» відкривати аркуш немає сенсу.
+                  <button
+                    key={task.id}
+                    type="button"
+                    className="pmap-line"
+                    data-done={task.done}
+                    aria-pressed={task.done}
+                    onClick={() => toggleTask.mutate({ task })}
+                  >
+                    <i className="pmap-check" aria-hidden="true" />
+                    <span>{task.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {visible.hidden > 0 && <span className="pmap-more">ще {visible.hidden}</span>}
+
+            <button type="button" className="pmap-ghost" onClick={() => setSheet('tasks')}>
+              <PlusIcon size={14} /> Додати крок
+            </button>
+
+            {/* Бюджет — рядок підготовки, а не окремий блок: одне число,
+                яке або є, або його ще не назвали. */}
+            <button type="button" className="pmap-budget" onClick={() => setSheet('money')}>
+              <span><PiggyBankIcon size={15} /> Бюджет</span>
+              <b>{plan.budget === null ? 'додати' : fmtMoney(plan.budget)}</b>
+            </button>
+          </article>
+        )}
+
+        <MapBlock
+          id="links"
+          title="Пов’язане"
+          icon={<GiftIcon size={18} />}
+          count={planLinks.length > 0 ? String(planLinks.length) : undefined}
+          onOpen={() => setSheet('links')}
+          label="Відкрити місця й пов’язане"
+        >
+          {/* Назва місця — найконкретніший факт плану, тому першим рядком. */}
+          {plan.location_name && (
+            <span className="pmap-value pmap-place">{plan.location_name}</span>
+          )}
+          <span className="pmap-chips">
+            <span className="pmap-chip"><GiftIcon size={14} /> Бажання <em>{wishCount || '—'}</em></span>
+            <span className="pmap-chip"><MapPinIcon size={14} /> Місця <em>{placeCount || '—'}</em></span>
+            <span className="pmap-chip"><CameraIcon size={14} /> Спогади <em>{memoryCount || '—'}</em></span>
+          </span>
+        </MapBlock>
       </div>
 
       {sheet === 'edit' && (
@@ -510,48 +429,6 @@ export function PlanDetailsPage() {
         </MapSheet>
       )}
 
-      {sheet === 'status' && (
-        <MapSheet
-          title="Стан плану"
-          copy="На карті буде видно лише поточний стан, а не всі варіанти одразу."
-          onClose={() => setSheet(null)}
-        >
-          <div className="plan-status-sheet-list">
-            {ACTIVE_STATUSES.map((key) => (
-              <StatusOption
-                key={key}
-                statusKey={key}
-                current={plan.status}
-                disabled={setStatus.isPending}
-                onChoose={() => {
-                  setStatus.mutate({ id: plan.id, status: key });
-                  setSheet(null);
-                }}
-              />
-            ))}
-          </div>
-
-          <div className="plan-status-sheet-divider"><span>Завершення</span></div>
-
-          <div className="plan-status-sheet-list plan-status-sheet-list--closed">
-            {CLOSED_STATUSES.map((key) => (
-              <StatusOption
-                key={key}
-                statusKey={key}
-                current={plan.status}
-                disabled={setStatus.isPending}
-                onChoose={() => {
-                  setStatus.mutate(
-                    { id: plan.id, status: key },
-                    { onSuccess: () => { if (key === 'done') { setAddingMemory(false); setSheet('memories'); } } },
-                  );
-                  if (key !== 'done') setSheet(null);
-                }}
-              />
-            ))}
-          </div>
-        </MapSheet>
-      )}
     </section>
   );
 }
@@ -562,11 +439,10 @@ export function PlanDetailsPage() {
  * Кнопка, а не `<article>` з `onClick`: інакше блок не сфокусувати з
  * клавіатури й читалка не знає, що він клікабельний.
  */
-function MapBlock({ id, title, icon, drift, count, onOpen, label, children }: {
+function MapBlock({ id, title, icon, count, onOpen, label, children }: {
   id: string;
   title: string;
   icon: ReactNode;
-  drift: string;
   count?: string | undefined;
   onOpen: () => void;
   label: string;
@@ -577,7 +453,6 @@ function MapBlock({ id, title, icon, drift, count, onOpen, label, children }: {
       type="button"
       className="pmap-block"
       data-map-block={id}
-      style={{ '--pmap-drift': drift } as CSSProperties}
       onClick={onOpen}
       aria-label={label}
     >
@@ -675,33 +550,6 @@ function EditSheet({ title, description, busy, onSave, onDelete, onClose }: {
         <TrashIcon size={15} /> Видалити план
       </button>
     </MapSheet>
-  );
-}
-
-function StatusOption({ statusKey, current, disabled, onChoose }: {
-  statusKey: PlanStatus;
-  current: PlanStatus;
-  disabled: boolean;
-  onChoose: () => void;
-}) {
-  const option = PLAN_STATUSES[statusKey];
-  const active = current === statusKey;
-
-  return (
-    <button
-      type="button"
-      className={`plan-status-sheet-option${active ? ' active' : ''}`}
-      disabled={disabled}
-      aria-pressed={active}
-      onClick={onChoose}
-    >
-      <span className="plan-status-sheet-icon"><option.Icon size={18} /></span>
-      <span className="plan-status-sheet-copy">
-        <b>{option.label}</b>
-        <small>{STATUS_HELP[statusKey]}</small>
-      </span>
-      {active && <CheckIcon size={17} />}
-    </button>
   );
 }
 
