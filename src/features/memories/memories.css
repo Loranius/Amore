@@ -234,7 +234,12 @@
 }
 
 .mt-caption i {
-  display: block;
+  /* Два рядки: довга адреса («вулиця Академіка Янгеля, Вінниця») на
+     живому знімку розтягувала підпис на три й штовхала нотатку вниз. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
   margin-top: 4px;
   font-style: normal;
   font-size: 12px;
