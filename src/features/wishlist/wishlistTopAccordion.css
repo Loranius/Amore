@@ -411,3 +411,102 @@
     transition: none;
   }
 }
+
+/* ── Вкладки словами (ADR-0255) ──────────────────────────────
+   Один рядок: три слова й кнопка «вигляд і виконані» праворуч. Картка
+   панелі лишається — під словами живе сцена, і без тла слова читались би
+   по кулях. Аркуш акордеона (`display: contents`) не ламає рядок: кнопка
+   стає в нього, а сам аркуш і далі абсолютний під панеллю. */
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls[data-words='true'] {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 56px;
+  padding: 4px 6px 4px 14px;
+  border-radius: var(--radius-pill);
+}
+
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls[data-words='true'] > .wl-top-filter-accordion {
+  display: contents;
+}
+
+.wishlist .wl-word-tabs {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  align-items: baseline;
+  gap: 18px;
+}
+
+.wishlist .wl-word-tab {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--world-text-muted, var(--muted));
+  font: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wishlist .wl-word-tab[aria-selected='true'] {
+  color: var(--world-text, var(--text));
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.wishlist .wl-word-tab-count {
+  color: var(--world-text-muted, var(--muted));
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.wishlist .wl-word-tab[aria-selected='true'] .wl-word-tab-count {
+  color: var(--accent);
+  font-weight: 800;
+}
+
+.wishlist .wl-word-tab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls[data-words='true'] .wl-top-filter-toggle {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-pill);
+}
+
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls[data-words='true'] .wl-top-filter-toggle::before {
+  display: none;
+}
+
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls[data-words='true'] .wl-top-filter-toggle > svg,
+[data-portal-scene='true'] .wishlist .wl-wishlist-controls[data-words='true'] .wl-top-filter-accordion[data-open='true'] .wl-top-filter-toggle > svg {
+  width: 22px;
+  height: 22px;
+  margin: 0;
+  transform: none;
+}
+
+@media (max-width: 370px) {
+  .wishlist .wl-word-tabs {
+    gap: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wishlist .wl-word-tab {
+    transition: none;
+  }
+}
