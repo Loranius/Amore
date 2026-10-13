@@ -37,6 +37,10 @@ describe('заняття в містах', () => {
     expect(gym.skills.sport).toBe(s({}).skills.sport + 1);
     const warmDay = Array.from({ length: 7 }, (_, d) => firstDayOfWeek(17) + d).find((d) => dayInfo(d).season !== 'winter')!;
     const base = s({ city: 'zhylyntsi', day: warmDay, hearts: { mom: 6, dima: 6, friend: 6 } });
-    expect(doActivity(base, 'garden').state.hearts.mom).toBe(6.5);
+    // Город — з міні-грою (власник 2026-10-13): без гри не зараховується, а
+    // що краще зіграла, то тепліше з мамою.
+    expect(() => doActivity(base, 'garden')).toThrow('Спершу — сама гра');
+    expect(doActivity(base, 'garden', { score: 0, tally: {} }).state.hearts.mom).toBe(6.5);
+    expect(doActivity(base, 'garden', { score: 1, tally: { potato: 4, cabbage: 3 } }).state.hearts.mom).toBe(7);
   });
 });

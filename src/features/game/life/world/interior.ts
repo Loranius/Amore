@@ -103,12 +103,21 @@ const HATA_TABLE_CX = 6.5;
 /** Ширина речі в кімнаті (клітинки, з масштабом меблів 1.25). */
 const HATA_SPAN = { plant: 1, lamp: 1, shelf: 1.25, tv: 1.25, desk: 1.9, sofa: 2.4 } as const;
 
-function hataInterior(state: LifeState): GameMap {
+/**
+ * Хата в Жилинцях. `guest` — Лєна вже живе деінде (гуртожиток, своя
+ * квартира) й прийшла до мами в гості (власник 2026-10-13: «доросла Лєна
+ * не може зайти до будинку мами»): її кімната — та, що була в дитинстві,
+ * без меблів, куплених уже для свого житла, а ночує, перевдягається й
+ * облаштовує вона в себе вдома.
+ */
+function hataInterior(state: LifeState, guest = false): GameMap {
   const W = 19;
   const H = 18;
   const stage = stageOfWeek(dayInfo(state.day).week).stage;
   const brothersHome = stage === 'sadok' || stage === 'school';
-  const m = new MapBuilder(`home:hata:${brothersHome ? 'b' : ''}:${Object.values(state.decor).join(',')}:${JSON.stringify(state.layout)}:${state.owned.includes('laptop') ? 'pc' : ''}`, null, state.homeName, W, H, 'x', true);
+  if (guest) state = { ...state, decor: {}, layout: {}, owned: state.owned.filter((id) => id !== 'laptop') };
+  const name = guest ? 'Мамина хата' : state.homeName;
+  const m = new MapBuilder(`home:hata${guest ? ':guest' : ''}:${brothersHome ? 'b' : ''}:${Object.values(state.decor).join(',')}:${JSON.stringify(state.layout)}:${state.owned.includes('laptop') ? 'pc' : ''}`, null, name, W, H, 'x', true);
   for (const [id, r] of Object.entries(HATA_ROOMS)) {
     m.fill(r.x + 1, r.y, r.w - 1, r.wall, 'W');
     m.fill(r.x + 1, r.y + r.wall, r.w - 1, r.h - r.wall, HATA_FLOORS[id as keyof typeof HATA_ROOMS] ?? 'f');
@@ -129,9 +138,13 @@ function hataInterior(state: LifeState): GameMap {
   // ── Кімната Лєни ─────────────────────────────────────────
   const [bx, by] = at('bed');
   m.prop('bed', bx, by, { tint: tint('bed') ?? '#e98fb0' });
-  m.zone('bed', 1, L.y + L.h - 1, 2, 1, { type: 'bed' }, 'Лягти спати');
+  if (guest) {
+    m.zone('bed', 1, L.y + L.h - 1, 2, 1, { type: 'info', text: `Твоє дитяче ліжко — мама так нічого й не переставила. Ночуєш тепер у себе — ${state.homeName}.` }, 'Дитяче ліжко');
+  } else {
+    m.zone('bed', 1, L.y + L.h - 1, 2, 1, { type: 'bed' }, 'Лягти спати');
+  }
   m.prop('wardrobe', HATA_WARDROBE.x, L.y + 2.1);
-  m.zone('wardrobe', 3, L.y + L.wall + 1, 2, 1, { type: 'wardrobe' }, 'Шафа · перевдягнутись');
+  if (!guest) m.zone('wardrobe', 3, L.y + L.wall + 1, 2, 1, { type: 'wardrobe' }, 'Шафа · перевдягнутись');
   // Задня стіна Лєниної кімнати — спільна з коридорчиком і кімнатою мами,
   // тож вікон на ній немає: годинник, сімейне фото, рушник.
   m.prop('clock', 6.4, L.y + 0.7).prop('photo', 10.2, L.y + 0.6).prop('rushnyk', 4.8, L.y + 0.8);
@@ -156,7 +169,7 @@ function hataInterior(state: LifeState): GameMap {
     laptopAt = [Math.round(x), L.y + L.h - 2];
   }
   if (state.owned.includes('laptop')) m.zone('laptop', laptopAt[0], laptopAt[1], 2, 1, { type: 'laptop' }, 'Ноутбук · робота й справи');
-  m.zone('decorate', 9, L.y + L.h - 2, 2, 1, { type: 'decorate' }, 'Облаштувати кімнату');
+  if (!guest) m.zone('decorate', 9, L.y + L.h - 2, 2, 1, { type: 'decorate' }, 'Облаштувати кімнату');
 
   // ── Брати: Діма й Саша — поки Лєна в садочку й школі ──────
   m.prop('window', 9.6, 0.4);
@@ -183,6 +196,23 @@ function hataInterior(state: LifeState): GameMap {
   // ── Кімната над верандою: кухня з піччю ──────────────────
   m.prop('stove', 13.1, 2.1).prop('table', 14.7, 3.1, { tint: '#c49a6c' }).prop('fridge', 16.6, 2.2).prop('window', 15.2, 0.4).prop('rushnyk', 13.6, 0.6);
   return m.build();
+}
+
+/**
+ * Хата на подвір'ї в Жилинцях: Лєнина, поки вона тут живе, а коли
+ * переїхала — мамина, і Лєна в ній у гостях.
+ */
+export function momHata(state: LifeState): GameMap {
+  return hataInterior(state, state.home !== 'zhylyntsi');
+}
+
+/**
+ * Назва місця на табличці HUD. Своє житло — як воно зветься тепер
+ * (`homeName`), у мами в гостях — «Мамина хата», решта (кухня, погріб,
+ * міста) — за мапою. Раніше гостина в хаті підписувалась новим житлом Лєни.
+ */
+export function placeTitle(map: GameMap, homeName: string): string {
+  return map.id.startsWith('home:') && !map.id.startsWith('home:hata:guest') ? homeName : map.name;
 }
 
 export function homeInterior(state: LifeState): GameMap {

@@ -41,7 +41,8 @@ import {
 } from './sim/life';
 import { hashString, rngFor } from './sim/rng';
 import { SAVE_KEY, SaveError, parseSave, serialize } from './sim/save';
-import { dayPlan, friendsGame, makeGame, type PlannedGame } from './games/day';
+import { dayPlan, farmPlan, friendsGame, makeGame, type PlannedGame } from './games/day';
+import { farmSummary } from './sim/farm';
 import { Kit, type MiniGame } from './games/kit';
 import { lenaLook } from './look';
 import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
@@ -49,7 +50,7 @@ import { artFor, hasHd, readArt, saveArt, type Art } from './render/art';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
 import { birdCanStand, birdFeet, colliderFor, tileFeet, zoneAt } from './world/collide';
-import { HATA_MOM_BED, homeInterior } from './world/interior';
+import { HATA_MOM_BED, homeInterior, momHata, placeTitle } from './world/interior';
 import { cityMap, homeYard } from './world/maps';
 import { MOM_DOORS, MOM_SPOTS, YARD_ID } from './world/yard';
 import { CELLAR_ID, cellarMap } from './world/cellar';
@@ -165,6 +166,8 @@ export class GameController {
   private trail: { x: number; y: number }[] = [];
   private keys = new Set<string>();
   private joy: { id: number; ox: number; oy: number; dx: number; dy: number } | null = null;
+  /** Палець, що веде гру (сад: Лєна йде за ним). */
+  private gamePointer: number | null = null;
   private busy = false;
   private minuteAcc = 0;
   private warnedLate = -1;
@@ -449,6 +452,17 @@ export class GameController {
     this.emit();
   }
 
+  /** У хату на подвір'ї: свою, поки Лєна живе в Жилинцях, а потім — до мами в гості. */
+  enterMomHata(): void {
+    this.map = momHata(this.life!);
+    this.place(this.map.spawns.door!);
+    this.folk = [];
+    this.residents = [];
+    this.setupCompanions();
+    this.ui = { ...this.ui, near: null };
+    this.emit();
+  }
+
   enterHome(spawnName: 'wake' | 'door'): void {
     this.map = homeInterior(this.life!);
     this.place(this.map.spawns[spawnName]!);
@@ -513,7 +527,11 @@ export class GameController {
     this.canvas = canvas;
     this.toTitle();
     const onKeyDown = (e: KeyboardEvent) => this.keyDown(e);
-    const onKeyUp = (e: KeyboardEvent) => this.keys.delete(e.key.toLowerCase());
+    const onKeyUp = (e: KeyboardEvent) => {
+      const k = e.key.toLowerCase();
+      this.keys.delete(k);
+      if (this.game && this.ui.activity?.phase === 'play') this.game.key?.(k, false);
+    };
     window.addEventListener('keydown', onKeyDown);
     window.addEventListener('keyup', onKeyUp);
     canvas.addEventListener('pointerdown', this.pointerDown);
@@ -549,6 +567,7 @@ export class GameController {
     unlockAudio();
     if (this.ui.dialog && (k === ' ' || k === 'enter' || k === 'e')) { this.advanceDialog(); return; }
     if (this.ui.card && (k === ' ' || k === 'enter' || k === 'e')) { this.closeCard(); return; }
+    if (this.game && this.ui.activity?.phase === 'play') { this.game.key?.(k, true); return; }
     if (k === 'escape' && this.ui.panel) { this.closePanel(); return; }
     if ((k === 'e' || k === ' ' || k === 'enter') && !this.blocked() && this.ui.near) { void this.interact(this.ui.near); return; }
     this.keys.add(k);
@@ -566,15 +585,22 @@ export class GameController {
     return { dpr, w, h };
   }
 
+  /** Дотик у віртуальних пікселях гри. */
+  private gamePoint(e: PointerEvent): { vx: number; vy: number } {
+    const { dpr } = this.deviceScale();
+    const r = this.canvas!.getBoundingClientRect();
+    return { vx: ((e.clientX - r.left) * dpr) / this.kit.s, vy: ((e.clientY - r.top) * dpr) / this.kit.s };
+  }
+
   private pointerDown = (e: PointerEvent): void => {
     unlockAudio();
     if (this.game && this.ui.activity?.phase === 'play') {
-      const { dpr } = this.deviceScale();
-      const r = this.canvas!.getBoundingClientRect();
-      const vx = ((e.clientX - r.left) * dpr) / this.kit.s;
-      const vy = ((e.clientY - r.top) * dpr) / this.kit.s;
+      const { vx, vy } = this.gamePoint(e);
       if (this.kit.hitAt(vx, vy) === '__skip') { this.skipGame(); return; }
       this.game.tap(vx, vy, this.kit);
+      // Палець веде Лєну (сад): поки торкається — гра чує, куди.
+      this.gamePointer = e.pointerId;
+      this.game.point?.(vx, vy, this.kit);
       return;
     }
     if (this.ui.dialog) { this.advanceDialog(); return; }
@@ -583,6 +609,11 @@ export class GameController {
   };
 
   private pointerMove = (e: PointerEvent): void => {
+    if (this.gamePointer === e.pointerId && this.game && this.ui.activity?.phase === 'play') {
+      const { vx, vy } = this.gamePoint(e);
+      this.game.point?.(vx, vy, this.kit);
+      return;
+    }
     if (!this.joy || e.pointerId !== this.joy.id) return;
     let dx = e.clientX - this.joy.ox;
     let dy = e.clientY - this.joy.oy;
@@ -593,6 +624,7 @@ export class GameController {
   };
 
   private pointerUp = (e: PointerEvent): void => {
+    if (this.gamePointer === e.pointerId) { this.gamePointer = null; this.game?.release?.(); }
     if (this.joy && e.pointerId === this.joy.id) this.joy = null;
   };
 
@@ -1063,15 +1095,19 @@ export class GameController {
         return;
       }
       case 'home':
+        // Хата на подвір'ї — мамина: до неї Лєна заходить завжди, навіть коли
+        // вже живе деінде (власник 2026-10-13: «доросла Лєна не може зайти
+        // до будинку мами»). Тоді — у гості (`momHata`).
+        if (this.map.id === YARD_ID) { this.enterMomHata(); return; }
         if (life.home !== this.map.city) { this.toast('Тут живуть інші люди'); return; }
         this.enterHome('door');
         return;
       case 'exit':
         // З літньої кухні — на подвір'я біля неї; з хати в Жилинцях — на
-        // своє подвір'я, а не одразу на сільську вулицю.
+        // подвір'я, а не одразу на сільську вулицю (і коли Лєна в гостях).
         if (this.map.id === KITCHEN_ID) this.enterYard('kitchen');
         else if (this.map.id === CELLAR_ID) this.enterYard('cellar');
-        else if (life.home === 'zhylyntsi') this.enterYard('house');
+        else if (this.map.id.startsWith('home:hata')) this.enterYard('house');
         else this.enterCity(life.home, 'home');
         await this.checkStory();
         return;
@@ -1101,7 +1137,18 @@ export class GameController {
         const act = ACTIVITY_BY_ID.get(a.id)!;
         await this.showCard({ title: act.title, body: act.blurb, button: 'Далі' });
         this.busy = false;
-        await this.attempt((s) => doActivity(s, a.id));
+        // Сад, город, курник і ставок — з міні-грою (власник 2026-10-13):
+        // що зібрала, те й отримала (`sim/farm.ts`).
+        const plan = farmPlan(life, a.id);
+        if (!plan) { await this.attempt((s) => doActivity(s, a.id)); return; }
+        const tallies: Readonly<Record<string, number>>[] = [];
+        const [score] = await this.runActivity([plan], act.title, tallies);
+        const tally = tallies[0] ?? {};
+        if (await this.attempt((s) => doActivity(s, a.id, { score: score ?? 0, tally }))) {
+          this.busy = true;
+          await this.showCard({ title: act.title, lines: farmSummary(a.id, tally), button: 'Готово' });
+          this.busy = false;
+        }
         return;
       }
       case 'decorate': this.openPanel({ kind: 'decorate' }); return;
@@ -1147,8 +1194,11 @@ export class GameController {
     await this.attempt(playWithFriends);
   }
 
-  /** Послідовність міні-ігор: вступ → ігри → оцінки. */
-  runActivity(plans: PlannedGame[], title: string): Promise<number[]> {
+  /**
+   * Послідовність міні-ігор: вступ → ігри → оцінки. `tallies` — куди скласти,
+   * що зібрано в кожній грі (заняття садиби рахують з цього нагороду).
+   */
+  runActivity(plans: PlannedGame[], title: string, tallies?: Readonly<Record<string, number>>[]): Promise<number[]> {
     const life = this.life!;
     return new Promise((resolve) => {
       const scores: number[] = [];
@@ -1160,9 +1210,11 @@ export class GameController {
           resolve(scores);
           return;
         }
-        this.game = makeGame(life, plans[index]!, this.player.look);
+        const game = makeGame(life, plans[index]!, this.player.look);
+        this.game = game;
         this.gameDone = (score) => {
           scores.push(score);
+          tallies?.push({ ...(game.tally ?? {}) });
           this.setUi({ activity: { plans, index, phase: 'between', title, scores: [...scores] } });
           window.setTimeout(() => playNext(index + 1), 900);
         };
@@ -1204,9 +1256,15 @@ export class GameController {
       g.fillStyle = 'rgba(30,18,24,0.45)';
       g.fillRect(0, 0, kit.W, kit.H);
       kit.panel(kit.W / 2 - 70, kit.H / 2 - 30, 140, 60, 'paper');
-      const mark = Math.max(1, Math.round(1 + game.score * 11));
-      kit.text(game.score >= 0.75 ? 'Чудово!' : game.score >= 0.45 ? 'Добре!' : 'Наступного разу вийде', kit.W / 2, kit.H / 2 - 10, { size: 11, color: '#4a2a14', shadow: null });
-      kit.text(`${mark} з 12`, kit.W / 2, kit.H / 2 + 12, { size: 14, color: '#b8703a', shadow: null });
+      if (game.summary?.length) {
+        // Заняття — не урок: замість оцінки — що зібрано.
+        kit.text(game.summary[0]!, kit.W / 2, kit.H / 2 - 10, { size: 10, color: '#4a2a14', shadow: null, maxWidth: 130 });
+        if (game.summary[1]) kit.text(game.summary[1], kit.W / 2, kit.H / 2 + 12, { size: 11, color: '#b8703a', shadow: null, maxWidth: 130 });
+      } else {
+        const mark = Math.max(1, Math.round(1 + game.score * 11));
+        kit.text(game.score >= 0.75 ? 'Чудово!' : game.score >= 0.45 ? 'Добре!' : 'Наступного разу вийде', kit.W / 2, kit.H / 2 - 10, { size: 11, color: '#4a2a14', shadow: null });
+        kit.text(`${mark} з 12`, kit.W / 2, kit.H / 2 + 12, { size: 14, color: '#b8703a', shadow: null });
+      }
     }
   }
 
@@ -1486,7 +1544,7 @@ export class GameController {
   }
 
   placeName(): string {
-    return this.map.interior && this.map.id !== KITCHEN_ID && this.map.id !== CELLAR_ID ? this.life?.homeName ?? '' : this.map.name;
+    return placeTitle(this.map, this.life?.homeName ?? '');
   }
 
   shiftJobTitle(): string | null {

@@ -9,6 +9,7 @@
 import { DAY_END_MIN, type Season } from './calendar';
 import type { CityId, SkillId } from './content';
 import { LifeRuleError, today, type LifeState, type Outcome } from './life';
+import { farmReward, isFarmGame } from './farm';
 import { rngFor } from './rng';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -38,7 +39,10 @@ export const ACTIVITIES: readonly Activity[] = [
   // Садиба Лєни (власник, 2026-10-06): літня кухня, майстерня й сад.
   { id: 'summerKitchen', city: 'zhylyntsi', title: 'Літня кухня з мамою', minutes: 60, energy: 4, mood: 7, skill: 'creativity', mom: 0.4, seasons: ['spring', 'summer', 'autumn'], blurb: 'Вареники, компот і мамині історії' },
   { id: 'workshop', city: 'zhylyntsi', title: 'Майстерня', minutes: 90, energy: 8, mood: 5, skill: 'creativity', minWeek: 6, blurb: 'Полагодити стілець і змайструвати шпаківню' },
-  { id: 'orchard', city: 'zhylyntsi', title: 'Збирати фрукти в саду', minutes: 60, energy: 8, mood: 8, earn: 80, seasons: ['summer', 'autumn'], blurb: 'Вишні, яблука, груші — частину на продаж' },
+  // Сад, город, курник і ставок — з міні-грою (власник 2026-10-13): що
+  // зібрано, те й заробила (`farm.ts`).
+  { id: 'orchard', city: 'zhylyntsi', title: 'Збирати фрукти в саду', minutes: 60, energy: 8, mood: 8, seasons: ['summer', 'autumn'], blurb: 'Яблука, сливи й груші падають — лови в кошик і продавай' },
+  { id: 'eggs', city: 'zhylyntsi', title: 'Зібрати яйця в курнику', minutes: 30, energy: 3, mood: 4, mom: 0.1, blurb: 'Кури понеслися — яйця котяться з сідал, лови в кошик!' },
   { id: 'fishing', city: 'zhylyntsi', title: 'Рибалка на ставку', minutes: 60, energy: 4, mood: 9, minWeek: 3, blurb: 'Тиша, поплавок і качки поруч' },
   { id: 'mushrooms', city: 'pravdivka', title: 'По гриби в лісосмугу', minutes: 120, energy: 14, mood: 6, earn: 120, seasons: ['summer', 'autumn'], blurb: 'Повний кошик — частину можна продати' },
   { id: 'concert', city: 'khmelnytskyi', title: 'Вуличний концерт на Проскурівській', minutes: 60, energy: 3, mood: 12, skill: 'creativity', fromHour: 17, minWeek: 4, blurb: 'Марко грає до темряви' },
@@ -69,11 +73,25 @@ export function activityCheck(state: LifeState, id: string): Check {
   return { ok: true };
 }
 
-export function doActivity(state: LifeState, id: string): Outcome {
+/** Зіграна міні-гра заняття: як гра оцінила себе й що зібрано (`games/farm.ts`). */
+export interface Played {
+  score: number;
+  tally: Readonly<Record<string, number>>;
+}
+
+/**
+ * Заняття. Для занять з міні-грою (`isFarmGame`) нагорода — від зіграного
+ * (`farmReward`): що зібрала, те й заробила; без гри таке заняття не
+ * зараховується.
+ */
+export function doActivity(state: LifeState, id: string, played?: Played): Outcome {
   const check = activityCheck(state, id);
   if (!check.ok) throw new LifeRuleError(check.reason);
   const a = ACTIVITY_BY_ID.get(id)!;
-  const earned = a.earn ? Math.round((a.earn * (0.5 + 0.5 * rngFor(state.seed, 'act', id, state.day)())) / 10) * 10 : 0;
+  if (isFarmGame(id) && !played) throw new LifeRuleError('Спершу — сама гра');
+  const reward = played && isFarmGame(id) ? farmReward(id, played.tally, played.score) : null;
+  const earned = reward ? reward.earned : a.earn ? Math.round((a.earn * (0.5 + 0.5 * rngFor(state.seed, 'act', id, state.day)())) / 10) * 10 : 0;
+  const mom = (a.mom ?? 0) + (reward?.mom ?? 0);
   const skills = a.skill ? { ...state.skills, [a.skill]: clamp(state.skills[a.skill] + 1, 0, 100) } : state.skills;
   return {
     state: {
@@ -81,11 +99,11 @@ export function doActivity(state: LifeState, id: string): Outcome {
       money: state.money - (a.price ?? 0) + earned,
       minute: state.minute + a.minutes,
       energy: clamp(state.energy - a.energy, 0, 100),
-      mood: clamp(state.mood + a.mood, 0, 100),
+      mood: clamp(state.mood + a.mood + (reward?.mood ?? 0), 0, 100),
       skills,
-      hearts: a.mom ? { ...state.hearts, mom: clamp(state.hearts.mom + a.mom, 0, 10) } : state.hearts,
+      hearts: mom ? { ...state.hearts, mom: clamp(state.hearts.mom + mom, 0, 10) } : state.hearts,
       doneToday: [...state.doneToday, `act:${id}`],
     },
-    events: [{ kind: 'toast', text: earned ? `${a.title}: +${earned} ₴` : a.title }],
+    events: [{ kind: 'toast', text: reward ? reward.note : earned ? `${a.title}: +${earned} ₴` : a.title }],
   };
 }

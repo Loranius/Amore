@@ -6,7 +6,7 @@ import { newLife } from '../sim/life';
 import { propBase, propSolid } from '../render/props';
 import { isWallTop } from '../render/tiles';
 import { birdCanStand, birdFeet, colliderFor, reachableTiles, tileFeet, zoneTiles } from './collide';
-import { HATA_DOORS, HATA_FLOORS, HATA_ROOMS, homeInterior } from './interior';
+import { HATA_DOORS, HATA_FLOORS, HATA_ROOMS, homeInterior, momHata, placeTitle } from './interior';
 import { cellarMap } from './cellar';
 import { MOM_SPOTS, YARD, YARD_BIRDS } from './yard';
 import { summerKitchenMap } from './kitchen';
@@ -82,6 +82,44 @@ describe('дім', () => {
     const full = { ...s, decor: { rug: 'rugPink', plant: 'plant', lamp: 'lamp', poster: 'poster', shelf: 'shelf', tv: 'tv', pet: 'kitten', table: 'table', bed: 'bedQueen' } };
     assertReachable(homeInterior(full));
     assertReachable(homeInterior(s));
+  });
+});
+
+describe('мамина хата (власник 2026-10-13: «доросла Лєна не може зайти до будинку мами»)', () => {
+  it('поки Лєна живе в Жилинцях, хата з подвір\'я — її власна, з усім облаштуванням', () => {
+    const s = { ...newLife(1, 'sadok'), home: 'zhylyntsi' as const };
+    expect(momHata(s)).toEqual(homeInterior(s));
+  });
+
+  it.each(['uni', 'adult'] as const)('%s: переїхала — заходить до мами в гості: її дитяча кімната, без речей з нового житла, і вихід на подвір\'я', (chapter) => {
+    const s = newLife(1, chapter);
+    expect(s.home).not.toBe('zhylyntsi');
+    const lived = { ...s, owned: [...s.owned, 'laptop'], decor: { rug: 'rugPink', tv: 'tv', sofa: 'sofa', pet: 'kitten', bed: 'bedQueen' } };
+    const hata = momHata(lived);
+    expect(hata.id.startsWith('home:hata:guest')).toBe(true);
+    expect(hata.name).toBe('Мамина хата');
+    assertReachable(hata);
+    const kinds = hata.zones.map((z) => z.action.type);
+    expect(kinds).toContain('exit');
+    // Ночує, перевдягається, працює й облаштовує — у себе вдома.
+    for (const k of ['bed', 'wardrobe', 'decorate', 'laptop']) expect(kinds, k).not.toContain(k);
+    expect(hata.zones.find((z) => z.id === 'bed')?.action).toMatchObject({ type: 'info' });
+    // Меблів із нового житла в маминій хаті нема: кімната — як у дитинстві.
+    const L = HATA_ROOMS.lena;
+    const inLena = hata.props.filter((p) => p.x >= L.x && p.x < L.x + L.w && p.y >= L.y && p.y < L.y + L.h).map((p) => p.type);
+    for (const t of ['tv', 'sofa', 'pet', 'rug']) expect(inLena, t).not.toContain(t);
+    expect(inLena).toContain('bed');
+  });
+
+  it('табличка HUD у гостях — «Мамина хата», а не нове житло Лєни; своє житло — під своєю назвою', () => {
+    const adult = newLife(1, 'adult');
+    expect(placeTitle(momHata(adult), adult.homeName)).toBe('Мамина хата');
+    expect(placeTitle(homeInterior(adult), adult.homeName)).toBe(adult.homeName);
+    const kid = { ...newLife(1, 'sadok'), home: 'zhylyntsi' as const };
+    expect(placeTitle(momHata(kid), kid.homeName)).toBe(kid.homeName);
+    expect(placeTitle(summerKitchenMap(), kid.homeName)).toBe('Літня кухня');
+    expect(placeTitle(cellarMap(), kid.homeName)).toBe('Погріб');
+    expect(placeTitle(homeYard(), kid.homeName)).toBe(homeYard().name);
   });
 });
 

@@ -70,3 +70,16 @@ export function drawBird(g: CanvasRenderingContext2D, b: Bird): void {
   if (!img) return;
   g.drawImage(img, col * BIRD_CELL, row * BIRD_CELL, BIRD_CELL, BIRD_CELL, Math.round(b.x - FOOT_X), Math.round(b.y - FOOT_Y), BIRD_CELL, BIRD_CELL);
 }
+
+/**
+ * Курка чи півень з аркуша 16×16 поза світом — у міні-грі (курник):
+ * `dir` 1 ліворуч / 2 праворуч, `col` — кадр (0 стоїть, далі хода й
+ * дзьобання), лапи в (x, y), `scale` — ціле збільшення. Поки аркуш
+ * вантажиться — нічого (мить на початку гри).
+ */
+export function drawBirdSprite(g: CanvasRenderingContext2D, kind: BirdKind, dir: 0 | 1 | 2, col: number, x: number, y: number, scale: number): void {
+  const img = sheet('pixel');
+  if (!img) return;
+  const row = BIRD_KINDS.indexOf(kind) * 4 + dir;
+  g.drawImage(img, col * BIRD_CELL, row * BIRD_CELL, BIRD_CELL, BIRD_CELL, Math.round(x - FOOT_X * scale), Math.round(y - FOOT_Y * scale), BIRD_CELL * scale, BIRD_CELL * scale);
+}

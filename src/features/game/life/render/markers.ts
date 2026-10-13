@@ -16,11 +16,11 @@ import { bitmapSize, ICONS } from './icons';
 import { densityOf, ellipse } from './pixel';
 
 export type MarkerKind =
-  | 'door' | 'shop' | 'fruit' | 'garden' | 'fish' | 'tool' | 'cook' | 'talk' | 'look' | 'bus' | 'walk' | 'bed'
+  | 'door' | 'shop' | 'fruit' | 'garden' | 'fish' | 'tool' | 'cook' | 'eggs' | 'talk' | 'look' | 'bus' | 'walk' | 'bed'
   | 'pet' | 'sale' | 'friends' | 'date' | 'wardrobe' | 'laptop' | 'decor' | 'task';
 
 /** Заняття з власним значком; решта — зірочка «тут можна чимось зайнятися». */
-const ACTIVITY: Record<string, MarkerKind> = { orchard: 'fruit', garden: 'garden', workshop: 'tool', fishing: 'fish', summerKitchen: 'cook', museum: 'look' };
+const ACTIVITY: Record<string, MarkerKind> = { orchard: 'fruit', garden: 'garden', workshop: 'tool', fishing: 'fish', summerKitchen: 'cook', eggs: 'eggs', museum: 'look' };
 
 /** Що можна зробити в цій зоні — яким значком її позначити. */
 export function markerKind(a: ZoneAction): MarkerKind {
@@ -46,7 +46,7 @@ export function markerKind(a: ZoneAction): MarkerKind {
 
 /** Піктограма кожного значка (`icons.ts`). */
 export const MARKER_ICON: Record<MarkerKind, keyof typeof ICONS> = {
-  door: 'door', shop: 'bag', fruit: 'apple', garden: 'sprout', fish: 'fish', tool: 'hammer', cook: 'cake', talk: 'bubble',
+  door: 'door', shop: 'bag', fruit: 'apple', garden: 'sprout', fish: 'fish', tool: 'hammer', cook: 'cake', eggs: 'egg', talk: 'bubble',
   look: 'eye', bus: 'bus', walk: 'map', bed: 'sleep', pet: 'heart', sale: 'key', friends: 'smile', date: 'heart',
   wardrobe: 'shirt', laptop: 'tv', decor: 'sofa', task: 'star',
 };

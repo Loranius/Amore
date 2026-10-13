@@ -12,9 +12,11 @@ import type { GameContext, MiniGame } from './kit';
 import { SUBJECT_NAME, lessonGame, subjectsFor, type Subject } from './lessons';
 import { PLAYGROUND } from './playground';
 import { shiftGame } from './work';
+import { FARM_GAME } from './farm';
+import { isFarmGame, type FarmGameId } from '../sim/farm';
 
 export interface PlannedGame {
-  kind: 'playground' | 'lesson' | 'shift';
+  kind: 'playground' | 'lesson' | 'shift' | 'farm';
   id: string;
   title: string;
   level: number;
@@ -73,8 +75,18 @@ export function makeGame(state: LifeState, plan: PlannedGame, lena: Look): MiniG
   const ctx: GameContext = { rng: rngFor(state.seed, plan.key), level: plan.level, lena };
   if (plan.kind === 'playground') return PLAYGROUND[plan.id]!(ctx);
   if (plan.kind === 'lesson') return lessonGame(plan.id as Subject, ctx);
+  if (plan.kind === 'farm') return FARM_GAME[plan.id as FarmGameId](ctx);
   return shiftGame(plan.id, ctx);
 }
+
+/** Заняття садиби з міні-грою (`sim/farm.ts`): сад, город, курник, ставок. */
+export function farmPlan(state: LifeState, id: string): PlannedGame | null {
+  if (!isFarmGame(id)) return null;
+  const info = today(state);
+  return { kind: 'farm', id, title: FARM_TITLE[id], level: 0, key: `farm:${id}:${info.day}` };
+}
+
+const FARM_TITLE: Record<FarmGameId, string> = { orchard: 'Сад: лови фрукти', garden: 'Город: урожай, кроти й бур\'яни', eggs: 'Курник: яйця в кошик', fishing: 'Рибалка на ставку' };
 
 /** Вільна гра у дворі з друзями (не обов'язок): одна гра з садочкових. */
 export function friendsGame(state: LifeState, lena: Look): { plan: PlannedGame; game: MiniGame } {

@@ -53,10 +53,11 @@ export const ICONS: Record<SignIcon | UiIcon, Bitmap> = {
   fish: { rows: ['...aaa...', '.aaaaaa.b', 'acaaaaabb', '.aaaaaa.b', '...aaa...'], palette: { a: '#7fc0ec', b: '#3a6fd8', c: '#1b2b4a' } },
   hammer: { rows: ['cccccc.', 'aaaaaa.', '..b....', '..b....', '..b....', '..b....'], palette: { a: '#8a8f96', b: '#8a5a34', c: '#c9ced8' } },
   bubble: { rows: ['.aaaaaa.', 'abbbbbba', 'abcbcbca', 'abbbbbba', '.aaaaaa.', '..aa....', '..a.....'], palette: { a: '#5a3a24', b: '#ffffff', c: '#5a3a24' } },
+  egg: { rows: ['..aaa..', '.abbba.', 'abbcbba', 'abbbbba', 'abbbbda', 'adbbdda', '.addda.', '..aaa..'], palette: { a: '#7a5a3a', b: '#fbf3e4', c: '#ffffff', d: '#e2d2b8' } },
 };
 
 export type UiIcon = 'coin' | 'bolt' | 'heart' | 'sun' | 'moon' | 'bag' | 'map' | 'album' | 'phone' | 'smile' | 'sleep' | 'arrow' | 'cross' | 'ring'
-  | 'door' | 'eye' | 'apple' | 'sprout' | 'fish' | 'hammer' | 'bubble';
+  | 'door' | 'eye' | 'apple' | 'sprout' | 'fish' | 'hammer' | 'bubble' | 'egg';
 
 export function drawBitmap(g: CanvasRenderingContext2D, name: keyof typeof ICONS, x: number, y: number): void {
   const bm = ICONS[name];

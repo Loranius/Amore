@@ -20,9 +20,22 @@ export interface MiniGame {
   render(kit: Kit): void;
   /** Дотик у віртуальних пікселях. */
   tap(x: number, y: number, kit: Kit): void;
+  /**
+   * Палець на екрані — і коли торкнувся, і коли веде (віртуальні пікселі).
+   * Для ігор, де Лєна йде за пальцем: кошик під фруктами.
+   */
+  point?(x: number, y: number, kit: Kit): void;
+  /** Палець відпустили. */
+  release?(): void;
+  /** Клавіша натиснута чи відпущена (`key` — у нижньому регістрі). */
+  key?(key: string, down: boolean): void;
   readonly done: boolean;
   /** Підсумок 0..1 (відомий, коли `done`). */
   readonly score: number;
+  /** Що зібрано й зроблено: з цього рахується нагорода заняття (`sim/farm.ts`). */
+  readonly tally?: Readonly<Record<string, number>>;
+  /** Рядки підсумку замість оцінки «N з 12» — для занять, а не уроків. */
+  readonly summary?: readonly string[];
 }
 
 export interface GameContext {

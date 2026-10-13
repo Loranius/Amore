@@ -123,6 +123,9 @@ export function yardMap(): GameMap {
   m.building({ id: 'barn2', x: 10, y: 11, w: 5, h: 3, style: 'barn', label: 'Хлів', doorX: 12, roof: '#6e6a62' });
   // Курник — двері збоку, просто у вигул.
   m.building({ id: 'coop', x: 15, y: 11, w: 4, h: 3, style: 'coop', label: 'Курник', door: false, sideDoor: true });
+  // Яйця збирають біля курника (власник 2026-10-13: міні-гра «як вовк у
+  // "Ну, погоди!"»).
+  m.zone('eggs', 16, 14, 2, 1, { type: 'activity', id: 'eggs' }, 'Курник · зібрати яйця');
   // Вигул: тин довкола, ґрунт усередині, кури.
   m.fill(19, 10, 6, 4, 'd');
   m.fill(19, 10, 6, 1, 'F').fill(24, 10, 1, 4, 'F').fill(19, 13, 5, 1, 'F');
