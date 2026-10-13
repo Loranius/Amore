@@ -13,6 +13,7 @@
 // ============================================================
 import { TILE, type GameMap, type Zone, type ZoneAction } from '../world/types';
 import { bitmapSize, ICONS } from './icons';
+import { densityOf, ellipse } from './pixel';
 
 export type MarkerKind =
   | 'door' | 'shop' | 'fruit' | 'garden' | 'fish' | 'tool' | 'cook' | 'talk' | 'look' | 'bus' | 'walk' | 'bed'
@@ -162,5 +163,86 @@ export function drawMarkers(g: CanvasRenderingContext2D, markers: readonly Marke
       }
     });
   }
+  g.globalAlpha = 1;
+}
+
+// ============================================================
+// Кільце на землі (власник 2026-10-13: «на землі виділений маркер, типу
+// світла область, прибери на підлозі ці маркери і заміни їх на менші з
+// якоюсь легкою анімацією, наприклад жовті кільця які на землі сяють»).
+// Замість світлої плями на всю зону — невелике жовте кільце там, де Лєна
+// стоїть у зоні: тонкий обідок, що тихо дихає, і хвиля, що раз на півтори
+// секунди розходиться від нього й гасне. Розмова — кільце під людиною.
+// ============================================================
+
+/** Обідок кільця (світові пікселі): ширше, ніж глибше, — земля в ракурсі «три чверті». */
+export const RING_RX = 7.5;
+export const RING_RY = 3.5;
+/** Хвиля: розходиться від 4 до 10 px за `RIPPLE_S` секунд. */
+const RIPPLE_S = 1.4;
+
+/**
+ * Де світиться кільце зони, в якій стоїть Лєна: посередині клітинки зони,
+ * найближчої до її стоп (кільце стоїть на місці, поки Лєна в клітинці, а
+ * вздовж довгої зони переходить за нею). Розмова (`talk:…`) — кільце під
+ * тим, з ким говорити; якщо його вже нема на мапі — кільця нема.
+ */
+export function ringSpot(near: Zone, lena: { x: number; y: number } | null, who: readonly { id: string; x: number; y: number }[]): { x: number; y: number } | null {
+  if (near.id.startsWith('talk:')) {
+    const id = near.id.slice(5);
+    const p = who.find((a) => a.id === id || a.id === `res:${id}`);
+    return p ? { x: p.x, y: p.y } : null;
+  }
+  const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+  const i = lena ? clamp(Math.floor(lena.x / TILE), near.x, near.x + near.w - 1) : Math.floor(near.x + near.w / 2);
+  const j = lena ? clamp(Math.floor(lena.y / TILE), near.y, near.y + near.h - 1) : Math.floor(near.y + near.h / 2);
+  return { x: i * TILE + 8, y: j * TILE + 12 };
+}
+
+/**
+ * Пікселі обідка еліпса завтовшки в один піксель малюнка: зсуви від центру
+ * в пікселях малюнка (щільність `d`). Піксель — на обідку, якщо він усередині
+ * еліпса, а хоч один його сусід — уже ні.
+ */
+export function ringPixels(rx: number, ry: number, d: number): [number, number][] {
+  const inside = (i: number, j: number) => ((i / d) / rx) ** 2 + ((j / d) / ry) ** 2 <= 1;
+  const out: [number, number][] = [];
+  const X = Math.ceil(rx * d);
+  const Y = Math.ceil(ry * d);
+  for (let j = -Y; j <= Y; j += 1) {
+    for (let i = -X; i <= X; i += 1) {
+      if (!inside(i, j)) continue;
+      if (!inside(i + 1, j) || !inside(i - 1, j) || !inside(i, j + 1) || !inside(i, j - 1)) out.push([i, j]);
+    }
+  }
+  return out;
+}
+
+/** Намалювати кільце на землі довкола точки (x, y) — центр під стопами. */
+export function drawGroundRing(g: CanvasRenderingContext2D, x: number, y: number, time: number): void {
+  const d = densityOf(g);
+  const cx = Math.round(x * d) / d;
+  const cy = Math.round(y * d) / d;
+  const breath = 0.5 + Math.sin(time * 4) * 0.5;
+  const dots = (px: readonly [number, number][], back: string, front: string, alpha: number) => {
+    g.globalAlpha = alpha;
+    for (const [i, j] of px) {
+      // Передній край ближче до глядача — світліший, як відблиск.
+      g.fillStyle = j > 0 ? front : back;
+      g.fillRect(cx + i / d, cy + j / d, 1 / d, 1 / d);
+    }
+  };
+  // Ореол довкола й тепле сяйво всередині — дихають разом з обідком.
+  g.globalAlpha = 0.1 + breath * 0.1;
+  ellipse(g, cx, cy, RING_RX + 1.5, RING_RY + 1, '#ffd84a');
+  g.globalAlpha = 0.2 + breath * 0.16;
+  ellipse(g, cx, cy, RING_RX - 1, RING_RY - 0.8, '#fff0a0');
+  // Хвиля, що розходиться й гасне.
+  const ph = (time % RIPPLE_S) / RIPPLE_S;
+  const rr = 4 + ph * 7;
+  dots(ringPixels(rr, rr * (RING_RY / RING_RX), d), '#ffe680', '#fff4b8', 0.7 * (1 - ph));
+  // Сам обідок — завтовшки у світовий піксель: у 32×32 це два кільця по пів пікселя.
+  const rim = d > 1 ? [...ringPixels(RING_RX, RING_RY, d), ...ringPixels(RING_RX - 1 / d, RING_RY - 1 / d, d)] : ringPixels(RING_RX, RING_RY, d);
+  dots(rim, '#f0ac1c', '#ffdf4a', 0.8 + breath * 0.2);
   g.globalAlpha = 1;
 }

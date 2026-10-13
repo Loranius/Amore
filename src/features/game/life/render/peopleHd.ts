@@ -12,9 +12,12 @@
 import lenaKidUrl from './assets/hd/lena-kid.png';
 import lenaTeenUrl from './assets/hd/lena-teen.png';
 import lenaAdultUrl from './assets/hd/lena-adult.png';
+import lenaKidFallUrl from './assets/hd/lena-kid-fall.png';
+import lenaTeenFallUrl from './assets/hd/lena-teen-fall.png';
+import lenaAdultFallUrl from './assets/hd/lena-adult-fall.png';
 import dimaUrl from './assets/hd/dima.png';
 import momUrl from './assets/hd/mom.png';
-import { recolorOutfit, type Garment, type OutfitColors, type Tone } from './outfitHd';
+import { recolorByPalette, recolorOutfit, type Garment, type OutfitColors, type Tone } from './outfitHd';
 import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, type Dir, type Look } from './people';
 
 interface HdSheet {
@@ -33,7 +36,17 @@ interface HdSheet {
   ready?: boolean;
   /** Перефарбовані аркуші за кольорами «верх|низ|оздоблення». */
   dressed?: Map<string, HTMLCanvasElement>;
+  /**
+   * Падіння від Басі (лише Лєна): смуга кадрів «праворуч» на тому самому
+   * полотні — `FALL_DOWN_FRAMES` падіння навзнак, далі `FALL_UP_FRAMES` підйому
+   * (PixelLab, шаблони `falling-back-death` і `getting-up`).
+   */
+  fall?: { url: string; img?: HTMLImageElement; ready?: boolean; dressed?: Map<string, HTMLCanvasElement> };
 }
+
+/** Кадри смуги падіння: спершу падає (останній — лежить), потім підводиться. */
+export const FALL_DOWN_FRAMES = 7;
+export const FALL_UP_FRAMES = 5;
 
 // Де лежить одяг на аркушах Лєни — заміряно за барвою по рядках силуету
 // в усіх кадрах (ADR-0239). Смуги — частки зросту від маківки до стоп;
@@ -65,13 +78,13 @@ export const ADULT_DRESS: readonly Garment[] = [
 
 const SHEETS: HdSheet[] = [
   // Персонаж PixelLab «Лєна мала HD (48)» (a046bd5b-…).
-  { url: lenaKidUrl, cell: 68, frames: 4, footX: 34, footY: 56, outfit: { base: LENA_KID, garments: KID_DRESS }, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
+  { url: lenaKidUrl, fall: { url: lenaKidFallUrl }, cell: 68, frames: 4, footX: 34, footY: 56, outfit: { base: LENA_KID, garments: KID_DRESS }, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
   // Персонаж PixelLab «Лєна підліток HD (2)» (10065427-…), власник 2026-10-11:
   // «дуже різниться між дитиною і дорослою, перемалюй» — кругле обличчя й
   // великі очі, як у малої й дорослої, світло-каштанове волосся, зріст між ними.
-  { url: lenaTeenUrl, cell: 80, frames: 4, footX: 40, footY: 67, outfit: { base: LENA_TEEN, garments: TEEN_CLOTHES }, match: (l) => isLenaTeen(l) },
+  { url: lenaTeenUrl, fall: { url: lenaTeenFallUrl }, cell: 80, frames: 4, footX: 40, footY: 67, outfit: { base: LENA_TEEN, garments: TEEN_CLOTHES }, match: (l) => isLenaTeen(l) },
   // Персонаж PixelLab «Лєна доросла HD» (2ddf3605-…), власник 2026-10-06: «Доросла Лєна».
-  { url: lenaAdultUrl, cell: 92, frames: 4, footX: 46, footY: 76, outfit: { base: LENA_ADULT, garments: ADULT_DRESS }, match: (l) => isLenaAdult(l) },
+  { url: lenaAdultUrl, fall: { url: lenaAdultFallUrl }, cell: 92, frames: 4, footX: 46, footY: 76, outfit: { base: LENA_ADULT, garments: ADULT_DRESS }, match: (l) => isLenaAdult(l) },
   // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).
   { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
   // Персонаж PixelLab «Діма HD» (ff0178ab-…), власник 2026-10-06: «Діму давай далі».
@@ -106,6 +119,14 @@ function sheetOf(look: Look): HdSheet | null {
     s.img.onload = () => { s.ready = true; };
     s.img.onerror = () => console.error(`Люди 32×32: не вдалося завантажити аркуш ${s.url}`);
     s.img.src = s.url;
+    // Падіння вантажиться разом з аркушем, щоб бути готовим до першого ж падіння.
+    const f = s.fall;
+    if (f) {
+      f.img = new Image();
+      f.img.onload = () => { f.ready = true; };
+      f.img.onerror = () => console.error(`Люди 32×32: не вдалося завантажити падіння ${f.url}`);
+      f.img.src = f.url;
+    }
   }
   return s;
 }
@@ -127,6 +148,84 @@ export function drawPersonHd(g: CanvasRenderingContext2D, look: Look, x: number,
   const dx = Math.round((x - s.footX / 2) * 2) / 2;
   const dy = Math.round((y - s.footY / 2) * 2) / 2;
   g.drawImage(src, col * s.cell, dir * s.cell, s.cell, s.cell, dx, dy, half, half);
+}
+
+/** Чи є для цієї людини готова смуга падіння 32×32 (лише Лєна). */
+export function hasHdFall(look: Look): boolean {
+  const s = sheetOf(look);
+  return !!s?.ready && !!s.fall?.ready;
+}
+
+/**
+ * Кадр падіння: `x, y` — де Лєна стояла (точка між стопами), `mirror` —
+ * дзеркально (обличчям ліворуч, падає праворуч). Кадри намальовані
+ * «праворуч»: Лєна дивиться праворуч і падає навзнак — ліворуч.
+ */
+export function drawFallHd(g: CanvasRenderingContext2D, look: Look, x: number, y: number, mirror: boolean, frame: number): void {
+  const s = sheetOf(look);
+  if (!s?.img || !s.ready || !s.fall?.img || !s.fall.ready) return;
+  const src = dressedFall(s, look);
+  const half = s.cell / 2;
+  const xs = Math.round(x * 2) / 2;
+  const dy = Math.round((y - s.footY / 2) * 2) / 2;
+  if (!mirror) {
+    g.drawImage(src, frame * s.cell, 0, s.cell, s.cell, xs - s.footX / 2, dy, half, half);
+    return;
+  }
+  g.save();
+  g.translate(xs, 0);
+  g.scale(-1, 1);
+  g.drawImage(src, frame * s.cell, 0, s.cell, s.cell, -s.footX / 2, dy, half, half);
+  g.restore();
+}
+
+/** Розмір клітинки аркуша цієї людини (пікселі малюнка), або 0, якщо аркуша нема. */
+export function hdCell(look: Look): number {
+  return sheetOf(look)?.cell ?? 0;
+}
+
+/** Пікселі зображення (для перефарбування падіння за кольорами основного аркуша). */
+function pixelsOf(img: HTMLImageElement): ImageData {
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth;
+  c.height = img.naturalHeight;
+  const g = c.getContext('2d');
+  if (!g) throw new Error('Люди 32×32: немає 2D-контексту для перевдягання');
+  g.drawImage(img, 0, 0);
+  return g.getImageData(0, 0, c.width, c.height);
+}
+
+/**
+ * Смуга падіння в теперішньому одязі. Лежачи смуги висоти не діють, тож
+ * одяг упізнається за кольором основного аркуша (`recolorByPalette`).
+ */
+function dressedFall(s: HdSheet, look: Look): CanvasImageSource {
+  const f = s.fall!;
+  const img = f.img!;
+  if (!s.outfit) return img;
+  const colors = outfitColors(s.outfit.base, look);
+  if (!colors.top && !colors.bottom && !colors.accent) return img;
+  const key = `${colors.top ?? ''}|${colors.bottom ?? ''}|${colors.accent ?? ''}`;
+  f.dressed ??= new Map();
+  let c = f.dressed.get(key);
+  if (!c) {
+    const frames = pixelsOf(img);
+    const base = pixelsOf(s.img!);
+    recolorByPalette(
+      { data: frames.data, width: frames.width, height: frames.height, cell: s.cell },
+      { data: base.data, width: base.width, height: base.height, cell: s.cell },
+      s.outfit.garments,
+      colors,
+    );
+    c = document.createElement('canvas');
+    c.width = frames.width;
+    c.height = frames.height;
+    const g = c.getContext('2d');
+    if (!g) throw new Error('Люди 32×32: немає 2D-контексту для перевдягання');
+    g.putImageData(frames, 0, 0);
+    f.dressed.set(key, c);
+  }
+  return c;
 }
 
 /**

@@ -6,7 +6,7 @@ import { summerKitchenMap } from '../world/kitchen';
 import { ALL_CITY_IDS, cityMap, homeYard } from '../world/maps';
 import { TILE, type GameMap, type ZoneAction } from '../world/types';
 import { bitmapSize, ICONS } from './icons';
-import { MARKER_ICON, markerAlpha, markerAnchor, markerKind, markersFor } from './markers';
+import { MARKER_ICON, RING_RX, RING_RY, markerAlpha, markerAnchor, markerKind, markersFor, ringPixels, ringSpot } from './markers';
 
 // Маркери взаємодій (ADR-0239, власник 2026-10-12: «щоб було видно, де є
 // якісь події, як-от увійти в приміщення чи збирати фрукти»).
@@ -120,5 +120,52 @@ describe('маркери взаємодій', () => {
     // Розмова, яку Лєна вже може почати (стоїть у зоні розмови), — без значка.
     const talking = markersFor({ ...map, zones: [] }, { lena, near: { id: 'talk:mom', x: 0, y: 0, w: 1, h: 1, action: { type: 'mom' }, label: '' }, target: null, people });
     expect(talking.map((m) => m.kind)).toEqual(['pet']);
+  });
+});
+
+// Кільце на землі (ADR-0239, власник 2026-10-13: «прибери на підлозі ці
+// маркери і заміни їх на менші з якоюсь легкою анімацією, наприклад жовті
+// кільця які на землі сяють»).
+describe('кільце на землі замість світлої плями', () => {
+  it('кільце — у клітинці зони, найближчій до стоп Лєни: на дверях стоїть на місці, уздовж довгої зони йде за нею', () => {
+    const door = { id: 'home', x: 7, y: 12, w: 1, h: 1, action: { type: 'home' } as const, label: '' };
+    for (const lena of [{ x: 7 * TILE + 2, y: 12 * TILE + 3 }, { x: 7 * TILE + 14, y: 12 * TILE + 15 }]) {
+      expect(ringSpot(door, lena, [])).toEqual({ x: 7 * TILE + 8, y: 12 * TILE + 12 });
+    }
+    const garden = { id: 'garden', x: 2, y: 9, w: 12, h: 1, action: { type: 'activity', id: 'garden' } as const, label: '' };
+    expect(ringSpot(garden, { x: 5 * TILE + 3, y: 9 * TILE + 10 }, [])).toEqual({ x: 5 * TILE + 8, y: 9 * TILE + 12 });
+    expect(ringSpot(garden, { x: 11 * TILE + 3, y: 9 * TILE + 10 }, [])).toEqual({ x: 11 * TILE + 8, y: 9 * TILE + 12 });
+    // Навіть якщо стопи на краю, кільце лишається в зоні.
+    expect(ringSpot(garden, { x: 40 * TILE, y: 3 * TILE }, [])).toEqual({ x: 13 * TILE + 8, y: 9 * TILE + 12 });
+  });
+
+  it('розмова — кільце під тим, з ким говорити; нема його на мапі — нема й кільця', () => {
+    const who = [{ id: 'mom', x: 120, y: 90 }, { id: 'basia', x: 60, y: 70 }, { id: 'res:olya', x: 300, y: 200 }];
+    const talk = (id: string) => ({ id, x: 0, y: 0, w: 1, h: 1, action: { type: 'talk' } as const, label: '' });
+    expect(ringSpot(talk('talk:mom'), null, who)).toEqual({ x: 120, y: 90 });
+    expect(ringSpot(talk('talk:basia'), null, who)).toEqual({ x: 60, y: 70 });
+    expect(ringSpot(talk('talk:olya'), null, who)).toEqual({ x: 300, y: 200 });
+    expect(ringSpot(talk('talk:dima'), null, who)).toBeNull();
+  });
+
+  it('обідок — замкнений еліпс завтовшки в піксель, менший за клітинку, в обох деталізаціях', () => {
+    for (const d of [1, 2]) {
+      const px = ringPixels(RING_RX, RING_RY, d);
+      const set = new Set(px.map(([i, j]) => `${i},${j}`));
+      expect(px.length).toBeGreaterThan(14 * d);
+      for (const [i, j] of px) {
+        // Не ширше за клітинку: кільце менше за колишню пляму на всю зону.
+        expect(Math.abs(i / d)).toBeLessThanOrEqual(RING_RX);
+        expect(Math.abs(j / d)).toBeLessThanOrEqual(RING_RY);
+        // Дзеркальне й замкнене: у кожного пікселя обідка є щонайменше два сусіди на обідку.
+        expect(set.has(`${-i},${j}`) && set.has(`${i},${-j}`)).toBe(true);
+        let near = 0;
+        for (let a = -1; a <= 1; a += 1) for (let b = -1; b <= 1; b += 1) if ((a || b) && set.has(`${i + a},${j + b}`)) near += 1;
+        expect(near, `${d}: ${i},${j}`).toBeGreaterThanOrEqual(2);
+      }
+      // Усередині порожньо: обідок, а не пляма.
+      expect(set.has('0,0')).toBe(false);
+    }
+    expect(2 * RING_RX).toBeLessThan(TILE);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DOG_CHASE_S, DOG_ROAM_S, DOG_TRIP_CHANCE, newDog, stepDog, type Dog, type DogWorld } from './dog';
+import { DOG_CHASE_S, DOG_ROAM_S, DOG_TRIP_CHANCE, LENA_FALL_DOWN_S, LENA_FALL_S, LENA_GET_UP_S, LENA_TRIP_S, fallPhase, newDog, stepDog, type Dog, type DogWorld } from './dog';
 
 const open: DogWorld['canStand'] = (x, y) => x > 0 && y > 0 && x < 600 && y < 500;
 
@@ -95,5 +95,33 @@ describe('догляд за Басею (власник, 2026-10-05: «погла
     const r = run(d, 0.9, w).dog;
     expect(Math.hypot(r.x - 280, r.y - 250)).toBe(0);
     expect(r.dir).toBe(2);
+  });
+});
+
+// Анімація падіння (власник 2026-10-13: «створи анімацію падіння від Басі
+// для Лєни»): падає, лежить секунду (власник: «на 1 секунду»), підводиться.
+describe('Лєна падає від Басі', () => {
+  it('падає, лежить рівно секунду, підводиться — і все це, поки не може йти', () => {
+    expect(LENA_FALL_S).toBe(1);
+    expect(LENA_TRIP_S).toBeCloseTo(LENA_FALL_DOWN_S + LENA_FALL_S + LENA_GET_UP_S, 9);
+    expect(fallPhase(0)).toEqual({ phase: 'down', k: 0 });
+    expect(fallPhase(LENA_FALL_DOWN_S - 0.01).phase).toBe('down');
+    expect(fallPhase(LENA_FALL_DOWN_S + 0.01).phase).toBe('lie');
+    expect(fallPhase(LENA_FALL_DOWN_S + LENA_FALL_S - 0.01).phase).toBe('lie');
+    expect(fallPhase(LENA_FALL_DOWN_S + LENA_FALL_S + 0.01).phase).toBe('up');
+    expect(fallPhase(LENA_TRIP_S)).toEqual({ phase: 'up', k: 1 });
+    // Частка фази росте й не виходить за 0…1.
+    let was = { phase: 'down', k: -1 };
+    for (let t = 0; t <= LENA_TRIP_S; t += 0.01) {
+      const f = fallPhase(t);
+      expect(f.k).toBeGreaterThanOrEqual(0);
+      expect(f.k).toBeLessThanOrEqual(1);
+      if (f.phase === was.phase) expect(f.k).toBeGreaterThanOrEqual(was.k);
+      was = f;
+    }
+    // Падіння й підйом — швидкі, але не миттєві: кадри встигають прочитатись.
+    expect(LENA_FALL_DOWN_S).toBeGreaterThanOrEqual(0.3);
+    expect(LENA_GET_UP_S).toBeGreaterThanOrEqual(0.3);
+    expect(LENA_TRIP_S).toBeLessThanOrEqual(2.2);
   });
 });

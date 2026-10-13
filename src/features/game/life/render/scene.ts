@@ -21,7 +21,8 @@ import { drawWater, groundCanvas } from './tiles';
 import { drawBitmap } from './icons';
 import { drawBird } from './birds';
 import { drawDog } from './dog';
-import { drawMarkers, markersFor } from './markers';
+import { drawLenaFall } from './fall';
+import { drawGroundRing, drawMarkers, markersFor, ringSpot } from './markers';
 
 export type Weather = 'clear' | 'rain' | 'snow' | 'leaves' | 'petals';
 
@@ -35,7 +36,7 @@ export interface Actor {
   look: Look;
   /** Серце чи нотка над головою. */
   emote?: 'heart' | 'note' | 'sleep' | null;
-  /** Падіння: 0…1 — частка від початку до кінця (зірочки над головою). */
+  /** Падіння від Басі: секунди від удару (`sim/dog.ts` `fallPhase`, малює `fall.ts`). */
   fall?: number | null;
   /** Лежить у ліжку під ковдрою цього кольору: видно лише голову на подушці. */
   inBed?: string | null;
@@ -88,12 +89,6 @@ export interface SceneOptions {
   talkable?: readonly string[];
 }
 
-/** Кут падіння (радіани): швидко вниз, полежати, підвестись. */
-export function fallAngle(p: number): number {
-  const k = p < 0.3 ? p / 0.3 : p < 0.75 ? 1 : 1 - (p - 0.75) / 0.25;
-  return Math.max(0, Math.min(1, k)) * (Math.PI / 2);
-}
-
 let lightCanvas: HTMLCanvasElement | null = null;
 
 function darknessLayer(w: number, h: number): CanvasRenderingContext2D {
@@ -141,13 +136,10 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     drawLeafLitter(g, bx, by, season, t.kind, cellHash(t.x, t.y));
   }
 
-  // Підсвітка зони, де стоїть Лєна.
-  if (opts.near) {
-    const z = opts.near;
-    const pulse = 0.18 + Math.sin(env.time * 4) * 0.08;
-    g.fillStyle = `rgba(255,236,160,${pulse})`;
-    g.fillRect(z.x * TILE, z.y * TILE, z.w * TILE, z.h * TILE);
-  }
+  // Кільце на землі там, де Лєна може щось зробити (`markers.ts`).
+  const who = [...actors, ...(opts.pets ?? []).map((p) => ({ id: 'basia', x: p.x, y: p.y }))];
+  const ring = opts.near ? ringSpot(opts.near, actors.find((a) => a.id === 'lena') ?? null, who) : null;
+  if (ring) drawGroundRing(g, ring.x, ring.y, env.time);
 
   // Усе, що стоїть, — за глибиною.
   type Item = { y: number; draw: () => void };
@@ -199,6 +191,11 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     items.push({
       y: a.y,
       draw: () => {
+        if (a.fall != null) {
+          // Перечепилась об Басю: падає навзнак, лежить, підводиться (`fall.ts`).
+          drawLenaFall(g, a.look, a.x, a.y, a.fallDir ?? 1, a.fall, env.time);
+          return;
+        }
         ellipse(g, a.x, a.y, a.look.kid ? 4 : 5, 2, 'rgba(28,20,40,0.28)');
         if (a.inBed) {
           // Голова на подушці, решта — під ковдрою.
@@ -210,23 +207,6 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
           if (a.emote === 'sleep') {
             const bob = Math.round(Math.sin(env.time * 3) * 1.5);
             drawBitmap(g, 'sleep', Math.round(a.x + 4), Math.round(a.y - 30 + bob));
-          }
-          return;
-        }
-        if (a.fall != null) {
-          // Перечепилась: падає вперед, обертаючись довкола ніг; над головою — зірочки.
-          const ang = fallAngle(a.fall) * (a.fallDir ?? 1);
-          g.save();
-          g.translate(Math.round(a.x), Math.round(a.y));
-          g.rotate(ang);
-          g.drawImage(img, -Math.round(img.width / 2), -img.height + 2);
-          g.restore();
-          const hh = img.height - 8;
-          const hx = a.x + Math.sin(ang) * hh;
-          const hy = a.y - Math.cos(ang) * hh - 6;
-          for (let k = 0; k < 3; k += 1) {
-            const s = env.time * 7 + (k * Math.PI * 2) / 3;
-            drawBitmap(g, 'star', Math.round(hx + Math.cos(s) * 8 - 3), Math.round(hy + Math.sin(s) * 3 - 3));
           }
           return;
         }
@@ -310,6 +290,8 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
           if (l) hole(l.x, l.y, l.r, 0.9);
         }
         for (const a of actors) if (a.id === 'lena') hole(a.x, a.y - 8, 30, 0.45);
+        // Кільце сяє й уночі.
+        if (ring) hole(ring.x, ring.y, 12, 0.7);
         d.globalCompositeOperation = 'source-over';
       }
       g.drawImage(lightCanvas!, 0, 0);
@@ -357,6 +339,10 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
 
 /** Людина у 32×32 — аркуш із PixelLab: стоїть, іде, лежить у ліжку чи падає. */
 function drawActorHd(g: Ctx, a: Actor, time: number): void {
+  if (a.fall != null) {
+    drawLenaFall(g, a.look, a.x, a.y, a.fallDir ?? 1, a.fall, time);
+    return;
+  }
   ellipse(g, a.x, a.y, a.look.kid ? 4.5 : 5.5, 1.5, 'rgba(28,20,40,0.28)');
   if (a.inBed) {
     // Голова на подушці: видно лише верх аркуша, решта — під ковдрою.
@@ -370,22 +356,6 @@ function drawActorHd(g: Ctx, a: Actor, time: number): void {
     rect(g, a.x - 9, a.y - 7, 18, 2, shade(a.inBed, 0.3));
     rect(g, a.x - 9, a.y + 8, 18, 2, shade(a.inBed, -0.3));
     if (a.emote === 'sleep') drawBitmap(g, 'sleep', Math.round(a.x + 4), Math.round(a.y - 30 + Math.sin(time * 3) * 1.5));
-    return;
-  }
-  if (a.fall != null) {
-    const ang = fallAngle(a.fall) * (a.fallDir ?? 1);
-    g.save();
-    g.translate(a.x, a.y);
-    g.rotate(ang);
-    drawPersonHd(g, a.look, 0, 0, a.fallDir === -1 ? 1 : 2, false, time);
-    g.restore();
-    const hh = (a.look.kid ? 26 : 31) - 8;
-    const hx = a.x + Math.sin(ang) * hh;
-    const hy = a.y - Math.cos(ang) * hh - 6;
-    for (let k = 0; k < 3; k += 1) {
-      const s = time * 7 + (k * Math.PI * 2) / 3;
-      drawBitmap(g, 'star', Math.round(hx + Math.cos(s) * 8 - 3), Math.round(hy + Math.sin(s) * 3 - 3));
-    }
     return;
   }
   drawPersonHd(g, a.look, a.x, a.y, a.dir, a.moving, a.t);

@@ -15,6 +15,23 @@ export const DOG_CHASE_S = 3;
 export const DOG_TRIP_CHANCE = 0.3;
 /** Скільки Лєна лежить, коли Бася збила її з ніг (власник: «на 1 секунду»). */
 export const LENA_FALL_S = 1;
+/**
+ * Анімація падіння (власник 2026-10-13: «створи анімацію падіння від Басі
+ * для Лєни»): спершу Лєна падає навзнак, потім лежить `LENA_FALL_S`, потім
+ * підводиться. Увесь цей час іти не може.
+ */
+export const LENA_FALL_DOWN_S = 0.45;
+export const LENA_GET_UP_S = 0.55;
+export const LENA_TRIP_S = LENA_FALL_DOWN_S + LENA_FALL_S + LENA_GET_UP_S;
+
+export type FallPhase = 'down' | 'lie' | 'up';
+
+/** Що робить Лєна через `t` секунд після того, як Бася її збила, і яка частка цієї фази минула (0…1). */
+export function fallPhase(t: number): { phase: FallPhase; k: number } {
+  if (t < LENA_FALL_DOWN_S) return { phase: 'down', k: Math.max(0, t) / LENA_FALL_DOWN_S };
+  if (t < LENA_FALL_DOWN_S + LENA_FALL_S) return { phase: 'lie', k: (t - LENA_FALL_DOWN_S) / LENA_FALL_S };
+  return { phase: 'up', k: Math.min(1, (t - LENA_FALL_DOWN_S - LENA_FALL_S) / LENA_GET_UP_S) };
+}
 /** Скільки Бася сидить біля Лєни, коли її гладять чи годують. */
 export const DOG_HAPPY_S = 2.5;
 /** Скільки разів на день погладжування ще піднімає настрій. */

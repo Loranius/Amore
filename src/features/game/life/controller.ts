@@ -56,7 +56,7 @@ import { CELLAR_ID, cellarMap } from './world/cellar';
 import { KITCHEN_ID, KITCHEN_MOM_SPOTS, summerKitchenMap } from './world/kitchen';
 import { momPlan, type MomPlan } from './sim/mom';
 import { newBird, stepBird, type Bird } from './sim/birds';
-import { DOG_HAPPY_S, LENA_FALL_S, feedBasia, newDog, petBasia, stepDog, type Dog } from './sim/dog';
+import { DOG_HAPPY_S, LENA_TRIP_S, feedBasia, newDog, petBasia, stepDog, type Dog } from './sim/dog';
 
 /** Стеля щільності пікселів полотна гри (власник: «оптимізуй під айфони»). */
 export const GAME_MAX_DPR = 2;
@@ -152,7 +152,7 @@ export class GameController {
   private birdStand: (x: number, y: number) => boolean = () => false;
   /** Мама Лєни: ходить подвір'ям за розкладом або відпочиває у своїй кімнаті. */
   private momA: (Actor & { target: { x: number; y: number } | null; wait: number; stuck: number; leaving: boolean; plan: MomPlan }) | null = null;
-  /** Скільки ще секунд Лєна лежить, перечепившись об Басю. */
+  /** Скільки ще секунд Лєна падає, лежить і підводиться, перечепившись об Басю (`LENA_TRIP_S`). */
   private fallLeft = 0;
   /** Падає геть від Басі, щоб не впасти на неї. */
   private fallDir: 1 | -1 = 1;
@@ -772,8 +772,10 @@ export class GameController {
     this.dog = r.dog;
     // Перечепилась — лише коли Лєна вільна (не в розмові, не в панелі).
     if (r.trip && this.fallLeft <= 0 && !this.blocked()) {
-      this.fallLeft = LENA_FALL_S;
+      this.fallLeft = LENA_TRIP_S;
       this.fallDir = this.dog.x > this.player.x ? -1 : 1;
+      // Обличчям до Басі — і навзнак геть від неї; підводиться так само.
+      this.player.dir = this.fallDir === -1 ? 2 : 1;
       sfx.oops();
     }
   }
@@ -969,7 +971,7 @@ export class GameController {
     const info = dayInfo(life?.day ?? 3);
     const actors: Actor[] = [...this.folk, ...this.residents, ...this.extras];
     if (this.momA) actors.push(this.momA);
-    if (this.ui.screen === 'world') actors.push(this.fallLeft > 0 ? { ...this.player, fall: 1 - this.fallLeft / LENA_FALL_S, fallDir: this.fallDir } : this.player);
+    if (this.ui.screen === 'world') actors.push(this.fallLeft > 0 ? { ...this.player, fall: LENA_TRIP_S - this.fallLeft, fallDir: this.fallDir } : this.player);
     if (this.dima) actors.push({ ...this.dima, emote: this.ui.celebrate ? 'heart' : null });
     renderScene(g, this.map, actors, {
       season: info.season,
