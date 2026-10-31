@@ -229,13 +229,11 @@ describe('Перевдягання на справжніх аркушах Лєн
 // - PixelLab намалював білу курку й півня без обвідки, а коричневу — з нею;
 // - v3 малює біля дзьоба крихти окремими цятками.
 // ============================================================
-import { BIRD_CELL, BIRD_HD_CELL, BIRD_KINDS, BIRD_PECK_FRAMES, BIRD_WALK_FRAMES, birdCell } from '../../src/features/game/life/render/birds.ts';
+import { BIRD_CELL, BIRD_KINDS, BIRD_PECK_FRAMES, BIRD_WALK_FRAMES, birdCell } from '../../src/features/game/life/render/birds.ts';
 import { newBird, stepBird } from '../../src/features/game/life/sim/birds.ts';
 
-const BIRD_SHEETS = [
-  { name: '32×32', file: `${DIR}/birds.png`, cell: BIRD_HD_CELL },
-  { name: '16×16', file: 'src/features/game/life/render/assets/birds.png', cell: BIRD_CELL },
-];
+// Аркуш лише один, 32×32 (власник 2026-10-31: «повністю відмовляємось від 16×16»).
+const BIRD_SHEETS = [{ name: '32×32', file: `${DIR}/birds.png`, cell: BIRD_CELL }];
 const BIRD_COLS = 1 + BIRD_WALK_FRAMES + BIRD_PECK_FRAMES;
 
 function loadFile(file) {
@@ -305,7 +303,7 @@ describe('Аркуші курей і півня', () => {
 
   it('32×32: усі три птахи з темною обвідкою, без окремих цяток', () => {
     const sheet = loadFile(BIRD_SHEETS[0].file);
-    const cell = BIRD_HD_CELL;
+    const cell = BIRD_CELL;
     for (const key of used) {
       const [row, col] = key.split(':').map(Number);
       const px = cellPixels(sheet, cell, row, col);
@@ -343,7 +341,7 @@ describe('Аркуші курей і півня', () => {
 
   it('32×32: під лапами немає білих «черевиків» із шаблону людської ходи', () => {
     const sheet = loadFile(BIRD_SHEETS[0].file);
-    const cell = BIRD_HD_CELL;
+    const cell = BIRD_CELL;
     const white = (i) => { const [, s, v] = hsv(sheet.data[i], sheet.data[i + 1], sheet.data[i + 2]); return s < 0.18 && v > 0.78; };
     const found = [];
     for (const key of used) {

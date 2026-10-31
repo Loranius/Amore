@@ -7,6 +7,7 @@ import { ALL_CITY_IDS, cityMap, homeYard } from '../world/maps';
 import { TILE, type GameMap, type ZoneAction } from '../world/types';
 import { bitmapSize, ICONS } from './icons';
 import { MARKER_ICON, RING_RX, RING_RY, markerAlpha, markerAnchor, markerKind, markersFor, ringPixels, ringSpot } from './markers';
+import { ART_DENSITY } from './pixel';
 
 // Маркери взаємодій (ADR-0239, власник 2026-10-12: «щоб було видно, де є
 // якісь події, як-от увійти в приміщення чи збирати фрукти»).
@@ -148,8 +149,9 @@ describe('кільце на землі замість світлої плями'
     expect(ringSpot(talk('talk:dima'), null, who)).toBeNull();
   });
 
-  it('обідок — замкнений еліпс завтовшки в піксель, менший за клітинку, в обох деталізаціях', () => {
-    for (const d of [1, 2]) {
+  it('обідок — замкнений еліпс завтовшки в піксель малюнка, менший за клітинку', () => {
+    {
+      const d = ART_DENSITY;
       const px = ringPixels(RING_RX, RING_RY, d);
       const set = new Set(px.map(([i, j]) => `${i},${j}`));
       expect(px.length).toBeGreaterThan(14 * d);

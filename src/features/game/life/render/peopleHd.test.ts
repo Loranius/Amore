@@ -1,6 +1,53 @@
 import { describe, expect, it } from 'vitest';
-import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA } from './people';
-import { isLenaAdult, isLenaTeen, outfitColors } from './peopleHd';
+import { lenaLook } from '../look';
+import { firstDayOfWeek } from '../sim/calendar';
+import { ITEMS } from '../sim/content';
+import { newLife } from '../sim/life';
+import { rngFor } from '../sim/rng';
+import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, townsfolkLook } from './people';
+import { hasHdSheet, isLenaAdult, isLenaTeen, outfitColors } from './peopleHd';
+import { RESIDENT_LOOKS } from './residents';
+
+// Власник 2026-10-31: «повністю відмовляємось від 16×16». Лєна (будь-якого
+// тижня, у будь-якому вбранні з шафи), мама й Діма малюються лише аркушами
+// PixelLab — і на мапі (`scene.ts`), і в міні-іграх (`Kit.person`).
+// 16-піксельні спрайти лишаються мешканцям, перехожим і Олі, доки для них
+// нема аркушів (етап 2).
+describe('Хто малюється аркушем PixelLab', () => {
+  it('Лєна будь-якого тижня в будь-якому вбранні, мама й Діма', () => {
+    const outfits = [null, ...ITEMS.filter((i) => i.outfit).map((i) => i.id)];
+    expect(outfits.length).toBeGreaterThan(3);
+    for (let week = 0; week <= 20; week += 1) {
+      for (const outfit of outfits) {
+        const look = lenaLook({ ...newLife(7, 'school'), day: firstDayOfWeek(week), outfit });
+        expect(hasHdSheet(look), `тиждень ${week}, ${outfit ?? 'своє'}`).toBe(true);
+      }
+    }
+    expect(hasHdSheet(MOM)).toBe(true);
+    expect(hasHdSheet(DIMA)).toBe(true);
+  });
+
+  it('мешканці, перехожі й Оля — ще 16-піксельні (етап 2)', () => {
+    for (const look of [OLYA, ...Object.values(RESIDENT_LOOKS)]) expect(hasHdSheet(look)).toBe(false);
+  });
+
+  // Регресія: перехожий з Лєниним волоссям, хвостом, шкірою й очима (з кості
+  // — раз на ~1600) малювався аркушем Лєни-підлітка, тобто другою Лєною.
+  // Перевіряємо й так, як перехожих беруть міні-ігри: суперник у забігу й
+  // друзі на майданчику — той самий вигляд з іншим `kid`.
+  it('жоден перехожий не малюється аркушем Лєни, мами чи Діми', () => {
+    let doubles = 0;
+    for (let seed = 1; seed <= 40; seed += 1) {
+      for (let k = 0; k < 400; k += 1) {
+        const look = townsfolkLook(rngFor(seed, 'перехожі в тесті', k));
+        if (look.hair === LENA_TEEN.hair && look.skin === LENA_TEEN.skin && look.eyes === LENA_TEEN.eyes) doubles += 1;
+        for (const l of [look, { ...look, kid: true }, { ...look, kid: false }]) expect(hasHdSheet(l), `${seed}/${k}: ${JSON.stringify(l)}`).toBe(false);
+      }
+    }
+    // Схожі волоссям, шкірою й очима трапляються — відрізняє їх зачіска.
+    expect(doubles).toBeGreaterThan(20);
+  });
+});
 
 // ADR-0239, власник 2026-10-06 «Лєна підліток»: аркуш 32×32 малює Лєну
 // 7–11 тижня в будь-якому одязі з шафи й нікого іншого.

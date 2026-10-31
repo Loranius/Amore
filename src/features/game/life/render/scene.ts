@@ -13,9 +13,8 @@ import { buildingSprite, drawBuildingShadow } from './buildings';
 import { drawLeafLitter, drawTreeShadow, treeSprite, TREE_BASE } from './nature';
 import { ambientAt, lightsOn } from './palette';
 import { sheetFor, walkFrame, type Dir, type Look } from './people';
-import { cellHash, drawSprite, ellipse, rect, setDensity, shade, worldSize, type Ctx } from './pixel';
-import type { Art } from './art';
-import { drawPersonHd, hasHdLook } from './peopleHd';
+import { ART_DENSITY, cellHash, drawSprite, ellipse, rect, setDensity, shade, worldSize, type Ctx } from './pixel';
+import { drawPersonHd, hasHdLook, hasHdSheet } from './peopleHd';
 import { drawProp, propBase, propLight } from './props';
 import { drawWater, groundCanvas } from './tiles';
 import { drawBitmap } from './icons';
@@ -60,8 +59,6 @@ export interface SceneEnv {
   minute: number;
   time: number;
   weather: Weather;
-  /** Деталізація цієї мапи (`art.ts`): 'hd' — 32×32 на клітинку; без неї — 16×16. */
-  art?: Art;
 }
 
 export interface View {
@@ -107,7 +104,7 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
   const { scale, camX, camY } = view;
   const season = env.season;
   const lit = map.interior ? true : lightsOn(env.minute);
-  const d = env.art === 'hd' ? 2 : 1;
+  const d = ART_DENSITY;
   setDensity(g, d);
   g.imageSmoothingEnabled = false;
   g.fillStyle = map.interior ? '#1b1420' : '#2a3a2a';
@@ -120,7 +117,7 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
   // Земля.
   const vw = view.w / scale;
   const vh = view.h / scale;
-  drawSprite(g, groundCanvas(map, season, d), 0, 0);
+  drawSprite(g, groundCanvas(map, season), 0, 0);
   const i0 = Math.max(0, Math.floor(camX / TILE));
   const j0 = Math.max(0, Math.floor(camY / TILE));
   const i1 = Math.min(map.w - 1, Math.ceil((camX + vw) / TILE));
@@ -147,7 +144,7 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
   const windowsLit: { x: number; y: number; w: number; h: number }[] = [];
   const smokes: { x: number; y: number }[] = [];
   for (const b of map.buildings) {
-    const s = buildingSprite(b, season, d);
+    const s = buildingSprite(b, season);
     const sz = worldSize(s.img);
     const x = b.x * TILE + s.ox;
     const y = b.y * TILE + s.oy;
@@ -166,7 +163,7 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     if (s.smoke && (season === 'winter' || season === 'autumn' || lit)) smokes.push({ x: x + s.smoke.x, y: y + s.smoke.y });
   }
   for (const t of map.trees) {
-    const img = treeSprite(t, season, d);
+    const img = treeSprite(t, season);
     const isz = worldSize(img);
     // Обвідка додає піксель малюнка з кожного боку.
     const x = t.x * TILE + 8 - TREE_BASE.x - 1 / d;
@@ -182,34 +179,20 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     items.push({ y: propBase(p), draw: () => drawProp(g, p, season, env.time) });
   }
   for (const a of actors) {
-    if (d > 1 && hasHdLook(a.look)) {
-      items.push({ y: a.y, draw: () => drawActorHd(g, a, env.time) });
+    // Лєна, мама й Діма — лише аркушами PixelLab (`peopleHd.ts`): поки аркуш
+    // вантажиться (мить на початку гри), їх ще не видно.
+    if (hasHdSheet(a.look)) {
+      if (hasHdLook(a.look)) items.push({ y: a.y, draw: () => drawActorHd(g, a, env.time) });
       continue;
     }
-    const sheet = sheetFor(a.look);
-    const img = sheet[a.dir]![walkFrame(a.moving, a.t)]!;
+    // Мешканці й перехожі, поки для них нема аркушів PixelLab, — 16-піксельні
+    // спрайти (піксель спрайта — два пікселі малюнка). Падає лише Лєна, у
+    // ліжку лежить лише мама — обидві вище.
+    const img = sheetFor(a.look)[a.dir]![walkFrame(a.moving, a.t)]!;
     items.push({
       y: a.y,
       draw: () => {
-        if (a.fall != null) {
-          // Перечепилась об Басю: падає навзнак, лежить, підводиться (`fall.ts`).
-          drawLenaFall(g, a.look, a.x, a.y, a.fallDir ?? 1, a.fall, env.time);
-          return;
-        }
         ellipse(g, a.x, a.y, a.look.kid ? 4 : 5, 2, 'rgba(28,20,40,0.28)');
-        if (a.inBed) {
-          // Голова на подушці, решта — під ковдрою.
-          const head = 14;
-          g.drawImage(img, 0, 0, img.width, head, Math.round(a.x - img.width / 2), Math.round(a.y - 20), img.width, head);
-          rect(g, Math.round(a.x - 9), Math.round(a.y - 7), 18, 17, a.inBed);
-          rect(g, Math.round(a.x - 9), Math.round(a.y - 7), 18, 2, shade(a.inBed, 0.3));
-          rect(g, Math.round(a.x - 9), Math.round(a.y + 8), 18, 2, shade(a.inBed, -0.3));
-          if (a.emote === 'sleep') {
-            const bob = Math.round(Math.sin(env.time * 3) * 1.5);
-            drawBitmap(g, 'sleep', Math.round(a.x + 4), Math.round(a.y - 30 + bob));
-          }
-          return;
-        }
         g.drawImage(img, Math.round(a.x - img.width / 2), Math.round(a.y - img.height + 2));
         if (a.emote) {
           const bob = Math.round(Math.sin(env.time * 5) * 1.5);

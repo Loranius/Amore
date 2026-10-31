@@ -19,6 +19,12 @@ export type Ctx = CanvasRenderingContext2D;
 const ctxDensity = new WeakMap<Ctx, number>();
 const canvasDensity = new WeakMap<HTMLCanvasElement, number>();
 
+/**
+ * Пікселів малюнка на світовий піксель у світі гри: лише 32×32 на клітинку
+ * (власник 2026-10-31: «повністю відмовляємось від 16×16»).
+ */
+export const ART_DENSITY = 2;
+
 /** Скільки пікселів малюнка на світовий піксель у цьому контексті. */
 export function densityOf(g: Ctx): number {
   return ctxDensity.get(g) ?? 1;

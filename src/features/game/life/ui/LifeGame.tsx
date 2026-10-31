@@ -139,11 +139,6 @@ function Hud({ c }: { c: GameController }) {
         <button type="button" className="lg-btn is-paper" onClick={() => c.openPanel({ kind: 'bag' })} aria-label="Сумка"><PixelIcon name="bag" size={3} /></button>
         <button type="button" className="lg-btn is-paper" onClick={() => c.openPanel({ kind: 'album' })} aria-label="Альбом"><PixelIcon name="album" size={3} /></button>
         <button type="button" className="lg-btn is-paper" onClick={() => c.openPanel({ kind: 'phone' })} aria-label="Телефон"><PixelIcon name="phone" size={3} /></button>
-        {c.canSwitchArt() && (
-          <button type="button" className="lg-btn is-paper lg-art" onClick={() => c.toggleArt()} aria-label={ui.art === 'hd' ? 'Повернути 16×16' : 'Спробувати деталізовані пікселі 32×32'} aria-pressed={ui.art === 'hd'}>
-            {ui.art === 'hd' ? '16px' : 'HD'}
-          </button>
-        )}
       </nav>
       {ui.saveProblem && <div className="lg-panel lg-warn">{ui.saveProblem}</div>}
     </div>

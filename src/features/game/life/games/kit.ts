@@ -9,7 +9,18 @@
 import type { Rng } from '../sim/rng';
 import { drawBitmap, ICONS } from '../render/icons';
 import { sheetFor, type Dir, type Look } from '../render/people';
-import { disc, ellipse, rect, shade, type Ctx } from '../render/pixel';
+import { drawPersonHdFrame, hasHdLook, hasHdSheet } from '../render/peopleHd';
+import { disc, ellipse, rect, setDensity, shade, type Ctx } from '../render/pixel';
+
+/**
+ * Віртуальних пікселів міні-гри на піксель малюнка PixelLab, коли
+ * світовий піксель — `scale` віртуальних (`Kit.person`): пів світового,
+ * округлене до цілої кількості пікселів пристрою (`s` на віртуальний), але
+ * не менше одного.
+ */
+export function hdArtScale(s: number, scale: number): number {
+  return Math.max(1, Math.round((s * scale) / 2)) / s;
+}
 
 export interface MiniGame {
   /** Назва — на табличці вгорі. */
@@ -87,6 +98,11 @@ export class Kit {
     this.hits = [];
     g.setTransform(this.s, 0, 0, this.s, 0, 0);
     g.imageSmoothingEnabled = false;
+    // Полотно спільне зі світом, а світ малює зі щільністю 2 (32×32). У
+    // міні-грі найменша одиниця — її власний піксель: без цього прямокутники
+    // липли б до пів пікселя поля — на телефоні півтора пікселя пристрою, і
+    // краї розпливались би.
+    setDensity(g, 1);
   }
 
   /** Дотик екранними пікселями → id кнопки. */
@@ -123,10 +139,32 @@ export class Kit {
     this.g.restore();
   }
 
-  /** Персонаж зі спрайта. */
+  /**
+   * Людина: (x, y) — точка між стопами, `scale` — віртуальних пікселів на
+   * світовий піксель, `frame` — 0 стоїть, 1…3 хода.
+   *
+   * Лєна, мама й Діма — аркушем PixelLab 32×32 (власник 2026-10-31:
+   * «повністю відмовляємось від 16×16»): піксель малюнка — пів світового,
+   * округлений до цілої кількості пікселів пристрою (`hdArtScale`); поки
+   * аркуш вантажиться (мить), їх ще немає. Решта людей — 16-піксельні
+   * спрайти, доки для них нема аркушів (етап 2).
+   */
   person(look: Look, x: number, y: number, scale = 2, dir: Dir = 0, frame = 0): void {
-    const img = sheetFor(look)[dir]![frame]!;
+    const hd = hasHdSheet(look);
+    if (hd && !hasHdLook(look)) return;
     ellipse(this.g, x, y, (look.kid ? 4 : 5) * scale, 2 * scale, 'rgba(28,20,40,0.25)');
+    if (hd) {
+      const g = this.g;
+      const a = hdArtScale(this.s, scale);
+      g.save();
+      g.translate(Math.round(x * this.s) / this.s, Math.round(y * this.s) / this.s);
+      // Аркуш малюється у світових пікселях — два пікселі малюнка.
+      g.scale(2 * a, 2 * a);
+      drawPersonHdFrame(g, look, 0, 0, dir, frame);
+      g.restore();
+      return;
+    }
+    const img = sheetFor(look)[dir]![frame]!;
     this.g.drawImage(img, Math.round(x - (img.width * scale) / 2), Math.round(y - img.height * scale + 2 * scale), img.width * scale, img.height * scale);
   }
 

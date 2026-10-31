@@ -77,6 +77,17 @@ export function sceneZoom(kit: Kit): number {
   return kit.H - TOP >= 300 && kit.W >= 200 ? 2 : 1;
 }
 
+/**
+ * Курка чи півень з аркуша 32×32 (`drawBirdSprite`) у сцені зі збільшенням
+ * `z`: піксель аркуша — пів пікселя сцени, тож птаха завбільшки така ж, як
+ * та, що була 16-піксельною, а лапи й піксель аркуша лягають на пікселі
+ * пристрою.
+ */
+function drawHen(kit: Kit, kind: BirdKind, dir: 1 | 2, col: number, x: number, y: number, z: number): void {
+  const snap = (v: number) => Math.round(v * kit.s) / kit.s;
+  drawBirdSprite(kit.g, kind, dir, col, snap(x), snap(y), Math.max(1, Math.round((kit.s * z) / 2)) / kit.s);
+}
+
 /** Намалювати `draw` збільшеним у `z` разів довкола точки (px, py) — піксель лишається пікселем. */
 function zoomed(kit: Kit, px: number, py: number, z: number, draw: () => void): void {
   if (z === 1) { draw(); return; }
@@ -719,7 +730,7 @@ export class GardenGame extends FarmGame {
       const my = H - 14;
       const mx = 34;
       kit.rect(0, my - 6, W, H - my + 6, '#86c46a');
-      if (!drawPersonFarm(kit, MOM, mx, my, 2, z)) kit.person(MOM, mx, my, 3, 2, 0);
+      drawPersonFarm(kit, MOM, mx, my, 2, z);
       drawBasketFarm(kit, mx + 40, my - 16, 20, this.basketItems, z);
       if (this.momT > 0) {
         const bw = Math.max(54, this.momSays.length * 5 + 10);
@@ -1007,7 +1018,7 @@ export class EggsGame extends FarmGame {
       line(kit, ch.x0, ch.y0 + 5 * z, ch.x1, ch.y1 + 5 * z, '#5a3218', 2 * z);
       line(kit, ch.x0, ch.y0 + 3 * z, ch.x1, ch.y1 + 3 * z, '#b07a40', 2 * z);
       const lay = this.laying[c]! > 0;
-      drawBirdSprite(kit.g, henKinds[c]!, left ? 2 : 1, lay ? 6 : 0, ch.x0 + (left ? -2 : 2) * z, ch.y0 + z - (lay ? z : 0), z);
+      drawHen(kit, henKinds[c]!, left ? 2 : 1, lay ? 6 : 0, ch.x0 + (left ? -2 : 2) * z, ch.y0 + z - (lay ? z : 0), z);
     });
     // Яйця на жолобах: котяться крок за кроком, обертаючись. Розбиті — під
     // кінцем жолоба на соломі, курчатко тікає геть від Лєни.
@@ -1056,7 +1067,7 @@ export class EggsGame extends FarmGame {
       // Хтось дзьобне, хтось постоїть — по черзі, від часу гри.
       const phase = (this.t + i * 1.7) % 4;
       const col = phase < 1 ? 1 + BIRD_WALK_FRAMES + Math.min(BIRD_PECK_FRAMES - 1, Math.floor(phase * BIRD_PECK_FRAMES)) : 0;
-      drawBirdSprite(kit.g, kind, dir, kind === 'rooster' ? 0 : col, Math.round(W * at), y + z, z);
+      drawHen(kit, kind, dir, kind === 'rooster' ? 0 : col, Math.round(W * at), y + z, z);
     });
     // Півень співає, а коли яйця котяться швидше — кричить про це.
     const crow = this.faster > 0 || (this.t > 1.5 && this.t % 7 < 1.2);
@@ -1263,9 +1274,10 @@ export class FishingGame extends FarmGame {
     const feet = H - (portrait ? 26 : 6);
     const a = artScale(kit, z);
     this.renderBucket(kit, lx + 30 * a, feet - 2, z);
-    // Лєна профілем з аркуша PixelLab, вудка — з її рук; поки аркуш вантажиться — спрайт.
+    // Лєна профілем з аркуша PixelLab, вудка — з її рук; поки смуга поз
+    // вантажиться (мить) — Лєна з аркуша ходи, обличчям до ставка.
     const hands = drawLenaFishing(kit, this.ctx.lena, lx, feet, z);
-    if (!hands) kit.person(this.ctx.lena, lx, feet, 2 * z, 2, 0);
+    if (!hands) drawPersonFarm(kit, this.ctx.lena, lx, feet, 2, z);
     const handX = hands ? hands.hx : lx + 6 * z;
     const handY = hands ? hands.hy : feet - 24 * z;
     const tipX = handX + 60 * a;

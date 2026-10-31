@@ -493,5 +493,15 @@ export function townsfolkLook(r: () => number): Look {
   if (r() < 0.16) look.scarf = pick(ACCENTS);
   if (!kid && r() < 0.15) look.glasses = true;
   if (male && r() < 0.3) look.hoodie = true;
+  // Перехожий — не двійник Лєни. Її аркуш PixelLab упізнає Лєну за
+  // волоссям, зачіскою, шкірою й очима в будь-якому одязі (`peopleHd.ts`),
+  // тож такий перехожий ходив би містом другою Лєною — а з кості випадало
+  // приблизно раз на 1600. Жодна Лєна не носить каре.
+  if (lenaDouble(look)) look.hairStyle = 'bob';
   return look;
+}
+
+/** Волосся, зачіска, шкіра й очі — як у Лєни якогось віку. */
+function lenaDouble(l: Look): boolean {
+  return [LENA_KID, LENA_TEEN, LENA_ADULT].some((b) => l.hair === b.hair && l.hairStyle === b.hairStyle && l.skin === b.skin && l.eyes === b.eyes);
 }

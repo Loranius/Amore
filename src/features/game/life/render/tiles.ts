@@ -10,7 +10,7 @@ import type { Season } from '../sim/calendar';
 import { TILE, type CropKind, type GameMap, type Ground } from '../world/types';
 import { cropTile } from './crops';
 import { PALETTES, type SeasonPalette } from './palette';
-import { canvasAt, cellHash, densityOf, mix, px, rect, shade, type Ctx } from './pixel';
+import { ART_DENSITY, canvasAt, cellHash, mix, px, rect, shade, type Ctx } from './pixel';
 import { bedHd, clayFloorHd, cobbleHd, dirtHd, earthHd, fenceHd, fenceVerticalHd, floorHd, fringeTipHd, grassHd, iceHd, lawnHd, paintedFloorHd, rutHd, wallTopHd, wallpaperHd, waterHd } from './tilesHd';
 
 const SOFT: ReadonlySet<Ground> = new Set<Ground>(['d', 'c', 'p', 's', 'b', 'a', 'm', 'z', 'v']);
@@ -23,47 +23,7 @@ const GRASSY: ReadonlySet<Ground> = new Set<Ground>(['g', 'G', 'h', 'F']);
  */
 function grassTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette, flowers: boolean, lawn = false): void {
   rect(g, x, y, TILE, TILE, P.grass);
-  if (densityOf(g) > 1) {
-    if (!lawn) grassHd(g, x, y, i, j, P, flowers);
-    return;
-  }
-  const h = cellHash(i, j);
-  // Світлі й темні плями — трава нерівна.
-  if (h % 5 === 0) rect(g, x + (h % 9), y + ((h >> 4) % 9), 6, 4, P.grassLight);
-  if (h % 7 === 1) rect(g, x + ((h >> 3) % 10), y + ((h >> 6) % 10), 5, 3, P.grassDark);
-  // Травинки: «галочки» по 2 пікселі.
-  for (let k = 0; k < 4; k += 1) {
-    const hh = cellHash(i, j, k + 1);
-    const bx = x + (hh % 14) + 1;
-    const by = y + ((hh >> 5) % 13) + 2;
-    if (P.snow) {
-      if (hh % 3 === 0) px(g, bx, by, P.grassDark);
-      continue;
-    }
-    px(g, bx, by, P.blade);
-    px(g, bx - 1, by - 1, P.blade);
-    px(g, bx + 1, by - 1, P.blade);
-    if (hh % 4 === 0) px(g, bx, by - 2, P.grassLight);
-  }
-  if (flowers && !P.snow) {
-    for (let k = 0; k < 3; k += 1) {
-      const hh = cellHash(i, j, k + 11);
-      const fx = x + 2 + (hh % 11);
-      const fy = y + 2 + ((hh >> 4) % 11);
-      const c = P.flowers[hh % P.flowers.length]!;
-      px(g, fx, fy + 1, P.blade);
-      px(g, fx, fy, c);
-      px(g, fx - 1, fy, c);
-      px(g, fx + 1, fy, c);
-      px(g, fx, fy - 1, c);
-      px(g, fx, fy, '#fff6b0');
-    }
-  }
-  if (flowers && P.snow) {
-    const hh = cellHash(i, j, 5);
-    rect(g, x + (hh % 8), y + 6, 7, 3, '#ffffff');
-    rect(g, x + (hh % 8) + 1, y + 9, 6, 1, P.grassDark);
-  }
+  if (!lawn) grassHd(g, x, y, i, j, P, flowers);
 }
 
 /** Колія: куди йде дорога завширшки дві клітинки й з якого боку друга її половина. */
@@ -107,10 +67,8 @@ function dirtTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonP
     rect(g, x + (hh % 11) + 1, y + ((hh >> 3) % 11) + 2, 3, 2, shade(base, -0.25));
     px(g, x + (hh % 11) + 1, y + ((hh >> 3) % 11) + 2, shade(base, 0.2));
   }
-  if (densityOf(g) > 1) {
-    dirtHd(g, x, y, i, j, base, P);
-    if (rut) rutHd(g, x, y, i, j, base, P, rut.axis, rut.inner);
-  }
+  dirtHd(g, x, y, i, j, base, P);
+  if (rut) rutHd(g, x, y, i, j, base, P, rut.axis, rut.inner);
 }
 
 /** Грядки городу: темний ґрунт борознами й рядки рослин за порою року. */
@@ -138,7 +96,7 @@ function bedTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPa
       if (big && hh % 3 === 0) px(g, x + c + 1, y + r + 1, '#e8576c');
     }
   }
-  if (densityOf(g) > 1) bedHd(g, x, y, i, j, soil, plant);
+  bedHd(g, x, y, i, j, soil, plant);
 }
 
 function cobbleTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
@@ -153,7 +111,7 @@ function cobbleTile(g: Ctx, x: number, y: number, i: number, j: number, P: Seaso
     rect(g, x + sx, y + sy, sw - 1, 1, shade(c, 0.15));
     rect(g, x + sx, y + sy + sh - 2, sw - 1, 1, shade(c, -0.15));
   });
-  if (densityOf(g) > 1) cobbleHd(g, x, y, i, j, stones, mortar, P.snow);
+  cobbleHd(g, x, y, i, j, stones, mortar, P.snow);
 }
 
 function paveTile(g: Ctx, x: number, y: number, i: number, j: number, P: SeasonPalette): void {
@@ -234,7 +192,7 @@ function fenceBody(g: Ctx, x: number, y: number, i: number, j: number, P: Season
     if (P.snow) rect(g, x + pxl, y + 1, 3, 2, '#ffffff');
   }
   rect(g, x, y + 14, TILE, 1, 'rgba(20,30,20,0.25)');
-  if (densityOf(g) > 1) fenceHd(g, x, y, i, j, wood, P);
+  fenceHd(g, x, y, i, j, wood, P);
 }
 
 function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f' | 't' | 'k' | 'o' | 'l'): void {
@@ -248,7 +206,7 @@ function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f'
       const seam = (cellHash(i, j, r) % 12) + 2;
       rect(g, x + seam, y + r * 4, 1, 3, shade(base, -0.2));
     }
-    if (densityOf(g) > 1) floorHd(g, x, y, i, j, base);
+    floorHd(g, x, y, i, j, base);
   } else if (kind === 'o') {
     // Веранда: дошки, пофарбовані червоно-брунатною фарбою; де ходять
     // найбільше, фарба витерлась до дерева.
@@ -260,7 +218,7 @@ function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f'
       rect(g, x + (cellHash(i, j, r + 7) % 12) + 2, y + r * 4, 1, 3, shade(base, -0.22));
     }
     if (cellHash(i, j, 41) % 5 === 0) rect(g, x + (cellHash(i, j, 42) % 10) + 2, y + (cellHash(i, j, 43) % 3) * 4 + 1, 3, 1, '#b8845a');
-    if (densityOf(g) > 1) paintedFloorHd(g, x, y, i, j, base);
+    paintedFloorHd(g, x, y, i, j, base);
   } else if (kind === 'l') {
     // Глиняна долівка: рівна, мазана, з дугами від долоні й піщинками.
     const base = '#c8a57a';
@@ -275,7 +233,7 @@ function floorTile(g: Ctx, x: number, y: number, i: number, j: number, kind: 'f'
       px(g, ax - 1, ay + 1, shade(base, 0.1));
     }
     for (let k = 0; k < 4; k += 1) px(g, x + (cellHash(i, j, k + 60) % 16), y + (cellHash(i, j, k + 64) % 16), shade(base, -0.14));
-    if (densityOf(g) > 1) clayFloorHd(g, x, y, i, j, base);
+    clayFloorHd(g, x, y, i, j, base);
   } else if (kind === 't') {
     const a = (i + j) % 2 === 0 ? '#e9e3d6' : '#b9c7d6';
     rect(g, x, y, TILE, TILE, a);
@@ -296,8 +254,7 @@ function wallTile(g: Ctx, x: number, y: number, i: number, j: number, map: GameM
   for (let k = 0; k < 16; k += 4) {
     rect(g, x + k + 1, y, 1, TILE, '#ddc9a2');
   }
-  if (densityOf(g) > 1) wallpaperHd(g, x, y, i, j);
-  else if ((i + j) % 2 === 0) { px(g, x + 3, y + 6, '#d98a8a'); px(g, x + 11, y + 12, '#8ab0d9'); }
+  wallpaperHd(g, x, y, i, j);
   if (below && below !== 'W' && below !== 'x') {
     rect(g, x, y + 12, TILE, 4, '#8a5a34');
     rect(g, x, y + 12, TILE, 1, '#b07a4a');
@@ -334,7 +291,7 @@ function voidTile(g: Ctx, x: number, y: number, i: number, j: number, map: GameM
   if (room(1, 0)) { rect(g, x + TILE - 2, y, 2, TILE, shade(base, 0.12)); rect(g, x + TILE - 1, y, 1, TILE, rim); }
   if (room(0, -1)) { rect(g, x, y, TILE, 2, shade(base, 0.12)); rect(g, x, y, TILE, 1, rim); }
   if (room(0, 1)) { rect(g, x, y + TILE - 2, TILE, 2, shade(base, 0.12)); rect(g, x, y + TILE - 1, TILE, 1, rim); }
-  if (densityOf(g) > 1) wallTopHd(g, x, y, i, j, base, vertical);
+  wallTopHd(g, x, y, i, j, base, vertical);
 }
 
 /** Погріб: утоптана земля з камінцями, темніша під стінами. */
@@ -346,7 +303,7 @@ function earthTile(g: Ctx, x: number, y: number, i: number, j: number, map: Game
     px(g, x + (h % 16), y + ((h >>> 4) % 16), k % 3 === 0 ? shade(base, 0.16) : shade(base, -0.12));
   }
   if (cellHash(i, j, 5) % 4 === 0) rect(g, x + (cellHash(i, j, 6) % 12), y + (cellHash(i, j, 7) % 12), 3, 2, '#8a7c6c');
-  if (densityOf(g) > 1) earthHd(g, x, y, i, j, base);
+  earthHd(g, x, y, i, j, base);
   // Тінь від стіни над клітинкою.
   if (map.ground[j - 1]?.[i] === 'S') rect(g, x, y, TILE, 4, 'rgba(20,12,10,0.35)');
 }
@@ -373,7 +330,6 @@ function stoneWallTile(g: Ctx, x: number, y: number, i: number, j: number, map: 
 
 /** Рваний край трави, що лягає на стежку: стежка «врізана» в траву. */
 function grassFringe(g: Ctx, map: GameMap, P: SeasonPalette): void {
-  const hd = densityOf(g) > 1;
   for (let j = 0; j < map.h; j += 1) {
     for (let i = 0; i < map.w; i += 1) {
       if (!GRASSY.has(map.ground[j]![i]!)) continue;
@@ -386,8 +342,8 @@ function grassFringe(g: Ctx, map: GameMap, P: SeasonPalette): void {
         for (let k = 0; k < TILE; k += 1) {
           const depth = 1 + (cellHash(i * 3 + di, j * 3 + dj, k) % 3);
           const len = depth;
-          // 32×32: через раз травинка ще на пів пікселя далі — край рваніший.
-          const tip = hd && cellHash(i * 5 + di, j * 5 + dj, k + 40) % 2 === 0;
+          // Через раз травинка ще на пів пікселя далі — край рваніший.
+          const tip = cellHash(i * 5 + di, j * 5 + dj, k + 40) % 2 === 0;
           const tk = k + (cellHash(i, j, k + 41) % 2) * 0.5;
           if (axis === 'h') {
             const yy = dj > 0 ? ey : ey - len;
@@ -408,18 +364,18 @@ function grassFringe(g: Ctx, map: GameMap, P: SeasonPalette): void {
 const groundCache = new Map<string, HTMLCanvasElement>();
 
 /** Нерухома земля мапи на цю пору року (кешується). */
-export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCanvasElement {
-  const key = `${map.id}|${season}|${density}`;
+export function groundCanvas(map: GameMap, season: Season): HTMLCanvasElement {
+  const key = `${map.id}|${season}`;
   const hit = groundCache.get(key);
   if (hit) return hit;
   const P = PALETTES[map.interior ? 'summer' : season];
-  const { c, g } = canvasAt(map.w * TILE, map.h * TILE, density);
+  const { c, g } = canvasAt(map.w * TILE, map.h * TILE, ART_DENSITY);
   // Яка культура на якій клітинці городу.
   const crop = new Map<number, CropKind>();
   for (const plot of map.crops ?? []) for (let j = plot.y; j < plot.y + plot.h; j += 1) for (let i = plot.x; i < plot.x + plot.w; i += 1) crop.set(j * map.w + i, plot.kind);
-  // 32×32 надворі: трава (з травою під парканом) — окремим проходом `lawnHd`,
+  // Надворі трава (з травою під парканом) — окремим проходом `lawnHd`,
   // паркан — уже поверх неї.
-  const lawn = density > 1 && !map.interior;
+  const lawn = !map.interior;
   for (let j = 0; j < map.h; j += 1) {
     for (let i = 0; i < map.w; i += 1) {
       const t = map.ground[j]![i]!;
@@ -477,7 +433,6 @@ export function groundCanvas(map: GameMap, season: Season, density = 1): HTMLCan
 export function drawWater(g: Ctx, map: GameMap, season: Season, time: number, i0: number, j0: number, i1: number, j1: number): void {
   const P = PALETTES[season];
   const frozen = season === 'winter' && map.pondFreezes;
-  const hd = densityOf(g) > 1;
   for (let j = j0; j <= j1; j += 1) {
     for (let i = i0; i <= i1; i += 1) {
       if (map.ground[j]?.[i] !== 'w') continue;
@@ -485,26 +440,13 @@ export function drawWater(g: Ctx, map: GameMap, season: Season, time: number, i0
       const y = j * TILE;
       if (frozen) {
         rect(g, x, y, TILE, TILE, '#cfe6f5');
-        if (hd) { iceHd(g, x, y, i, j); continue; }
-        if (cellHash(i, j) % 4 === 0) rect(g, x + 3, y + 5, 7, 1, '#ffffff');
-        if (cellHash(i, j) % 5 === 1) rect(g, x + 8, y + 10, 5, 1, '#a9cfe6');
+        iceHd(g, x, y, i, j);
         continue;
       }
-      const deep = ['w', undefined].includes(map.ground[j - 1]?.[i]) && map.ground[j + 1]?.[i] === 'w';
-      // 32×32: вода одного кольору з мілиною вздовж берега (смуги «глибина
+      // Вода одного кольору з мілиною вздовж берега (смуги «глибина
       // клітинками» тут читались рядами), тонкі брижі, іскри й латаття.
-      if (hd) {
-        const shore = (a: number, b: number) => b >= 0 && b < map.h && a >= 0 && a < map.w && map.ground[b]![a] !== 'w';
-        waterHd(g, x, y, i, j, P, time, { top: shore(i, j - 1), bottom: shore(i, j + 1), left: shore(i - 1, j), right: shore(i + 1, j) });
-      } else {
-        rect(g, x, y, TILE, TILE, deep ? shade(P.water, -0.08) : P.water);
-        const phase = Math.floor(time * 2.2 + cellHash(i, j) % 7) % 6;
-        const hh = cellHash(i, j, 3);
-        if (phase < 3) rect(g, x + (hh % 8) + phase, y + ((hh >> 4) % 10) + 2, 4, 1, P.waterLight);
-        if ((phase + 3) % 6 < 2) rect(g, x + ((hh >> 2) % 9), y + ((hh >> 6) % 9) + 5, 3, 1, shade(P.water, 0.15));
-        // Сонячні відблиски.
-        if ((Math.floor(time * 3) + i * 7 + j * 3) % 37 === 0) px(g, x + 6, y + 6, '#ffffff');
-      }
+      const shore = (a: number, b: number) => b >= 0 && b < map.h && a >= 0 && a < map.w && map.ground[b]![a] !== 'w';
+      waterHd(g, x, y, i, j, P, time, { top: shore(i, j - 1), bottom: shore(i, j + 1), left: shore(i - 1, j), right: shore(i + 1, j) });
       // Піна біля берега.
       const up = map.ground[j - 1]?.[i];
       if (up && up !== 'w') {

@@ -8,7 +8,7 @@
 import type { Season } from '../sim/calendar';
 import { TILE, type Prop, type PropType, type Rect } from '../world/types';
 import { PALETTES } from './palette';
-import { cellHash, densityOf, disc, ellipse, px, rect, shade, type Ctx } from './pixel';
+import { cellHash, disc, ellipse, px, rect, shade, type Ctx } from './pixel';
 import { drawCorn, drawTomatoes } from './crops';
 import { propHd } from './propsHd';
 
@@ -659,7 +659,7 @@ export function drawProp(g: Ctx, p: Prop, season: Season, t: number): void {
     default:
       drawFurniture(g, p, x, y, t, season);
   }
-  if (densityOf(g) > 1) propHd(g, p, x, y, t, season);
+  propHd(g, p, x, y, t, season);
 }
 
 // ------------------------------------------------------------

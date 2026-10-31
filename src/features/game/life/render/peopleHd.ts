@@ -170,6 +170,15 @@ export function preloadHd(look: Look): void {
   sheetOf(look);
 }
 
+/**
+ * Чи малюється ця людина аркушем PixelLab (Лєна, мама, Діма) — навіть якщо
+ * він іще вантажиться. Таких 16-піксельним спрайтом не малюють ніколи
+ * (власник 2026-10-31: «повністю відмовляємось від 16×16»).
+ */
+export function hasHdSheet(look: Look): boolean {
+  return sheetOf(look) != null;
+}
+
 /** Чи є для цієї людини готовий аркуш 32×32. */
 export function hasHdLook(look: Look): boolean {
   const s = sheetOf(look);
@@ -179,9 +188,19 @@ export function hasHdLook(look: Look): boolean {
 /** Людина з аркуша: `x, y` — точка між стопами (світові пікселі). */
 export function drawPersonHd(g: CanvasRenderingContext2D, look: Look, x: number, y: number, dir: Dir, moving: boolean, t: number): void {
   const s = sheetOf(look);
+  if (!s) return;
+  drawPersonHdFrame(g, look, x, y, dir, moving && s.frames > 0 ? 1 + (Math.floor(t * 8) % s.frames) : 0);
+}
+
+/**
+ * Кадр аркуша людини: `col` 0 — стоїть, далі кадри ходи (`HdSheet.frames`);
+ * `x, y` — точка між стопами (світові пікселі).
+ */
+export function drawPersonHdFrame(g: CanvasRenderingContext2D, look: Look, x: number, y: number, dir: Dir, col: number): void {
+  const s = sheetOf(look);
   if (!s?.img || !s.ready) return;
+  if (col < 0 || col > s.frames) throw new Error(`Люди 32×32: кадру ${col} нема (є 0…${s.frames})`);
   const src = dressedSheet(s, look);
-  const col = moving && s.frames > 0 ? 1 + (Math.floor(t * 8) % s.frames) : 0;
   const half = s.cell / 2;
   // Точка опори — на сітці пікселів малюнка (пів світового).
   const dx = Math.round((x - s.footX / 2) * 2) / 2;

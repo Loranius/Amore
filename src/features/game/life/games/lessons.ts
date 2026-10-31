@@ -674,8 +674,8 @@ class Race extends Lesson {
     const lanes = [kit.H * 0.45, kit.H * 0.58];
     for (const y of lanes) kit.rect(0, y + 4, kit.W, 2, '#f4f4f7');
     kit.rect(kit.W - 24, lanes[0]! - 30, 3, 70, '#e8576c');
-    const lenaKid = { ...this.ctx.lena, kid: this.ctx.level < 9 };
-    kit.person(lenaKid, 16 + this.me * (kit.W - 44), lanes[0]!, 2, 2, Math.floor(this.me * 60) % 4);
+    // Лєна — своїм аркушем PixelLab: він і так показує її вік.
+    kit.person(this.ctx.lena, 16 + this.me * (kit.W - 44), lanes[0]!, 2, 2, Math.floor(this.me * 60) % 4);
     kit.person(this.rivals[0]!, 16 + this.rival * (kit.W - 44), lanes[1]!, 2, 2, Math.floor(this.rival * 60) % 4);
     if (this.go > 0) kit.text(this.go > 1 ? 'На старт!' : this.go > 0.5 ? 'Увага!' : 'Руш!', kit.W / 2, kit.H * 0.3, { size: 16, color: '#f6c14e' });
     const by = kit.H - 70;
@@ -738,8 +738,7 @@ class LongJump extends Lesson {
       px = this.x * kit.W + p * this.dist * (kit.W - bar - 10) * 0.9 + 10 * p;
       py = y - Math.sin(p * Math.PI) * 40;
     }
-    const lenaKid = { ...this.ctx.lena, kid: this.ctx.level < 9 };
-    kit.person(lenaKid, px, py, 2, 2, this.state === 'run' ? Math.floor(this.t * 10) % 4 : 1);
+    kit.person(this.ctx.lena, px, py, 2, 2, this.state === 'run' ? Math.floor(this.t * 10) % 4 : 1);
     kit.text(`Спроби: ${this.jumps.map((j) => (j * 4.5).toFixed(1) + ' м').join(' · ') || '—'}`, kit.W / 2, 70, { size: 10 });
     if (this.state === 'land') kit.text(this.dist === 0 ? 'Заступ!' : `${(this.dist * 4.5).toFixed(1)} м`, kit.W / 2, y - 60, { size: 14, color: '#f6c14e' });
     kit.region('any', 0, 0, kit.W, kit.H);

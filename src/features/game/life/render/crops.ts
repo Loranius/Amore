@@ -11,7 +11,7 @@
 // ============================================================
 import type { Season } from '../sim/calendar';
 import type { CropKind } from '../world/types';
-import { cellHash, densityOf, disc, dot, ellipse, px, rect, shade, type Ctx } from './pixel';
+import { cellHash, disc, dot, ellipse, px, rect, shade, type Ctx } from './pixel';
 
 const SOIL = '#7a5236';
 
@@ -24,7 +24,6 @@ function furrows(g: Ctx, x: number, y: number, soil: string): void {
   }
 }
 
-const hd = (g: Ctx) => densityOf(g) > 1;
 const hh = (i: number, j: number, k: number) => cellHash(i, j, k + 1200);
 
 /** Низька культура на грядці — частина землі. */
@@ -66,19 +65,19 @@ function potato(g: Ctx, x: number, y: number, i: number, j: number, s: Season): 
         rect(g, x + c, y + r - 1, 3, 2, '#4f9e3c');
         px(g, x + c + 1, y + r - 1, '#73bd4c');
         if (k % 3 === 0) px(g, x + c + (k % 2 ? 0 : 2), y + r - 1, k % 2 ? '#f4f1ff' : '#b9a7f2');
-        if (hd(g)) { dot(g, x + c - 0.5, y + r + 1.5, '#5fae48'); dot(g, x + c + 2.5, y + r + 0.5, '#2f6a2a'); }
+        dot(g, x + c - 0.5, y + r + 1.5, '#5fae48'); dot(g, x + c + 2.5, y + r + 0.5, '#2f6a2a');
         continue;
       }
       // Осінь: бадилля жовте й прилягло; де-не-де вже викопано.
       if (k % 4 === 0) {
         ellipse(g, x + c + 1, y + r + 3, 2, 1.2, '#d8b884');
         px(g, x + c, y + r + 3, '#b8945e');
-        if (hd(g)) dot(g, x + c + 1.5, y + r + 2.5, '#efd6a8');
+        dot(g, x + c + 1.5, y + r + 2.5, '#efd6a8');
       } else {
         rect(g, x + c - 1, y + r + 1, 5, 3, '#a8904a');
         rect(g, x + c, y + r + 1, 3, 1, '#c9b45a');
         px(g, x + c + 3, y + r + 3, '#7a6a34');
-        if (hd(g)) dot(g, x + c + 0.5, y + r + 2.5, '#8a7a3a');
+        dot(g, x + c + 0.5, y + r + 2.5, '#8a7a3a');
       }
     }
   }
@@ -112,12 +111,10 @@ function cabbage(g: Ctx, x: number, y: number, i: number, j: number, s: Season):
     px(g, ox + 2, oy, shade(head, -0.2));
     px(g, ox - 1, oy - 2, shade(head, 0.25));
     px(g, ox, oy - 1, shade(head, -0.08));
-    if (hd(g)) {
-      dot(g, ox - 1.5, oy - 1.5, '#e2f4cc');
-      dot(g, ox + 0.5, oy + 0.5, shade(head, -0.12));
-      dot(g, ox - 3.5, oy - 0.5, shade(outer, 0.3));
-      dot(g, ox + 3.5, oy + 0.5, shade(outer, -0.2));
-    }
+    dot(g, ox - 1.5, oy - 1.5, '#e2f4cc');
+    dot(g, ox + 0.5, oy + 0.5, shade(head, -0.12));
+    dot(g, ox - 3.5, oy - 0.5, shade(outer, 0.3));
+    dot(g, ox + 3.5, oy + 0.5, shade(outer, -0.2));
   }
 }
 
@@ -131,7 +128,7 @@ function beet(g: Ctx, x: number, y: number, i: number, j: number, s: Season): vo
       px(g, x + c, y + r + 1, '#b8323a');
       px(g, x + c + 1, y + r, '#b8323a');
       if (s === 'autumn') { rect(g, x + c - 1, y + r + 3, 3, 1, '#8a2a3a'); px(g, x + c, y + r + 3, '#a8384a'); }
-      if (hd(g)) dot(g, x + c + 1.5, y + r - 0.5, '#d04a5a');
+      dot(g, x + c + 1.5, y + r - 0.5, '#d04a5a');
     }
   }
 }
@@ -143,7 +140,7 @@ function onion(g: Ctx, x: number, y: number, i: number, j: number, s: Season): v
       if (s === 'autumn') {
         rect(g, x + c, y + r + 2, 2, 1, '#c9b45a');
         px(g, x + c + 1, y + r + 3, '#e0b070');
-        if (hd(g)) dot(g, x + c + 1.5, y + r + 2.5, '#f2d08a');
+        dot(g, x + c + 1.5, y + r + 2.5, '#f2d08a');
         continue;
       }
       const k = hh(i * 5 + c, j * 2 + r, 7);
@@ -151,7 +148,7 @@ function onion(g: Ctx, x: number, y: number, i: number, j: number, s: Season): v
       const tall = (s === 'summer' ? 3 : 1) + (k % 3 === 0 ? 1 : 0) + ((k >>> 4) % 2);
       rect(g, x + c, y + r + 4 - tall, 1, tall, (c + j) % 2 ? '#7fc46a' : '#6aa88a');
       if (s === 'summer' && k % 4 === 1) px(g, x + c + 1, y + r + 4 - tall + 1, '#7fc46a');
-      if (hd(g)) dot(g, x + c + 0.5, y + r + 4 - tall, '#b6e6a0');
+      dot(g, x + c + 0.5, y + r + 4 - tall, '#b6e6a0');
     }
   }
 }
@@ -166,7 +163,7 @@ function carrot(g: Ctx, x: number, y: number, i: number, j: number, s: Season): 
       px(g, x + c + 1, y + r + 1, leaf);
       if (s !== 'spring') { px(g, x + c, y + r, leaf); px(g, x + c - 1, y + r - 1, shade(leaf, 0.2)); }
       if (s === 'autumn') px(g, x + c, y + r + 3, '#ef8d3a');
-      if (hd(g)) { dot(g, x + c + 1.5, y + r + 0.5, shade(leaf, 0.25)); dot(g, x + c - 1.5, y + r + 1.5, shade(leaf, -0.15)); }
+      dot(g, x + c + 1.5, y + r + 0.5, shade(leaf, 0.25)); dot(g, x + c - 1.5, y + r + 1.5, shade(leaf, -0.15));
     }
   }
 }
@@ -196,7 +193,7 @@ function pumpkin(g: Ctx, x: number, y: number, i: number, j: number, s: Season):
     rect(g, ox + 1.5, oy - 1.5, 1, 3, '#c86a1e');
     px(g, ox - 1, oy - 1, '#f6aa5a');
     rect(g, ox, oy - 4, 1, 2, '#6e5a2a');
-    if (hd(g)) { dot(g, ox - 1.5, oy - 1.5, '#ffd08a'); dot(g, ox + 2, oy + 1, '#b85a1a'); }
+    dot(g, ox - 1.5, oy - 1.5, '#ffd08a'); dot(g, ox + 2, oy + 1, '#b85a1a');
   }
 }
 
@@ -215,7 +212,7 @@ function cucumber(g: Ctx, x: number, y: number, i: number, j: number, s: Season)
         px(g, x + c + 3, y + r + 3, shade(fruit, 0.3));
       }
       if (s === 'summer' && k % 5 === 0) px(g, x + c, y + r, '#f6d55c');
-      if (hd(g)) dot(g, x + c + 0.5, y + r + 1.5, shade(leaf, -0.2));
+      dot(g, x + c + 0.5, y + r + 1.5, shade(leaf, -0.2));
     }
   }
 }
@@ -230,7 +227,7 @@ function strawberry(g: Ctx, x: number, y: number, i: number, j: number, s: Seaso
       if (s === 'autumn' && (c + j) % 2) px(g, x + c + 1, y + r + 1, '#c2493a');
       if (s !== 'autumn' && hh(i * 4 + c, j * 2 + r, 17) % 2 === 0) {
         px(g, x + c + 2, y + r + 3, '#e83a4a');
-        if (hd(g)) dot(g, x + c + 2, y + r + 3, '#ff8a8a');
+        dot(g, x + c + 2, y + r + 3, '#ff8a8a');
       }
       if (s === 'spring' && (c + i) % 3 === 0) px(g, x + c - 1, y + r, '#f8f4ec');
     }
@@ -280,11 +277,9 @@ export function drawCorn(g: Ctx, x: number, y: number, season: Season, seed: num
       rect(g, bx + 1, top + 12, 2, 4, dry ? '#d8c07a' : '#7ab84a');
       px(g, bx + 1, top + 11, dry ? '#e8d26a' : '#c9b44a');
     }
-    if (hd(g)) {
-      dot(g, bx + 0.5, top + 3, shade(stalk, 0.25));
-      if (k !== 1) dot(g, bx + 1.5, top + 13, dry ? '#f0dc8a' : '#9ad866');
-      dot(g, bx - 0.5, top + 6, shade(leaf, 0.25));
-    }
+    dot(g, bx + 0.5, top + 3, shade(stalk, 0.25));
+    if (k !== 1) dot(g, bx + 1.5, top + 13, dry ? '#f0dc8a' : '#9ad866');
+    dot(g, bx - 0.5, top + 6, shade(leaf, 0.25));
   }
 }
 
@@ -317,7 +312,7 @@ export function drawTomatoes(g: Ctx, x: number, y: number, season: Season, seed:
       const ripe = season === 'autumn' || (seed + k + n) % 3 !== 0;
       disc(g, bx + fx, y + fy, 1.3, ripe ? '#e0402e' : '#7ab84a');
       px(g, bx + fx, y + fy - 1, shade(leaf, 0.1));
-      if (hd(g)) dot(g, bx + fx - 0.5, y + fy - 0.5, ripe ? '#ff9a7a' : '#b6e08a');
+      dot(g, bx + fx - 0.5, y + fy - 0.5, ripe ? '#ff9a7a' : '#b6e08a');
     });
   }
 }

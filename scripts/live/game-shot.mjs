@@ -11,9 +11,10 @@ mkdirSync(OUT, { recursive: true });
 const vite = spawn('npx', ['vite', '--port', '5199', '--strictPort'], { cwd: ROOT, stdio: 'ignore', detached: true });
 for (let i = 0; i < 60; i += 1) { try { const r = await fetch('http://localhost:5199/game.html'); if (r.ok) break; } catch {} await new Promise((r) => setTimeout(r, 1000)); }
 // Аркуш усіх персонажів (сценарій `lineup:<ім'я>`): виконується в сторінці гри.
-// 16×16 і 32×32 — в одному світовому масштабі (4 пікселі екрана на світовий),
-// тож видно, хто з ким не в парі; мешканці, перехожі й Лєна з міні-ігор —
-// там само. Для «до й після», коли перемальовуються люди.
+// Аркуші PixelLab і ще 16-піксельні мешканці, перехожі й Оля (до етапу 2) —
+// в одному світовому масштабі (4 пікселі екрана на світовий), тож видно, хто
+// з ким не в парі; Лєна з міні-ігор — там само. Для «до й після», коли
+// перемальовуються люди.
 async function lineup() {
   const P = await import('/src/features/game/life/render/people.ts');
   const H = await import('/src/features/game/life/render/peopleHd.ts');
@@ -24,8 +25,7 @@ async function lineup() {
   const FL = await import('/src/features/game/life/games/farmLena.ts');
   const { rngFor } = await import('/src/features/game/life/sim/rng.ts');
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const core = [['Лєна мала', P.LENA_KID], ['Лєна-підліток', P.LENA_TEEN], ['Лєна доросла', P.LENA_ADULT], ['Мама', P.MOM], ['Діма', P.DIMA], ['Оля', P.OLYA]];
-  const hd = core.slice(0, 5);
+  const hd = [['Лєна мала', P.LENA_KID], ['Лєна-підліток', P.LENA_TEEN], ['Лєна доросла', P.LENA_ADULT], ['Мама', P.MOM], ['Діма', P.DIMA]];
   const lenas = [P.LENA_KID, P.LENA_TEEN, P.LENA_ADULT];
   for (let k = 0; k < 80 && !(hd.every(([, l]) => H.hasHdLook(l)) && lenas.every((l) => H.hasHdPoses(l))); k += 1) await sleep(100);
   const S = 4;
@@ -83,15 +83,7 @@ async function lineup() {
     frames.forEach((f, i) => at(x0 + CELL / 2 + i * CELL, y + ROW - 8, f.d, f.draw));
   };
   const DIRS = [0, 1, 2, 3];
-  title('16×16 — головні (вниз, ліворуч, праворуч, угору, далі хода вниз)');
-  for (let i = 0; i < core.length; i += 2) {
-    for (let j = 0; j < 2 && i + j < core.length; j += 1) {
-      const [name, look] = core[i + j];
-      strip(name, 16 + j * 740, [...DIRS.map((d) => ({ d: 1, draw: px16(look, d, 0) })), ...[1, 2, 3].map((f) => ({ d: 1, draw: px16(look, 0, f) }))]);
-    }
-    y += ROW + 10;
-  }
-  title('32×32 — PixelLab (той самий масштаб)');
+  title('PixelLab 32×32 (вниз, ліворуч, праворуч, угору, далі хода вниз)');
   for (let i = 0; i < hd.length; i += 2) {
     for (let j = 0; j < 2 && i + j < hd.length; j += 1) {
       const [name, look] = hd[i + j];
@@ -99,10 +91,10 @@ async function lineup() {
     }
     y += ROW + 10;
   }
-  strip('Бася: 16×16 · 32×32', 16, [...DIRS.map((d) => ({ d: 1, draw: () => D.drawDog(g, 0, 0, d, false, 0) })), ...DIRS.map((d) => ({ d: 2, draw: () => D.drawDog(g, 0, 0, d, false, 0) }))]);
+  strip('Бася', 16, DIRS.map((d) => ({ d: 2, draw: () => D.drawDog(g, 0, 0, d, false, 0) })));
   y += ROW + 10;
-  title('Мешканці (16×16, вниз і праворуч)');
-  const res = Object.entries(R.RESIDENT_LOOKS);
+  title('Ще 16×16 до етапу 2: Оля й мешканці (вниз і праворуч)');
+  const res = [['olya', P.OLYA], ...Object.entries(R.RESIDENT_LOOKS)];
   for (let i = 0; i < res.length; i += 5) {
     res.slice(i, i + 5).forEach(([id, look], j) => strip(id, 16 + j * 296, [{ d: 1, draw: px16(look, 0, 0) }, { d: 1, draw: px16(look, 2, 0) }, { d: 1, draw: px16(look, 0, 1) }]));
     y += ROW + 10;
@@ -152,23 +144,23 @@ await shot('title');
 const scenarios = (process.argv[3] ?? 'village').split('||');
 const setup = async (fn, arg) => page.evaluate(([src, a]) => { const c = window.__lifeGame; return new Function('c', 'a', src)(c, a); }, [fn, arg]);
 for (const sc of scenarios) {
-  // png:<ім'я>:<пора року>[:hd|pixel] — уся поточна мапа одним PNG без
-  // людей: піксель малюнка — один піксель файлу. Екран вміщає лише ~20
+  // png:<ім'я>:<пора року> — уся поточна мапа одним PNG без людей: піксель
+  // малюнка (32×32 на клітинку) — один піксель файлу. Екран вміщає лише ~20
   // клітинок, а текстури треба порівнювати по всьому подвір'ю разом.
   if (sc.startsWith('png:')) {
-    const [, name, season = 'summer', art = 'hd'] = sc.split(':');
-    const url = await page.evaluate(async ([season, art]) => {
+    const [, name, season = 'summer'] = sc.split(':');
+    const url = await page.evaluate(async ([season]) => {
       const S = await import('/src/features/game/life/render/scene.ts');
       const c = window.__lifeGame;
-      const d = art === 'hd' ? 2 : 1;
+      const d = 2;
       const W = c.map.w * 16 * d;
       const H = c.map.h * 16 * d;
       const cv = document.createElement('canvas');
       cv.width = W;
       cv.height = H;
-      S.renderScene(cv.getContext('2d'), c.map, [], { season, minute: 660, time: 0, weather: 'clear', art }, { w: W, h: H, scale: d, camX: 0, camY: 0, dpr: 1 }, { target: null, near: null, pets: [] });
+      S.renderScene(cv.getContext('2d'), c.map, [], { season, minute: 660, time: 0, weather: 'clear' }, { w: W, h: H, scale: d, camX: 0, camY: 0, dpr: 1 }, { target: null, near: null, pets: [] });
       return cv.toDataURL('image/png');
-    }, [season, art]);
+    }, [season]);
     writeFileSync(`${OUT}/${dev}-map-${name}.png`, Buffer.from(url.split(',')[1], 'base64'));
     console.log('map', name);
     continue;

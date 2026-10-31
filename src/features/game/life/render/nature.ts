@@ -7,7 +7,7 @@
 import type { Season } from '../sim/calendar';
 import type { Tree, TreeKind } from '../world/types';
 import { PALETTES } from './palette';
-import { canvasAt, cellHash, densityOf, dot, disc, ellipse, outline, px, rect, shade, type Ctx } from './pixel';
+import { ART_DENSITY, canvasAt, cellHash, dot, disc, ellipse, outline, px, rect, shade, type Ctx } from './pixel';
 
 const TW = 34;
 const TH = 48;
@@ -25,13 +25,11 @@ function trunk(g: Ctx, kind: TreeKind, top: number): void {
   px(g, 22, TREE_BASE.y - 1, shade(bark, -0.2));
   if (kind === 'birch') for (let y = top + 2; y < TREE_BASE.y - 2; y += 4) rect(g, 15 + (y % 3), y, 2, 1, '#2b2b2b');
   else for (let y = top + 3; y < TREE_BASE.y - 2; y += 5) px(g, 17, y, shade(bark, -0.25));
-  if (densityOf(g) > 1) {
-    // 32×32: кора борознами — вертикальні рисочки пів-пікселя.
-    for (let y = top + 1; y < TREE_BASE.y - 2; y += 1) {
-      const h = cellHash(y, top, 13) % 4;
-      dot(g, 16 + h * 0.5, y + 0.5, shade(bark, -0.22));
-      if (h === 0) dot(g, 18.5, y, shade(bark, 0.1));
-    }
+  // Кора борознами — вертикальні рисочки пів-пікселя.
+  for (let y = top + 1; y < TREE_BASE.y - 2; y += 1) {
+    const h = cellHash(y, top, 13) % 4;
+    dot(g, 16 + h * 0.5, y + 0.5, shade(bark, -0.22));
+    if (h === 0) dot(g, 18.5, y, shade(bark, 0.1));
   }
 }
 
@@ -47,25 +45,22 @@ function canopy(g: Ctx, blobs: readonly [number, number, number][], dark: string
     const rr = ((h >> 12) % 100) / 100 * (br - 1);
     px(g, bx + Math.cos(ang) * rr, by + Math.sin(ang) * rr, (h >> 20) % 2 ? light : dark);
   }
-  if (densityOf(g) > 1) {
-    // 32×32: крона з окремих листочків — пари пів-пікселів (лист і його
-    // тінь), густіше на освітленому верхньому лівому боці.
-    for (let k = 0; k < 140; k += 1) {
-      const h = cellHash(k, seed, 31);
-      const [bx, by, br] = blobs[h % blobs.length]!;
-      const ang = ((h >> 4) % 360) * (Math.PI / 180);
-      const rr = (((h >> 12) % 100) / 100) * (br - 0.5);
-      const x = Math.round((bx + Math.cos(ang) * rr) * 2) / 2;
-      const y = Math.round((by + Math.sin(ang) * rr) * 2) / 2;
-      const litSide = Math.cos(ang) < 0 && Math.sin(ang) < 0;
-      dot(g, x, y, litSide ? light : (h >> 22) % 3 === 0 ? dark : mid);
-      dot(g, x + 0.5, y + 0.5, shade((h >> 22) % 2 ? mid : dark, -0.12));
-    }
+  // Крона з окремих листочків — пари пів-пікселів (лист і його тінь),
+  // густіше на освітленому верхньому лівому боці.
+  for (let k = 0; k < 140; k += 1) {
+    const h = cellHash(k, seed, 31);
+    const [bx, by, br] = blobs[h % blobs.length]!;
+    const ang = ((h >> 4) % 360) * (Math.PI / 180);
+    const rr = (((h >> 12) % 100) / 100) * (br - 0.5);
+    const x = Math.round((bx + Math.cos(ang) * rr) * 2) / 2;
+    const y = Math.round((by + Math.sin(ang) * rr) * 2) / 2;
+    const litSide = Math.cos(ang) < 0 && Math.sin(ang) < 0;
+    dot(g, x, y, litSide ? light : (h >> 22) % 3 === 0 ? dark : mid);
+    dot(g, x + 0.5, y + 0.5, shade((h >> 22) % 2 ? mid : dark, -0.12));
   }
 }
 
 function blossoms(g: Ctx, blobs: readonly [number, number, number][], color: string, seed: number, count: number): void {
-  const hd = densityOf(g) > 1;
   for (let k = 0; k < count; k += 1) {
     const h = cellHash(k, seed, 9);
     const [bx, by, br] = blobs[h % blobs.length]!;
@@ -73,9 +68,7 @@ function blossoms(g: Ctx, blobs: readonly [number, number, number][], color: str
     const rr = ((h >> 12) % 100) / 100 * br;
     const x = Math.round(bx + Math.cos(ang) * rr);
     const y = Math.round(by + Math.sin(ang) * rr);
-    if (hd) { bloomHd(g, x, y, color, k); continue; }
-    px(g, x, y, color);
-    if (k % 3 === 0) px(g, x + 1, y, shade(color, -0.1));
+    bloomHd(g, x, y, color, k);
   }
 }
 
@@ -83,10 +76,10 @@ function blossoms(g: Ctx, blobs: readonly [number, number, number][], color: str
 const BLOOM_HEART: Record<string, string> = { '#fff4f8': '#f2a0b8', '#ffc4dc': '#f6e0a0', '#fff8e8': '#f0c060' };
 
 /**
- * 32×32: яблуко — округле, з відблиском угорі ліворуч і тінню внизу,
- * подекуди з хвостиком; вишні — парою на хвостиках; цвіт — чотири пелюстки
- * зі серединкою. У 16×16 це квадратики пікселів, і в 32×32 вони такими й
- * читались.
+ * Яблуко — округле, з відблиском угорі ліворуч і тінню внизу, подекуди з
+ * хвостиком; вишні — парою на хвостиках; цвіт — чотири пелюстки зі
+ * серединкою. Квадратики пікселів, як було в 16×16, у 32×32 читались
+ * квадратиками.
  */
 function bloomHd(g: Ctx, x: number, y: number, c: string, k: number): void {
   const hl = shade(c, 0.35);
@@ -141,14 +134,14 @@ function bareBranches(g: Ctx, seed: number, snow: boolean): void {
 
 const cache = new Map<string, HTMLCanvasElement>();
 
-/** Спрайт дерева; `density` 2 — малюнок 32×32 на клітинку. */
-export function treeSprite(tree: Tree, season: Season, density = 1): HTMLCanvasElement {
+/** Спрайт дерева, 32×32 на клітинку. */
+export function treeSprite(tree: Tree, season: Season): HTMLCanvasElement {
   const seed = cellHash(Math.round(tree.x * 7), Math.round(tree.y * 7), 3);
   const variant = seed % 3;
-  const key = `${tree.kind}|${season}|${variant}|${density}`;
+  const key = `${tree.kind}|${season}|${variant}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const { c, g } = canvasAt(TW, TH, density);
+  const { c, g } = canvasAt(TW, TH, ART_DENSITY);
   const P = PALETTES[season];
   const kind = tree.kind;
 

@@ -13,7 +13,7 @@
 // ============================================================
 import { TILE, type GameMap, type Zone, type ZoneAction } from '../world/types';
 import { bitmapSize, ICONS } from './icons';
-import { densityOf, ellipse } from './pixel';
+import { ART_DENSITY, ellipse } from './pixel';
 
 export type MarkerKind =
   | 'door' | 'shop' | 'fruit' | 'garden' | 'fish' | 'tool' | 'cook' | 'eggs' | 'talk' | 'look' | 'bus' | 'walk' | 'bed'
@@ -220,7 +220,7 @@ export function ringPixels(rx: number, ry: number, d: number): [number, number][
 
 /** Намалювати кільце на землі довкола точки (x, y) — центр під стопами. */
 export function drawGroundRing(g: CanvasRenderingContext2D, x: number, y: number, time: number): void {
-  const d = densityOf(g);
+  const d = ART_DENSITY;
   const cx = Math.round(x * d) / d;
   const cy = Math.round(y * d) / d;
   const breath = 0.5 + Math.sin(time * 4) * 0.5;
@@ -241,8 +241,8 @@ export function drawGroundRing(g: CanvasRenderingContext2D, x: number, y: number
   const ph = (time % RIPPLE_S) / RIPPLE_S;
   const rr = 4 + ph * 7;
   dots(ringPixels(rr, rr * (RING_RY / RING_RX), d), '#ffe680', '#fff4b8', 0.7 * (1 - ph));
-  // Сам обідок — завтовшки у світовий піксель: у 32×32 це два кільця по пів пікселя.
-  const rim = d > 1 ? [...ringPixels(RING_RX, RING_RY, d), ...ringPixels(RING_RX - 1 / d, RING_RY - 1 / d, d)] : ringPixels(RING_RX, RING_RY, d);
+  // Сам обідок — завтовшки у світовий піксель: два кільця по пікселю малюнка.
+  const rim = [...ringPixels(RING_RX, RING_RY, d), ...ringPixels(RING_RX - 1 / d, RING_RY - 1 / d, d)];
   dots(rim, '#f0ac1c', '#ffdf4a', 0.8 + breath * 0.2);
   g.globalAlpha = 1;
 }

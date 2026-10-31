@@ -7,7 +7,7 @@
 import type { Season } from '../sim/calendar';
 import { TILE, buildingParts, type Building, type BuildingStyle, type Rect } from '../world/types';
 import { bitmapSize, drawBitmap } from './icons';
-import { canvasAt, cellHash, densityOf, disc, disciplinePalette, drawSprite, ellipse, mix, px, rect, shade, worldSize, type Ctx } from './pixel';
+import { ART_DENSITY, canvasAt, cellHash, disc, disciplinePalette, drawSprite, ellipse, mix, px, rect, shade, worldSize, type Ctx } from './pixel';
 import { awningHd, doorHd, flatRoofHd, flowerBoxHd, mallowBloomHd, roofRowHd, snowCapHd, wallHd, windowHd } from './buildingsHd';
 
 export interface BuildingSprite {
@@ -161,7 +161,7 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
     rect(g, 1, top, W - 2, 2, shade(color, 0.25));
     rect(g, 1, bottom - 2, W - 2, 2, shade(color, -0.3));
     if (season === 'winter') rect(g, 2, top, W - 4, 2, '#ffffff');
-    if (densityOf(g) > 1) flatRoofHd(g, W, top, bottom, color, season, seed);
+    flatRoofHd(g, W, top, bottom, color, season, seed);
     return;
   }
   const inset = rule.roof === 'thatch' ? 10 : 8;
@@ -206,7 +206,7 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
         else if (course !== 0 && cellHash(at.x + x, ry, cs) % 7 === 0) px(g, x, top + r, shade(color, 0.14));
       }
     }
-    if (densityOf(g) > 1) roofRowHd(g, rule.roof, c === color ? color : c, x0, x1, top + r, ry, at.x, cs);
+    roofRowHd(g, rule.roof, c === color ? color : c, x0, x1, top + r, ry, at.x, cs);
     // Темні краї даху.
     if (fl(r) !== 'left') px(g, k, top + r, shade(color, -0.35));
     if (fl(r) !== 'right') px(g, W - k - 1, top + r, shade(color, -0.35));
@@ -249,7 +249,7 @@ function roof(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
       rect(g, kl(k), top + r, W - kl(k) - kr(k), 1, r > snowH - 3 ? '#dfe9f6' : '#ffffff');
       capRows.push({ x0: kl(k), x1: W - kr(k), y: top + r });
     }
-    if (densityOf(g) > 1) snowCapHd(g, capRows, seed);
+    snowCapHd(g, capRows, seed);
     for (let x = inset; x < W - inset; x += 1) {
       const drip = cellHash(x, seed) % 4;
       if (drip > 1) rect(g, x, top + snowH, 1, drip - 1, '#dfe9f6');
@@ -311,7 +311,7 @@ function wall(g: Ctx, W: number, top: number, bottom: number, rule: StyleRule, c
       px(g, 3 + (hh % (W - 6)), top + ((hh >> 8) % H), shade(color, -0.06));
     }
   }
-  if (densityOf(g) > 1) wallHd(g, W, top, bottom, rule.material, color, seed);
+  wallHd(g, W, top, bottom, rule.material, color, seed);
   // Освітлення: лівий край світліший, правий у тіні.
   // На стику з іншою частиною тієї ж будівлі краю немає — стіна йде далі.
   if (flush !== 'left') rect(g, 3, top, 2, H, shade(color, 0.12));
@@ -352,7 +352,7 @@ function windowAt(g: Ctx, x: number, y: number, w: number, h: number, frame: str
     px(g, x - 3, y + 2, shade(frame, 0.3));
     px(g, x + w + 2, y + 2, shade(frame, 0.3));
   }
-  if (densityOf(g) > 1) windowHd(g, x, y, w, h, frame, c);
+  windowHd(g, x, y, w, h, frame, c);
   out.push({ x, y, w, h });
 }
 
@@ -361,7 +361,7 @@ function flowerBox(g: Ctx, x: number, y: number, w: number, season: Season): voi
   if (season === 'winter') { rect(g, x - 1, y - 1, w + 2, 1, '#ffffff'); return; }
   for (let k = 0; k < w; k += 2) px(g, x + k, y - 1, ['#ff7aa8', '#f6d55c', '#e8576c'][k % 3]!);
   rect(g, x, y - 2, w, 1, '#4f9a3e');
-  if (densityOf(g) > 1) flowerBoxHd(g, x, y, w, season);
+  flowerBoxHd(g, x, y, w, season);
 }
 
 /** Наличник над вікном хати: різьблена дошка з «дашком», фарбована як віконниці. */
@@ -402,7 +402,7 @@ function mallows(g: Ctx, W: number, Ht: number, avoid: { x0: number; x1: number 
       const fy = base - h + 2 + k * 5;
       rect(g, x - 1, fy, 3, 3, c);
       px(g, x, fy + 1, '#f6d55c');
-      if (densityOf(g) > 1) mallowBloomHd(g, x, fy, c);
+      mallowBloomHd(g, x, fy, c);
     }
   }
 }
@@ -421,7 +421,7 @@ function door(g: Ctx, x: number, bottom: number, w: number, h: number, kind: 'wo
     rect(g, x + 1, y + 2, w - 2, Math.floor(h / 2) - 2, '#7a4a2a');
     rect(g, x + 1, y + Math.floor(h / 2) + 1, w - 2, Math.floor(h / 2) - 3, '#7a4a2a');
     px(g, x + w - 2, y + Math.floor(h / 2) + 1, '#f6c14e');
-    if (densityOf(g) > 1) doorHd(g, x, bottom, w, h);
+    doorHd(g, x, bottom, w, h);
   }
   // Ґанок.
   rect(g, x - 3, bottom, w + 6, 2, '#b8b0a2');
@@ -440,7 +440,7 @@ function awning(g: Ctx, x0: number, x1: number, y: number, color: string, season
   rect(g, x0, y, W, 1, shade(color, -0.3));
   rect(g, x0, y + 8, W, 1, 'rgba(0,0,0,0.18)');
   if (season === 'winter') rect(g, x0, y - 1, W, 2, '#ffffff');
-  if (densityOf(g) > 1) awningHd(g, x0, x1, y, color, season);
+  awningHd(g, x0, x1, y, color, season);
 }
 
 function signBoard(g: Ctx, cx: number, y: number, icon: Building['sign']): void {
@@ -496,13 +496,13 @@ function columns(g: Ctx, x0: number, x1: number, top: number, bottom: number): v
 // ------------------------------------------------------------
 const cache = new Map<string, BuildingSprite>();
 
-/** Спрайт будинку; `density` 2 — малюнок 32×32 на клітинку. */
-export function buildingSprite(b: Building, season: Season, density = 1): BuildingSprite {
+/** Спрайт будинку, 32×32 на клітинку. */
+export function buildingSprite(b: Building, season: Season): BuildingSprite {
   const n = b.notch;
-  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}|${b.join ?? ''}${b.joinTo ? `@${b.joinTo.x},${b.joinTo.y},${b.joinTo.w},${b.joinTo.h}` : ''}|${b.chimney === false ? 'nochim' : ''}|${hasGable(b) ? 'gable' : ''}|${density}`;
+  const key = `${b.id}|${b.style}|${b.x},${b.y},${b.w},${b.h}|${season}|${b.wall ?? ''}|${b.roof ?? ''}|${b.door === false ? 'nodoor' : ''}|${n ? `${n.side}${n.w}x${n.h}` : ''}|${b.sideDoor ? 'side' : ''}|${b.join ?? ''}${b.joinTo ? `@${b.joinTo.x},${b.joinTo.y},${b.joinTo.w},${b.joinTo.h}` : ''}|${b.chimney === false ? 'nochim' : ''}|${hasGable(b) ? 'gable' : ''}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const sprite = n ? ellSprite(b, season, density) : partSprite(b, season, joinOpts(b), density);
+  const sprite = n ? ellSprite(b, season) : partSprite(b, season, joinOpts(b));
   disciplinePalette(sprite.img);
   cache.set(key, sprite);
   return sprite;
@@ -535,7 +535,7 @@ export function joinOpts(b: Building): PartOpts {
  * однакову висоту стіни, тож фасад і звис даху — одна лінія; дах нижчого
  * крила прилягає до вищого без скосу; димар один, двері одні.
  */
-function ellSprite(b: Building, season: Season, density: number): BuildingSprite {
+function ellSprite(b: Building, season: Season): BuildingSprite {
   const rule = STYLES[b.style];
   const [tall, low] = buildingParts(b) as [Rect, Rect];
   const wallPx = wallOf(b.style, low.h);
@@ -548,12 +548,12 @@ function ellSprite(b: Building, season: Season, density: number): BuildingSprite
   const toLow: Flush = side === 'right' ? 'right' : 'left';
   const toTall: Flush = side === 'right' ? 'left' : 'right';
   const lowTop = (tall.h - low.h) * TILE * rule.roofFrac;
-  const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall), sideDoor: rightEdge(tall) }, season, { wallPx, flush: toLow, flushRows: { from: Math.round(lowTop) + rule.rise, until: Infinity }, wallFlush: toLow, chimney: true }, density);
-  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low), sideDoor: rightEdge(low), gable: false }, season, { wallPx, flush: toTall, wallFlush: toTall, chimney: false }, density);
+  const A = partSprite({ ...b, ...tall, notch: undefined, door: hasDoor(tall), sideDoor: rightEdge(tall) }, season, { wallPx, flush: toLow, flushRows: { from: Math.round(lowTop) + rule.rise, until: Infinity }, wallFlush: toLow, chimney: true });
+  const B = partSprite({ ...b, ...low, notch: undefined, door: hasDoor(low), sideDoor: rightEdge(low), gable: false }, season, { wallPx, flush: toTall, wallFlush: toTall, chimney: false });
   const W = b.w * TILE + 6;
   // Обидва крила стоять на одній лінії фасаду: низи спрайтів збігаються.
   const Ht = worldSize(A.img).h;
-  const { c: img, g } = canvasAt(W, Ht, density);
+  const { c: img, g } = canvasAt(W, Ht, ART_DENSITY);
   const ax = (tall.x - b.x) * TILE;
   const bx = (low.x - b.x) * TILE;
   const by = Ht - worldSize(B.img).h;
@@ -577,7 +577,7 @@ export interface PartOpts {
   chimney?: boolean;
 }
 
-function partSprite(b: Building, season: Season, opts: PartOpts, density = 1): BuildingSprite {
+function partSprite(b: Building, season: Season, opts: PartOpts): BuildingSprite {
   const rule = STYLES[b.style];
   const seed = cellHash(b.x, b.y, b.w * 31 + b.h);
   const W = b.w * TILE + 6;
@@ -586,7 +586,7 @@ function partSprite(b: Building, season: Season, opts: PartOpts, density = 1): B
   const roofBottom = rule.rise + Math.round(b.h * TILE * rule.roofFrac) + (opts.extraRoof ?? 0);
   const wallPx = opts.wallPx ?? wallOf(b.style, b.h);
   const Ht = roofBottom + wallPx;
-  const { c: img, g } = canvasAt(W, Ht, density);
+  const { c: img, g } = canvasAt(W, Ht, ART_DENSITY);
   const wallColor = b.wall ?? rule.wall;
   const roofColor = b.roof ?? rule.roofColor;
   const windows: Rect[] = [];

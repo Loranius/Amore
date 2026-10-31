@@ -2,12 +2,12 @@
 """Аркуші курей і півня з PixelLab для гри «Дєвочка в городі» (ADR-0239).
 
 Власник, 2026-10-12: «модельки курей коричневих і білих і одного півня …
-замість тих курей-кругляшків, що дригаються з місця на місце». Складає два
-PNG з кадрів персонажів PixelLab: 32×32 (піксель аркуша — пів світового,
-як у людей) і 16×16 (піксель аркуша — світовий; той самий малюнок, зменшений
-удвічі).
+замість тих курей-кругляшків, що дригаються з місця на місце». Складає PNG
+32×32 з кадрів персонажів PixelLab: піксель аркуша — пів світового, як у
+людей. (Зменшений удвічі аркуш 16×16 гра більше не має: власник 2026-10-31,
+«повністю відмовляємось від 16×16».)
 
-    python scripts/pixellab/build_birds.py spec.json birds-hd.png birds.png
+    python scripts/pixellab/build_birds.py spec.json birds.png
 
 Рядки — птаха × напрям (вниз, ліворуч, праворуч, угору), птахи в порядку
 `kinds`. Стовпці — стоїть, 4 кадри ходи, далі кадри дзьобання. Дзьобання є
@@ -35,10 +35,6 @@ spec.json:
   `white` — білих пікселів у птахи немає ніде, тож кожен стає кольором
   сусідів (коричнева курка, хода «угору»).
 
-16×16: зовнішня обвідка знімається, кожен квадрат 2×2 стає одним пікселем
-(найчастіший колір; за рівності — насиченіший, щоб гребінь, дзьоб і лапи не
-зникали), а обвідка малюється наново, як `outline` у `render/pixel.ts`:
-темна з тіні, а згори-зліва — затемнений сусідній колір.
 """
 import colorsys
 import io
@@ -51,7 +47,6 @@ from PIL import Image, ImageOps
 
 ORDER = ['south', 'west', 'east', 'north']
 WALK = 4
-PIXEL_OUTLINE = (0x1c, 0x14, 0x19)
 
 
 def fetch(url: str) -> Image.Image:
@@ -93,7 +88,7 @@ def place(img: Image.Image, cell: int, dx: int, dy: int) -> Image.Image:
 def drop_crumbs(img: Image.Image) -> Image.Image:
     """Крихти біля дзьоба (v3 малює зерно й пил окремими цятками й
     рисками) — геть: лишається тільки найбільший острів пікселів, сама
-    птаха. Зменшені вдвічі, крихти читалися б смітом."""
+    птаха. Окремими цятками крихти читаються смітом."""
     out = img.copy()
     px = out.load()
     w, h = out.size
@@ -186,95 +181,6 @@ def add_outline(img: Image.Image, color: tuple) -> Image.Image:
     return out
 
 
-def strip_outline(img: Image.Image) -> Image.Image:
-    """Знімає темну обвідку: темні пікселі на краю силуету."""
-    out = img.copy()
-    src = img.load()
-    px = out.load()
-    w, h = img.size
-    for y in range(h):
-        for x in range(w):
-            c = src[x, y]
-            if c[3] == 0 or hsv(c)[2] > 0.16:
-                continue
-            if any(not (0 <= x + dx < w and 0 <= y + dy < h) or src[x + dx, y + dy][3] == 0 for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))):
-                px[x, y] = (0, 0, 0, 0)
-    return out
-
-
-def eyes(img: Image.Image) -> set:
-    """Очі: піксель у голові (верхні 40% силуету), набагато темніший за всіх
-    чотирьох сусідів. Нижче — темні риски на крилах коричневої курки, які
-    зменшеними читалися б плямами-очима на тулубі."""
-    w, h = img.size
-    src = img.load()
-    box = img.getchannel('A').getbbox()
-    if not box:
-        return set()
-    head = box[1] + (box[3] - box[1]) * 0.4
-    out = set()
-    for y in range(max(1, box[1]), min(h - 1, int(head) + 1)):
-        for x in range(1, w - 1):
-            c = src[x, y]
-            near = [src[x + dx, y + dy] for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1))]
-            if c[3] and all(n[3] for n in near) and hsv(c)[2] + 0.3 < min(hsv(n)[2] for n in near):
-                out.add((x, y))
-    return out
-
-
-def halve(img: Image.Image, keep_eyes: bool) -> Image.Image:
-    """Квадрат 2×2 — один піксель: найчастіший колір, за рівності — насиченіший.
-
-    Профілем око (один темний піксель на світлому) у квадраті завжди
-    перемагає — інакше в 16×16 птахи сліпі. Анфас — ні: два ока там на
-    три пікселі одне від одного, і вдвічі менші вони злипаються в темну
-    риску, що читається ротом."""
-    w, h = img.size
-    src = img.load()
-    eye = eyes(img) if keep_eyes else set()
-    out = Image.new('RGBA', (w // 2, h // 2), (0, 0, 0, 0))
-    px = out.load()
-    for y in range(h // 2):
-        for x in range(w // 2):
-            cells = [(2 * x + i, 2 * y + j) for j in (0, 1) for i in (0, 1)]
-            solid = [src[c] for c in cells if src[c][3] > 0]
-            if len(solid) < 2:
-                continue
-            seen = [src[c] for c in cells if c in eye]
-            if seen:
-                px[x, y] = seen[0]
-                continue
-            counts = Counter(solid)
-            px[x, y] = max(counts, key=lambda c: (counts[c], hsv(c)[1], -hsv(c)[2]))
-    return out
-
-
-def pixel_outline(img: Image.Image) -> Image.Image:
-    """Обвідка 16×16 — як `outline` у `render/pixel.ts`."""
-    w, h = img.size
-    out = Image.new('RGBA', (w, h), (0, 0, 0, 0))
-    out.paste(img, (0, 0))
-    src = img.load()
-    px = out.load()
-
-    def solid(x: int, y: int) -> bool:
-        return 0 <= x < w and 0 <= y < h and src[x, y][3] > 0
-
-    for y in range(h):
-        for x in range(w):
-            if solid(x, y):
-                continue
-            below, right, left, above = solid(x, y + 1), solid(x + 1, y), solid(x - 1, y), solid(x, y - 1)
-            if not (below or right or left or above):
-                continue
-            rgb = PIXEL_OUTLINE
-            if (below or right) and not left and not above:
-                hh, ss, vv = hsv(src[x, y + 1] if below else src[x + 1, y])
-                rgb = tuple(round(c * 255) for c in colorsys.hsv_to_rgb(hh, min(1.0, ss * 1.15 + 0.08), vv * 0.5))
-            px[x, y] = rgb + (255,)
-    return out
-
-
 def kind_frames(kind: dict, cell: int, foot: tuple) -> dict:
     """Напрям → [стоїть, хода × 4, дзьобання …] у клітинках `cell`."""
     rot = {d: fetch(u) for d, u in kind['rotations'].items()}
@@ -315,17 +221,13 @@ def main() -> None:
         raise ValueError(f'у птахів різна кількість кадрів дзьобання: {pecks}')
     cols = 1 + WALK + pecks.pop()
     hd = Image.new('RGBA', (cell * cols, cell * 4 * len(kinds)), (0, 0, 0, 0))
-    small = Image.new('RGBA', (cell // 2 * cols, cell // 2 * 4 * len(kinds)), (0, 0, 0, 0))
     for k, (kind, frames) in enumerate(zip(kinds, built)):
         for r, d in enumerate(ORDER):
             row = (k * 4 + r)
             for c, img in enumerate(frames.get(d, [])):
                 drawn = add_outline(img, color) if kind.get('outline') else img
                 hd.paste(drawn, (c * cell, row * cell))
-                bare = img if kind.get('outline') else strip_outline(img)
-                small.paste(pixel_outline(halve(bare, keep_eyes=d != 'south')), (c * cell // 2, row * cell // 2))
     hd.save(sys.argv[2])
-    small.save(sys.argv[3])
     print(json.dumps({'cell': cell, 'cols': cols, 'walk': WALK, 'peck': cols - 1 - WALK, 'footX': foot[0], 'footY': foot[1], 'kinds': [k['name'] for k in kinds]}))
 
 
