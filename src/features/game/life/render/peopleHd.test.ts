@@ -5,14 +5,14 @@ import { ITEMS } from '../sim/content';
 import { newLife } from '../sim/life';
 import { rngFor } from '../sim/rng';
 import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, townsfolkLook } from './people';
-import { hasHdSheet, isLenaAdult, isLenaTeen, outfitColors } from './peopleHd';
+import { hasHdSheet, hdCell, isLenaAdult, isLenaTeen, outfitColors } from './peopleHd';
 import { RESIDENT_LOOKS } from './residents';
 
 // Власник 2026-10-31: «повністю відмовляємось від 16×16». Лєна (будь-якого
-// тижня, у будь-якому вбранні з шафи), мама й Діма малюються лише аркушами
-// PixelLab — і на мапі (`scene.ts`), і в міні-іграх (`Kit.person`).
-// 16-піксельні спрайти лишаються мешканцям, перехожим і Олі, доки для них
-// нема аркушів (етап 2).
+// тижня, у будь-якому вбранні з шафи), мама, Діма й Оля («Починай з Олі»)
+// малюються лише аркушами PixelLab — на мапі (`scene.ts`), у міні-іграх
+// (`Kit.person`) і в портретах (`Portrait`). 16-піксельні спрайти лишаються
+// мешканцям і перехожим, доки для них нема аркушів (етап 2).
 describe('Хто малюється аркушем PixelLab', () => {
   it('Лєна будь-якого тижня в будь-якому вбранні, мама й Діма', () => {
     const outfits = [null, ...ITEMS.filter((i) => i.outfit).map((i) => i.id)];
@@ -27,8 +27,23 @@ describe('Хто малюється аркушем PixelLab', () => {
     expect(hasHdSheet(DIMA)).toBe(true);
   });
 
-  it('мешканці, перехожі й Оля — ще 16-піксельні (етап 2)', () => {
-    for (const look of [OLYA, ...Object.values(RESIDENT_LOOKS)]) expect(hasHdSheet(look)).toBe(false);
+  // Оля на мапі й у діалогах — `{ ...OLYA, kid: тиждень ≤ 6 }` (`controller.ts`,
+  // `LifeGame.tsx`); дорослою вона в грі не з'являється.
+  it('Оля: мала — своїм аркушем, підліток — своїм, і жоден не чужий', () => {
+    const kid = { ...OLYA, kid: true };
+    const teen = { ...OLYA, kid: false };
+    expect(hasHdSheet(kid)).toBe(true);
+    expect(hasHdSheet(teen)).toBe(true);
+    expect(hdCell(kid)).toBe(68);
+    expect(hdCell(teen)).toBe(72);
+    for (const look of [kid, teen]) {
+      expect(isLenaTeen(look)).toBe(false);
+      expect(isLenaAdult(look)).toBe(false);
+    }
+  });
+
+  it('мешканці — ще 16-піксельні (етап 2)', () => {
+    for (const look of Object.values(RESIDENT_LOOKS)) expect(hasHdSheet(look), JSON.stringify(look)).toBe(false);
   });
 
   // Регресія: перехожий з Лєниним волоссям, хвостом, шкірою й очима (з кості

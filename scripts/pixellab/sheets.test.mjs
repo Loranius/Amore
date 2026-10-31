@@ -20,20 +20,29 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { decodePng } from '../live/luminance.mjs';
 import { recolorOutfit } from '../../src/features/game/life/render/outfitHd.ts';
-import { ADULT_DRESS, KID_DRESS, TEEN_CLOTHES } from '../../src/features/game/life/render/peopleHd.ts';
+import { ADULT_DRESS, KID_DRESS, PORTRAIT_CROP, TEEN_CLOTHES, silhouette } from '../../src/features/game/life/render/peopleHd.ts';
 
 const DIR = 'src/features/game/life/render/assets/hd';
 /** Рядки аркуша: униз, ліворуч, праворуч, угору. */
 const SOUTH = 0;
 const NORTH = 3;
 
+// `face` — очі перефарбовано на карі (`build_sheet.py`, крок `eyes`); маминих
+// і Дімових очей ніхто не перефарбовував. `nape` — довге волосся (хвіст,
+// кіски), що спадає на спину: у ході «угору» перемальованого підлітка хвіст
+// блимав. Олине каре закінчується вище, а в Діми червоний каптур на потилиці
+// рахувався б волоссям.
 const PEOPLE = [
-  { name: 'lena-kid', cell: 68 },
-  { name: 'lena-teen', cell: 80 },
-  { name: 'lena-adult', cell: 92 },
+  { name: 'lena-kid', cell: 68, kid: true, face: true, nape: true },
+  { name: 'lena-teen', cell: 80, face: true, nape: true },
+  { name: 'lena-adult', cell: 92, face: true, nape: true },
   { name: 'mom', cell: 92 },
   { name: 'dima', cell: 92 },
+  // Оля (власник 2026-10-31: «Починай з Олі») — мала до 6 тижня й підліток до 11.
+  { name: 'olya-kid', cell: 68, kid: true, face: true },
+  { name: 'olya-teen', cell: 72, face: true },
 ];
+const FACES = PEOPLE.filter((p) => p.face);
 
 function hsv(r, g, b) {
   const R = r / 255, G = g / 255, B = b / 255;
@@ -115,9 +124,7 @@ describe('Аркуші людей 32×32', () => {
     }
   });
 
-  // Лише Лєна: у неї одяг за кольором не схожий на волосся. У Діми червоний
-  // каптур на потилиці рахувався б волоссям.
-  it.each(PEOPLE.slice(0, 3))('$name: зі спини волосся видно в кожному кадрі ходи', ({ name, cell }) => {
+  it.each(PEOPLE.filter((p) => p.nape))('$name: зі спини волосся видно в кожному кадрі ходи', ({ name, cell }) => {
     const nape = new Map();
     for (const p of pixels(load(name), cell)) {
       const [h, s, v] = p.hsv;
@@ -134,7 +141,7 @@ describe('Аркуші людей 32×32', () => {
 
   // Очі їдуть разом із головою, тож тут висота — від маківки кадру, а не
   // від стоп: у ході стопи стрибають на кілька пікселів.
-  it.each(PEOPLE.slice(0, 3))('$name: у кожному кадрі з обличчям кожне око має біле', ({ name, cell }) => {
+  it.each(FACES)('$name: у кожному кадрі з обличчям кожне око має біле', ({ name, cell }) => {
     const sheet = load(name);
     const { width, data } = sheet;
     const isWhite = (i) => {
@@ -172,13 +179,38 @@ describe('Аркуші людей 32×32', () => {
     }
   });
 
-  it.each(PEOPLE.slice(0, 3))('$name: очі карі в кожному кадрі з обличчям', ({ name, cell }) => {
+  it.each(FACES)('$name: очі карі в кожному кадрі з обличчям', ({ name, cell }) => {
     const blue = [];
     for (const p of pixels(load(name), cell)) {
       const [h, s] = p.hsv;
       if (p.row !== NORTH && p.rel >= 0.17 && p.rel < 0.31 && h > 0.5 && h < 0.75 && s > 0.15) blue.push(`${p.row}:${p.col}@${p.rel.toFixed(2)}`);
     }
     expect(blue).toEqual([]);
+  });
+});
+
+// Портрети в інтерфейсі — діалоги, шафа, панелі (власник 2026-10-31:
+// «повністю відмовляємось від 16×16»): кадр «стоїть, униз» з аркуша,
+// обрізаний до голови й плечей (`hdPortrait`). Обріз — частка зросту
+// силуету, тож перевіряємо її на кожному справжньому аркуші: уся голова
+// з шиєю в кадрі, ноги — ні.
+describe('Портрети з аркушів 32×32', () => {
+  it.each(PEOPLE)('$name: портрет «голова й плечі» — уся голова з шиєю в кадрі, ноги — ні', ({ name, cell, kid }) => {
+    const sheet = load(name);
+    const box = silhouette(sheet, cell);
+    const h = Math.round(box.h * (kid ? PORTRAIT_CROP.kid : PORTRAIT_CROP.grown));
+    // Найнижча шкіра посередині силуету у верхніх 40% зросту — підборіддя чи
+    // шия; руки й долоні — збоку, їх не рахуємо.
+    let neck = -1;
+    for (let y = box.y; y < box.y + box.h * 0.4; y += 1) {
+      for (let x = box.x + Math.floor(box.w / 3); x < box.x + Math.ceil((box.w * 2) / 3); x += 1) {
+        const i = (y * sheet.width + x) * 4;
+        if (sheet.data[i + 3] > 0 && isFaceSkin(hsv(sheet.data[i], sheet.data[i + 1], sheet.data[i + 2]))) neck = y;
+      }
+    }
+    expect(neck, `${name}: обличчя не знайшлось`).toBeGreaterThan(box.y + 4);
+    expect(box.y + h, `${name}: під шиєю лишається плечей ${box.y + h - neck} пікселів`).toBeGreaterThanOrEqual(neck + 4);
+    expect(h / box.h, `${name}: портрет до пояса`).toBeLessThan(0.66);
   });
 });
 

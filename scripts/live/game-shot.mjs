@@ -11,7 +11,7 @@ mkdirSync(OUT, { recursive: true });
 const vite = spawn('npx', ['vite', '--port', '5199', '--strictPort'], { cwd: ROOT, stdio: 'ignore', detached: true });
 for (let i = 0; i < 60; i += 1) { try { const r = await fetch('http://localhost:5199/game.html'); if (r.ok) break; } catch {} await new Promise((r) => setTimeout(r, 1000)); }
 // Аркуш усіх персонажів (сценарій `lineup:<ім'я>`): виконується в сторінці гри.
-// Аркуші PixelLab і ще 16-піксельні мешканці, перехожі й Оля (до етапу 2) —
+// Аркуші PixelLab і ще 16-піксельні мешканці й перехожі (до етапу 2) —
 // в одному світовому масштабі (4 пікселі екрана на світовий), тож видно, хто
 // з ким не в парі; Лєна з міні-ігор — там само. Для «до й після», коли
 // перемальовуються люди.
@@ -25,7 +25,7 @@ async function lineup() {
   const FL = await import('/src/features/game/life/games/farmLena.ts');
   const { rngFor } = await import('/src/features/game/life/sim/rng.ts');
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-  const hd = [['Лєна мала', P.LENA_KID], ['Лєна-підліток', P.LENA_TEEN], ['Лєна доросла', P.LENA_ADULT], ['Мама', P.MOM], ['Діма', P.DIMA]];
+  const hd = [['Лєна мала', P.LENA_KID], ['Лєна-підліток', P.LENA_TEEN], ['Лєна доросла', P.LENA_ADULT], ['Мама', P.MOM], ['Діма', P.DIMA], ['Оля мала', { ...P.OLYA, kid: true }], ['Оля-підліток', P.OLYA]];
   const lenas = [P.LENA_KID, P.LENA_TEEN, P.LENA_ADULT];
   for (let k = 0; k < 80 && !(hd.every(([, l]) => H.hasHdLook(l)) && lenas.every((l) => H.hasHdPoses(l))); k += 1) await sleep(100);
   const S = 4;
@@ -93,8 +93,8 @@ async function lineup() {
   }
   strip('Бася', 16, DIRS.map((d) => ({ d: 2, draw: () => D.drawDog(g, 0, 0, d, false, 0) })));
   y += ROW + 10;
-  title('Ще 16×16 до етапу 2: Оля й мешканці (вниз і праворуч)');
-  const res = [['olya', P.OLYA], ...Object.entries(R.RESIDENT_LOOKS)];
+  title('Ще 16×16 до етапу 2: мешканці (вниз і праворуч)');
+  const res = Object.entries(R.RESIDENT_LOOKS);
   for (let i = 0; i < res.length; i += 5) {
     res.slice(i, i + 5).forEach(([id, look], j) => strip(id, 16 + j * 296, [{ d: 1, draw: px16(look, 0, 0) }, { d: 1, draw: px16(look, 2, 0) }, { d: 1, draw: px16(look, 0, 1) }]));
     y += ROW + 10;

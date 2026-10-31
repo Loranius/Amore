@@ -6,8 +6,10 @@
 // тобто пів світового: людина малюється вдвічі меншою за аркуш, і на
 // парному масштабі сцени жоден піксель не розпливається.
 //
-// Поки аркуш вантажиться (чи для когось аркуша ще немає), людину малює
-// піксельний стиль — `hasHdLook` тоді каже «ні».
+// Гра лише в 32×32 (власник 2026-10-31): кого малює аркуш (`hasHdSheet`),
+// того ніде не малюють 16-піксельним спрайтом — поки аркуш вантажиться,
+// людини ще не видно (`hasHdLook` тоді каже «ні»). 16-піксельні спрайти
+// лишаються тим, для кого аркушів ще нема (мешканці, перехожі).
 // ============================================================
 import lenaKidUrl from './assets/hd/lena-kid.png';
 import lenaTeenUrl from './assets/hd/lena-teen.png';
@@ -19,9 +21,11 @@ import lenaKidPosesUrl from './assets/hd/lena-kid-poses.png';
 import lenaTeenPosesUrl from './assets/hd/lena-teen-poses.png';
 import lenaAdultPosesUrl from './assets/hd/lena-adult-poses.png';
 import dimaUrl from './assets/hd/dima.png';
+import olyaKidUrl from './assets/hd/olya-kid.png';
+import olyaTeenUrl from './assets/hd/olya-teen.png';
 import momUrl from './assets/hd/mom.png';
 import { recolorByPalette, recolorOutfit, type Garment, type OutfitColors, type Tone } from './outfitHd';
-import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, type Dir, type Look } from './people';
+import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, type Dir, type Look } from './people';
 
 interface HdSheet {
   url: string;
@@ -37,6 +41,10 @@ interface HdSheet {
   outfit?: { base: Look; garments: readonly Garment[] };
   img?: HTMLImageElement;
   ready?: boolean;
+  /** Аркуш завантажився (`true`) чи ні (`false`, причину сказано в консолі). */
+  loaded?: Promise<boolean>;
+  /** Силует кадру «стоїть, униз» у клітинці (для портрета). */
+  box?: Box;
   /** Перефарбовані аркуші за кольорами «верх|низ|оздоблення». */
   dressed?: Map<string, HTMLCanvasElement>;
   /**
@@ -54,6 +62,14 @@ interface HdSheet {
   poses?: Strip & { hands: Readonly<Record<PoseName, { x: number; y: number }>> };
   /** Обличчям до нас: висота низу долонь над стопами й де вони ліворуч і праворуч від середини. */
   front?: { up: number; l: number; r: number };
+}
+
+/** Прямокутник у пікселях малюнка. */
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
 }
 
 /** Смуга кадрів одного напряму («праворуч») на полотні людини. */
@@ -118,7 +134,21 @@ const SHEETS: HdSheet[] = [
   { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
   // Персонаж PixelLab «Діма HD» (ff0178ab-…), власник 2026-10-06: «Діму давай далі».
   { url: dimaUrl, cell: 92, frames: 4, footX: 46, footY: 75, match: (l) => l.hairStyle === DIMA.hairStyle && l.top === DIMA.top && !!l.hoodie },
+  // Оля — подружка Лєни в Жилинцях (власник 2026-10-31: «Починай з Олі»):
+  // мала до 6 тижня, підліток до 11-го, дорослою в грі не буває. Персонажі
+  // PixelLab «Оля мала HD (2)» (f95cea47-…) і «Оля підліток HD (50)»
+  // (7dcf2e6a-…): каре з рожевою заколкою, м'ятна футболка, джинси.
+  { url: olyaKidUrl, cell: 68, frames: 4, footX: 34, footY: 57, match: (l) => !!l.kid && isOlya(l) },
+  { url: olyaTeenUrl, cell: 72, frames: 4, footX: 36, footY: 63, match: (l) => !l.kid && isOlya(l) },
 ];
+
+/**
+ * Оля — за волоссям, зачіскою й футболкою: таких нема ні в кого з мешканців
+ * чи перехожих (тест у `peopleHd.test.ts`).
+ */
+function isOlya(l: Look): boolean {
+  return l.hair === OLYA.hair && l.hairStyle === OLYA.hairStyle && l.top === OLYA.top;
+}
 
 /**
  * Лєна за її зачіскою, волоссям, шкірою й очима, хоч би який одяг з шафи
@@ -144,10 +174,13 @@ function sheetOf(look: Look): HdSheet | null {
   const s = SHEETS.find((x) => x.match(look));
   if (!s) return null;
   if (!s.img && typeof Image !== 'undefined') {
-    s.img = new Image();
-    s.img.onload = () => { s.ready = true; };
-    s.img.onerror = () => console.error(`Люди 32×32: не вдалося завантажити аркуш ${s.url}`);
-    s.img.src = s.url;
+    const img = new Image();
+    s.img = img;
+    s.loaded = new Promise((resolve) => {
+      img.onload = () => { s.ready = true; resolve(true); };
+      img.onerror = () => { console.error(`Люди 32×32: не вдалося завантажити аркуш ${s.url}`); resolve(false); };
+    });
+    img.src = s.url;
     // Падіння й пози вантажаться разом з аркушем, щоб бути готовими до першого ж падіння чи міні-гри.
     if (s.fall) loadStrip(s.fall, 'падіння');
     if (s.poses) loadStrip(s.poses, 'пози');
@@ -177,6 +210,50 @@ export function preloadHd(look: Look): void {
  */
 export function hasHdSheet(look: Look): boolean {
   return sheetOf(look) != null;
+}
+
+/**
+ * Дочекатися аркуша цієї людини: `true` — готовий, `false` — аркуша нема
+ * чи він не завантажився (причину вже сказано в консолі).
+ */
+export function hdReady(look: Look): Promise<boolean> {
+  return sheetOf(look)?.loaded ?? Promise.resolve(false);
+}
+
+/** Частка зросту, яку показує портрет «голова й плечі»: у дитини голова більша. */
+export const PORTRAIT_CROP = { kid: 0.6, grown: 0.52 } as const;
+
+/**
+ * Портрет з аркуша: кадр «стоїть, униз» у теперішньому одязі, обрізаний до
+ * силуету, а з `crop` — до голови й плечей (`PORTRAIT_CROP`). Межі — у
+ * пікселях малюнка. `null`, поки аркуш вантажиться чи якщо його нема.
+ */
+export function hdPortrait(look: Look, crop: boolean): { src: CanvasImageSource } & Box | null {
+  const s = sheetOf(look);
+  if (!s?.img || !s.ready) return null;
+  s.box ??= silhouette(pixelsOf(s.img), s.cell);
+  const b = s.box;
+  const h = crop ? Math.round(b.h * (look.kid ? PORTRAIT_CROP.kid : PORTRAIT_CROP.grown)) : b.h;
+  return { src: dressedSheet(s, look), x: b.x, y: b.y, w: b.w, h };
+}
+
+/** Межі непрозорих пікселів першої клітинки аркуша (кадр «стоїть, униз»): RGBA-пікселі аркуша. */
+export function silhouette(px: { data: ArrayLike<number>; width: number }, cell: number): Box {
+  let x0 = cell;
+  let y0 = cell;
+  let x1 = -1;
+  let y1 = -1;
+  for (let y = 0; y < cell; y += 1) {
+    for (let x = 0; x < cell; x += 1) {
+      if (px.data[(y * px.width + x) * 4 + 3]! === 0) continue;
+      x0 = Math.min(x0, x);
+      y0 = Math.min(y0, y);
+      x1 = Math.max(x1, x);
+      y1 = Math.max(y1, y);
+    }
+  }
+  if (x1 < 0) throw new Error('Люди 32×32: кадр «стоїть, униз» порожній');
+  return { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 };
 }
 
 /** Чи є для цієї людини готовий аркуш 32×32. */
