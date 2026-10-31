@@ -16,6 +16,13 @@
 кадри на землі стають на лінію стоп (`ground`), очі виправляються в межах
 голови (`fix_strip_eyes`), бо Лєна тут і лежить, і сидить.
 
+Пози з руками перед собою для міні-ігор (`lena-*-poses.png`) — та сама
+смуга з `"hands": [46, 76]` (точка між стопами аркуша). Кадри `skeleton-v3`
+приходять на більшому полотні (96 замість 92): вони стають у клітинку за
+центром, стопами — туди ж, де стопи повороту (`plant`), а скрипт друкує, де
+в кожному кадрі долоні (`hands_at`): пікселі малюнка від точки між стопами,
+`x` уперед, `y` угору — низ долоні. Ці числа йдуть у `render/peopleHd.ts`.
+
 spec.json: {"cell": 92, "rotations": {"south": url, ...},
             "walk": {"south": [url, ...], "east": [...], ...},
             "eyes": {"band": [0.17, 0.31], "color": "#5a3a26"},
@@ -259,6 +266,46 @@ def ground(frames: list, rot: Image.Image, air: list) -> list:
     return [shift(f, dy) for f, dy in zip(frames, dys)]
 
 
+def feet_x(img: Image.Image) -> float:
+    """Середина стоп: непрозорі пікселі трьох нижніх рядків силуету."""
+    px = img.load()
+    bottom = bottom_of(img)
+    xs = [x for y in range(bottom - 3, bottom) for x in range(img.width) if px[x, y][3]]
+    return (min(xs) + max(xs) + 1) / 2
+
+
+def plant(img: Image.Image, rot: Image.Image, cell: int) -> Image.Image:
+    """Кадр на більшому полотні — у клітинку `cell`, стопами під стопи
+    повороту (у позах стопи не рухаються); обрізати не можна."""
+    dx = round(feet_x(img) - feet_x(rot))
+    dy = (img.height - cell) // 2
+    out = Image.new('RGBA', (cell, cell), (0, 0, 0, 0))
+    out.paste(img, (-dx, -dy))
+    before = sum(1 for a in img.getchannel('A').tobytes() if a)
+    after = sum(1 for a in out.getchannel('A').tobytes() if a)
+    if before != after:
+        raise ValueError('кадр не вміщається в клітинку')
+    return out
+
+
+def hands_at(img: Image.Image, foot: list, chin) -> dict:
+    """Де долоні в кадрі «праворуч»: найдальші вперед пікселі шкіри нижче
+    рядка `chin` (щоб не взяти ніс). `chin` = None — долоні перед обличчям
+    («high»): тоді вони й так попереду носа. Повертає середину долоні
+    вздовж і її низ від точки між стопами."""
+    px = img.load()
+    w, h = img.size
+    skin = [(x, y) for y in range(h) for x in range(w)
+            if px[x, y][3] and is_skin(*px[x, y][:3]) and (chin is None or y > chin)]
+    if not skin:
+        raise ValueError('у кадрі немає шкіри — долонь не знайдено')
+    front = max(x for x, _ in skin)
+    hand = [(x, y) for x, y in skin if x >= front - 3]
+    hx = sum(x for x, _ in hand) / len(hand)
+    hy = max(y for _, y in hand) + 1
+    return {'x': round(hx - foot[0], 1), 'y': foot[1] - hy}
+
+
 def strip(spec: dict, out: str) -> None:
     """Смуга кадрів одного напряму (падіння й підйом, «праворуч»): кадри на
     тому самому полотні, що й аркуш людини, тож стопи стоять там само.
@@ -269,9 +316,7 @@ def strip(spec: dict, out: str) -> None:
     cell = spec['cell']
     rot = fetch(spec['rotation'])
     frames = [fetch(u) for u in spec['strip']]
-    for f in frames:
-        if f.size != (cell, cell):
-            raise ValueError(f'кадр {f.size} не на полотні {cell}×{cell}')
+    frames = [f if f.size == (cell, cell) else plant(f, rot, cell) for f in frames]
     if spec.get('stand_end'):
         frames[-1] = rot
     frames = ground(frames, rot, spec.get('air', []))
@@ -283,7 +328,21 @@ def strip(spec: dict, out: str) -> None:
     for c, f in enumerate(frames):
         sheet.paste(f, (c * cell, 0))
     sheet.save(out)
-    print(json.dumps({'cell': cell, 'frames': len(frames)}))
+    report = {'cell': cell, 'frames': len(frames)}
+    foot = spec.get('hands')
+    if foot:
+        # Долоні шукаються нижче обличчя: `chin` — частка висоти силуету від
+        # маківки (довге волосся дорослої сягає плечей, тож низ волосся не
+        # годиться). У кадрах `hands_by_face` (руки біля обличчя) — будь-де,
+        # бо там вони попереду носа.
+        by_face = spec.get('hands_by_face', [])
+        chin = spec.get('chin', 0.3)
+
+        def chin_row(f: Image.Image) -> int:
+            box = f.getchannel('A').getbbox()
+            return box[1] + round((box[3] - box[1]) * chin)
+        report['hands'] = [hands_at(f, foot, None if i in by_face else chin_row(f)) for i, f in enumerate(frames)]
+    print(json.dumps(report, ensure_ascii=False))
 
 
 def main() -> None:

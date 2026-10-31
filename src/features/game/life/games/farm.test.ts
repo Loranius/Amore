@@ -136,6 +136,11 @@ describe('курник', () => {
           expect(Math.min(ch.x0, ch.x1)).toBeGreaterThanOrEqual(0);
           expect(Math.max(ch.x0, ch.x1)).toBeLessThanOrEqual(kit.W);
         });
+        // Віялом: верхнє гніздо кожного боку набагато вище за нижнє, щоб кури
+        // на гніздах не налазили одна на одну (власник 2026-10-31, кадр курника).
+        for (const [u, d] of [[0, 1], [2, 3]] as const) {
+          expect(sc.chutes[d]!.y0 - sc.chutes[u]!.y0, `${lena.kid ? 'мала' : 'доросла'}, ${kit.W}`).toBeGreaterThanOrEqual(sc.z > 1 ? 30 : 14);
+        }
       }
     }
   });

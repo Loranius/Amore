@@ -400,6 +400,111 @@ function boxOf(sheet, cell, col, row = 0) {
 
 const isBluish = ([h, s, v]) => h > 0.5 && h < 0.75 && s > 0.08 && v > 0.3;
 
+/**
+ * Блакитні очі в смузі `file` (кадри `cols` на полотні `cell`): острівці
+ * синюватих пікселів у межах голови посеред обличчя. Голова — там, де
+ * волосся аркуша ходи `name`.
+ */
+function blueEyes(name, file, cell, cols) {
+  const strip = load(file);
+  const { width, data } = strip;
+  const at = (x, y) => ((y) * width + x) * 4;
+  // Голова — там, де волосся: кольори волосся — каштанові пікселі верхніх
+  // 15% силуету «праворуч» на аркуші ходи (як у `build_sheet.py`). Без
+  // цього за очі сходять джинси й манжети біля рук підлітка.
+  const base = load(name);
+  const stand = boxOf(base, cell, 0, 2);
+  const hair = new Set();
+  for (let y = stand.top; y <= stand.top + stand.h * 0.15; y += 1) {
+    for (let x = 0; x < cell; x += 1) {
+      const i = ((2 * cell + y) * base.width + x) * 4;
+      const [h, s, v] = hsv(base.data[i], base.data[i + 1], base.data[i + 2]);
+      if (base.data[i + 3] > 0 && h >= 0.02 && h <= 0.12 && s >= 0.25 && v <= 0.85) hair.add(`${base.data[i]},${base.data[i + 1]},${base.data[i + 2]}`);
+    }
+  }
+  expect(hair.size).toBeGreaterThan(2);
+  const found = [];
+  for (let col = 0; col < cols; col += 1) {
+    let hx0 = cell, hy0 = cell, hx1 = -1, hy1 = -1;
+    for (let y = 0; y < cell; y += 1) {
+      for (let x = 0; x < cell; x += 1) {
+        const i = at(col * cell + x, y);
+        if (data[i + 3] === 0 || !hair.has(`${data[i]},${data[i + 1]},${data[i + 2]}`)) continue;
+        hx0 = Math.min(hx0, x); hy0 = Math.min(hy0, y); hx1 = Math.max(hx1, x); hy1 = Math.max(hy1, y);
+      }
+    }
+    expect(hx1, `кадр ${col}: волосся видно`).toBeGreaterThanOrEqual(0);
+    const inHead = ([a, b]) => a >= hx0 - 2 && a <= hx1 + 2 && b >= hy0 - 2 && b <= hy1 + 2;
+    const seen = new Set();
+    for (let y = 0; y < cell; y += 1) {
+      for (let x = 0; x < cell; x += 1) {
+        const i = at(col * cell + x, y);
+        if (seen.has(`${x},${y}`) || data[i + 3] === 0 || !isBluish(hsv(data[i], data[i + 1], data[i + 2]))) continue;
+        // Острівець синюватих пікселів…
+        const comp = [];
+        const stack = [[x, y]];
+        seen.add(`${x},${y}`);
+        while (stack.length > 0) {
+          const [a, b] = stack.pop();
+          comp.push([a, b]);
+          for (let dx = -1; dx <= 1; dx += 1) {
+            for (let dy = -1; dy <= 1; dy += 1) {
+              const nx = a + dx, ny = b + dy;
+              if (nx < 0 || ny < 0 || nx >= cell || ny >= cell || seen.has(`${nx},${ny}`)) continue;
+              const j = at(col * cell + nx, ny);
+              if (data[j + 3] > 0 && isBluish(hsv(data[j], data[j + 1], data[j + 2]))) { seen.add(`${nx},${ny}`); stack.push([nx, ny]); }
+            }
+          }
+        }
+        if (comp.length > 6 || !comp.every(inHead)) continue;
+        // …посеред обличчя — це око.
+        const skin = new Set();
+        for (const [a, b] of comp) {
+          for (let dx = -3; dx <= 3; dx += 1) {
+            for (let dy = -3; dy <= 3; dy += 1) {
+              const nx = a + dx, ny = b + dy;
+              if (nx < 0 || ny < 0 || nx >= cell || ny >= cell) continue;
+              const j = at(col * cell + nx, ny);
+              const [h, s, v] = hsv(data[j], data[j + 1], data[j + 2]);
+              if (data[j + 3] > 0 && (h <= 0.1 || h >= 0.97) && s >= 0.12 && s <= 0.5 && v >= 0.7) skin.add(`${nx},${ny}`);
+            }
+          }
+        }
+        if (skin.size >= 8) found.push(`кадр ${col}: ${comp.map(([a, b]) => `${a},${b}`).join(' ')}`);
+      }
+    }
+  }
+  return found;
+}
+
+/**
+ * Перевдягання смуги `file` за кольорами аркуша ходи (`garmentMapByPalette`):
+ * одяг знайдено в кожному кадрі; повертає пікселі шкіри й волосся, які
+ * перефарбувались би (їх не має бути).
+ */
+function paintedSkinOrHair(name, file, cell, cols, garments) {
+  const strip = load(file);
+  const base = load(name);
+  const map = garmentMapByPalette({ ...strip, cell }, { ...base, cell }, garments);
+  const skinOrHair = [];
+  for (let col = 0; col < cols; col += 1) {
+    let dressed = 0, all = 0;
+    for (let y = 0; y < cell; y += 1) {
+      for (let x = 0; x < cell; x += 1) {
+        const p = y * strip.width + col * cell + x;
+        if (strip.data[p * 4 + 3] === 0) continue;
+        all += 1;
+        if (map[p] < 0) continue;
+        dressed += 1;
+        const [h, s, v] = hsv(strip.data[p * 4], strip.data[p * 4 + 1], strip.data[p * 4 + 2]);
+        if (isFaceSkin([h, s, v]) || (h >= 0.02 && h <= 0.12 && s >= 0.3 && v <= 0.6)) skinOrHair.push(`кадр ${col}: ${x},${y}`);
+      }
+    }
+    expect(dressed / all, `${file}, кадр ${col}: одяг знайдено`).toBeGreaterThan(0.1);
+  }
+  return skinOrHair;
+}
+
 describe('Падіння Лєни 32×32', () => {
   it.each(FALLS)('$name: 12 кадрів; лягає навзнак і підводиться туди ж, де стояла', ({ name, cell }) => {
     const strip = load(`${name}-fall`);
@@ -419,97 +524,79 @@ describe('Падіння Лєни 32×32', () => {
   });
 
   it.each(FALLS)('$name: очі карі в кожному кадрі падіння', ({ name, cell }) => {
-    const strip = load(`${name}-fall`);
-    const { width, data } = strip;
-    const at = (x, y) => ((y) * width + x) * 4;
-    // Голова — там, де волосся: кольори волосся — каштанові пікселі верхніх
-    // 15% силуету «праворуч» на аркуші ходи (як у `build_sheet.py`). Без
-    // цього за очі сходять джинси й манжети біля рук підлітка.
-    const base = load(name);
-    const stand = boxOf(base, cell, 0, 2);
-    const hair = new Set();
-    for (let y = stand.top; y <= stand.top + stand.h * 0.15; y += 1) {
-      for (let x = 0; x < cell; x += 1) {
-        const i = ((2 * cell + y) * base.width + x) * 4;
-        const [h, s, v] = hsv(base.data[i], base.data[i + 1], base.data[i + 2]);
-        if (base.data[i + 3] > 0 && h >= 0.02 && h <= 0.12 && s >= 0.25 && v <= 0.85) hair.add(`${base.data[i]},${base.data[i + 1]},${base.data[i + 2]}`);
-      }
-    }
-    expect(hair.size).toBeGreaterThan(2);
-    const found = [];
-    for (let col = 0; col < FALL_COLS; col += 1) {
-      let hx0 = cell, hy0 = cell, hx1 = -1, hy1 = -1;
-      for (let y = 0; y < cell; y += 1) {
-        for (let x = 0; x < cell; x += 1) {
-          const i = at(col * cell + x, y);
-          if (data[i + 3] === 0 || !hair.has(`${data[i]},${data[i + 1]},${data[i + 2]}`)) continue;
-          hx0 = Math.min(hx0, x); hy0 = Math.min(hy0, y); hx1 = Math.max(hx1, x); hy1 = Math.max(hy1, y);
-        }
-      }
-      expect(hx1, `кадр ${col}: волосся видно`).toBeGreaterThanOrEqual(0);
-      const inHead = ([a, b]) => a >= hx0 - 2 && a <= hx1 + 2 && b >= hy0 - 2 && b <= hy1 + 2;
-      const seen = new Set();
-      for (let y = 0; y < cell; y += 1) {
-        for (let x = 0; x < cell; x += 1) {
-          const i = at(col * cell + x, y);
-          if (seen.has(`${x},${y}`) || data[i + 3] === 0 || !isBluish(hsv(data[i], data[i + 1], data[i + 2]))) continue;
-          // Острівець синюватих пікселів…
-          const comp = [];
-          const stack = [[x, y]];
-          seen.add(`${x},${y}`);
-          while (stack.length > 0) {
-            const [a, b] = stack.pop();
-            comp.push([a, b]);
-            for (let dx = -1; dx <= 1; dx += 1) {
-              for (let dy = -1; dy <= 1; dy += 1) {
-                const nx = a + dx, ny = b + dy;
-                if (nx < 0 || ny < 0 || nx >= cell || ny >= cell || seen.has(`${nx},${ny}`)) continue;
-                const j = at(col * cell + nx, ny);
-                if (data[j + 3] > 0 && isBluish(hsv(data[j], data[j + 1], data[j + 2]))) { seen.add(`${nx},${ny}`); stack.push([nx, ny]); }
-              }
-            }
-          }
-          if (comp.length > 6 || !comp.every(inHead)) continue;
-          // …посеред обличчя — це око.
-          const skin = new Set();
-          for (const [a, b] of comp) {
-            for (let dx = -3; dx <= 3; dx += 1) {
-              for (let dy = -3; dy <= 3; dy += 1) {
-                const nx = a + dx, ny = b + dy;
-                if (nx < 0 || ny < 0 || nx >= cell || ny >= cell) continue;
-                const j = at(col * cell + nx, ny);
-                const [h, s, v] = hsv(data[j], data[j + 1], data[j + 2]);
-                if (data[j + 3] > 0 && (h <= 0.1 || h >= 0.97) && s >= 0.12 && s <= 0.5 && v >= 0.7) skin.add(`${nx},${ny}`);
-              }
-            }
-          }
-          if (skin.size >= 8) found.push(`кадр ${col}: ${comp.map(([a, b]) => `${a},${b}`).join(' ')}`);
-        }
-      }
-    }
-    expect(found).toEqual([]);
+    expect(blueEyes(name, `${name}-fall`, cell, FALL_COLS)).toEqual([]);
   });
 
   it.each(FALLS)('$name: куплений одяг перефарбовується й лежачи, а шкіра й волосся — ні', ({ name, cell, garments }) => {
-    const strip = load(`${name}-fall`);
-    const base = load(name);
-    const map = garmentMapByPalette({ ...strip, cell }, { ...base, cell }, garments);
-    const skinOrHair = [];
-    for (let col = 0; col < FALL_COLS; col += 1) {
-      let dressed = 0, all = 0;
-      for (let y = 0; y < cell; y += 1) {
-        for (let x = 0; x < cell; x += 1) {
-          const p = y * strip.width + col * cell + x;
-          if (strip.data[p * 4 + 3] === 0) continue;
-          all += 1;
-          if (map[p] < 0) continue;
-          dressed += 1;
-          const [h, s, v] = hsv(strip.data[p * 4], strip.data[p * 4 + 1], strip.data[p * 4 + 2]);
-          if (isFaceSkin([h, s, v]) || (h >= 0.02 && h <= 0.12 && s >= 0.3 && v <= 0.6)) skinOrHair.push(`кадр ${col}: ${x},${y}`);
+    expect(paintedSkinOrHair(name, `${name}-fall`, cell, FALL_COLS, garments), 'шкіра й волосся не фарбуються').toEqual([]);
+  });
+});
+
+// ============================================================
+// Пози з руками перед собою (власник, 2026-10-31: «допрацьовувати візуал
+// персонажів» → «Лєна в міні-іграх»): смуги `build_sheet.py` "strip" з
+// кадрів PixelLab `skeleton-v3` — руки на рівні грудей, низько біля стегон,
+// на рівні плечей, «праворуч». Курник і рибалка кладуть кошик і вудку в
+// точку долоні з таблиці аркуша (`poseHand`), тож та точка мусить бути на
+// долоні, а стопи — там, де Лєна стоїть, щоб вона не стрибала між позами.
+// ============================================================
+import { POSE_NAMES, POSE_FRAME, hdFoot, poseHand } from '../../src/features/game/life/render/peopleHd.ts';
+import { LENA_ADULT, LENA_KID, LENA_TEEN } from '../../src/features/game/life/render/people.ts';
+
+/** Шкіра долоні разом із тінню: низ долоні темніший за обличчя. */
+const isHandSkin = ([h, s, v]) => (h <= 0.1 || h >= 0.97) && s >= 0.12 && s <= 0.5 && v >= 0.6;
+
+const POSES = [
+  { name: 'lena-kid', cell: 68, garments: KID_DRESS, look: LENA_KID },
+  { name: 'lena-teen', cell: 80, garments: TEEN_CLOTHES, look: LENA_TEEN },
+  { name: 'lena-adult', cell: 92, garments: ADULT_DRESS, look: LENA_ADULT },
+];
+
+describe('Пози Лєни з руками перед собою 32×32', () => {
+  it.each(POSES)('$name: три пози на полотні людини, стопи там само, де стоїть «праворуч»', ({ name, cell }) => {
+    const strip = load(`${name}-poses`);
+    expect(strip.width).toBe(cell * POSE_NAMES.length);
+    expect(strip.height).toBe(cell);
+    const stand = boxOf(load(name), cell, 0, 2);
+    for (const pose of POSE_NAMES) {
+      const b = boxOf(strip, cell, POSE_FRAME[pose]);
+      expect(Math.abs(b.bottom - stand.bottom), `${pose}: стопи на тій самій лінії`).toBeLessThanOrEqual(1);
+      // Руки попереду — силует сягає далі, ніж у того, що стоїть (у позі
+      // «high» руки біля обличчя, лише трохи попереду носа).
+      expect(b.right, `${pose}: руки попереду`).toBeGreaterThan(stand.right + 2);
+    }
+  });
+
+  it.each(POSES)('$name: точка долоні з таблиці — на шкірі долоні, попереду тіла', ({ name, cell, look }) => {
+    const strip = load(`${name}-poses`);
+    const foot = hdFoot(look);
+    expect(foot).not.toBeNull();
+    const missed = [];
+    for (const pose of POSE_NAMES) {
+      const hand = poseHand(look, pose);
+      expect(hand, pose).not.toBeNull();
+      expect(hand.x, `${pose}: долоня попереду`).toBeGreaterThan(6);
+      // Низ долоні — рядок над `hand.y`; шкіра (з тінню знизу долоні) — у
+      // квадраті 3×3 довкола.
+      const cx = Math.round(foot.x + hand.x);
+      const cy = foot.y - hand.y - 1;
+      let skin = 0;
+      for (let dy = -1; dy <= 1; dy += 1) {
+        for (let dx = -1; dx <= 1; dx += 1) {
+          const i = ((cy + dy) * strip.width + POSE_FRAME[pose] * cell + cx + dx) * 4;
+          if (strip.data[i + 3] > 0 && isHandSkin(hsv(strip.data[i], strip.data[i + 1], strip.data[i + 2]))) skin += 1;
         }
       }
-      expect(dressed / all, `кадр ${col}: одяг знайдено`).toBeGreaterThan(0.1);
+      if (skin < 2) missed.push(`${pose}: ${cx},${cy}`);
     }
-    expect(skinOrHair, 'шкіра й волосся не фарбуються').toEqual([]);
+    expect(missed).toEqual([]);
+  });
+
+  it.each(POSES)('$name: очі карі в кожній позі', ({ name, cell }) => {
+    expect(blueEyes(name, `${name}-poses`, cell, POSE_NAMES.length)).toEqual([]);
+  });
+
+  it.each(POSES)('$name: куплений одяг перефарбовується й у позах, а шкіра й волосся — ні', ({ name, cell, garments }) => {
+    expect(paintedSkinOrHair(name, `${name}-poses`, cell, POSE_NAMES.length, garments), 'шкіра й волосся не фарбуються').toEqual([]);
   });
 });

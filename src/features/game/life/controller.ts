@@ -42,10 +42,11 @@ import {
 import { hashString, rngFor } from './sim/rng';
 import { SAVE_KEY, SaveError, parseSave, serialize } from './sim/save';
 import { dayPlan, farmPlan, friendsGame, makeGame, type PlannedGame } from './games/day';
-import { farmSummary } from './sim/farm';
+import { farmSummary, isFarmGame } from './sim/farm';
 import { Kit, type MiniGame } from './games/kit';
 import { lenaLook } from './look';
 import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
+import { preloadHd } from './render/peopleHd';
 import { artFor, hasHd, readArt, saveArt, type Art } from './render/art';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
@@ -1135,6 +1136,8 @@ export class GameController {
         if (!check.ok) { this.toast(check.reason); return; }
         this.busy = true;
         const act = ACTIVITY_BY_ID.get(a.id)!;
+        // Лєна й мама в міні-іграх садиби — з аркушів 32×32: вантажаться, поки картка на екрані.
+        if (isFarmGame(a.id)) { preloadHd(this.player.look); preloadHd(MOM); }
         await this.showCard({ title: act.title, body: act.blurb, button: 'Далі' });
         this.busy = false;
         // Сад, город, курник і ставок — з міні-грою (власник 2026-10-13):

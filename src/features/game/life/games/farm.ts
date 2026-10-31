@@ -19,6 +19,7 @@ import type { BirdKind } from '../sim/birds';
 import { MOM, type Look } from '../render/people';
 import { shade } from '../render/pixel';
 import { sfx } from '../sound';
+import { artScale, coopBasketAt, drawBasketFarm, drawLenaCoop, drawLenaFishing, drawLenaFront, drawPersonFarm, type CoopPose } from './farmLena';
 import type { GameContext, Kit, MiniGame } from './kit';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -369,7 +370,9 @@ export class OrchardGame extends FarmGame {
     const lx = this.lena * W;
     const colors = this.caught.map((k) => FRUIT_LOOK[k].body);
     const fr = 4 * z;
-    const spot = lenaWithBasket(kit, this.ctx.lena, lx, ground + 2, 'front', this.t, this.joy > 0, colors, z);
+    const moving = Math.abs(this.target - this.lena) > 0.004;
+    const spot = drawLenaFront(kit, this.ctx.lena, lx, ground + 2, moving, this.t, colors, z)
+      ?? lenaWithBasket(kit, this.ctx.lena, lx, ground + 2, 'front', this.t, this.joy > 0, colors, z);
     this.catchY = clamp01((spot.by - crownY) / span);
     this.catchHalf = (spot.half + fr) / W;
     // Фрукти: що висить — хитається, що падає — летить, що впало — лежить.
@@ -716,8 +719,8 @@ export class GardenGame extends FarmGame {
       const my = H - 14;
       const mx = 34;
       kit.rect(0, my - 6, W, H - my + 6, '#86c46a');
-      kit.person(MOM, mx, my, 3, 2, 0);
-      basket(kit, mx + 40, my - 14, this.basketItems.slice(-9), 26);
+      if (!drawPersonFarm(kit, MOM, mx, my, 2, z)) kit.person(MOM, mx, my, 3, 2, 0);
+      drawBasketFarm(kit, mx + 40, my - 16, 20, this.basketItems, z);
       if (this.momT > 0) {
         const bw = Math.max(54, this.momSays.length * 5 + 10);
         const bx = mx + 22;
@@ -818,7 +821,7 @@ function drawMole(kit: Kit, x: number, y: number, t: number): void {
 // 3. Курник: яйця котяться з чотирьох сідал — лови, як вовк у «Ну, погоди!».
 // ------------------------------------------------------------
 /** Жолоби: ліворуч угорі, ліворуч унизу, праворуч угорі, праворуч унизу. */
-export const CHUTES: readonly BasketPose[] = ['ul', 'dl', 'ur', 'dr'];
+export const CHUTES: readonly CoopPose[] = ['ul', 'dl', 'ur', 'dr'];
 /** Кроків по жолобу, перш ніж яйце скотиться в кошик (чи на підлогу). */
 export const EGG_STEPS = 5;
 
@@ -844,7 +847,7 @@ interface Egg {
 export class EggsGame extends FarmGame {
   title = 'Курник';
   hint = 'Торкайся кута — Лєна підставить кошик під жолоб';
-  pose: BasketPose = 'dl';
+  pose: CoopPose = 'dl';
   eggs: Egg[] = [];
   /** Скільки яєць уже покотилось (з `EGGS_PER_ROUND`). */
   launched = 0;
@@ -933,16 +936,22 @@ export class EggsGame extends FarmGame {
     const floor = portrait ? H - 92 : H - 12;
     const lx = Math.round(W / 2);
     const look = this.ctx.lena;
-    const slope = portrait ? 0.95 : 0.42;
+    // Верхні жолоби крутіші за нижні: біля Лєни кінці близько (кошик угорі й
+    // унизу — на долоню), а гнізда з курками розходяться. Гніздо не вище за
+    // табличку з назвою.
+    const nestTop = TOP + (portrait ? 30 : 16);
     const chutes = CHUTES.map((pose) => {
-      const b = basketAt(look, lx, floor + 1, pose, z);
+      const b = coopBasketAt(kit, look, lx, floor + 1, pose, z) ?? basketAt(look, lx, floor + 1, pose, z);
       const left = pose === 'ul' || pose === 'dl';
+      const upper = pose === 'ul' || pose === 'ur';
       const x0 = left ? 6 + 8 * z : W - 6 - 8 * z;
       const y1 = b.by - 10 * z;
-      return { x0, y0: Math.round(y1 - Math.abs(b.bx - x0) * slope), x1: b.bx, y1 };
+      const run = Math.abs(b.bx - x0);
+      const slope = Math.min(portrait ? (upper ? 1.3 : 0.9) : upper ? 0.62 : 0.4, (y1 - nestTop) / run);
+      return { x0, y0: Math.round(y1 - run * slope), x1: b.bx, y1 };
     });
-    const up = basketAt(look, lx, floor + 1, 'ul', z).by;
-    const down = basketAt(look, lx, floor + 1, 'dl', z).by;
+    const up = (coopBasketAt(kit, look, lx, floor + 1, 'ul', z) ?? basketAt(look, lx, floor + 1, 'ul', z)).by;
+    const down = (coopBasketAt(kit, look, lx, floor + 1, 'dl', z) ?? basketAt(look, lx, floor + 1, 'dl', z)).by;
     return { z, portrait, floor, lx, chutes, split: Math.round((up + down) / 2) };
   }
 
@@ -1021,7 +1030,7 @@ export class EggsGame extends FarmGame {
     }
     // Лєна з кошиком.
     const items = Array.from({ length: Math.min(9, this.caught) }, () => '#fbf3e4');
-    lenaWithBasket(kit, this.ctx.lena, lx, floor + 1, this.pose, this.t, this.joy > 0, items, z);
+    if (!drawLenaCoop(kit, this.ctx.lena, lx, floor + 1, this.pose, items, z)) lenaWithBasket(kit, this.ctx.lena, lx, floor + 1, this.pose, this.t, this.joy > 0, items, z);
     if (this.faster > 0) {
       const y = portrait ? winY + winH + 20 : TOP + 18;
       kit.text('Швидше!', W / 2, y - (1.6 - this.faster) * 4, { size: portrait ? 12 : 10, color: '#ffe48a' });
@@ -1250,15 +1259,17 @@ export class FishingGame extends FarmGame {
       kit.rect(x0 - 1, bank - h + 4, 3, portrait ? 7 : 4, '#7a4a24');
     }
     // Лєна з вудкою на березі, біля неї — відро з уловом.
-    const sc = 2 * z;
     const lx = portrait ? 52 : 30;
     const feet = H - (portrait ? 26 : 6);
-    this.renderBucket(kit, lx + 15 * sc, feet - 2, z);
-    kit.person(this.ctx.lena, lx, feet, sc, 2, 0);
-    const handX = lx + 3 * sc;
-    const handY = feet - 12 * sc;
-    const tipX = handX + 23 * sc;
-    const tipY = handY - 17 * sc;
+    const a = artScale(kit, z);
+    this.renderBucket(kit, lx + 30 * a, feet - 2, z);
+    // Лєна профілем з аркуша PixelLab, вудка — з її рук; поки аркуш вантажиться — спрайт.
+    const hands = drawLenaFishing(kit, this.ctx.lena, lx, feet, z);
+    if (!hands) kit.person(this.ctx.lena, lx, feet, 2 * z, 2, 0);
+    const handX = hands ? hands.hx : lx + 6 * z;
+    const handY = hands ? hands.hy : feet - 24 * z;
+    const tipX = handX + 60 * a;
+    const tipY = handY - 46 * a;
     line(kit, handX, handY, tipX, tipY, '#7a4a24', z);
     // Поплавок і волосінь.
     const fx = this.float.x * W;

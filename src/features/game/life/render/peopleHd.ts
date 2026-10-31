@@ -15,6 +15,9 @@ import lenaAdultUrl from './assets/hd/lena-adult.png';
 import lenaKidFallUrl from './assets/hd/lena-kid-fall.png';
 import lenaTeenFallUrl from './assets/hd/lena-teen-fall.png';
 import lenaAdultFallUrl from './assets/hd/lena-adult-fall.png';
+import lenaKidPosesUrl from './assets/hd/lena-kid-poses.png';
+import lenaTeenPosesUrl from './assets/hd/lena-teen-poses.png';
+import lenaAdultPosesUrl from './assets/hd/lena-adult-poses.png';
 import dimaUrl from './assets/hd/dima.png';
 import momUrl from './assets/hd/mom.png';
 import { recolorByPalette, recolorOutfit, type Garment, type OutfitColors, type Tone } from './outfitHd';
@@ -41,8 +44,31 @@ interface HdSheet {
    * полотні — `FALL_DOWN_FRAMES` падіння навзнак, далі `FALL_UP_FRAMES` підйому
    * (PixelLab, шаблони `falling-back-death` і `getting-up`).
    */
-  fall?: { url: string; img?: HTMLImageElement; ready?: boolean; dressed?: Map<string, HTMLCanvasElement> };
+  fall?: Strip;
+  /**
+   * Пози з руками перед собою (лише Лєна, міні-ігри садиби): кадри
+   * «праворуч» у порядку `POSE_NAMES` (PixelLab `skeleton-v3`). `hands` —
+   * де долоні в кожній позі: пікселі малюнка від точки між стопами, `x`
+   * уперед, `y` угору (низ долоні).
+   */
+  poses?: Strip & { hands: Readonly<Record<PoseName, { x: number; y: number }>> };
+  /** Обличчям до нас: висота низу долонь над стопами й де вони ліворуч і праворуч від середини. */
+  front?: { up: number; l: number; r: number };
 }
+
+/** Смуга кадрів одного напряму («праворуч») на полотні людини. */
+interface Strip {
+  url: string;
+  img?: HTMLImageElement;
+  ready?: boolean;
+  dressed?: Map<string, HTMLCanvasElement>;
+}
+
+/** Пози з руками перед собою: на рівні грудей, низько біля стегон, на рівні плечей. */
+export type PoseName = 'chest' | 'low' | 'high';
+export const POSE_NAMES: readonly PoseName[] = ['chest', 'low', 'high'];
+/** Кадр пози в смузі. */
+export const POSE_FRAME: Readonly<Record<PoseName, number>> = { chest: 0, low: 1, high: 2 };
 
 /** Кадри смуги падіння: спершу падає (останній — лежить), потім підводиться. */
 export const FALL_DOWN_FRAMES = 7;
@@ -76,15 +102,18 @@ export const ADULT_DRESS: readonly Garment[] = [
   { part: 'bottom', band: [0.6, 0.93], tones: ADULT_BLUE },
 ];
 
+// Пози з руками перед собою (`poses`) — персонажі PixelLab тих самих Лєн,
+// `skeleton-v3` «reaches both empty hands forward» «праворуч», 2026-10-31;
+// точки долонь і `front` (долоні в кадрі «униз») заміряв `build_sheet.py`.
 const SHEETS: HdSheet[] = [
   // Персонаж PixelLab «Лєна мала HD (48)» (a046bd5b-…).
-  { url: lenaKidUrl, fall: { url: lenaKidFallUrl }, cell: 68, frames: 4, footX: 34, footY: 56, outfit: { base: LENA_KID, garments: KID_DRESS }, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
+  { url: lenaKidUrl, fall: { url: lenaKidFallUrl }, poses: { url: lenaKidPosesUrl, hands: { chest: { x: 11.5, y: 22 }, low: { x: 9.1, y: 13 }, high: { x: 10.2, y: 27 } } }, front: { up: 14, l: -7.5, r: 6.5 }, cell: 68, frames: 4, footX: 34, footY: 56, outfit: { base: LENA_KID, garments: KID_DRESS }, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
   // Персонаж PixelLab «Лєна підліток HD (2)» (10065427-…), власник 2026-10-11:
   // «дуже різниться між дитиною і дорослою, перемалюй» — кругле обличчя й
   // великі очі, як у малої й дорослої, світло-каштанове волосся, зріст між ними.
-  { url: lenaTeenUrl, fall: { url: lenaTeenFallUrl }, cell: 80, frames: 4, footX: 40, footY: 67, outfit: { base: LENA_TEEN, garments: TEEN_CLOTHES }, match: (l) => isLenaTeen(l) },
+  { url: lenaTeenUrl, fall: { url: lenaTeenFallUrl }, poses: { url: lenaTeenPosesUrl, hands: { chest: { x: 14.9, y: 26 }, low: { x: 12, y: 15 }, high: { x: 11.1, y: 32 } } }, front: { up: 16, l: -8.5, r: 7.5 }, cell: 80, frames: 4, footX: 40, footY: 67, outfit: { base: LENA_TEEN, garments: TEEN_CLOTHES }, match: (l) => isLenaTeen(l) },
   // Персонаж PixelLab «Лєна доросла HD» (2ddf3605-…), власник 2026-10-06: «Доросла Лєна».
-  { url: lenaAdultUrl, fall: { url: lenaAdultFallUrl }, cell: 92, frames: 4, footX: 46, footY: 76, outfit: { base: LENA_ADULT, garments: ADULT_DRESS }, match: (l) => isLenaAdult(l) },
+  { url: lenaAdultUrl, fall: { url: lenaAdultFallUrl }, poses: { url: lenaAdultPosesUrl, hands: { chest: { x: 16.1, y: 30 }, low: { x: 13.1, y: 17 }, high: { x: 13, y: 37 } } }, front: { up: 19, l: -10, r: 9 }, cell: 92, frames: 4, footX: 46, footY: 76, outfit: { base: LENA_ADULT, garments: ADULT_DRESS }, match: (l) => isLenaAdult(l) },
   // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).
   { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
   // Персонаж PixelLab «Діма HD» (ff0178ab-…), власник 2026-10-06: «Діму давай далі».
@@ -119,16 +148,26 @@ function sheetOf(look: Look): HdSheet | null {
     s.img.onload = () => { s.ready = true; };
     s.img.onerror = () => console.error(`Люди 32×32: не вдалося завантажити аркуш ${s.url}`);
     s.img.src = s.url;
-    // Падіння вантажиться разом з аркушем, щоб бути готовим до першого ж падіння.
-    const f = s.fall;
-    if (f) {
-      f.img = new Image();
-      f.img.onload = () => { f.ready = true; };
-      f.img.onerror = () => console.error(`Люди 32×32: не вдалося завантажити падіння ${f.url}`);
-      f.img.src = f.url;
-    }
+    // Падіння й пози вантажаться разом з аркушем, щоб бути готовими до першого ж падіння чи міні-гри.
+    if (s.fall) loadStrip(s.fall, 'падіння');
+    if (s.poses) loadStrip(s.poses, 'пози');
   }
   return s;
+}
+
+function loadStrip(st: Strip, what: string): void {
+  st.img = new Image();
+  st.img.onload = () => { st.ready = true; };
+  st.img.onerror = () => console.error(`Люди 32×32: не вдалося завантажити ${what} ${st.url}`);
+  st.img.src = st.url;
+}
+
+/**
+ * Почати вантажити аркуш людини з падінням і позами наперед — перед
+ * міні-грою, щоб Лєна з кошиком була готова до першого ж кадру.
+ */
+export function preloadHd(look: Look): void {
+  sheetOf(look);
 }
 
 /** Чи є для цієї людини готовий аркуш 32×32. */
@@ -164,7 +203,43 @@ export function hasHdFall(look: Look): boolean {
 export function drawFallHd(g: CanvasRenderingContext2D, look: Look, x: number, y: number, mirror: boolean, frame: number): void {
   const s = sheetOf(look);
   if (!s?.img || !s.ready || !s.fall?.img || !s.fall.ready) return;
-  const src = dressedFall(s, look);
+  drawStrip(g, s, dressedStrip(s, s.fall, look), x, y, mirror, frame);
+}
+
+/** Чи готова смуга поз з руками перед собою (лише Лєна). */
+export function hasHdPoses(look: Look): boolean {
+  const s = sheetOf(look);
+  return !!s?.ready && !!s.poses?.ready;
+}
+
+/** Де долоні в позі: пікселі малюнка від точки між стопами (`x` уперед, `y` угору), або `null`, якщо поз нема. */
+export function poseHand(look: Look, pose: PoseName): { x: number; y: number } | null {
+  return sheetOf(look)?.poses?.hands[pose] ?? null;
+}
+
+/** Точка між стопами в клітинці аркуша (пікселі малюнка), або `null`, якщо аркуша нема. */
+export function hdFoot(look: Look): { x: number; y: number } | null {
+  const s = sheetOf(look);
+  return s ? { x: s.footX, y: s.footY } : null;
+}
+
+/** Обличчям до нас: де долоні (`HdSheet.front`), або `null`. */
+export function frontHands(look: Look): { up: number; l: number; r: number } | null {
+  return sheetOf(look)?.front ?? null;
+}
+
+/**
+ * Поза з руками перед собою (`POSE_FRAME`): `x, y` — точка між стопами,
+ * `mirror` — обличчям ліворуч. Кадри намальовані «праворуч».
+ */
+export function drawPoseHd(g: CanvasRenderingContext2D, look: Look, x: number, y: number, mirror: boolean, frame: number): void {
+  const s = sheetOf(look);
+  if (!s?.img || !s.ready || !s.poses?.img || !s.poses.ready) return;
+  drawStrip(g, s, dressedStrip(s, s.poses, look), x, y, mirror, frame);
+}
+
+/** Кадр смуги (падіння чи пози) на місці людини; «ліворуч» — дзеркало. */
+function drawStrip(g: CanvasRenderingContext2D, s: HdSheet, src: CanvasImageSource, x: number, y: number, mirror: boolean, frame: number): void {
   const half = s.cell / 2;
   const xs = Math.round(x * 2) / 2;
   const dy = Math.round((y - s.footY / 2) * 2) / 2;
@@ -196,11 +271,11 @@ function pixelsOf(img: HTMLImageElement): ImageData {
 }
 
 /**
- * Смуга падіння в теперішньому одязі. Лежачи смуги висоти не діють, тож
- * одяг упізнається за кольором основного аркуша (`recolorByPalette`).
+ * Смуга (падіння чи пози) в теперішньому одязі. Лежачи й з піднятими
+ * руками смуги висоти не діють, тож одяг упізнається за кольором основного
+ * аркуша (`recolorByPalette`).
  */
-function dressedFall(s: HdSheet, look: Look): CanvasImageSource {
-  const f = s.fall!;
+function dressedStrip(s: HdSheet, f: Strip, look: Look): CanvasImageSource {
   const img = f.img!;
   if (!s.outfit) return img;
   const colors = outfitColors(s.outfit.base, look);
