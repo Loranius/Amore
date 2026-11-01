@@ -12,15 +12,7 @@
 
 // Закон росту: голова, річні колонії, їхня розкладка на куполі.
 export {
-  ANNUAL_BODIES_MAX,
-  ANNUAL_BODIES_MIN,
-  ANNUAL_DENSITY_FLOOR,
   ANNUAL_HEAD_SHARE,
-  reefAnnualColonySize,
-  reefColonyAnchor,
-  reefColonyAzimuthRad,
-  reefColonyBand,
-  reefColonyLayout,
   reefHeadScale,
   reefHeadSize,
   yearFill,
@@ -30,12 +22,11 @@ export {
 } from './colonyFormations';
 
 // Тіла всередині однієї річної колонії.
-export { reefColonyBodies, type ReefCoralBody } from './colonyBodies';
+export { type ReefCoralBody } from './colonyBodies';
 
 // Складання: історія пари → повний план рифа.
 export {
   buildReefPlan,
-  reefHistoryFromArtifact,
   type BuildReefPlanInput,
   type ReefColonyPlan,
   type ReefHistoryEvent,
@@ -50,28 +41,17 @@ export {
 } from './reefProfile';
 
 // Форма: купол голови, коралові тіла, риба.
-export { buildReefHeadMesh, type ReefMeshData } from './headMesh';
-export { buildReefColonyMesh } from './bodyMesh';
-export { buildReefFishEyeMesh, buildReefFishMesh } from './fishMesh';
+export { type ReefMeshData } from './headMesh';
 export {
-  FISH_MAX,
-  FISH_MIN,
-  REEF_FISH_COLOURS,
-  reefFishSchool,
   type ReefFish,
 } from './fishSchool';
 
 // Палітра пари й постановка сцени.
 export {
-  reefCoupleHue,
-  reefCoupleTint,
   type ReefTheme,
   type ReefTint,
 } from './coralPalette';
 export {
-  REEF_CAMERA_FOV_DEG,
-  reefCameraFrame,
-  reefStanding,
   type ReefCameraFrame,
   type ReefStanding,
 } from './reefStaging';

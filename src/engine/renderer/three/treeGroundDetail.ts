@@ -18,7 +18,7 @@ function matrixForInstance(instance: TreeGroundDetailInstance): THREE.Matrix4 {
   );
 }
 
-export function createThreeTreeGroundDetailGeometry(
+function createThreeTreeGroundDetailGeometry(
   state: TreeGroundDetailState,
 ): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
@@ -38,7 +38,7 @@ export function createThreeTreeGroundDetailGeometry(
   return geometry;
 }
 
-export function createThreeTreeGroundDetailMaterial(
+function createThreeTreeGroundDetailMaterial(
   state: TreeGroundDetailState,
 ): THREE.MeshStandardMaterial {
   const material = new THREE.MeshStandardMaterial({

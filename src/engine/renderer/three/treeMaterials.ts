@@ -267,7 +267,7 @@ function applyFoliageSurfaceShader(material: THREE.MeshStandardMaterial): void {
   };
 }
 
-export function createThreeTreeMaterial(
+function createThreeTreeMaterial(
   recipe: TreeMaterialRecipe,
   bark?: TreeBarkSurfaceState,
 ): THREE.MeshStandardMaterial {

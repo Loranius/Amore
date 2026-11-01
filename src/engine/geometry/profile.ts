@@ -6,7 +6,7 @@ import {
   scale,
   seededUnit,
 } from '../growth/math';
-import type { GrowthAttributeValue, GrowthBody, GrowthTier } from '../growth';
+import type { GrowthAttributeValue, GrowthBody } from '../growth';
 import { buildCrystalFacePlanes, transformCrystalPlane } from './planes';
 import { crystalHabitShape } from './habit';
 import { intersectHalfSpaces, polytopeTolerance } from './polytope';
@@ -26,21 +26,6 @@ interface ProfileShapeTuning {
 
 function stringAttribute(value: GrowthAttributeValue | undefined, fallback: string): string {
   return typeof value === 'string' && value.trim() ? value : fallback;
-}
-
-function baseSegments(tier: GrowthTier): number {
-  if (tier === 'king') return 10;
-  if (tier === 'support') return 9;
-  if (tier === 'family') return 8;
-  if (tier === 'companion') return 6;
-  return 5;
-}
-
-export function crystalSegments(tier: GrowthTier, lod: CrystalLodLevel): number {
-  const high = baseSegments(tier);
-  if (lod === 'high') return high;
-  if (lod === 'medium') return Math.max(5, high - 2);
-  return Math.max(4, Math.ceil(high * 0.6));
 }
 
 /**

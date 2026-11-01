@@ -1,17 +1,12 @@
-export { createThreeCrystalGeometry } from './bufferGeometry';
 export { createThreeOrganicSweepGeometry } from './organicSweep';
 export {
-  createThreeTreeLeafCardGeometry,
   createThreeTreeLeafInstancedMesh,
 } from './leafInstances';
 export {
-  createThreeTreeGroundDetailGeometry,
   createThreeTreeGroundDetailInstancedMesh,
-  createThreeTreeGroundDetailMaterial,
 } from './treeGroundDetail';
 export { createThreeTreeRootGeometry } from './treeRootGeometry';
 export {
-  createThreeTreeMaterial,
   createThreeTreeMaterialPair,
 } from './treeMaterials';
 export {
@@ -19,7 +14,6 @@ export {
   createThreeTreeLifeBinding,
 } from './treeLife';
 export type { ThreeTreeLifeBinding } from './treeLife';
-export { createThreeCrystalMaterial } from './material';
 export { createThreeCrystalInnerSparks } from './innerSparks';
 export type { ThreeCrystalInnerSparks } from './innerSparks';
 export {
@@ -37,9 +31,6 @@ export type { ThreeCrystalRenderBundle } from './bundle';
 export { fitThreeTree, measureThreeTreeReach, TREE_FIT_HEIGHT } from './treeFit';
 export type { ThreeTreeFit, ThreeTreeFitContent, ThreeTreeReach } from './treeFit';
 export {
-  TREE_LEAF_SWAY_ATTRIBUTE,
   TREE_LEAF_SWAY_VERSION,
-  applyThreeTreeLeafSway,
-  setThreeTreeLeafSwayFrame,
   type TreeLeafSwayUniforms,
 } from './treeLeafSway';

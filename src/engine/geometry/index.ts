@@ -1,15 +1,15 @@
 export { DEFAULT_CRYSTAL_GEOMETRY_CONFIG } from './config';
 export { buildCrystalGeometry } from './engine';
 export { buildCrystalJunction } from './junction';
-export { buildCrystalMesh, rebuildCrystalMeshNormals } from './mesh';
-export { buildCrystalProfile, crystalSegments } from './profile';
+export { buildCrystalMesh } from './mesh';
+export { buildCrystalProfile } from './profile';
 export {
   CRYSTAL_SUBSTRATE_BODY_ID,
   crystalVeinBearings,
   crystalVeinBuriedRadiusAt,
   crystalVeinRadiusAt,
 } from './substrate';
-export { pointInsideCrystalSolid, trimCrystalMesh } from './trim';
+export { pointInsideCrystalSolid } from './trim';
 export type {
   BuildCrystalGeometryInput,
   CrystalAttachmentJunction,

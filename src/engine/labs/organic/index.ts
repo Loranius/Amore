@@ -1,4 +1,3 @@
-export { generateEllipsoidAttractors } from './attractors';
 export { DEFAULT_ORGANIC_SKELETON_CONFIG } from './config';
 export { buildOrganicCurveFrames } from './curveFrames';
 export { buildOrganicSkeleton } from './spaceColonization';
