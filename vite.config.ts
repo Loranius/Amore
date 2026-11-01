@@ -68,7 +68,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/(?:models\/coral_reef_set_cc0\.glb|textures\/reef\/[^/]+\.webp|assets\/reef\/volcano\/[^/]+\.webp)$/,
+            urlPattern: /\/(?:models\/coral_reef_set_cc0\.glb|textures\/reef\/[^/]+\.webp)$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'reef-visual-assets',

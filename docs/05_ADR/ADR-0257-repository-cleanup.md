@@ -78,9 +78,6 @@
 - Невикористані експорти в `src/engine/**` (`dispose*`-функції текстур,
   сталі шапок росту) — рушій під нормативною специфікацією, його публічні
   контракти не чіпаються без окремого рішення.
-- `public/textures/reef/coral_stone_diff_1k.webp` (свідомо не береться,
-  `reefStoneSurface.ts`) і `public/assets/reef/volcano/volcano-reference-albedo.webp`
-  (призначення не встановлено) лишено.
 - `heic2any` поруч із `heic-to` — свідомий запасний конвертер HEIC.
 - Жива перевірка `npm run live` не проводилась: у середовищі немає
   `.env.live`. Аргумент, що вигляд не змінився, — статичний (видалено лише
@@ -123,3 +120,17 @@
   їм не потрібна; новий код ходить конвеєром v5 з орендою.
 - **База не змінювалась:** функція `set_wishlist_processed_image_v3` і
   таблиця `map_pins` лишились як були.
+
+## Поправка 2026-11-01 — два зображення без завантажувача
+
+Власник: «Прибери і coral_stone_diff та volcano-reference-albedo».
+
+- **`public/textures/reef/coral_stone_diff_1k.webp`** (108 КБ) — дифузна карта
+  набору Coral Stone Wall. `reefStoneSurface.ts` свідомо бере з набору лише
+  нормаль і шорсткість: колір каменю дає тема. У `LICENSE.txt` набору рядок
+  про дифузну карту прибрано й сказано, чому її нема.
+- **`public/assets/reef/volcano/volcano-reference-albedo.webp`** (16 КБ) — не
+  згадувався ніде, крім правила кешу PWA; тека `public/assets/` спорожніла
+  й зникла.
+- **`vite.config.ts`:** у правилі кешу `reef-visual-assets` прибрано шаблон
+  `assets/reef/volcano/*.webp` — під ним більше нічого не лежить.
