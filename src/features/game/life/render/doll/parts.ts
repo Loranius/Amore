@@ -1,27 +1,24 @@
 // ============================================================
 // Модульні люди (ADR-0239, поправка 2026-11-01): частини тіла — піксельні
-// сітки, однакові для всіх. Зріст, голова, руки, ноги, вуха й очі в Лєни,
-// Діми й будь-кого в грі одні й ті самі: відрізняються лише кольори
-// (шкіра, очі, брови) й обличчя (`face`), а згодом — зачіска й одяг.
+// сітки, однакові для всіх. Зріст, голова, руки, ноги, вуха й форма очей у
+// Лєни, Діми й будь-кого в грі одні й ті самі: відрізняються лише кольори
+// (шкіра, очі, брови) й обличчя (`faces.ts`), а згодом — зачіска й одяг.
 //
-// Ключі сітки (матеріал «шкіра», кольори — `palette.ts`):
+// Пропорції — за референсами власника (2026-11-01, «спробуй щось схоже на
+// це»): велика кругла голова (~45% зросту) з очима в нижній половині,
+// коротке м'яке тіло, тонкі руки, коротенькі ноги. Пікселі референсів не
+// копійовано — лише пропорції й прийоми.
+//
+// Ключі сітки (матеріал «шкіра», кольори — `dolls.ts`):
 //   .  порожньо
 //   h  світло   s  основний   S  тінь   D  глибока тінь
-// Обвідку не малюють — її додає `compose.ts` довкола кожної частини.
-//
-// Сітку з `half` пишуть лише ліву половину: права — її дзеркало (так
-// фронтальний ракурс симетричний за побудовою).
+// Обвідку не малюють — її додає `rig.ts` довкола кожної частини.
 // ============================================================
 
 /** Частина тіла: сітка й точка кріплення (`pivot`) у пікселях сітки. */
 export interface Part {
   readonly rows: readonly string[];
   readonly pivot: { readonly x: number; readonly y: number };
-}
-
-/** Ліва половина → повна сітка (права половина — дзеркало). */
-function half(rows: readonly string[]): string[] {
-  return rows.map((r) => r + [...r].reverse().join(''));
 }
 
 /** Дзеркальна копія частини: сітка й точка кріплення. */
@@ -32,206 +29,217 @@ export function mirrorPart(p: Part): Part {
 
 // ---------- Обличчям до нас ----------
 
-/** Голова спереду: 16×12 з вухами (чверть зросту), точка кріплення — під серединою підборіддя. */
+/** Голова спереду з вухами, точка кріплення — під серединою підборіддя. Зі спини та сама (обличчя — окремі шари). */
 export const HEAD_FRONT: Part = {
-  rows: half([
-    '....ssss',
-    '..ssssss',
-    '.sssssss',
-    '.ssssshh',
-    '.sssssss',
-    'Ssssssss',
-    'SSssssss',
-    'SSssssss',
-    '.Sssssss',
-    '.SSsssss',
-    '..SSssss',
-    '....SSss',
-  ]),
-  pivot: { x: 8, y: 12 },
+  rows: [
+    '.........ssssssssss.........',
+    '......ssssssssssssssss......',
+    '.....ssshhhssssssssssss.....',
+    '....ssshhsssssssssssssss....',
+    '...ssshssssssssssssssssss...',
+    '...ssssssssssssssssssssss...',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    '..ssssssssssssssssssssssss..',
+    'ssssssssssssssssssssssssssss',
+    'sSssssssssssssssssssssssssSs',
+    'sSssssssssssssssssssssssssSs',
+    'sSssssssssssssssssssssssssSs',
+    'ssssssssssssssssssssssssssss',
+    '...ssssssssssssssssssssss...',
+    '...ssssssssssssssssssssss...',
+    '....ssssssssssssssssssss....',
+    '......sSssssssssssssSs......',
+    '........SsSSSSSSSSsS........',
+  ],
+  pivot: { x: 14, y: 27 },
 };
 
-/** Носик спереду — дві тіньові крапки (частина голови, а не обличчя: він у всіх однаковий). */
-export const NOSE_FRONT: Part = { rows: ['SS'], pivot: { x: 1, y: 0 } };
-
-/** Тулуб спереду з шиєю: 18×20, точка кріплення — верх шиї. */
+/** Тулуб спереду з шиєю й тазом, кріплення — верх шиї. */
 export const TORSO_FRONT: Part = {
-  rows: half([
-    '......SSS',
-    '......sss',
-    '......sss',
-    '....sssss',
-    '.ssssssss',
-    'hssssssss',
-    'hssssssss',
-    'sssssssss',
-    '.Ssssssss',
-    '.Ssssssss',
-    '..Sssssss',
-    '..Sssssss',
-    '..Sssssss',
-    '..Sssssss',
-    '.SSssssss',
-    '.SSssssss',
-    '.SSssssss',
-    '.SSssssss',
-    '..SSsssss',
-    '...SSSSSS',
-  ]),
-  pivot: { x: 9, y: 0 },
-};
-
-/** Тулуб зі спини: той самий силует, хребет і лопатки. */
-export const TORSO_BACK: Part = {
-  rows: half([
-    '......SSS',
-    '......sss',
-    '......sss',
-    '....sssss',
-    '.ssssssss',
-    'hssssssss',
-    'hsssssssS',
-    'ssssssssS',
-    '.SssssssS',
-    '.SssssssS',
-    '..SsssssS',
-    '..SsssssS',
-    '..SsssssS',
-    '..SsssssS',
-    '.SSsssssS',
-    '.SSsssssS',
-    '.SSsssssS',
-    '.SSsssssS',
-    '..SSsssss',
-    '...SSSSSS',
-  ]),
-  pivot: { x: 9, y: 0 },
-};
-
-/** Ліва рука (з нашого погляду) спереду: 3×19, кріплення — плече. */
-export const ARM: Part = {
   rows: [
-    '.hs',
-    'hss',
-    'hsS',
-    'hsS',
-    'ssS',
-    'ssS',
-    'ssS',
-    'ssS',
-    'ssS',
-    'ssS',
-    'ssS',
-    'ssS',
-    'ssS',
-    'ssS',
-    'sss',
-    'hss',
-    'sss',
-    'sss',
-    '.s.',
-  ],
-  pivot: { x: 1, y: 1 },
-};
-
-/** Ліва нога спереду: 7×20 зі стопою, кріплення — кульшовий суглоб. */
-export const LEG_FRONT: Part = {
-  rows: [
-    '.ssssss',
-    '.ssssss',
-    '.sssssS',
-    '.sssssS',
-    '.sssssS',
-    '.sssssS',
-    '.sssssS',
-    '.sssssS',
-    '..ssssS',
-    '..ssssS',
-    '..sssS.',
-    '..sssS.',
-    '..sssS.',
-    '..sssS.',
-    '..sssS.',
-    '..sssS.',
-    '..sssS.',
-    '.ssssS.',
-    'ssssss.',
-    'SSSSSS.',
-  ],
-  pivot: { x: 3, y: 0 },
-};
-
-// ---------- Профіль (обличчям праворуч; ліворуч — дзеркало) ----------
-
-/** Голова в профіль: 14×12, обличчя праворуч, вухо трохи позаду середини. */
-export const HEAD_SIDE: Part = {
-  rows: [
-    '...ssssss.....',
-    '.ssssssssss...',
-    '.sssssssshhs..',
-    'sssssssssshhs.',
-    'sssssssssssss.',
-    'ssssSDsssssss.',
-    'sssssDsssssss.',
-    'ssssSDssssssss',
-    '.ssssssssssssS',
-    '.Sssssssssss..',
-    '..SSsssssss...',
-    '....SSSSss....',
-  ],
-  pivot: { x: 6, y: 12 },
-};
-
-/** Тулуб у профіль: 12×20, груди праворуч. */
-export const TORSO_SIDE: Part = {
-  rows: [
-    '....SSSS....',
-    '....ssss....',
-    '....ssss....',
+    '...SSSSSS...',
+    '...SSSSSS...',
     '...ssssss...',
     '..ssssssss..',
-    '.ssssssssss.',
-    '.sssssssssss',
-    '.sssssssssss',
-    '.ssssssssssS',
-    '.sssssssssS.',
-    '..ssssssssS.',
-    '..ssssssssS.',
-    '..ssssssssS.',
-    '..sssssssss.',
-    '.ssssssssss.',
-    '.sssssssssS.',
-    '.sssssssssS.',
-    '.sssssssssS.',
-    '.SsssssssSS.',
-    '..SSSSSSSS..',
+    '.shhsssssss.',
+    'shssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'ssssssssssss',
+    'SssssSsssssS',
+    'SssssssssssS',
+    'SssssssssssS',
+    'SssssssssssS',
+    'SssssssssssS',
+    'SssssssssssS',
+    '..ssssssss..',
+    '....ssss....',
   ],
   pivot: { x: 6, y: 0 },
 };
 
-/** Нога в профіль: 7×20, стопа вперед (праворуч). */
+/** Тулуб зі спини: той самий силует, хребет. */
+export const TORSO_BACK: Part = {
+  rows: [
+    '...SSSSSS...',
+    '...SSSSSS...',
+    '...ssssss...',
+    '..ssssssss..',
+    '.shhsssssss.',
+    'shssssssssss',
+    'sssssSSsssss',
+    'sssssSSsssss',
+    'sssssSSsssss',
+    'sssssSSsssss',
+    'sssssSSsssss',
+    'SssssSSssssS',
+    'SssssSSssssS',
+    'SssssSSssssS',
+    'SssssSSssssS',
+    'SssssssssssS',
+    'SssssSSssssS',
+    '..ssSSSSss..',
+    '....ssss....',
+  ],
+  pivot: { x: 6, y: 0 },
+};
+
+/** Ліва рука (з нашого погляду): плече, передпліччя, долоня; кріплення — плече. */
+export const ARM: Part = {
+  rows: [
+    '..ss',
+    '.hss',
+    '.hsS',
+    '.ssS',
+    '.ssS',
+    '.ssS',
+    '.ssS',
+    '.ssS',
+    '.ssS',
+    '.ssS',
+    'ssss',
+    'ssss',
+    'sssS',
+    '.SS.',
+  ],
+  pivot: { x: 2, y: 1 },
+};
+
+/** Ліва нога спереду зі стопою, кріплення — кульшовий суглоб. */
+export const LEG_FRONT: Part = {
+  rows: [
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.ssssS',
+    '.sssss',
+    'ssssss',
+    'SSSSSS',
+  ],
+  pivot: { x: 3, y: 1 },
+};
+
+// ---------- Профіль (обличчям праворуч; ліворуч — дзеркало) ----------
+
+/** Голова в профіль: обличчя праворуч, вухо посередині. */
+export const HEAD_SIDE: Part = {
+  rows: [
+    '.......ssssssssss........',
+    '....sssssssssssssss......',
+    '...ssshhhhssssssssss.....',
+    '..ssshhssssssssssssss....',
+    '.sssssssssssssssssssss...',
+    '.sssssssssssssssssssss...',
+    'sssssssssssssssssssssss..',
+    'sssssssssssssssssssssss..',
+    'sssssssssssssssssssssss..',
+    'sssssssssssssssssssssss..',
+    'ssssssssssssssssssssssss.',
+    'ssssssssssssssssssssssss.',
+    'ssssssssssssssssssssssss.',
+    'ssssssssssssssssssssssss.',
+    'ssssssssssssssssssssssss.',
+    'ssssssssssssssssssssssss.',
+    '.sssssssssssssssssssssss.',
+    '.ssssssssDDsssssssssssss.',
+    '.sssssssSDssssssssssssss.',
+    '.sssssssSDssssssssssssss.',
+    '.sssssssSDssssssssssssss.',
+    '.ssssssssDDssssssssssssss',
+    '..ssssssssssssssssssssssS',
+    '..ssssssssssssssssssssss.',
+    '...ssssssssssssssssssss..',
+    '....ssssssssssssssssss...',
+    '......sSSSSSSSSSSSss.....',
+  ],
+  pivot: { x: 13, y: 27 },
+};
+
+/** Тулуб у профіль: груди праворуч. */
+export const TORSO_SIDE: Part = {
+  rows: [
+    '...SSSS...',
+    '...SSSS...',
+    '...ssss...',
+    '..ssssss..',
+    '.shhsssss.',
+    '.sssssssss',
+    '.sssssssss',
+    '.sssssssss',
+    '.ssssssss.',
+    '.ssssssss.',
+    '.ssssssssS',
+    '.ssssssssS',
+    '.ssssssssS',
+    'sssssssssS',
+    'sssssssssS',
+    'sssssssssS',
+    'ssssssssS.',
+    '.ssssssS..',
+    '..ssssS...',
+  ],
+  pivot: { x: 5, y: 0 },
+};
+
+/** Нога в профіль, стопа вперед (праворуч). */
 export const LEG_SIDE: Part = {
   rows: [
-    'ssssss.',
-    'ssssss.',
-    'ssssss.',
-    'ssssss.',
-    'ssssss.',
-    'ssssss.',
-    'ssssss.',
-    'ssssss.',
-    '.sssss.',
-    '.sssss.',
-    '.ssss..',
-    '.ssss..',
-    '.ssss..',
-    '.ssss..',
-    '.ssss..',
-    '.ssss..',
-    '.ssss..',
-    '.ssssss',
-    '.ssssss',
-    '.SSSSSS',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'Sssss..',
+    'sssss..',
+    'sssssss',
+    'SSSSSSS',
   ],
-  pivot: { x: 2, y: 0 },
+  pivot: { x: 2, y: 1 },
 };

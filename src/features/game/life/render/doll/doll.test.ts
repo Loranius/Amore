@@ -29,7 +29,7 @@ describe('модульні люди: один скелет', () => {
     }
   });
 
-  it('обличчя різняться лише накладкою: брови, вії, рот', () => {
+  it('обличчя різняться лише накладкою: брови, рот, рум\'янець', () => {
     expect(renderLayer('face', 0, 'girl')).not.toEqual(renderLayer('face', 0, 'boy'));
     expect(renderLayer('face', 3, 'girl').join('')).toMatch(/^\.+$/);
   });
@@ -48,15 +48,15 @@ describe('модульні люди: один скелет', () => {
     }
   });
 
-  it('стоїть на точці між стопами, зріст 48–56 пікселів малюнка, в усіх напрямах однаковий', () => {
+  it('стоїть на точці між стопами, зріст 56–64 пікселі малюнка, в усіх напрямах однаковий', () => {
     for (const dir of DOLL_DIRS) {
       const rows = mask(stack('girl', dir, ['body', 'head']));
       const filled = rows.map((r, y) => (r.includes('#') ? y : -1)).filter((y) => y >= 0);
       const top = filled[0]!;
       const bottom = filled[filled.length - 1]!;
       expect(bottom, `низ, напрям ${dir}`).toBe(FOOT.y - 1);
-      expect(bottom - top + 1).toBeGreaterThanOrEqual(48);
-      expect(bottom - top + 1).toBeLessThanOrEqual(56);
+      expect(bottom - top + 1).toBeGreaterThanOrEqual(56);
+      expect(bottom - top + 1).toBeLessThanOrEqual(64);
       // Стопи — по обидва боки від осі (x 15 | 16), а не зсунуті вбік.
       const feet = rows[bottom]!;
       expect(feet.indexOf('#')).toBeLessThan(FOOT.x);

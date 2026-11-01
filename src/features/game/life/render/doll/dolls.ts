@@ -4,7 +4,7 @@
 // Діми ті самі, що й у решті гри.
 // ============================================================
 import { DIMA, LENA_ADULT, type Look } from '../people';
-import { mix, shade } from '../pixel';
+import { mix } from '../pixel';
 import type { FaceKind } from './faces';
 
 export interface Doll {
@@ -18,35 +18,32 @@ export interface Doll {
 }
 
 export function dollOf(name: string, look: Look, face: FaceKind): Doll {
-  return { name, face, skin: look.skin, eyes: look.eyes, hair: look.hair, lips: face === 'girl' ? '#d2706f' : shade(look.skin, -0.32) };
+  return { name, face, skin: look.skin, eyes: look.eyes, hair: look.hair, lips: face === 'girl' ? '#d2706f' : mix(look.skin, '#5c2e2e', 0.5) };
 }
 
 export const LENA_DOLL = dollOf('lena', LENA_ADULT, 'girl');
 export const DIMA_DOLL = dollOf('dima', DIMA, 'boy');
 export const DOLLS: readonly Doll[] = [LENA_DOLL, DIMA_DOLL];
 
-/** Ключ сітки → колір. */
+/** Ключ сітки → колір. Обвідка м'яка, червонувато-коричнева, а не майже чорна (за референсами власника). */
 export function paletteOf(d: Doll): Readonly<Record<string, string>> {
-  const lid = '#2b1d1f';
-  const S = shade(d.skin, -0.16);
-  const o = mix(shade(d.skin, -0.7), lid, 0.5);
+  const dark = '#5c2e2e';
+  const lid = '#2f1d22';
   return {
-    h: shade(d.skin, 0.3),
+    h: mix(d.skin, '#ffffff', 0.35),
     s: d.skin,
-    S,
-    // Глибока тінь і внутрішня обвідка — не насиченіші за тінь, а темніші до обвідки.
-    D: mix(S, o, 0.28),
-    o,
-    i: mix(S, o, 0.5),
+    S: mix(d.skin, '#d9826e', 0.32),
+    D: mix(d.skin, dark, 0.3),
+    o: mix(d.skin, dark, 0.72),
+    i: mix(d.skin, dark, 0.45),
     p: lid,
-    l: lid,
+    E: mix(d.eyes, '#1a1014', 0.45),
     e: d.eyes,
-    E: shade(d.eyes, -0.4),
+    L: mix(d.eyes, '#ffffff', 0.35),
     w: '#ffffff',
-    b: shade(d.hair, -0.35),
+    b: mix(d.hair, lid, 0.35),
     m: d.lips,
     M: d.lips,
-    r: '#f09a94',
+    r: '#f2a0a0',
   };
 }
-
