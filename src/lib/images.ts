@@ -9,7 +9,7 @@
 // обрано HEIC. Magic-byte sniffing (розпізнавання «фейкових» .heic,
 // нативного AVIF тощо) — портований 1:1.
 //
-// Типи бібліотек heic-to / heic2any на межі виклику звужуємо вручну:
+// Типи бібліотеки heic-to на межі виклику звужуємо вручну:
 // це той самий свідомий виняток, що й для supabase-патча — ми не
 // контролюємо форму чужого коду, лише власні дані.
 // ============================================================
@@ -84,14 +84,6 @@ async function convertViaHeicTo(file: File): Promise<Blob> {
   return fn({ blob: file, type: 'image/jpeg', quality: 0.9 });
 }
 
-async function convertViaHeic2any(file: File): Promise<Blob> {
-  const mod = (await import('heic2any')) as {
-    default: (o: { blob: Blob; toType: string; quality?: number }) => Promise<Blob | Blob[]>;
-  };
-  const res = await mod.default({ blob: file, toType: 'image/jpeg', quality: 0.9 });
-  return Array.isArray(res) ? res[0]! : res; // burst-sequence → перший кадр
-}
-
 // ── normalize: HEIC/HEIF → JPEG; решта — без змін ────────────
 export async function normalize(file: File): Promise<File> {
   if (!isHeic(file)) return file;
@@ -111,27 +103,23 @@ export async function normalize(file: File): Promise<File> {
     console.info(`[Images] HEIF, бренд «${sniff.brand}» — конвертую в JPEG…`);
   }
 
-  // По черзі: свіжий heic-to, потім запасний heic2any (різні файли
-  // валять різні декодери — саме тому їх два, як у старому коді).
-  let lastErr: unknown = null;
-  for (const convert of [convertViaHeicTo, convertViaHeic2any]) {
-    try {
-      const jpeg = await convert(file);
-      const name = (file.name || 'photo').replace(/\.(heic|heif)$/i, '') + '.jpg';
-      return new File([jpeg], name, {
-        type: 'image/jpeg',
-        lastModified: file.lastModified || Date.now(),
-      });
-    } catch (e) {
-      lastErr = e;
-      console.warn('[Images] конвертер HEIC не впорався:', e);
-    }
+  // Один декодер — heic-to. Запасний heic2any прибрано (ADR-0257): файл,
+  // з яким heic-to не впорається, падає з його ж повідомленням.
+  try {
+    const jpeg = await convertViaHeicTo(file);
+    const name = (file.name || 'photo').replace(/\.(heic|heif)$/i, '') + '.jpg';
+    return new File([jpeg], name, {
+      type: 'image/jpeg',
+      lastModified: file.lastModified || Date.now(),
+    });
+  } catch (e) {
+    console.warn('[Images] конвертер HEIC не впорався:', e);
+    const msg =
+      e && typeof e === 'object' && 'message' in e
+        ? String((e as { message: unknown }).message)
+        : 'формат не підтримується';
+    throw new Error(msg);
   }
-  const msg =
-    lastErr && typeof lastErr === 'object' && 'message' in lastErr
-      ? String((lastErr as { message: unknown }).message)
-      : 'формат не підтримується';
-  throw new Error(msg);
 }
 
 /**
