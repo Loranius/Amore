@@ -5,7 +5,7 @@
 // швидкість і розклад — гра не повторюється слово в слово.
 // ============================================================
 import { intIn, pickOne, shuffled, type Rng } from '../sim/rng';
-import { LENA_KID, OLYA, townsfolkLook, type Look } from '../render/people';
+import { townsfolkLook, type Look } from '../render/people';
 import { shade } from '../render/pixel';
 import { sfx } from '../sound';
 import { Flash, type GameContext, type Kit, type MiniGame } from './kit';
@@ -745,5 +745,3 @@ export const PLAYGROUND: Record<string, (ctx: GameContext) => MiniGame> = {
   shapes: (c) => new Shapes(c),
   simon: (c) => new Simon(c),
 };
-
-export const LENA_FOR_GAMES = { kid: LENA_KID, friend: OLYA };

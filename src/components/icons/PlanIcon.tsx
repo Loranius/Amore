@@ -43,17 +43,6 @@ export function PlaneIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
-/** Мішень — цілі. */
-export function TargetIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <circle cx="12" cy="12" r="8.2" />
-      <circle cx="12" cy="12" r="4.4" />
-      <circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
 /** Три крапки — інше. */
 export function DotsIcon({ size = 24, className = '' }: IconProps) {
   return (

@@ -125,8 +125,7 @@
   box-shadow: 0 0 0 2px var(--world-primary-soft);
 }
 
-.home-artifact-preview-fallback,
-.reef-preview-placeholder {
+.home-artifact-preview-fallback {
   position: relative;
   width: min(calc(100% - 24px), 520px);
   min-height: 360px;
@@ -177,39 +176,6 @@
   font-size: 14px;
   line-height: 1.5;
 }
-
-.reef-preview-wave {
-  position: absolute;
-  left: -12%;
-  right: -12%;
-  height: 90px;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, #5ca8aa 28%, transparent);
-  pointer-events: none;
-}
-
-.reef-preview-wave--one {
-  bottom: 26px;
-  transform: rotate(-5deg);
-}
-
-.reef-preview-wave--two {
-  bottom: -12px;
-  transform: rotate(4deg);
-  opacity: 0.72;
-}
-
-.reef-preview-bubble {
-  position: absolute;
-  border-radius: 50%;
-  border: 1px solid color-mix(in srgb, #5ca8aa 34%, transparent);
-  background: color-mix(in srgb, #bce7e7 12%, transparent);
-  pointer-events: none;
-}
-
-.reef-preview-bubble--one { width: 22px; height: 22px; top: 58px; left: 18%; }
-.reef-preview-bubble--two { width: 12px; height: 12px; top: 96px; right: 24%; }
-.reef-preview-bubble--three { width: 32px; height: 32px; bottom: 94px; right: 12%; }
 
 @media (max-width: 370px) {
   .home-artifact-switcher {

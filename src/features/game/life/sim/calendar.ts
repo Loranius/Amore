@@ -121,11 +121,3 @@ export function clockLabel(minutes: number): string {
   const m = ((minutes % 1440) + 1440) % 1440;
   return `${Math.floor(m / 60)}:${String(m % 60).padStart(2, '0')}`;
 }
-
-/** Частина доби для освітлення. */
-export function dayPhase(minutes: number): 'morning' | 'day' | 'evening' | 'night' {
-  if (minutes < 10 * 60) return 'morning';
-  if (minutes < 17 * 60) return 'day';
-  if (minutes < 20 * 60 + 30) return 'evening';
-  return 'night';
-}

@@ -28,9 +28,6 @@ interface ScheduleBatchInput {
   successMessage?: string | undefined;
 }
 
-/** Цикл позначки для сумісності зі старими сценаріями. */
-export const MARK_CYCLE: Record<string, ScheduleMark> = { '': 'Р', Р: 'Х', Х: '' };
-
 function buildMarks(rows: WorkScheduleRow[]): MarksMap {
   const map: MarksMap = {};
   for (const row of rows) {

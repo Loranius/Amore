@@ -96,10 +96,6 @@
   width: 100%;
 }
 
-.wishlist .wm-visibility-field {
-  gap: 8px;
-}
-
 .wishlist .wm-secret-status {
   padding: 10px 12px;
   display: flex;
@@ -188,46 +184,11 @@
   font-size: 14px;
 }
 
-.wishlist .wm-wish-editor .wm-scope-field .tab-bar {
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  gap: 8px;
-}
-
-.wishlist .wm-wish-editor .wm-scope-field .tab-bar-btn {
-  min-width: 0;
-  min-height: 48px;
-  flex: 1 1 0;
-  justify-content: center;
-  padding: 10px 9px;
-  border: 1px solid var(--wl-control-border);
-  border-radius: var(--radius-card);
-  background: var(--wl-control-bg-muted);
-  color: var(--wl-text-secondary);
-  font-size: 13px;
-  font-weight: 800;
-}
-
-.wishlist .wm-wish-editor .wm-scope-field .tab-bar-btn.active {
-  border-color: color-mix(in srgb, var(--accent) 68%, transparent);
-  background-color: var(--accent-strong);
-  background-image: var(--control-fill);
-  color: #fff;
-  box-shadow: var(--control-top), var(--control-lip), var(--control-cast);
-}
-
 .wishlist .wm-wish-editor .wm-title-field input {
   min-height: 56px;
   padding: 14px 16px;
   border-radius: var(--radius-card);
   font-weight: 700;
-}
-
-.wishlist .wm-wish-editor .wm-label-optional {
-  color: var(--wl-text-secondary);
-  font-size: 12px;
-  font-weight: 600;
 }
 
 .wishlist .wm-wish-editor .wm-link-inline {
@@ -293,58 +254,6 @@
   cursor: pointer;
 }
 
-.wishlist .wm-wish-editor .wm-photo-summary {
-  grid-template-columns: 72px minmax(0, 1fr) 22px;
-}
-
-.wishlist .wm-wish-editor .wm-photo-summary-visual {
-  display: grid;
-  width: 72px;
-  height: 72px;
-  overflow: hidden;
-  place-items: center;
-  border: 1px solid color-mix(in srgb, var(--accent) 18%, transparent);
-  border-radius: var(--radius-card);
-  background: color-mix(in srgb, var(--accent) 9%, var(--surface-3));
-  color: color-mix(in srgb, var(--accent) 56%, var(--muted));
-}
-
-.wishlist .wm-wish-editor .wm-photo-summary-visual img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.wishlist .wm-wish-editor .wm-disclosure-copy {
-  min-width: 0;
-  display: grid;
-  gap: 4px;
-  text-align: left;
-}
-
-.wishlist .wm-wish-editor .wm-disclosure-copy strong {
-  color: var(--text);
-  font-size: 15px;
-  font-weight: 900;
-  line-height: 1.25;
-}
-
-.wishlist .wm-wish-editor .wm-disclosure-copy small {
-  color: var(--wl-text-secondary);
-  font-size: 12px;
-  line-height: 1.4;
-}
-
-.wishlist .wm-wish-editor .wm-disclosure-chevron {
-  color: var(--wl-text-secondary);
-  transition: transform 180ms ease;
-}
-
-.wishlist .wm-wish-editor :is(.wm-photo-summary, .wm-details-summary)[aria-expanded='true']
-  .wm-disclosure-chevron {
-  transform: rotate(180deg);
-}
-
 .wishlist .wm-wish-editor :is(.wm-photo-summary, .wm-details-summary):disabled {
   cursor: default;
   opacity: 0.62;
@@ -401,30 +310,10 @@
   padding: 9px 12px;
 }
 
-.wishlist .wm-wish-editor .wm-visibility-field {
-  margin: 0;
-  gap: 8px;
-}
-
 .wishlist .wm-wish-editor .wm-visibility-hint {
   color: var(--wl-text-secondary);
   font-size: 11px;
   line-height: 1.4;
-}
-
-.wishlist .wm-wish-editor .wm-details-summary {
-  grid-template-columns: 42px minmax(0, 1fr) 22px;
-  padding-block: 13px;
-}
-
-.wishlist .wm-wish-editor .wm-details-icon {
-  display: grid;
-  width: 42px;
-  height: 42px;
-  place-items: center;
-  border-radius: var(--radius-md);
-  background: color-mix(in srgb, var(--accent) 11%, var(--surface-3));
-  color: color-mix(in srgb, var(--accent) 66%, var(--text));
 }
 
 .wishlist .wm-wish-editor .wm-details-panel .form-field {
@@ -454,39 +343,11 @@
     font-size: 13px;
   }
 
-  .wishlist .wm-wish-editor .wm-scope-field .tab-bar {
-    gap: 6px;
-  }
-
-  .wishlist .wm-wish-editor .wm-scope-field .tab-bar-btn {
-    min-height: 46px;
-    padding-inline: 7px;
-    font-size: 12px;
-  }
-
-  .wishlist .wm-wish-editor .wm-photo-summary {
-    grid-template-columns: 64px minmax(0, 1fr) 20px;
-    gap: 10px;
-    padding: 10px;
-  }
-
-  .wishlist .wm-wish-editor .wm-photo-summary-visual {
-    width: 64px;
-    height: 64px;
-    border-radius: var(--radius-md);
-  }
-
 }
 
 @media (max-width: 390px) {
   .wishlist .wm-wish-editor {
     padding-inline: 14px;
-  }
-
-  .wishlist .wm-wish-editor .wm-scope-field .tab-bar-btn {
-    gap: 5px;
-    padding-inline: 5px;
-    font-size: 11px;
   }
 
   .wishlist .wm-wish-editor .wm-photo-picker {

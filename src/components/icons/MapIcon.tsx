@@ -1,89 +1,11 @@
 // ============================================================
-// Значки категорій міток на карті.
+// Значки карти й місць: шпилька, компас, приціл.
 // ------------------------------------------------------------
-// Особливість цього набору: маркери карти — це живі вузли DOM, які
-// створює імперативний код (`mapMarkers.ts`), а не React. Тому шляхи
-// лежать окремою константою, а React-компонент і будівник вузла беруть
-// їх з одного місця. Дві копії тих самих кривих розійшлись би при
-// першій же правці.
+// Значки категорій міток (галочка, ресторан, зірка) і серце партнера
+// жили тут для імперативних маркерів `mapMarkers.ts`; той модуль
+// видалено, і вони лишились без жодного виклику — прибрано.
 // ============================================================
-import { iconAttrs, STROKE, type IconProps } from './iconBase';
-import type { PinCategory } from '@/types';
-
-/**
- * Криві по категоріях.
- *
- * «Були» — галочка, а не шпилька: сам маркер уже крапля, і шпилька
- * всередині шпильки нічого не додає.
- */
-export const PIN_CATEGORY_PATHS: Record<PinCategory, readonly string[]> = {
-  visited: ['m5.4 12.4 4.2 4.2L18.6 7.2'],
-  restaurant: [
-    'M7 3.2v7.2a2.4 2.4 0 0 0 4.8 0V3.2',
-    'M9.4 10.6V20.8',
-    'M17.2 3.2c-1.6 1-2.4 2.8-2.4 5s.8 3.4 2.4 3.4V20.8',
-  ],
-  favorite: ['m12 3.6 2.62 5.5 5.88.82-4.28 4.3 1.04 6.02L12 17.3l-5.26 2.94 1.04-6.02L3.5 9.92l5.88-.82L12 3.6Z'],
-};
-
-function CategoryIcon({ cat, size, className }: { cat: PinCategory; size: number; className: string }) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      {PIN_CATEGORY_PATHS[cat].map((d) => <path key={d} d={d} />)}
-    </svg>
-  );
-}
-
-export function PinCategoryIcon({
-  cat, size = 24, className = '',
-}: IconProps & { cat: PinCategory }) {
-  return <CategoryIcon cat={cat} size={size} className={className} />;
-}
-
-/**
- * Той самий значок як вузол DOM — для маркера карти.
- *
- * `createElementNS` замість innerHTML: рядок довелось би збирати
- * конкатенацією, а це саме той шлях, яким у розмітку зрештою потрапляє
- * щось неочікуване. Тут узагалі немає рядків ззовні, але звичка дешева.
- */
-export function pinCategoryNode(cat: PinCategory, size: number): SVGSVGElement {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('width', String(size));
-  svg.setAttribute('height', String(size));
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'none');
-  svg.setAttribute('stroke', 'currentColor');
-  svg.setAttribute('stroke-width', String(STROKE));
-  svg.setAttribute('stroke-linecap', 'round');
-  svg.setAttribute('stroke-linejoin', 'round');
-  svg.setAttribute('aria-hidden', 'true');
-  for (const d of PIN_CATEGORY_PATHS[cat]) {
-    const path = document.createElementNS(NS, 'path');
-    path.setAttribute('d', d);
-    svg.appendChild(path);
-  }
-  return svg;
-}
-
-/** Серце як вузол DOM — маркер геолокації партнера на карті. */
-export function heartNode(size: number): SVGSVGElement {
-  const NS = 'http://www.w3.org/2000/svg';
-  const svg = document.createElementNS(NS, 'svg');
-  svg.setAttribute('width', String(size));
-  svg.setAttribute('height', String(size));
-  svg.setAttribute('viewBox', '0 0 24 24');
-  svg.setAttribute('fill', 'currentColor');
-  svg.setAttribute('aria-hidden', 'true');
-  const path = document.createElementNS(NS, 'path');
-  path.setAttribute(
-    'd',
-    'M12 20.3c-.35.22-.79.22-1.14 0C9 19.06 3.6 15.3 3.6 10.6a4.1 4.1 0 0 1 7.83-1.72A4.1 4.1 0 0 1 19.26 10.6c0 4.7-5.4 8.46-7.26 9.7Z',
-  );
-  svg.appendChild(path);
-  return svg;
-}
+import { iconAttrs, type IconProps } from './iconBase';
 
 /** Шпилька — місце. Використовується поза картою: у джерелах «Спогадів». */
 export function MapPinIcon({ size = 24, className = '' }: IconProps) {

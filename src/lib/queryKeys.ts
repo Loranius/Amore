@@ -63,7 +63,6 @@ export const qk = {
   moments: () => ['moments'] as const,
 
   sharedDaysOff: () => ['sharedDaysOff'] as const,
-  scheduleTogetherness: () => ['scheduleTogetherness'] as const,
 
   mapPins: () => ['mapPins'] as const,
   userLocations: () => ['userLocations'] as const,
@@ -99,7 +98,7 @@ export const realtimeInvalidation: Record<
   plans: [qk.plans()],
   plan_tasks: [qk.planTasks()],
   plan_links: [qk.planLinks()],
-  work_schedule: [['schedule'], qk.sharedDaysOff(), qk.scheduleTogetherness()],
+  work_schedule: [['schedule'], qk.sharedDaysOff()],
   // Підпис місця в спогаді читається з мітки карти напряму — зміна
   // назви чи міста мітки мусить оновити й архів спогадів.
   map_pins: [qk.mapPins(), qk.moments()],

@@ -46,8 +46,6 @@
   background: var(--surface);
   border: 1px solid var(--border);
 }
-.pf-card--l1 { transform: translateY(9px) scale(0.965); opacity: 0.62; z-index: 1; }
-.pf-card--l2 { transform: translateY(18px) scale(0.93); opacity: 0.34; z-index: 0; }
 
 .pf-card-cat {
   display: inline-flex;

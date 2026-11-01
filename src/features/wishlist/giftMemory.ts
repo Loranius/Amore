@@ -140,10 +140,6 @@ export async function uploadGiftMemoryAssets(input: {
   }
 }
 
-export async function removeGiftMemoryAssets(paths: string[]): Promise<void> {
-  await removePaths(paths);
-}
-
 export async function createGiftMemorySignedUrl(path: string | null): Promise<string | null> {
   if (!path) return null;
   const { data, error } = await supabase.storage

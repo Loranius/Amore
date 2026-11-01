@@ -60,10 +60,6 @@
   order: 2;
 }
 
-.wl-page-skeleton .wl-skeleton-grid {
-  order: 3;
-}
-
 @media (max-width: 719px) {
   .wl-skeleton-hero-card {
     grid-template-columns: 1fr;

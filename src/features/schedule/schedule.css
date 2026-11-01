@@ -16,7 +16,6 @@
    кричала гучніше за головну. Разом із `.sched-subtitle` вона переїхала
    в спільні двері `PageHeader` (ADR-0046). Надзаголовок лишається тут, бо його
    ділить `.sched-section-kicker` усередині сторінки. */
-.sched-kicker,
 .sched-section-kicker {
   display: block;
   margin-bottom: 3px;
@@ -25,24 +24,6 @@
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-}
-
-.sched .sched-edit-toggle {
-  width: auto;
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 10px 15px;
-  border: 1px solid color-mix(in srgb, var(--accent) 24%, transparent);
-  border-radius: var(--radius-pill);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  color: var(--accent);
-  font-weight: 700;
-}
-
-.sched .sched-edit-toggle.is-active {
-  border-color: transparent;
-  background: var(--accent-strong);
-  color: #fff;
 }
 
 .sched-next-card {
@@ -217,50 +198,6 @@
   background: var(--warn);
 }
 
-.sched-stats {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.sched-stat {
-  min-width: 0;
-  padding: 10px 8px;
-  border: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  text-align: center;
-}
-
-.sched-stat--shared {
-  border-color: color-mix(in srgb, var(--accent) 25%, transparent);
-  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-}
-
-.sched-stat strong {
-  display: block;
-  color: var(--accent);
-  /* 800, а не типова вага <strong>.
-     Тут падало на СИСТЕМНИЙ шрифт: Fredoka не має кирилиці, а запасним
-     стояв `sans-serif`. Nunito на 700 при 23px читається легшою за те,
-     що бачила пара; трекінг — бо Nunito на 10% ширша (виміряно). */
-  font-size: 23px;
-  font-weight: 800;
-  letter-spacing: -.02em;
-  line-height: 1;
-}
-
-.sched-stat span {
-  display: block;
-  margin-top: 4px;
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 10px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 .sched .sched-board {
   padding: 10px;
   border: 1px solid color-mix(in srgb, var(--text) 7%, transparent);
@@ -324,25 +261,6 @@
   font-variant-numeric: tabular-nums;
 }
 
-/*
- * Смужка стану під числом.
- *
- * Особисті вихідні більше не заливають клітинку. Причина не в смаку:
- * екран відкривають з ОДНИМ питанням — коли ми вільні разом, — а три
- * насичені заливки давали три однакові голоси, і відповідь тонула серед
- * контексту. Тепер залита клітинка означає рівно одне.
- *
- * Смужка, а не крапка: колір тут єдиний носій сенсу, і смужка дає йому
- * утричі більше пікселів на тій самій висоті.
- */
-.sched-cell-symbol {
-  display: block;
-  width: 16px;
-  height: 3px;
-  border-radius: var(--radius-hair);
-  background: transparent;
-}
-
 .sched .sched-cell--both-off {
   background: var(--sched-both);
   box-shadow: var(--shadow-sm);
@@ -357,7 +275,6 @@
  * один контраст по всій площі.
  */
 .sched .sched-cell--both-off .sched-cell-num { color: #fff; }
-.sched .sched-cell--both-off .sched-cell-symbol { background: rgba(255, 255, 255, 0.85); }
 
 /* Число особистого вихідного — повним кольором тексту, а не приглушеним.
    Інакше день, коли хтось вільний, читався так само тихо, як порожній:
@@ -373,8 +290,6 @@
    спільному вихідному. */
 .sched .sched-cell--lena-off .sched-cell-num,
 .sched .sched-cell--dima-off .sched-cell-num { color: var(--text); }
-
-
 
 /* Крапка переїхала з НИЗУ вгору: смужка стану тепер стоїть саме внизу,
    і на знімку 12 серпня вони налазили одна на одну. */
@@ -432,19 +347,6 @@
 
 .sched-board--editing .sched-cell-letter {
   font-size: 17px;
-}
-
-.sched .heat-legend {
-  gap: 8px 12px;
-  margin: 12px 0 18px;
-}
-
-.heat-swatch--plan {
-  position: relative;
-  border: 3px solid var(--surface);
-  border-radius: 50%;
-  background: var(--ok);
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--text) 12%, transparent);
 }
 
 .sched-upcoming {
@@ -548,15 +450,6 @@
 .sched-upcoming-arrow {
   color: var(--accent);
   font-size: 24px;
-}
-
-.sched .date-plans {
-  margin-top: 24px;
-}
-
-.sched .date-plans-title {
-  margin-bottom: 9px;
-  font-size: 18px;
 }
 
 .sched-day-overlay {
@@ -710,11 +603,6 @@
     align-items: center;
   }
 
-  .sched .sched-edit-toggle {
-    padding: 9px 12px;
-    font-size: 12px;
-  }
-
   .sched-next-card {
     grid-template-columns: auto 1fr;
   }
@@ -722,14 +610,6 @@
   .sched-next-action {
     grid-column: 1 / -1;
     width: 100%;
-  }
-
-  .sched-stat {
-    padding-inline: 5px;
-  }
-
-  .sched-stat strong {
-    font-size: 21px;
   }
 }
 

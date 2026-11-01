@@ -17,7 +17,7 @@
 // Модуль лишається species-agnostic: жодних THREE/матеріалів, лише
 // геометрія й ідентичність.
 // ============================================================
-import { type Vec3, add, scale, sub, dot, normalize, lengthOf, perpendicularBasis, v3 } from '../vec3';
+import { type Vec3, add, scale, sub, dot, normalize, lengthOf, perpendicularBasis } from '../vec3';
 import { byCodePoint } from '@/engine/ordering';
 
 /** Версія формату junction — росте при зміні семантики полів. */
@@ -177,6 +177,3 @@ export function findOrphans(bodies: readonly JunctionBody[]): string[] {
     .map((b) => b.key)
     .sort();
 }
-
-/** Заглушка нульового вектора для зовнішніх споживачів рамки. */
-export const ZERO_VEC: Vec3 = v3(0, 0, 0);

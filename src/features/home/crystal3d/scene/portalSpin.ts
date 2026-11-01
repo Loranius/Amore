@@ -256,10 +256,3 @@ export function portalSpinStep(
   }
   return { ...state, elevation, clock: now };
 }
-
-/** Чи рухається ще щось — щоб не тримати кадри живими даремно. */
-export function portalSpinMoving(state: PortalSpinState): boolean {
-  return state.dragging
-    || state.glide !== null
-    || Math.abs(state.elevationTarget - state.elevation) > 1e-5;
-}
