@@ -19,7 +19,7 @@ export function saturate(value: number, halfSaturation: number): number {
   return round6(value / (value + halfSaturation));
 }
 
-export function vectorTotal(vector: EvolutionPressureVector): number {
+function vectorTotal(vector: EvolutionPressureVector): number {
   return EVOLUTION_CHANNELS.reduce((total, channel) => total + vector[channel], 0);
 }
 
@@ -88,10 +88,4 @@ export function daysBetweenExplicit(earlier: string, later: string): number | nu
   const end = parseEvolutionInstant(later);
   if (start === null || end === null) return null;
   return Math.max(0, Math.floor((end - start) / 86_400_000));
-}
-
-export function maturityAt(occurredAt: string, asOf: string, halfLifeDays: number): number {
-  const ageDays = daysBetweenExplicit(occurredAt, asOf);
-  if (ageDays === null || ageDays <= 0) return 0;
-  return round6(clamp01(ageDays / (ageDays + halfLifeDays)));
 }

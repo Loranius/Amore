@@ -79,7 +79,7 @@ export const TREE_CROWN_WIDEST_AT = (0.60 - TREE_CROWN_BOTTOM_SHARE)
  * крона: верхівка вужчає швидко, а під найширшим місцем ширина тримається.
  * Взято з еталона.
  */
-export const TREE_CROWN_FALLOFF_EXPONENT = 1.7;
+const TREE_CROWN_FALLOFF_EXPONENT = 1.7;
 
 /**
  * Яку частку найбільшого радіуса крона тримає на цій частці СВОЄЇ висоти.

@@ -171,9 +171,3 @@ export function rockGrainAt(u: number, v: number): number {
   const mixed = blotch * 0.52 + crack * 0.31 + grit * 0.17;
   return GRAIN_LOW + (GRAIN_HIGH - GRAIN_LOW) * Math.min(1, Math.max(0, mixed));
 }
-
-/** Тестовий шов: скидає полотно, щоб набір починав із нуля. */
-export function disposeCaveRockTexture(): void {
-  cached?.dispose();
-  cached = null;
-}

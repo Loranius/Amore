@@ -49,7 +49,7 @@ import type { CrystalArchetype } from './types';
  */
 export const CRYSTAL_HABITS = ['prismatic', 'massive', 'needle', 'tabular'] as const;
 
-export type CrystalHabit = (typeof CRYSTAL_HABITS)[number];
+type CrystalHabit = (typeof CRYSTAL_HABITS)[number];
 
 /*
  * Габітуси — підмножина `CrystalArchetype`, а не паралельний словник.

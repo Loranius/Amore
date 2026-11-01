@@ -13,9 +13,9 @@ import type {
   TreeRgb,
 } from '../../treeMaterial';
 
-export const TREE_MATERIAL_COLOR_SPACE_VERSION = 'tree-linear-srgb-v1';
-export const TREE_BARK_GRAIN_VERSION = 'tree-bark-grain-v1';
-export const TREE_FOLIAGE_SURFACE_VERSION = 'tree-foliage-surface-v2';
+const TREE_MATERIAL_COLOR_SPACE_VERSION = 'tree-linear-srgb-v1';
+const TREE_BARK_GRAIN_VERSION = 'tree-bark-grain-v1';
+const TREE_FOLIAGE_SURFACE_VERSION = 'tree-foliage-surface-v2';
 
 /**
  * Tree palettes are authored as familiar sRGB values while Three.js material

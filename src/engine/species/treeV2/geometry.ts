@@ -43,15 +43,15 @@ function deviate(d: V3, angleDeg: number, turnDeg: number): V3 {
   return norm(add(out, [0, 0.15, 0]));
 }
 
-export interface TreeV2Branch { start: V3; end: V3; r0: number; r1: number; order: number; key: string }
+interface TreeV2Branch { start: V3; end: V3; r0: number; r1: number; order: number; key: string }
 /**
  * Товщина деревини відносно моделі (ADR-0222): референс власника — кремезний
  * стовбур під круглою кроною. Модель росту (`trunkRadius`) лишається як є,
  * змінюється лише те, як її зображено; зведення двійника радіусів не містить.
  */
-export const TREE_GIRTH = 1.5;
+const TREE_GIRTH = 1.5;
 
-export interface TreeV2Cluster {
+interface TreeV2Cluster {
   centre: V3;
   radius: number;
   key: string;
@@ -138,7 +138,7 @@ function trunkAt(dir: V3, y: number): V3 {
  * природна кривизна»): до нахилу додано м'який S-вигин — дуга в один бік
  * унизу й ледь назад угорі. Ялина лишається прямою: так росте хвойне.
  */
-export function treeV2TrunkPoint(model: TreeV2Model, form: TreeForm, y: number): V3 {
+function treeV2TrunkPoint(model: TreeV2Model, form: TreeForm, y: number): V3 {
   const base = trunkAt(treeTrunkDir(model, form), y);
   if (form === 'spruce') return base;
   const H = model.height;
@@ -425,7 +425,7 @@ function buttressMesh(b: TreeV2Buttress, seed: string, key: string): { tris: V3[
   return { tris, normals };
 }
 
-export interface TreeV2Ornaments {
+interface TreeV2Ornaments {
   /**
    * Бажання: де зав'язано (низ крони гілки свого року) і `cluster` — центр
    * кластера, від якого плід виходить з листя на поверхню крони.
@@ -690,7 +690,7 @@ function inMass(p: V3, m: TreeV2CrownMass, shrink: number): boolean {
  * Точка прикраси — на поверхні найближчої маси крони, у напрямку від її
  * центру: яблуко й ягода висять на листі, а не сховані всередині купки.
  */
-export function treeV2OnCrown(masses: readonly TreeV2CrownMass[], p: V3, depth = 0.96, from?: V3): V3 {
+function treeV2OnCrown(masses: readonly TreeV2CrownMass[], p: V3, depth = 0.96, from?: V3): V3 {
   if (masses.length === 0) return p;
   if (from) {
     // Від своєї гілки — тим самим променем назовні, доки не вийде з листя:
@@ -738,7 +738,7 @@ export function treeV2CrownFlowerCount(model: TreeV2Model): number {
   return model.years < 6 ? 0 : Math.min(14, 3 + Math.floor((model.years - 6) * 1.5));
 }
 
-export function treeV2SakuraFlowerSpots(model: TreeV2Model, clusters: readonly TreeV2Cluster[], count: number): { point: V3; normal: V3 }[] {
+function treeV2SakuraFlowerSpots(model: TreeV2Model, clusters: readonly TreeV2Cluster[], count: number): { point: V3; normal: V3 }[] {
   if (count <= 0) return [];
   const seed = model.startDate;
   const masses = treeV2CrownMasses(model, clusters);

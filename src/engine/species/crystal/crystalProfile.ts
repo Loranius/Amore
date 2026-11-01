@@ -71,7 +71,7 @@ export interface CrystalProfile {
 }
 
 /** Скільки смуг ділять висоту. Двадцять — крок у 5% висоти. */
-export const CRYSTAL_PROFILE_BANDS = 20;
+const CRYSTAL_PROFILE_BANDS = 20;
 
 /**
  * Частка найбільшої ширини, нижче якої смуга вже не вважається призмою.
@@ -252,7 +252,7 @@ function cornerSpreadAt(
   return best !== null && best.min > 0 ? best.max / best.min : 1;
 }
 
-export interface CrystalSettingProfile {
+interface CrystalSettingProfile {
   /**
    * Наскільки високо стоїть порода над підошвою кристала, часткою його
    * висоти.
@@ -276,7 +276,7 @@ export interface CrystalSettingProfile {
 }
 
 /** На скільки секторів ділиться коло, коли міряють рваність вінця. */
-export const CRYSTAL_RIM_SECTORS = 24;
+const CRYSTAL_RIM_SECTORS = 24;
 
 /**
  * Як кристал СИДИТЬ у породі — четверо чисел про пару мешів.
@@ -387,7 +387,7 @@ export function crystalProfileDistance(
  * було б класти поруч. Тіла тут знаходить сам вимір — за спільними
  * вершинами.
  */
-export interface CrystalClusterProfile {
+interface CrystalClusterProfile {
   /** Скільки окремих тіл у скупченні. */
   count: number;
   /** Висота другого за висотою, часткою висоти лідера. */

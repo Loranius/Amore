@@ -14,7 +14,7 @@ export function saturate(value: number, halfSaturation: number): number {
   return round6(value / (value + halfSaturation));
 }
 
-export function vectorTotal(vector: EvolutionPressureVector): number {
+function vectorTotal(vector: EvolutionPressureVector): number {
   return EVOLUTION_CHANNELS.reduce((total, channel) => total + vector[channel], 0);
 }
 
@@ -99,7 +99,7 @@ export function maturityAt(occurredAt: string, asOf: string, halfLifeDays: numbe
  * How long the relationship has to run before the monarch crystal is
  * essentially full-grown. Deliberately measured in years, not months.
  */
-export const RELATIONSHIP_GROWTH_HORIZON_DAYS = 1600;
+const RELATIONSHIP_GROWTH_HORIZON_DAYS = 1600;
 
 /**
  * Maturity of the relationship itself, used for the monarch crystal's size.

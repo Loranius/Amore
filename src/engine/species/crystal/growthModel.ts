@@ -331,7 +331,7 @@ export function childGrowthProgress(year: RelationshipYear, asOf: string): numbe
  * самий»: на знімку монарх і найповніша дитина відрізнялись настільки
  * мало, що кільце виглядало не свитою, а другим рядом кристалів.
  */
-export const CHILD_MONARCH_SHARE = 0.4;
+const CHILD_MONARCH_SHARE = 0.4;
 
 /**
  * How many years a colony seats before its members start giving up room.
@@ -369,7 +369,7 @@ const CHILD_SHARE_FALLOFF = 0.35;
  * `20·2r` of circumference whatever else is true, so the only lever that
  * answers is `r` itself.
  */
-export function childMonarchShare(colonySize: number): number {
+function childMonarchShare(colonySize: number): number {
   const size = Number.isFinite(colonySize) ? Math.max(1, Math.floor(colonySize)) : 1;
   if (size <= CHILD_SHARE_FREE_COLONY) return CHILD_MONARCH_SHARE;
   return round6(
@@ -564,7 +564,7 @@ export function childRingIndex(yearIndex: number): number {
   return Math.max(0, Math.floor(yearIndex / CHILD_RING_CAPACITY));
 }
 
-export interface ChildDimensions {
+interface ChildDimensions {
   axialScale: number;
   radialScale: number;
 }
@@ -881,30 +881,7 @@ export function consistency(monthsTouched: number, monthsLived: number): number 
   return round6(clamp01(Math.min(touched, window) / window));
 }
 
-// ── Colour from fulfilled wishes ────────────────────────────
-
-/**
- * Wishes granted during one relationship year.
- *
- * Named for the two partners rather than for genders: which partner is
- * which colour is an application-layer decision, and the engine has no
- * business knowing. `forFirst` counts wishes belonging to the first
- * partner that the second one granted, and vice versa.
- */
-export interface WishGiftTally {
-  forFirst: number;
-  shared: number;
-  forSecond: number;
-}
-
-/** Wishes in one channel beyond which it stops pulling the hue any further. */
-export const WISH_CHANNEL_CAP = 10;
-
-/** Wishes granted in total beyond which the colour stops deepening. */
-export const WISH_TOTAL_CAP = 14;
-
-
-export interface CrystalTint {
+interface CrystalTint {
   /** Linear RGB in 0..1; pure white only when nothing was granted at all. */
   rgb: readonly [number, number, number];
   /** 0..1 rainbow strength on the facets. */

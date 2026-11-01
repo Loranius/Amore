@@ -252,7 +252,7 @@ export function treeSlenderness(daysTogether: number): number {
     + (SLENDERNESS_MATURE - SLENDERNESS_YOUNG) * treeAgeProgress(daysTogether);
 }
 
-export interface ScaledTreeSkeleton {
+interface ScaledTreeSkeleton {
   skeleton: OrganicSkeletonState;
   /**
    * Множник, який ФАКТИЧНО застосовано до довжин скелета.

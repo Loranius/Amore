@@ -1,6 +1,6 @@
 import type { CrystalMaterialConfig, CrystalMaterialQuality } from './types';
 
-export interface CrystalMaterialQualityPreset {
+interface CrystalMaterialQualityPreset {
   roughnessFloor: number;
   clearcoatScale: number;
   maxIridescence: number;

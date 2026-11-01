@@ -37,7 +37,7 @@ export const REEF_FORM_HEIGHT: Record<ReefForm, number> = {
   brain: 0.4, branch: 1, fan: 1.1, tube: 0.9, table: 0.5, finger: 0.85,
 };
 
-export function reefSurfaceY(model: ReefV2Model, d: number): number {
+function reefSurfaceY(model: ReefV2Model, d: number): number {
   const t = Math.min(1, d / model.radius);
   return model.rise * Math.sqrt(Math.max(0, 1 - t * t));
 }
@@ -93,7 +93,7 @@ export function reefV2Placements(model: ReefV2Model): ReefV2Placement[] {
 const UNDERGROWTH_FORMS: readonly ReefForm[] = ['finger', 'brain', 'branch', 'tube', 'finger', 'fan'];
 
 /** Дрібні корали по всьому каменю: форма й відтінок кожного — з хешу. */
-export function reefV2Undergrowth(model: ReefV2Model): ReefV2Placement[] {
+function reefV2Undergrowth(model: ReefV2Model): ReefV2Placement[] {
   const seed = model.startDate;
   const out: ReefV2Placement[] = [];
   for (let k = 0; k < model.undergrowth; k += 1) {
@@ -135,7 +135,7 @@ export interface ReefV2Ornaments {
   seagrass: V3[];
 }
 
-export function reefV2Ornaments(model: ReefV2Model): ReefV2Ornaments {
+function reefV2Ornaments(model: ReefV2Model): ReefV2Ornaments {
   const seed = model.startDate;
   const anemones = model.anemones.map((a) => ({ position: onSurface(model, `anemone${a.id}`, 0.2, 0.95), channel: a.channel }));
   const clams = Array.from({ length: model.clams }, (_, k) => onSurface(model, `clam${k}`, 0.3, 0.9));
@@ -236,7 +236,7 @@ function prism(start: V3, end: V3, r0: number, r1: number, sides = 5, caps = fal
   return tris;
 }
 
-export function reefV2RockTriangles(model: ReefV2Model): Tri[] {
+function reefV2RockTriangles(model: ReefV2Model): Tri[] {
   const seed = model.startDate;
   const pts = ICO.verts.map((v, i): V3 => {
     const k = 0.9 + 0.2 * unit(seed, `rock:v${i}`);

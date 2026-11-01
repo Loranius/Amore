@@ -144,7 +144,7 @@ function remappedRegionSurface(
  * share an angular-separation namespace and therefore spread around the
  * monarch instead of piling into one sector.
  */
-export const GROUND_HOST_ID = '__ground';
+const GROUND_HOST_ID = '__ground';
 
 function groundHost(root: GrowthBody): GrowthBody {
   return { ...root, id: GROUND_HOST_ID, generation: 0 };

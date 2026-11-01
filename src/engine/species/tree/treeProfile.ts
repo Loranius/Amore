@@ -56,7 +56,7 @@ export interface TreeProfile {
 }
 
 /** Скільки смуг ділять висоту. Двадцять — крок у 5% зросту. */
-export const TREE_PROFILE_BANDS = 20;
+const TREE_PROFILE_BANDS = 20;
 
 const CLEAR_BOLE_FACTOR = 3;
 

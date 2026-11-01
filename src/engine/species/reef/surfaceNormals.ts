@@ -32,7 +32,7 @@
 // ============================================================
 import { round6 } from './math';
 
-export interface CreasedMesh {
+interface CreasedMesh {
   positions: number[];
   normals: number[];
   indices: number[];
@@ -111,7 +111,7 @@ function faceNormals(positions: readonly number[], indices: readonly number[]): 
  * середнє: тінт у цьому проєкті — функція від висоти тіла, тож у зварених
  * вершин він однаковий, і середнє нічого не зміщує.
  */
-export interface WeldOptions {
+interface WeldOptions {
   creaseAngleDeg: number;
   /** Значення на ВХІДНУ вершину, яке треба донести до вихідної. */
   tint?: readonly number[];

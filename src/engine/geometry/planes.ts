@@ -30,9 +30,6 @@ import type { CrystalFacePlane, CrystalLodLevel } from './types';
  * geological identity on every reload, and each year crystal has its own.
  */
 
-/** A half-space: the solid is every point with `normal · p <= offset`. */
-export type { CrystalFacePlane };
-
 /**
  * How far a prism plane's azimuth may wander from an even split, as a fraction
  * of the even step.
@@ -386,7 +383,7 @@ function plane(
   };
 }
 
-export interface CrystalPlaneInput {
+interface CrystalPlaneInput {
   /** Local height the body starts at; the base plane sits here. */
   baseY: number;
   /** Local height of the tip. */

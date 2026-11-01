@@ -40,7 +40,7 @@ import veinsUrl from '@/assets/crystal/crystal-veins.webp';
 
 const cache = new Map<string, CrystalSurfaceTextures>();
 
-export interface CrystalSurfaceTextures {
+interface CrystalSurfaceTextures {
   /** Greyscale cell pattern; multiplies the body's earned colour. */
   surface: THREE.Texture;
   /** Tangent-space relief. */
@@ -104,15 +104,4 @@ export function crystalSurfaceTextures(density: number): CrystalSurfaceTextures 
   };
   cache.set(key, set);
   return set;
-}
-
-/** Test seam: drops the shared textures so a suite can start from nothing. */
-export function disposeCrystalSurfaceTextures(): void {
-  for (const set of cache.values()) {
-    set.surface.dispose();
-    set.relief.dispose();
-    set.veins.dispose();
-  }
-  cache.clear();
-  base = null;
 }

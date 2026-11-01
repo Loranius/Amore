@@ -74,7 +74,7 @@ function chooseArchetype(
 }
 
 /** Which portal module an event came from, e.g. `memories@1.0.0` -> `memories`. */
-export function eventModule(source: string): string {
+function eventModule(source: string): string {
   const at = source.indexOf('@');
   return at === -1 ? source : source.slice(0, at);
 }
@@ -278,7 +278,7 @@ function eventsWithin(
  * time a module outside the event ledger earns a say, and a call site with four
  * unlabelled trailing values is one transposition away from a silent defect.
  */
-export interface CrystalColonyContext {
+interface CrystalColonyContext {
   /** `YYYY-MM-DD` days both partners had off. See `CrystalSpeciesConfig`. */
   sharedDaysOff: readonly string[];
   /**
@@ -291,7 +291,7 @@ export interface CrystalColonyContext {
   colorPartners?: { first: number | null; second: number | null } | undefined;
 }
 
-export const EMPTY_COLONY_CONTEXT: CrystalColonyContext = {
+const EMPTY_COLONY_CONTEXT: CrystalColonyContext = {
   sharedDaysOff: [],
 };
 
@@ -308,7 +308,7 @@ function withinYear(value: string, startsAt: string, endsAt: string): boolean {
  * leaves the crystal exactly as white as it was.
  */
 
-export function buildAnnualFormations(
+function buildAnnualFormations(
   artifact: ArtifactBlueprint,
   asOf: string,
   context: CrystalColonyContext = EMPTY_COLONY_CONTEXT,

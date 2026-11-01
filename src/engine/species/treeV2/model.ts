@@ -37,7 +37,7 @@ import {
 } from '../crystalV2/model';
 import { tierSlot, yearElements } from '../grammar/grammar';
 
-export const TREE_V2_VERSION = 'tree-v3/2026-10-04';
+const TREE_V2_VERSION = 'tree-v3/2026-10-04';
 
 const FULL_TERM_YEARS = 40;
 const GROWTH_SATURATION = 3.8;

@@ -25,6 +25,7 @@
     "framer-motion": "^12.42.2",
     "heic-to": "^1.5.2",
     "maplibre-gl": "^6.4.1",
+    "postprocessing": "^6.36.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "react-router-dom": "^7.18.2",
