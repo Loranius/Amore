@@ -1,18 +1,12 @@
 import { stableHash32 } from '../evolution';
 import type { GrowthVec3 } from './types';
+import { clamp01, round6 } from '../kernel';
+export { clamp01, round6 };
 
 export const GROWTH_UP: GrowthVec3 = { x: 0, y: 1, z: 0 };
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-export function clamp01(value: number): number {
-  return clamp(value, 0, 1);
-}
-
-export function round6(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 export function roundVec(vector: GrowthVec3): GrowthVec3 {

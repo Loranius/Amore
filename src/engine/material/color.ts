@@ -1,5 +1,7 @@
 import type { EvolutionChannel, EvolutionPressureVector } from '../evolution';
 import type { CrystalRgb } from './types';
+import { clamp01, round6 } from '../kernel';
+export { clamp01, round6 };
 
 /**
  * What each pressure channel colours the stone.
@@ -25,14 +27,6 @@ const CHANNEL_COLORS: Record<EvolutionChannel, CrystalRgb> = {
   stability: { r: 0.84, g: 0.55, b: 0.86 },
   significance: { r: 0.94, g: 0.38, b: 0.72 },
 };
-
-export function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
-export function round6(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
-}
 
 export function rgb(r: number, g: number, b: number): CrystalRgb {
   return { r: round6(clamp01(r)), g: round6(clamp01(g)), b: round6(clamp01(b)) };

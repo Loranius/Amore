@@ -284,9 +284,43 @@ API through the package root» (`docs/02_VOLUMES/Volume_0*`, розділ
   однакові до біта. Ці числа записано еталоном у
   `species/shared/math.test.ts`; там само тест, що кожен вид віддає **ту
   саму** функцію, а не схожу, — щоб копія не повернулась тихо.
-- **Не зведено:** такі самі `clamp01`/`round6`/`seededUnit` у
-  `growth/math.ts`, `material/color.ts`, `life/engine.ts` і `labs/organic` —
-  це інші томи, і зведення між томами змінює їхні залежності, а не лише
-  прибирає копію.
+- Копії `clamp01`/`round6` в інших томах зведено наступною поправкою.
 - **Перевірено:** повні ворота — 370 файлів, 3643 перевірки, тести
+  детермінізму й еталони Python-двійника — зелені.
+
+## Поправка 2026-11-01 — детерміністичне ядро чисел
+
+Власник: «Зведи й копії в growth, material, life та labs».
+
+- **Куди.** `docs/00_GOVERNANCE/REPOSITORY_STRUCTURE.md` передбачає пакет
+  `deterministic-kernel` («Canonicalization, hashing, PRNG, ordering»), від
+  якого можуть залежати всі томи, а сам він — ні від кого. У коді його не
+  було. Тепер це `src/engine/kernel/` — `clamp01` і `round6`; ядро не
+  імпортує нічого, і тест це стереже. Це нова одиниця в структурі рушія,
+  але саме та, яку правило структури вже описує, — тому окремий ADR-перегляд
+  архітектури не потрібен.
+- **Зведено 15 копій:** `clamp01` — у `growth/math.ts`, `material/color.ts`,
+  `life/engine.ts`, `barkSurface/treeBarkSurface.ts`, трьох файлах
+  `labs/organic` і `species/shared/math.ts`; `round6` — у `growth/math.ts`,
+  `material/color.ts`, `life/engine.ts`, `species/tree/ageScale.ts`,
+  `species/tree/scaffold.ts`, `species/shared/math.ts`,
+  `species/shared/relationshipYear.ts`. `growth/math.ts`, `material/color.ts`
+  і `species/shared/math.ts` реекспортують їх далі, тож жоден імпорт у томах
+  не змінився.
+- **Чому числа ті самі.** Копії `clamp01` були записані трьома формами
+  (`max(0, min(1, v))`, `min(1, max(0, v))`, `clamp(v, 0, 1)`), `round6` —
+  двома (`1_000_000` і `1e6`). На всіх входах, зокрема NaN, ±Infinity, −0 і
+  найменших денормалах, вони дають той самий результат за `Object.is`;
+  `kernel/numeric.test.ts` звіряє ядро з кожною старою формою.
+- **Не зведено, бо зведення змінило б числа:**
+  - **`seededUnit` — це три різні алгоритми під одним ім'ям.** Види —
+    Mulberry32; `growth` — avalanche, `[0, 1)`; `life` — сирий
+    `stableHash32 / 0xffffffff`, який може повернути рівно 1 (коментар у
+    `growth/math.ts` називає саме це вадою, яку там виправили). Зведення
+    змінило б посів кристала, дерева й життя — тобто вигляд. Чи виправляти
+    `life` — окреме рішення власника з новим еталоном.
+  - **`clamp01` у `species/shared/relationshipYear.ts`** (тернарна форма)
+    повертає −0 на −0, ядро — +0. Лишено з поясненням над функцією.
+  - Загальна `clamp(value, min, max)` у `growth/math.ts` лишилась там.
+- **Перевірено:** повні ворота — 371 файл, 3647 перевірок, тести
   детермінізму й еталони Python-двійника — зелені.

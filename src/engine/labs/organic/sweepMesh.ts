@@ -25,6 +25,7 @@ import type {
   OrganicSurfaceConfig,
   OrganicSweepMesh,
 } from './surfaceTypes';
+import { clamp01 } from '../../kernel';
 
 interface PreparedCurveSamples {
   samples: OrganicCurveFrameSample[];
@@ -34,10 +35,6 @@ interface PreparedCurveSamples {
 interface ParentJunctionInfluence {
   junction: OrganicJunctionAnchor;
   reachesTerminal: boolean;
-}
-
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
 }
 
 function smoothstep(value: number): number {

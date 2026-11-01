@@ -10,14 +10,7 @@ import type {
   CrystalLifeState,
   SampleCrystalLifeInput,
 } from './types';
-
-function clamp01(value: number): number {
-  return Math.min(1, Math.max(0, value));
-}
-
-function round6(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
-}
+import { clamp01, round6 } from '../kernel';
 
 function seededUnit(seed: number, salt: string): number {
   return stableHash32(`${seed}\u001f${salt}`) / 0xffffffff;

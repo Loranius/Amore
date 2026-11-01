@@ -11,17 +11,14 @@
 // Кожен вид і далі імпортує з власного `./math` — той лише реекспортує
 // звідси рівно те, що мав, і тримає своє (`relationshipMaturityAt` у
 // кристала, `reefContactShade` у рифа). Поверхня видів не змінилась.
+//
+// `clamp01` і `round6` — з детерміністичного ядра (`engine/kernel`), спільного
+// для всіх томів; тут вони лише реекспортуються.
 // ============================================================
 import { EVOLUTION_CHANNELS, stableHash32, type EvolutionChannel, type EvolutionPressureVector } from '../../evolution';
 import { parseEvolutionInstant } from '../../evolution/calendar';
-
-export function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
-
-export function round6(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
-}
+import { clamp01, round6 } from '../../kernel';
+export { clamp01, round6 };
 
 export function saturate(value: number, halfSaturation: number): number {
   if (!Number.isFinite(value) || value <= 0) return 0;

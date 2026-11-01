@@ -19,6 +19,7 @@ import type {
   OrganicSurfaceConfig,
   OrganicSweepMesh,
 } from './surfaceTypes';
+import { clamp01 } from '../../kernel';
 
 interface ForkSegment {
   start: GrowthVec3;
@@ -60,10 +61,6 @@ const CUBE_TETRAHEDRA: readonly (readonly number[])[] = [
   [0, 7, 4, 6],
   [0, 4, 5, 6],
 ];
-
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
 
 function smoothstep(value: number): number {
   const clamped = clamp01(value);

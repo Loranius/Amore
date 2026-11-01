@@ -32,6 +32,7 @@
 import type { OrganicSkeletonState } from '../../labs/organic';
 export { treeDaysTogether } from './growthLaw';
 import { treeAgeProgress } from './growthLaw';
+import { round6 } from '../../kernel';
 
 /**
  * Висота скелета дорослого дерева, поділена на висоту стовбура з закону.
@@ -192,10 +193,6 @@ export function scaleLeafGeometryConfigToAge<T extends {
     minimumLength: config.minimumLength * scale,
     maximumLength: config.maximumLength * scale,
   };
-}
-
-function round6(value: number): number {
-  return Math.round(value * 1e6) / 1e6;
 }
 
 /**
