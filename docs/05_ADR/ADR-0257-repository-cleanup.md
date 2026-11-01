@@ -81,9 +81,6 @@
 - Невикористані експорти в `src/engine/**` (`dispose*`-функції текстур,
   сталі шапок росту) — рушій під нормативною специфікацією, його публічні
   контракти не чіпаються без окремого рішення.
-- `school_of_fish_reef.glb` досі матеріалізується в CI
-  (`scripts/reef/materialize_school_fish.sh`), хоча сцена його не вантажить.
-  Прибирання — зміна трьох робочих потоків; окремо.
 - `public/textures/reef/coral_stone_diff_1k.webp` (свідомо не береться,
   `reefStoneSurface.ts`) і `public/assets/reef/volcano/volcano-reference-albedo.webp`
   (призначення не встановлено) лишено.
@@ -91,3 +88,23 @@
 - Жива перевірка `npm run live` не проводилась: у середовищі немає
   `.env.live`. Аргумент, що вигляд не змінився, — статичний (видалено лише
   правила для класів, яких немає в розмітці).
+
+## Поправка 2026-11-01 — зграя риб прибрана й із CI
+
+Власник: «Прибери і school_of_fish з CI». `school_of_fish_reef.glb`
+збирався на кожному прогоні `ci.yml`, `deploy.yml` і `visual-preview.yml`
+(сценарій тягнув джерело з дзеркала й розпаковував закріплений збирач) і
+викладався на Pages, хоча жоден код його не вантажить відтоді, як сцену
+рифу з `ReefFishSchool.tsx` прибрано.
+
+- **Видалено:** крок «Materialize optimized reef fish asset» у трьох
+  робочих потоках; `scripts/reef/` (сценарій, `materializer.tgz.b64`,
+  README); `public/models/SCHOOL_OF_FISH_LICENSE.txt` — модель більше не
+  викладається, тож і атрибуції нема до чого стояти; рядок у `.gitignore`.
+- **`vite.config.ts`:** модель прибрано з `globIgnores` і з правила кешу
+  `reef-visual-assets`.
+- **`visual-preview.yml`:** фільтр шляхів `scripts/reef/**` прибрано —
+  теки більше нема.
+- **Лишено:** рядок `Could not load models/school_of_fish_reef.glb` у
+  `sceneFailure.test.ts` — це лише приклад тексту помилки для класифікатора
+  збоїв сцени, а не посилання на файл.
