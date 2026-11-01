@@ -14,14 +14,14 @@ export interface Rgba {
   readonly data: Uint8ClampedArray;
 }
 
-/** Аркуш одного шару (етап 1 — один кадр «стоїть» на напрям). */
+/** Аркуш одного шару (поки один кадр «стоїть» на напрям). Порожній шар — прозорий аркуш. */
 export function layerSheet(d: Doll, layer: LayerName): Rgba {
   const pal = paletteOf(d);
   const width = CELL.w;
   const height = CELL.h * DOLL_DIRS.length;
   const data = new Uint8ClampedArray(width * height * 4);
   for (const dir of DOLL_DIRS) {
-    const rows = renderLayer(layer, dir, d.face);
+    const rows = renderLayer(layer, dir, d);
     rows.forEach((r, y) => {
       for (let x = 0; x < r.length; x += 1) {
         const k = r[x]!;

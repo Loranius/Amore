@@ -43,10 +43,10 @@ const vite = await createServer({ root, server: { middlewareMode: true }, appTyp
 try {
   const { layerSheet } = await vite.ssrLoadModule('/src/features/game/life/render/doll/sheet.ts');
   const { DOLLS } = await vite.ssrLoadModule('/src/features/game/life/render/doll/dolls.ts');
-  const { BASE_LAYERS } = await vite.ssrLoadModule('/src/features/game/life/render/doll/rig.ts');
+  const { DRAWN_LAYERS } = await vite.ssrLoadModule('/src/features/game/life/render/doll/rig.ts');
   mkdirSync(out, { recursive: true });
   for (const d of DOLLS) {
-    for (const layer of BASE_LAYERS) {
+    for (const layer of DRAWN_LAYERS) {
       const file = resolve(out, `${d.name}-${layer}.png`);
       writeFileSync(file, encodePng(layerSheet(d, layer)));
       console.log('записано', file.slice(root.length + 1));

@@ -9,6 +9,7 @@
 // `LAYERS`. «Ліворуч» — дзеркало «праворуч».
 // ============================================================
 import { EYES_FRONT, EYES_SIDE, FACE_FRONT, FACE_SIDE, type FaceKind } from './faces';
+import { HAIR, type HairName } from './hair';
 import { ARM, HEAD_FRONT, HEAD_SIDE, LEG_FRONT, LEG_SIDE, TORSO_BACK, TORSO_FRONT, TORSO_SIDE, mirrorPart, type Part } from './parts';
 
 export const CELL = { w: 32, h: 48 } as const;
@@ -20,13 +21,19 @@ export type DollDir = 0 | 1 | 2 | 3;
 export const DOLL_DIRS: readonly DollDir[] = [0, 1, 2, 3];
 
 /**
- * Шари знизу вгору (власник 2026-11-01). Етап 1 — лише тіло, голова, очі
- * й обличчя; решта з'явиться разом з одягом і зачісками, у цьому ж порядку.
+ * Шари знизу вгору (власник 2026-11-01). Намальовано тіло, голову, очі,
+ * обличчя й зачіски; одяг і аксесуари з'являться в цьому ж порядку.
  */
 export const LAYERS = ['hairBack', 'body', 'head', 'eyes', 'face', 'pants', 'shoes', 'shirt', 'hairFront', 'accessory'] as const;
 export type LayerName = (typeof LAYERS)[number];
-/** Шари, які вже намальовано. */
-export const BASE_LAYERS: readonly LayerName[] = ['body', 'head', 'eyes', 'face'];
+/** Шари, які вже намальовано, — у порядку накладання. */
+export const DRAWN_LAYERS: readonly LayerName[] = ['hairBack', 'body', 'head', 'eyes', 'face', 'hairFront'];
+
+/** Що в людини своє поверх спільного скелета: обличчя й зачіска. */
+export interface DollShape {
+  readonly face: FaceKind;
+  readonly hairStyle: HairName;
+}
 
 interface Point {
   readonly x: number;
@@ -49,16 +56,20 @@ const IDLE: Readonly<Record<'front' | 'side', Joints>> = {
   side: { neck: { x: 16, y: 20 }, shoulderL: { x: 15, y: 23 }, shoulderR: { x: 16, y: 23 }, hipL: { x: 15, y: 33 }, hipR: { x: 16, y: 33 } },
 };
 
-/** Частина на суглобі. `dim` — дальня (на тон темніша), `outline` — обвести. */
+/**
+ * Частина на суглобі. `dim` — дальня (на тон темніша), `outline` — обвести,
+ * `ink` — чим: `o` обвідка шкіри (типово), `O` обвідка волосся.
+ */
 export interface Placement {
   readonly part: Part;
   readonly at: Point;
   readonly dim?: boolean;
   readonly outline: boolean;
+  readonly ink?: 'o' | 'O';
 }
 
 /** Що малює шар у кадрі «праворуч», «до нас» чи «від нас» (ліворуч — дзеркало «праворуч»). */
-export function placements(layer: LayerName, dir: DollDir, face: FaceKind): Placement[] {
+export function placements(layer: LayerName, dir: DollDir, who: DollShape): Placement[] {
   if (dir === 1) throw new Error('Люди: «ліворуч» — дзеркало «праворуч», окремих частин нема');
   const side = dir === 2;
   const j = side ? IDLE.side : IDLE.front;
@@ -88,7 +99,13 @@ export function placements(layer: LayerName, dir: DollDir, face: FaceKind): Plac
       return [{ part: side ? EYES_SIDE : EYES_FRONT, at: j.neck, outline: false }];
     case 'face':
       if (dir === 3) return [];
-      return [{ part: side ? FACE_SIDE[face] : FACE_FRONT[face], at: j.neck, outline: false }];
+      return [{ part: side ? FACE_SIDE[who.face] : FACE_FRONT[who.face], at: j.neck, outline: false }];
+    case 'hairFront':
+      return [{ part: HAIR[who.hairStyle].front[dir], at: j.neck, outline: true, ink: 'O' }];
+    case 'hairBack': {
+      const back = HAIR[who.hairStyle].back?.[dir];
+      return back ? [{ part: back, at: j.neck, outline: true, ink: 'O' }] : [];
+    }
     default:
       return [];
   }
@@ -97,15 +114,15 @@ export function placements(layer: LayerName, dir: DollDir, face: FaceKind): Plac
 const DIM: Readonly<Record<string, string>> = { h: 's', s: 'S', S: 'D', D: 'D' };
 
 /**
- * Кадр шару — ряди ключів клітинки (`.` порожньо, `o` обвідка, `i` обвідка
- * всередині силуету, решта —
+ * Кадр шару — ряди ключів клітинки (`.` порожньо, `o`/`O` обвідка шкіри й
+ * волосся, `i`/`I` вона ж усередині силуету, решта —
  * ключі частин). Обвідка — 4-сусідство довкола кожної обведеної частини:
  * вона лягає й поверх нижчих частин, тож рука відділяється від тулуба.
  */
-export function renderLayer(layer: LayerName, dir: DollDir, face: FaceKind): string[] {
-  if (dir === 1) return renderLayer(layer, 2, face).map((r) => [...r].reverse().join(''));
+export function renderLayer(layer: LayerName, dir: DollDir, who: DollShape): string[] {
+  if (dir === 1) return renderLayer(layer, 2, who).map((r) => [...r].reverse().join(''));
   const px: string[][] = Array.from({ length: CELL.h }, () => Array<string>(CELL.w).fill('.'));
-  for (const pl of placements(layer, dir, face)) {
+  for (const pl of placements(layer, dir, who)) {
     const { rows, pivot } = pl.part;
     const x0 = pl.at.x - pivot.x;
     const y0 = pl.at.y - pivot.y;
@@ -130,13 +147,14 @@ export function renderLayer(layer: LayerName, dir: DollDir, face: FaceKind): str
         if (filled(cx, cy)) continue;
         if (!(filled(cx - 1, cy) || filled(cx + 1, cy) || filled(cx, cy - 1) || filled(cx, cy + 1))) continue;
         if (cx < 0 || cy < 0 || cx >= CELL.w || cy >= CELL.h) throw new Error(`Люди: обвідка шару ${layer} виходить за клітинку (${cx}, ${cy})`);
-        px[cy]![cx] = 'o';
+        px[cy]![cx] = pl.ink ?? 'o';
       }
     }
   }
   // Обвідка всередині силуету (рука на тлі тулуба, між ногами) — світліша:
   // темною лишається лише та, що межує з порожнечею (вибірковий контур).
   const empty = (x: number, y: number): boolean => (px[y]?.[x] ?? '.') === '.';
-  const out = px.map((r, y) => r.map((k, x) => (k === 'o' && !(empty(x - 1, y) || empty(x + 1, y) || empty(x, y - 1) || empty(x, y + 1)) ? 'i' : k)));
+  const inner: Readonly<Record<string, string>> = { o: 'i', O: 'I' };
+  const out = px.map((r, y) => r.map((k, x) => (inner[k] && !(empty(x - 1, y) || empty(x + 1, y) || empty(x, y - 1) || empty(x, y + 1)) ? inner[k]! : k)));
   return out.map((r) => r.join(''));
 }

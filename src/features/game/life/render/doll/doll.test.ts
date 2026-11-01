@@ -3,8 +3,8 @@
 import { readFileSync } from 'node:fs';
 import { inflateSync } from 'node:zlib';
 import { describe, expect, it } from 'vitest';
-import { DOLLS, DIMA_DOLL, LENA_DOLL } from './dolls';
-import { BASE_LAYERS, CELL, DOLL_DIRS, FOOT, renderLayer, type LayerName } from './rig';
+import { DOLLS, DIMA_DOLL, LENA_DOLL, type Doll } from './dolls';
+import { DRAWN_LAYERS, CELL, DOLL_DIRS, FOOT, renderLayer, type LayerName } from './rig';
 import { layerSheet } from './sheet';
 
 /** Силует шару: `#` там, де щось намальовано. */
@@ -12,10 +12,10 @@ function mask(rows: readonly string[]): string[] {
   return rows.map((r) => r.replace(/[^.]/g, '#'));
 }
 
-function stack(face: 'girl' | 'boy', dir: 0 | 1 | 2 | 3, layers: readonly LayerName[]): string[] {
+function stack(who: Doll, dir: 0 | 1 | 2 | 3, layers: readonly LayerName[]): string[] {
   const out = Array.from({ length: CELL.h }, () => Array<string>(CELL.w).fill('.'));
   for (const l of layers) {
-    renderLayer(l, dir, face).forEach((r, y) => [...r].forEach((k, x) => { if (k !== '.') out[y]![x] = k; }));
+    renderLayer(l, dir, who).forEach((r, y) => [...r].forEach((k, x) => { if (k !== '.') out[y]![x] = k; }));
   }
   return out.map((r) => r.join(''));
 }
@@ -24,33 +24,33 @@ describe('модульні люди: один скелет', () => {
   it('тіло, голова й очі Лєни та Діми однакові за формою в кожному напрямі', () => {
     for (const dir of DOLL_DIRS) {
       for (const layer of ['body', 'head', 'eyes'] as const) {
-        expect(renderLayer(layer, dir, 'girl'), `${layer} ${dir}`).toEqual(renderLayer(layer, dir, 'boy'));
+        expect(renderLayer(layer, dir, LENA_DOLL), `${layer} ${dir}`).toEqual(renderLayer(layer, dir, DIMA_DOLL));
       }
     }
   });
 
   it('обличчя різняться лише накладкою: брови, рот, рум\'янець', () => {
-    expect(renderLayer('face', 0, 'girl')).not.toEqual(renderLayer('face', 0, 'boy'));
-    expect(renderLayer('face', 3, 'girl').join('')).toMatch(/^\.+$/);
+    expect(renderLayer('face', 0, LENA_DOLL)).not.toEqual(renderLayer('face', 0, DIMA_DOLL));
+    expect(renderLayer('face', 3, LENA_DOLL).join('')).toMatch(/^\.+$/);
   });
 
   it('«ліворуч» — дзеркало «праворуч» у кожному шарі', () => {
-    for (const layer of BASE_LAYERS) {
-      const right = renderLayer(layer, 2, 'girl');
-      expect(renderLayer(layer, 1, 'girl')).toEqual(right.map((r) => [...r].reverse().join('')));
+    for (const layer of DRAWN_LAYERS) {
+      const right = renderLayer(layer, 2, LENA_DOLL);
+      expect(renderLayer(layer, 1, LENA_DOLL)).toEqual(right.map((r) => [...r].reverse().join('')));
     }
   });
 
   it('спереду й ззаду силует симетричний', () => {
     for (const dir of [0, 3] as const) {
-      const m = mask(stack('girl', dir, ['body', 'head']));
+      const m = mask(stack(LENA_DOLL, dir, ['body', 'head']));
       expect(m).toEqual(m.map((r) => [...r].reverse().join('')));
     }
   });
 
   it('стоїть на точці між стопами, зріст 42–46 пікселів малюнка (спрайт власника — 44), в усіх напрямах однаковий', () => {
     for (const dir of DOLL_DIRS) {
-      const rows = mask(stack('girl', dir, ['body', 'head']));
+      const rows = mask(stack(LENA_DOLL, dir, ['body', 'head']));
       const filled = rows.map((r, y) => (r.includes('#') ? y : -1)).filter((y) => y >= 0);
       const top = filled[0]!;
       const bottom = filled[filled.length - 1]!;
@@ -66,18 +66,43 @@ describe('модульні люди: один скелет', () => {
 
   it('очі там, де голова, і не виходять за неї', () => {
     for (const dir of [0, 2] as const) {
-      const head = mask(renderLayer('head', dir, 'girl'));
-      renderLayer('eyes', dir, 'girl').forEach((r, y) => [...r].forEach((k, x) => {
+      const head = mask(renderLayer('head', dir, LENA_DOLL));
+      renderLayer('eyes', dir, LENA_DOLL).forEach((r, y) => [...r].forEach((k, x) => {
         if (k !== '.') expect(head[y]![x], `око (${x}, ${y})`).toBe('#');
       }));
     }
   });
 });
 
+describe('зачіски', () => {
+  it('у Лєни довге волосся (є шар за тілом), у Діми коротке (нема)', () => {
+    expect(renderLayer('hairBack', 0, LENA_DOLL).join('')).toMatch(/[aAqQ]/);
+    expect(renderLayer('hairBack', 0, DIMA_DOLL).join('')).toMatch(/^\.+$/);
+    expect(renderLayer('hairFront', 0, LENA_DOLL)).not.toEqual(renderLayer('hairFront', 0, DIMA_DOLL));
+  });
+
+  it('спереду й у профіль волосся не закриває очей', () => {
+    for (const d of DOLLS) {
+      for (const dir of [0, 1, 2] as const) {
+        const hair = renderLayer('hairFront', dir, d);
+        renderLayer('eyes', dir, d).forEach((r, y) => [...r].forEach((k, x) => {
+          if (k !== '.') expect(hair[y]![x], `${d.name}: око (${x}, ${y}) під волоссям, напрям ${dir}`).toBe('.');
+        }));
+      }
+    }
+  });
+
+  it('довге волосся спадає нижче плечей і в профіль, і зі спини; коротке — вище шиї', () => {
+    const bottom = (rows: string[]): number => rows.reduce((b, r, y) => (/[^.]/.test(r) ? y : b), -1);
+    for (const dir of [2, 3] as const) expect(bottom(renderLayer('hairFront', dir, LENA_DOLL))).toBeGreaterThan(25);
+    for (const dir of [0, 2, 3] as const) expect(bottom(renderLayer('hairFront', dir, DIMA_DOLL))).toBeLessThan(20);
+  });
+});
+
 describe('аркуші шарів', () => {
   it('лише повна прозорість або повна непрозорість — нічого не змішається при масштабуванні', () => {
     for (const d of DOLLS) {
-      for (const layer of BASE_LAYERS) {
+      for (const layer of DRAWN_LAYERS) {
         const s = layerSheet(d, layer);
         expect(s.width).toBe(CELL.w);
         expect(s.height).toBe(CELL.h * 4);
@@ -89,7 +114,7 @@ describe('аркуші шарів', () => {
   it('кольори різні: очі Лєни карі, Діми сіро-блакитні; шкіра однакова', () => {
     const eye = (d: typeof LENA_DOLL): number[] => {
       const s = layerSheet(d, 'eyes');
-      const rows = renderLayer('eyes', 0, d.face);
+      const rows = renderLayer('eyes', 0, d);
       const y = rows.findIndex((r) => r.includes('e'));
       const i = (y * CELL.w + rows[y]!.indexOf('e')) * 4;
       return [s.data[i]!, s.data[i + 1]!, s.data[i + 2]!];
@@ -98,9 +123,16 @@ describe('аркуші шарів', () => {
     expect(layerSheet(LENA_DOLL, 'body').data).toEqual(layerSheet(DIMA_DOLL, 'body').data);
   });
 
+  it('волосся й брови — кольору волосся з Look, обвідка волосся темніша за нього, а не шкіряна', () => {
+    const k = (d: Doll): Set<string> => new Set(renderLayer('hairFront', 0, d).join('').replace(/\./g, ''));
+    expect([...k(LENA_DOLL)]).toContain('c');
+    expect([...k(DIMA_DOLL)]).not.toContain('c');
+    for (const d of DOLLS) expect([...k(d)].filter((c) => c === 'o' || c === 'i')).toEqual([]);
+  });
+
   it('PNG у assets/doll збігаються з кодом (`node scripts/doll/export.mjs`)', () => {
     for (const d of DOLLS) {
-      for (const layer of BASE_LAYERS) {
+      for (const layer of DRAWN_LAYERS) {
         const file = new URL(`../assets/doll/${d.name}-${layer}.png`, import.meta.url);
         expect(decodePng(readFileSync(file)), `${d.name}-${layer}.png застарів`).toEqual(layerSheet(d, layer));
       }
