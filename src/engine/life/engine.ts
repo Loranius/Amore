@@ -10,10 +10,15 @@ import type {
   CrystalLifeState,
   SampleCrystalLifeInput,
 } from './types';
-import { clamp01, round6 } from '../kernel';
+import { clamp01, round6, unitFromHash32 } from '../kernel';
 
+/**
+ * Детермінована частка в [0, 1). Ділила на `0xffffffff` і на найбільшому хеші
+ * повертала рівно 1 — ту саму ваду, яку `growth/math.ts` виправив раніше
+ * (ADR-0257). Тепер ділення спільне з `growth`: `unitFromHash32`.
+ */
 function seededUnit(seed: number, salt: string): number {
-  return stableHash32(`${seed}\u001f${salt}`) / 0xffffffff;
+  return unitFromHash32(stableHash32(`${seed}\u001f${salt}`));
 }
 
 function qualityMotionScale(quality: CrystalMaterialQuality): number {

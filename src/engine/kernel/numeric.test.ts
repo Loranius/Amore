@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { clamp01, round6 } from './index';
+import { clamp01, round6, unitFromHash32 } from './index';
 import * as growth from '../growth/math';
 import * as material from '../material/color';
 import * as speciesMath from '../species/shared/math';
@@ -45,6 +45,19 @@ describe('deterministic kernel numerics', () => {
     expect(material.round6).toBe(round6);
     expect(speciesMath.clamp01).toBe(clamp01);
     expect(speciesMath.round6).toBe(round6);
+  });
+
+  it('unitFromHash32 stays in [0, 1) at both ends of the 32-bit range', () => {
+    // Регресія (ADR-0257): `life` ділив на 0xffffffff і на найбільшому хеші
+    // повертав рівно 1 — поза межами для кожного, хто бере частку чи індекс.
+    expect(unitFromHash32(0)).toBe(0);
+    expect(unitFromHash32(0xffffffff)).toBeLessThan(1);
+    expect(unitFromHash32(0xffffffff)).toBe(1 - 2 ** -32);
+    expect(unitFromHash32(0x8000_0000)).toBe(0.5);
+  });
+
+  it('unitFromHash32 reads the hash as unsigned, as stableHash32 produces it', () => {
+    expect(unitFromHash32(-1)).toBe(unitFromHash32(0xffffffff));
   });
 
   it('depends on nothing — the kernel is the bottom of the dependency graph', () => {
