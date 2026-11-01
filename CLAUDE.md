@@ -98,4 +98,4 @@ A task is not complete until the relevant checklist passes and the implementatio
 
 **Доставка.** Після `bash scripts/quality-gate.sh` власник хоче пуш і в робочу гілку, і в `main` (`git push origin HEAD:main`).
 
-**MCP.** `.mcp.json` підключає `threejs-devtools-mcp` (версія закріплена; для 3D-порталу, не для гри). PixelLab підключений на рівні акаунта — ключ ніколи не потрапляє в репозиторій.
+**MCP.** `.mcp.json` підключає `threejs-devtools-mcp` (версія закріплена; для 3D-порталу, не для гри), `pixellab` (HTTP, ключ — зі змінної `PIXELLAB_API_TOKEN` у секретах середовища; ключ ніколи не потрапляє в репозиторій), `pxcli` (малювання пікселями) і `pixelart-tiles` (тайли й тайлсети) — версії закріплені. Піксельні навички в `.claude/skills/`: `pxl-pixel-art` (crsolver/claude-pxl, MIT — спрайти кодом, `node .claude/skills/pxl-pixel-art/bin/pxl.js`), довідники `pixel-art` і `pixel-art-sprites` (omer-metin, Apache-2.0), `aseprite-pixel-art-*` (willibrandon/pixel-plugin, MIT — працюють лише з Aseprite і її MCP, яких у хмарі нема). Це поради, а не правила: стиль гри задають PixelLab-аркуші й правила вище.

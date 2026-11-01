@@ -3,6 +3,21 @@
     "threejs-devtools-mcp": {
       "command": "npx",
       "args": ["-y", "threejs-devtools-mcp@0.4.1"]
+    },
+    "pixellab": {
+      "type": "http",
+      "url": "https://api.pixellab.ai/mcp",
+      "headers": {
+        "Authorization": "Bearer ${PIXELLAB_API_TOKEN}"
+      }
+    },
+    "pxcli": {
+      "command": "npx",
+      "args": ["-y", "pxcli-mcp@0.1.0"]
+    },
+    "pixelart-tiles": {
+      "command": "uvx",
+      "args": ["--from", "ssyubix-pixelart-mcp==0.1.2", "ssyubix-pixelart-mcp"]
     }
   }
 }
