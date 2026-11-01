@@ -1,35 +1,7 @@
-import {
-  stableHash32,
-} from '../../evolution';
-import { parseEvolutionInstant } from '../../evolution/calendar';
+import { clamp01 } from '../shared/math';
 
-export function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
-
-export function round6(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
-}
-
-export function seededUnit(seed: number, salt: string): number {
-  let state = stableHash32(`${seed}\u001f${salt}`) >>> 0;
-  state = (state + 0x6d2b79f5) >>> 0;
-  let value = state;
-  value = Math.imul(value ^ (value >>> 15), value | 1);
-  value ^= value + Math.imul(value ^ (value >>> 7), value | 61);
-  return ((value ^ (value >>> 14)) >>> 0) / 4_294_967_296;
-}
-
-export function stableSeed(seed: number, salt: string): number {
-  return stableHash32(`${seed}\u001f${salt}`);
-}
-
-export function daysBetweenExplicit(earlier: string, later: string): number | null {
-  const start = parseEvolutionInstant(earlier);
-  const end = parseEvolutionInstant(later);
-  if (start === null || end === null) return null;
-  return Math.max(0, Math.floor((end - start) / 86_400_000));
-}
+// Спільна математика видів — `species/shared/math.ts`; тут лише своє.
+export { clamp01, daysBetweenExplicit, round6, seededUnit, stableSeed } from '../shared/math';
 
 /**
  * Затемнення в місці ДОТИКУ — те, чим виросле відрізняється від наклеєного.
