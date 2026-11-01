@@ -48,15 +48,15 @@ describe('модульні люди: один скелет', () => {
     }
   });
 
-  it('стоїть на точці між стопами, зріст 56–64 пікселі малюнка, в усіх напрямах однаковий', () => {
+  it('стоїть на точці між стопами, зріст 42–46 пікселів малюнка (спрайт власника — 44), в усіх напрямах однаковий', () => {
     for (const dir of DOLL_DIRS) {
       const rows = mask(stack('girl', dir, ['body', 'head']));
       const filled = rows.map((r, y) => (r.includes('#') ? y : -1)).filter((y) => y >= 0);
       const top = filled[0]!;
       const bottom = filled[filled.length - 1]!;
       expect(bottom, `низ, напрям ${dir}`).toBe(FOOT.y - 1);
-      expect(bottom - top + 1).toBeGreaterThanOrEqual(56);
-      expect(bottom - top + 1).toBeLessThanOrEqual(64);
+      expect(bottom - top + 1).toBeGreaterThanOrEqual(42);
+      expect(bottom - top + 1).toBeLessThanOrEqual(46);
       // Стопи — по обидва боки від осі (x 15 | 16), а не зсунуті вбік.
       const feet = rows[bottom]!;
       expect(feet.indexOf('#')).toBeLessThan(FOOT.x);

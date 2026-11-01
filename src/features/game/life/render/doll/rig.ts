@@ -1,6 +1,6 @@
 // ============================================================
 // Один скелет на всіх (ADR-0239, поправка 2026-11-01). Клітинка кадру —
-// 32×64 пікселі малюнка (піксель малюнка — пів світового, як в усій грі),
+// 32×48 пікселів малюнка (піксель малюнка — пів світового, як в усій грі),
 // точка між стопами — `FOOT`. Поза каже, де суглоби (шия, плечі, кульші),
 // а частини (`parts.ts`) кріпляться до них своїми точками — тож одяг і
 // зачіски, прив'язані до тих самих частин, рухатимуться разом із тілом.
@@ -11,9 +11,9 @@
 import { EYES_FRONT, EYES_SIDE, FACE_FRONT, FACE_SIDE, type FaceKind } from './faces';
 import { ARM, HEAD_FRONT, HEAD_SIDE, LEG_FRONT, LEG_SIDE, TORSO_BACK, TORSO_FRONT, TORSO_SIDE, mirrorPart, type Part } from './parts';
 
-export const CELL = { w: 32, h: 64 } as const;
+export const CELL = { w: 32, h: 48 } as const;
 /** Точка між стопами в клітинці: середина між x 15 і 16, під нижнім рядом. */
-export const FOOT = { x: 16, y: 63 } as const;
+export const FOOT = { x: 16, y: 47 } as const;
 
 /** 0 — до нас, 1 — ліворуч, 2 — праворуч, 3 — від нас (як `Dir` у `people.ts`). */
 export type DollDir = 0 | 1 | 2 | 3;
@@ -44,9 +44,9 @@ interface Joints {
 
 /** Стоїть (етап 1). Анімації — інші набори суглобів того самого скелета. */
 const IDLE: Readonly<Record<'front' | 'side', Joints>> = {
-  front: { neck: { x: 16, y: 31 }, shoulderL: { x: 8, y: 35 }, shoulderR: { x: 23, y: 35 }, hipL: { x: 12, y: 47 }, hipR: { x: 19, y: 47 } },
+  front: { neck: { x: 16, y: 20 }, shoulderL: { x: 9, y: 23 }, shoulderR: { x: 22, y: 23 }, hipL: { x: 12, y: 33 }, hipR: { x: 19, y: 33 } },
   // Профіль: L — дальні рука й нога, R — ближні.
-  side: { neck: { x: 16, y: 31 }, shoulderL: { x: 15, y: 35 }, shoulderR: { x: 16, y: 35 }, hipL: { x: 14, y: 47 }, hipR: { x: 16, y: 47 } },
+  side: { neck: { x: 16, y: 20 }, shoulderL: { x: 15, y: 23 }, shoulderR: { x: 16, y: 23 }, hipL: { x: 15, y: 33 }, hipR: { x: 16, y: 33 } },
 };
 
 /** Частина на суглобі. `dim` — дальня (на тон темніша), `outline` — обвести. */
