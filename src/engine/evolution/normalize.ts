@@ -12,7 +12,7 @@ import {
   relationshipEpochIndex,
 } from './calendar';
 
-export interface NormalizedEvolutionResult {
+interface NormalizedEvolutionResult {
   events: NormalizedEvolutionEvent[];
   diagnostics: EvolutionDiagnostics;
 }

@@ -92,7 +92,7 @@ export function volcanoRings(model: VolcanoModel): Ring[] {
 }
 
 /** Глибина озера лави під губою кратера. */
-export function volcanoMagmaY(model: VolcanoModel): number {
+function volcanoMagmaY(model: VolcanoModel): number {
   // Глибокий кратер (власник: «глибокий кратер; темна внутрішня порожнина»).
   return model.height - model.craterRadius * 1.15;
 }
@@ -197,7 +197,7 @@ export function volcanoVeinPaths(model: VolcanoModel): VeinPoint[][] {
  * Жар каменю в точці: тепліє до кратера й біля жил. Камінь сам не світить —
  * він лише теплішає й пульсує разом із лавою.
  */
-export function volcanoRockHeat(model: VolcanoModel, veins: readonly VeinPoint[][], p: V3): number {
+function volcanoRockHeat(model: VolcanoModel, veins: readonly VeinPoint[][], p: V3): number {
   const f = p[1] / model.height;
   // Біля губи камінь лише теплий; пізня стадія — світиться зсередини
   // (власник: «вулкан світиться зсередини») — тепло піднімається схилом.
@@ -247,7 +247,7 @@ export function volcanoCrater(model: VolcanoModel) {
   return { collar, bulge, rim, ledge, deep, inner };
 }
 
-export function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: number[]; heat: number[] } {
+function volcanoConeTriangles(model: VolcanoModel): { tris: Tri[]; tone: number[]; heat: number[] } {
   const seed = model.startDate;
   const rings = volcanoRings(model);
   const veins = volcanoVeinPaths(model);
@@ -331,60 +331,6 @@ export function volcanoConeRadiusAt(rings: readonly Ring[], a: number, y: number
   return volcanoRingHit(rings[rings.length - 1]!.points, a).r;
 }
 
-/** Мінімальна насиченість року, з якої він лишає уступ. */
-export const VOLCANO_LEDGE_FERTILITY = 0.4;
-
-/**
- * Уступи насичених років (ADR-0237 §5): на верху шару року, що був
- * насиченим, лава застигла терасою. Тераса — ДУГА на одному боці конуса
- * (азимут — золотий кут року), а не кільце: кільце на кожному насиченому
- * році робило з конуса посмугований стос (живий кадр, 2026-09-29), а смуги
- * власник уже відкидав. Чим насиченіший рік, тим ширша дуга й далі виступ.
- * Над ріками лави тераси немає: вона перекрила б ріку.
- */
-export function volcanoLedges(model: VolcanoModel): { tris: Tri[]; tone: number[] } {
-  const seed = model.startDate;
-  const rings = volcanoRings(model);
-  const crater = volcanoCrater(model);
-  const notches = volcanoVeinIndices(model).map((i) => Math.atan2(crater.rim[i]![2], crater.rim[i]![0]));
-  const tris: Tri[] = [];
-  const tone: number[] = [];
-  const N = 24;
-  for (const layer of model.layers) {
-    if (layer.fertility < VOLCANO_LEDGE_FERTILITY || layer.to > model.height * 0.85) continue;
-    const y = layer.to;
-    const drop = 0.035 + 0.03 * layer.fertility;
-    const out = 0.04 + 0.08 * layer.fertility;
-    const t = 0.78 + 0.3 * unit(seed, `ledge${layer.year}`);
-    const centre = layer.year * 2.399963 + unit(seed, `ledge${layer.year}:a`) * 0.6;
-    const span = (0.7 + 1.0 * layer.fertility) * (Math.PI / 3);
-    const segments = Math.max(3, Math.round((span / (Math.PI * 2)) * N));
-    for (let i = 0; i < segments; i += 1) {
-      const a0 = centre - span / 2 + (i / segments) * span;
-      const a1 = centre - span / 2 + ((i + 1) / segments) * span;
-      const mid = (a0 + a1) / 2;
-      const nearRiver = notches.some((n) => Math.abs(Math.atan2(Math.sin(mid - n), Math.cos(mid - n))) < 0.42);
-      if (nearRiver) continue;
-      const at = (a: number, dy: number, grow: number): V3 => {
-        const r = volcanoConeRadiusAt(rings, a, y + dy) * (1 + grow) - (grow === 0 ? 0.004 : 0);
-        return [Math.cos(a) * r, y + dy, Math.sin(a) * r];
-      };
-      const in0 = at(a0, 0, 0);
-      const in1 = at(a1, 0, 0);
-      // Тераса звужується до кінців дуги — як застиглий язик, а не полиця.
-      const taper = (k: number) => Math.sin((Math.PI * k) / segments) ** 0.6;
-      const o0 = at(a0, 0, out * taper(i));
-      const o1 = at(a1, 0, out * taper(i + 1));
-      const b0 = at(a0, -drop, 0);
-      const b1 = at(a1, -drop, 0);
-      // Полиця зверху й лице вниз до схилу — закручено назовні.
-      tris.push([in0, in1, o1], [in0, o1, o0], [o0, o1, b1], [o0, b1, b0]);
-      tone.push(t * 1.05, t * 1.05, t * 0.86, t * 0.86);
-    }
-  }
-  return { tris, tone };
-}
-
 export interface VolcanoLava {
   /** Трикутники лави: озеро в кратері й жили на схилах. */
   positions: Float32Array;
@@ -397,7 +343,7 @@ export interface VolcanoLava {
   flow: Float32Array;
 }
 
-export function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
+function buildVolcanoLava(model: VolcanoModel): VolcanoLava {
   const p: number[] = [];
   const h: number[] = [];
   const f: number[] = [];

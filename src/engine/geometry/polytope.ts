@@ -142,7 +142,7 @@ const COLLINEAR_SINE = 1e-3;
  * which a caller must treat as a bug in the plane set rather than as a shape,
  * since a crystal with no volume is not a fallback anyone wants rendered.
  */
-export interface CrystalPolytopeTolerance {
+interface CrystalPolytopeTolerance {
   /** How close a vertex has to sit to a plane to count as lying on its face. */
   onPlane: number;
   /**

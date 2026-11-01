@@ -1,18 +1,12 @@
 import { stableHash32 } from '../evolution';
 import type { GrowthVec3 } from './types';
+import { clamp01, round6, unitFromHash32 } from '../kernel';
+export { clamp01, round6 };
 
 export const GROWTH_UP: GrowthVec3 = { x: 0, y: 1, z: 0 };
 
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
-}
-
-export function clamp01(value: number): number {
-  return clamp(value, 0, 1);
-}
-
-export function round6(value: number): number {
-  return Math.round(value * 1_000_000) / 1_000_000;
 }
 
 export function roundVec(vector: GrowthVec3): GrowthVec3 {
@@ -144,7 +138,7 @@ function avalanche(hash: number): number {
  * is out of range for every caller that uses it to pick an index or a fraction.
  */
 export function seededUnit(seed: number, salt: string): number {
-  return avalanche(stableHash32(`${seed}\u001f${salt}`)) / 0x1_0000_0000;
+  return unitFromHash32(avalanche(stableHash32(`${seed}\u001f${salt}`)));
 }
 
 export function angularDistance(left: number, right: number): number {

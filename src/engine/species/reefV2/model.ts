@@ -41,7 +41,7 @@ import {
   type GiftChannel,
 } from '../crystalV2/model';
 
-export const REEF_V2_VERSION = 'reef-v2/2026-09-28b';
+const REEF_V2_VERSION = 'reef-v2/2026-09-28b';
 
 const HEAD_FULL_TERM_YEARS = 25;
 

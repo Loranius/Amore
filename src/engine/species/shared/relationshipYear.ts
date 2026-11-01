@@ -24,6 +24,7 @@
 // колір і розкладка лишаються за видом — у рифа вони інші за побудовою.
 // ============================================================
 import type { LeapDayPolicy } from '../../evolution/types';
+import { round6 } from '../../kernel';
 
 /**
  * Частини порталу, на які рік може спиратись: календар, плани, вішліст,
@@ -73,23 +74,25 @@ export function portalModuleOf(source: string): PortalModule | null {
 }
 
 /** Подій в одному модулі, після яких наступні додають мало. */
-export const YEAR_DEPTH_HALF_SATURATION = 12;
+const YEAR_DEPTH_HALF_SATURATION = 12;
 
 /** Спільних вихідних, які рахуються повним роком на цій осі. */
 export const SHARED_DAYS_OFF_FULL_YEAR = 60;
 
 /** Скільки спільний час може підняти рік, який модулі описали бідно. */
-export const TOGETHERNESS_LIFT = 0.5;
+const TOGETHERNESS_LIFT = 0.5;
 
 /** Що отримує рік, у якому не було нічого. */
-export const EMPTY_YEAR_FLOOR = 0.3;
+const EMPTY_YEAR_FLOOR = 0.3;
 
+/**
+ * Не `kernel/clamp01`, і це свідомо (ADR-0257). На −0 ця копія повертає −0, а
+ * ядро — +0; для решти входів, зокрема NaN і ±Infinity, вони однакові. Звести
+ * — означало б змінити знак нуля в опублікованому році, а тести звіряють
+ * через `Object.is`. Рішення про це — окреме, не прибирання.
+ */
 function clamp01(value: number): number {
   return value < 0 ? 0 : value > 1 ? 1 : value;
-}
-
-function round6(value: number): number {
-  return Math.round(value * 1e6) / 1e6;
 }
 
 /**

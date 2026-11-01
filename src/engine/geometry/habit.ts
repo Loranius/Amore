@@ -14,7 +14,7 @@
 // тупий стовп, який власник описав як «сталагміт».
 // ============================================================
 
-export interface CrystalHabitShape {
+interface CrystalHabitShape {
   /** Стиск перерізу по двох осях: 1 — коло. */
   scaleX: number;
   scaleZ: number;

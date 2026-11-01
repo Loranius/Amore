@@ -226,7 +226,7 @@ function fitScaleFor(size: { x: number; y: number; z: number }): {
   };
 }
 
-export interface CrystalSceneRadiusOptions {
+interface CrystalSceneRadiusOptions {
   /**
    * Whether the rock counts. The podium has to cover it; the camera does not
    * have to frame it. Two consumers, two answers — see the callers in the

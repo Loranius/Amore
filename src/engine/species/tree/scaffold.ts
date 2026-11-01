@@ -42,6 +42,7 @@ import {
 } from './crownProfile';
 import { treeAgeProgress } from './growthLaw';
 import { seededUnit } from './math';
+import { round6 } from '../../kernel';
 
 /**
  * Скільки скелетних гілок може бути в дорослого дерева.
@@ -320,10 +321,6 @@ const LEADER_LIFT_RAD = 0.35;
 
 /** Частка від власної основи, яку гілка лишає кінчику. */
 const TIP_SHARE = 0.18;
-
-function round6(value: number): number {
-  return Math.round(value * 1e6) / 1e6;
-}
 
 /*
  * ЛІДЕР ДОТЯГУЄТЬСЯ ДО ВЕРХУ ДЕРЕВА.

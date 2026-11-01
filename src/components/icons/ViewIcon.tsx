@@ -21,27 +21,3 @@ export function FoldedMapIcon({ size = 24, className = '' }: IconProps) {
     </svg>
   );
 }
-
-/** Шкала часу — хронологія відвідувань. */
-export function TimelineIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M5.6 4.4v15.2" />
-      <path d="M9.4 7.4h10.2M9.4 12h7M9.4 16.6h10.2" />
-      <circle cx="5.6" cy="7.4" r="1.5" />
-      <circle cx="5.6" cy="16.6" r="1.5" />
-    </svg>
-  );
-}
-
-/** Будинки — список міст. */
-export function CityIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M3.2 20.4h17.6" />
-      <path d="M4.8 20.4V9.4l6.2-3.6v14.6" />
-      <path d="M11 12.2h8.2v8.2" />
-      <path d="M7.6 11.6v.01M7.6 15.2v.01M14.4 15.6v.01M16.8 15.6v.01" />
-    </svg>
-  );
-}

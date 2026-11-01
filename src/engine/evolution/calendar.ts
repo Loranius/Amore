@@ -1,6 +1,6 @@
 import type { LeapDayPolicy } from './types';
 
-export interface CalendarDate {
+interface CalendarDate {
   year: number;
   month: number;
   day: number;

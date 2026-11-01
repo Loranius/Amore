@@ -149,12 +149,6 @@
   line-height: 1.45;
 }
 
-/* Виконана точка на карті отримує фото, але лишається частиною стежки. */
-.plan-journey-stop--completed .plan-journey-card {
-  overflow: hidden;
-  border-color: color-mix(in srgb, var(--plan-journey-accent) 34%, transparent);
-}
-
 @keyframes plan-memory-skeleton {
   from { opacity: .46; }
   to { opacity: .9; }

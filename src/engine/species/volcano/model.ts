@@ -35,16 +35,16 @@ import { ACTIVITY_WEIGHTS, datedItems, r6, type CrystalV2Snapshot } from '../cry
 import { buildReefV2Model, type ReefV2Model } from '../reefV2/model';
 import { yearFertility } from '../grammar/grammar';
 
-export const VOLCANO_VERSION = 'volcano/2026-10-06';
+const VOLCANO_VERSION = 'volcano/2026-10-06';
 
 /** Висота конуса до першого шару: пагорб, з якого все почалось. */
-export const VOLCANO_BASE_HEIGHT = 0.35;
+const VOLCANO_BASE_HEIGHT = 0.35;
 /** Товщина першого повного шару без подій. */
-export const VOLCANO_LAYER = 0.26;
+const VOLCANO_LAYER = 0.26;
 /** За скільки років товщина шару спадає в e разів. */
-export const VOLCANO_LAYER_DECAY_YEARS = 9;
+const VOLCANO_LAYER_DECAY_YEARS = 9;
 /** Скільки найбільше додає насичений рік до товщини шару. */
-export const VOLCANO_FERTILE_BONUS = 0.25;
+const VOLCANO_FERTILE_BONUS = 0.25;
 
 export interface VolcanoLayer {
   year: number;
@@ -62,7 +62,7 @@ export interface VolcanoLayer {
 }
 
 /** Скільки бічних конусів дають виконані плани: 3 → 1, 9 → 2, 21 → 3 (ADR-0237). */
-export function volcanoVentCount(plans: number): number {
+function volcanoVentCount(plans: number): number {
   return Math.min(3, Math.floor(Math.log2(1 + Math.max(0, plans) / 3)));
 }
 
@@ -73,9 +73,9 @@ export function volcanoVentCount(plans: number): number {
  * за кожне бажання.
  */
 export type VolcanoCreatureKind = 'fish' | 'jellyfish' | 'oyster' | 'bigFish' | 'whale' | 'dolphin';
-export const VOLCANO_CREATURE_ORDER: readonly VolcanoCreatureKind[] = ['fish', 'jellyfish', 'oyster', 'bigFish', 'whale', 'dolphin'];
+const VOLCANO_CREATURE_ORDER: readonly VolcanoCreatureKind[] = ['fish', 'jellyfish', 'oyster', 'bigFish', 'whale', 'dolphin'];
 /** Більше мешканців не додається: вулкан не акваріум. */
-export const VOLCANO_MAX_CREATURES = 30;
+const VOLCANO_MAX_CREATURES = 30;
 
 export interface VolcanoCreature {
   /** Бажання, що його привело (id), і його порядковий номер. */
@@ -96,7 +96,7 @@ export interface VolcanoCreature {
  * «маленький сплячий вулкан → світіння в кратері → маленькі лавові тріщини →
  * більший кратер і більше життя → світиться зсередини». Пороги — роки разом.
  */
-export const VOLCANO_STAGES = { glow: 1.5, streams: 3, crater: 7, inner: 10 } as const;
+const VOLCANO_STAGES = { glow: 1.5, streams: 3, crater: 7, inner: 10 } as const;
 
 const smooth = (a: number, b: number, x: number) => {
   const t = Math.min(1, Math.max(0, (x - a) / (b - a)));
@@ -117,7 +117,7 @@ export function volcanoAwakening(years: number): { glow: number; streams: number
  * Скільки тонких потоків лави: жодного у сплячого, далі 1–3. «Не робити
  * багато лави — вулкан має бути романтичним, а не пекельним» (власник).
  */
-export function volcanoStreamCount(years: number, recent: number): number {
+function volcanoStreamCount(years: number, recent: number): number {
   // 2026-10-06 (власник: «кілька тонких тріщин, що світяться»): щойно
   // кратер засвітився — дві тріщини; з потоками й свіжими роками — три.
   if (years < VOLCANO_STAGES.glow) return 0;
@@ -127,7 +127,7 @@ export function volcanoStreamCount(years: number, recent: number): number {
 }
 
 /** Роки разом, на яких у зграї з'являється новий вид риб (ADR-0237, власник). */
-export const VOLCANO_FISH_YEARS: readonly number[] = [5, 10, 20];
+const VOLCANO_FISH_YEARS: readonly number[] = [5, 10, 20];
 
 export interface VolcanoVent {
   /** Порядковий номер конуса: його азимут і місце не змінюються з роками. */
@@ -169,7 +169,7 @@ export interface VolcanoModel {
 }
 
 /** Кожне бажання — свій мешканець: вид за порядком, місце й рух — із хешу. */
-export function volcanoCreatures(
+function volcanoCreatures(
   wishIds: readonly number[],
   seed: string,
   shape: { height: number; baseRadius: number; craterRadius: number },

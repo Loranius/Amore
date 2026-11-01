@@ -7,7 +7,6 @@
 // ============================================================
 import {
   normalizeView,
-  readViewPreference,
   readViewPreferences,
   useViewPreference,
   writeViewPreference,
@@ -31,12 +30,6 @@ const CONFIG: ViewPreferenceConfig<WishlistViewMode> = {
   aliases: { table: 'grid', feed: 'grid', polaroid: 'grid' },
 };
 
-export const DEFAULT_WISHLIST_VIEW_PREFERENCES: WishlistViewPreferences = {
-  me: CONFIG.fallback,
-  partner: CONFIG.fallback,
-  shared: CONFIG.fallback,
-};
-
 export function normalizeWishlistStoredView(value: unknown): WishlistViewMode | null {
   return normalizeView(CONFIG, value);
 }
@@ -45,13 +38,6 @@ export function readWishlistViewPreferences(
   storage?: ViewPreferenceStorage | null,
 ): Partial<WishlistViewPreferences> {
   return readViewPreferences<WishlistViewMode, WishlistTabScope>(CONFIG, storage);
-}
-
-export function readWishlistView(
-  scope: WishlistTabScope,
-  storage?: ViewPreferenceStorage | null,
-): WishlistViewMode {
-  return readViewPreference<WishlistViewMode, WishlistTabScope>(CONFIG, scope, storage);
 }
 
 export function writeWishlistViewPreference(

@@ -62,8 +62,6 @@
 }
 
 .wishlist > .tab-bar,
-.wishlist > .wl-head,
-.wishlist > .plans-stat-banner,
 .wishlist > .wishlist-grid,
 .wishlist > .empty-state,
 .wishlist > [role='alert'] {
@@ -92,10 +90,7 @@
 }
 
 .wl-skeleton-line,
-.wl-skeleton-action,
-.wl-skeleton-cta,
-.wl-skeleton-stat,
-.wl-skeleton-media {
+.wl-skeleton-cta {
   border-radius: var(--radius-pill);
   background: color-mix(in srgb, var(--accent) 9%, var(--surface));
 }
@@ -106,9 +101,7 @@
 
 .wl-skeleton-line--eyebrow { width: min(160px, 42vw); height: 10px; }
 .wl-skeleton-line--hero { width: min(360px, 68vw); height: 30px; }
-.wl-skeleton-line--title { width: 76%; height: 20px; }
 .wl-skeleton-line--medium { width: 92%; }
-.wl-skeleton-line--short { width: 58%; }
 
 .wl-skeleton-cta {
   flex: 0 0 128px;

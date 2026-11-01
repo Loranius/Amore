@@ -73,23 +73,12 @@
   transform: scale(1);
 }
 
-.wl-progressive-photo--ready img.wl-gift-memory-product {
-  opacity: 0.9;
-  filter: saturate(0.9);
-}
-
 .wl-progressive-photo-fallback {
   position: absolute;
   inset: 0;
   z-index: 2;
   display: grid;
   place-items: stretch;
-}
-
-/* Gift/Shared Archive already uses 4:3; the progressive wrapper fills it. */
-.wl-gift-memory-photo .wl-progressive-photo {
-  position: absolute;
-  inset: 0;
 }
 
 @keyframes wl-photo-shimmer {
@@ -107,10 +96,5 @@
     transition-delay: 0ms;
     filter: none;
     transform: none;
-  }
-
-  .wl-progressive-photo--ready img.wl-gift-memory-product {
-    opacity: 0.9;
-    filter: saturate(0.9);
   }
 }

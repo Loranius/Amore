@@ -384,21 +384,6 @@ export async function failWishlistImageProcessing(input: {
   });
 }
 
-/** Compatibility path for older clients. New code uses the leased v5 pipeline. */
-export async function setWishlistProcessedImage(input: {
-  wishId: number;
-  sourceImageUrl: string;
-  processedImageUrl: string | null;
-  imageMode: WishlistImageDisplayMode;
-}): Promise<void> {
-  await callVoid('set_wishlist_processed_image_v3', {
-    p_wish_id: input.wishId,
-    p_source_image_url: input.sourceImageUrl,
-    p_processed_image_url: input.processedImageUrl,
-    p_image_mode: input.imageMode,
-  });
-}
-
 export async function moveWishlistItem(
   wishId: number,
   ownerId: number,

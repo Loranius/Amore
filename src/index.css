@@ -626,7 +626,6 @@ textarea {
   outline-offset: 2px;
 }
 
-
 input::placeholder,
 textarea::placeholder {
   color: var(--muted);
@@ -901,22 +900,6 @@ textarea::placeholder {
 /* ── Дзвіночок сповіщень (плаваюча кнопка, правий верхній кут) ──
    Топ-бару в застосунку немає — тому fixed, поверх усього контенту,
    під модалками (z-index:200) і над bottom-nav (z-index:50). */
-.notif-bell {
-  position: fixed;
-  top: calc(env(safe-area-inset-top, 0) + 14px);
-  right: 14px;
-  z-index: 60;
-  width: 44px;
-  height: 44px;
-  border: 0;
-  border-radius: 50%;
-  background: var(--surface);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
-  font-size: 20px;
-  display: grid;
-  place-items: center;
-  cursor: pointer;
-}
 
 @media (min-width: 900px) {
   .app-shell {
@@ -1566,19 +1549,6 @@ textarea::placeholder {
 .auth-success-heart::after { top: 0; left: 50%; }
 .auth-success-title { font-size: 25px; font-weight: 800; letter-spacing: -.02em; margin: 14px 0 0; color: var(--text); }
 .auth-success-sub { margin: 0; color: var(--muted); font-size: 14px; }
-.auth-success-btn {
-  margin-top: 8px;
-  appearance: none;
-  border: 0;
-  border-radius: var(--radius-card);
-  padding: 12px 22px;
-  font: inherit;
-  font-weight: 700;
-  color: #fff;
-  cursor: pointer;
-  background: var(--accent-strong);
-}
-.auth-success-btn:hover { filter: brightness(0.95); }
 
 @keyframes portalIn {
   from { clip-path: circle(0% at 50% 50%); opacity: 0.3; }
@@ -1635,7 +1605,6 @@ textarea::placeholder {
    старого components.css — під час фінального CSS-проходу.
    ============================================================ */
 .shopping h1 { margin-top: 0; }
-.sl-archive-arrow.open { transform: rotate(90deg); }
 
 .form-field {
   display: flex;
@@ -1728,7 +1697,6 @@ textarea::placeholder {
   border-top: 1px solid color-mix(in srgb, var(--text) 9%, transparent);
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
-.wl-head .btn { flex: 0 0 auto; padding: 8px 16px; }
 
 .wishlist-grid {
   display: grid;
@@ -1894,107 +1862,7 @@ textarea::placeholder {
 /* ============================================================
    КАЛЕНДАР + ПЛАНИ + чипи модалок
    ============================================================ */
-.cal-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.cal-head h1 { margin: 0; }
-.cal-head .btn { flex: 0 0 auto; padding: 8px 16px; }
-
-/* Банер — кнопка: найближчу подію відкривають частіше за будь-яку іншу,
-   і мати для неї єдиний шлях через дрібний рядок нижче не мало сенсу. */
-.cal-next-banner {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  width: 100%;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  background: var(--surface);
-  border: 2px solid;
-  border-radius: var(--radius-lg);
-  padding: 14px 16px;
-  margin-bottom: 14px;
-  cursor: pointer;
-  box-shadow: var(--shadow-sm);
-}
-.cal-next-banner:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-/* display:flex — інакше svg сидить на базовій лінії тексту й значок
-   з'їжджає вниз відносно підпису поруч. */
-.cal-next-icon { display: flex; align-items: center; flex: 0 0 auto; }
-.cal-next-label { font-size: 12px; color: var(--muted); text-transform: uppercase; }
-.cal-next-title { font-size: 18px; font-weight: 700; line-height: 1.25; }
-.cal-next-when { font-weight: 800; font-size: 17px; letter-spacing: -.01em; }
-.cal-next-years { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
-
-.cal-section { margin-bottom: 14px; }
-.cal-section-title { font-size: 13px; color: var(--muted); margin: 8px 2px; }
 .cal-muted { opacity: 0.6; }
-.cal-event-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  background: var(--surface);
-  border-radius: var(--radius-md);
-  padding: 11px 12px;
-  margin-bottom: 7px;
-  position: relative;
-  overflow: hidden;
-  box-shadow: var(--shadow-sm);
-}
-/* Накладка на весь рядок замість олівця впритул до хрестика: велика
-   ціль для пальця й фокус із клавіатури. Хрестик стоїть шаром вище. */
-.cal-event-open {
-  position: absolute; inset: 0; z-index: 1;
-  border: 0; background: none; padding: 0; cursor: pointer;
-}
-.cal-event-item:has(.cal-event-open:focus-visible) {
-  box-shadow: inset 0 0 0 2px var(--accent);
-}
-.cal-event-type-bar { position: absolute; left: 0; top: 0; bottom: 0; width: 4px; }
-.cal-event-icon { display: flex; align-items: center; flex: 0 0 auto; padding-left: 6px; }
-.cal-event-info { flex: 1; min-width: 0; }
-.cal-event-title { font-weight: 700; line-height: 1.3; }
-/* Головний елемент рядка: «коли». Решта меты під ним — тихо й в один рядок. */
-.cal-event-when { font-size: 14px; font-weight: 800; margin-top: 1px; letter-spacing: -.01em; }
-.cal-event-desc { font-size: 13px; color: var(--muted); }
-/* Один рядок, крапка-роздільник: раніше тут було до п'яти елементів
-   однаковою вагою, і вони регулярно ламались на два рядки. */
-.cal-event-meta {
-  display: flex; flex-wrap: wrap; gap: 4px 6px;
-  font-size: 12px; color: var(--muted); margin-top: 1px;
-}
-.cal-event-meta > span + span::before { content: '· '; }
-.cal-del-btn {
-  position: relative; z-index: 2;
-  flex: 0 0 auto;
-  border: 0;
-  background: transparent;
-  color: var(--muted);
-  font-size: 20px;
-  /* Власна зона дотику 36×36 і відступ від тексту: раніше хрестик стояв
-     упритул до олівця, і промах пальцем відкривав діалог видалення. */
-  width: 36px; height: 36px;
-  margin-left: 4px;
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-.cal-del-btn:focus-visible { outline: 2px solid var(--danger); outline-offset: -2px; }
-.cal-del-btn:hover { color: var(--danger); }
-/* align-items: flex-start — підпис «Велика подія (заручини, весілля,
-   важлива віха)» на телефоні лягає у два рядки, і центрований квадратик
-   опинявся десь між ними. */
-.cal-yearly-toggle { display: flex; align-items: flex-start; gap: 8px; font-size: 14px; line-height: 1.35; }
-.cal-yearly-toggle input { margin-top: 2px; flex: 0 0 auto; }
-.cal-field-hint { margin: -2px 0 8px 26px; font-size: 12px; color: var(--muted); line-height: 1.4; }
-.cal-reminder-note {
-  margin: 4px 0 2px; padding: 9px 11px; border-radius: var(--radius-md);
-  font-size: 12.5px; color: var(--muted); line-height: 1.4;
-  background: color-mix(in srgb, var(--accent) 8%, transparent);
-}
-.cal-person-chip {
-  margin-left: 7px; padding: 1px 7px; border-radius: var(--radius-pill);
-  font-size: 11px; font-weight: 700; vertical-align: 1px;
-  background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--text);
-}
 
 /* ── Сітка місяця ──────────────────────────────────────────── */
 .cal-month-nav {
@@ -2053,9 +1921,6 @@ textarea::placeholder {
    планів і типи подій уже ділять ту саму палітру, тож на п'яти пікселях
    вони б не розрізнялись. Форма розрізняє. */
 .cal-cell-dots i.cal-dot-plan { width: 8px; height: 3px; border-radius: var(--radius-hair); }
-.cal-year-dots i.cal-dot-plan {
-  width: 11px; height: 4px; border-radius: var(--radius-hair); background: var(--accent);
-}
 
 /* ── Панель вибраного дня ──────────────────────────────────── */
 .cal-day-panel {
@@ -2103,68 +1968,10 @@ textarea::placeholder {
 .cal-day-plan.cal-muted { opacity: 0.55; }
 
 /* ── Огляд року ────────────────────────────────────────────── */
-.cal-year-total { margin: 0 0 10px; font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
-.cal-year-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.cal-year-cell {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  padding: 12px 6px; border-radius: var(--radius-md); cursor: pointer; font: inherit;
-  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  background: var(--surface); color: var(--text); box-shadow: var(--shadow-sm);
-}
-.cal-year-cell b { font-size: 13px; }
-.cal-year-cell small { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
-/* Насиченість пропорційна кількості подій: --cal-heat приходить із
-   компонента (0.35…1 відносно найгустішого місяця). Стеля 26% — вище
-   назва місяця вже втрачає контраст із заливкою. */
-.cal-year-cell--has {
-  background: color-mix(in srgb, var(--accent) calc(var(--cal-heat, 1) * 26%), var(--surface));
-}
-.cal-year-cell--now { box-shadow: inset 0 0 0 2px var(--accent), var(--shadow-sm); }
-/* min-height — щоб місяці без подій не були нижчими за сусідів і сітка
-   не «ходила сходинками». */
-.cal-year-dots { display: flex; gap: 3px; min-height: 6px; }
-.cal-year-dots i { width: 6px; height: 6px; border-radius: 50%; display: block; }
-.cal-reminder-note { display: flex; align-items: flex-start; gap: 7px; }
-.cal-reminder-note > svg { flex: 0 0 auto; margin-top: 1px; }
-/* minmax(0, 1fr) — обов'язково: у grid елемент за замовчуванням не
-   вужчий за свій вміст, тож рядок із довгою назвою свята ставав ширшим
-   за колонку й виштовхував дату за край аркуша. «1 жо…» замість
-   «1 жовтня» — саме цей випадок. */
-.cal-preset-list {
-  display: grid; grid-template-columns: minmax(0, 1fr); gap: 4px;
-  max-height: 48vh; overflow-y: auto; margin-bottom: 4px;
-}
 /* Значок у чипі й у табі — інлайновий, вирівняний по центру рядка. */
 .chip > svg { vertical-align: -2px; margin-right: 5px; }
 .tab-icon { display: inline-flex; vertical-align: -2px; margin-right: 5px; }
-
-/* Помилка завантаження: повідомлення без кнопки повтору — це глухий кут,
-   особливо в PWA, яку відкривають у метро. */
-.cal-error { display: flex; flex-direction: column; align-items: center; gap: 10px; }
-
-/* Скелет списку подій — щоб висота не стрибала, коли дані приїхали. */
-.cal-skeleton { display: flex; flex-direction: column; gap: 6px; }
-.cal-skeleton-row {
-  height: 62px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(
-    90deg,
-    var(--surface) 0%,
-    color-mix(in srgb, var(--text) 7%, var(--surface)) 50%,
-    var(--surface) 100%
-  );
-  background-size: 220% 100%;
-  animation: cal-skeleton-shimmer 1.4s ease-in-out infinite;
-}
 @keyframes cal-skeleton-shimmer { to { background-position-x: -220%; } }
-@media (prefers-reduced-motion: reduce) {
-  .cal-skeleton-row { animation: none; }
-}
-.plans-tab-btn.active { background: var(--accent-strong); color: #fff; }
-/* Прострочений активний план. Раніше така картка не показувала взагалі
-   нічого замість відліку — дедлайн минув, і дата зникала з очей. */
-.plans-card--overdue { box-shadow: inset 3px 0 0 var(--danger); }
-.plan-archive-modal .modal-actions { padding: 0 18px 18px; }
 
 /* Чипи в модалках (тип події / категорія / статус) */
 .chips { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -2218,7 +2025,7 @@ textarea::placeholder {
 /* ============================================================
    ГРАФІК (schedule) + ФОТО-КАЛЕНДАР (photo-calendar)
    ============================================================ */
-.sched-nav, .pcal .sched-nav {
+.sched-nav {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -2235,11 +2042,10 @@ textarea::placeholder {
   cursor: pointer;
 }
 .sched-month-label { font-weight: 600; font-size: 17px; }
-.sched-edit-toggle.is-active { background: var(--accent-strong); color: #fff; }
 .card { background: var(--surface); border-radius: var(--radius-card); padding: 14px; }
 .sched-board-title { margin: 0 0 10px; font-size: 16px; }
 
-.sched-grid, .pcal-grid {
+.sched-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 4px;
@@ -2268,39 +2074,6 @@ textarea::placeholder {
 .sched-cell--today { outline: 2px solid var(--accent); }
 .sched-cell-num { font-size: 12px; color: var(--muted); position: relative; }
 .sched-cell-letter { font-size: 15px; font-weight: 700; min-height: 18px; }
-
-/*
- * ДРУГИЙ набір кольорів календаря жив тут — і саме тому легенда брехала.
- *
- * `.sched-cell--both-off` було описане двічі: тут `#9747d1`, а в
- * `schedule.css` градієнт `#a85bdf → #8535be`. Вигравав другий (вища
- * специфічність через `.sched`), але свотчі легенди читали ПЕРШИЙ. Тобто
- * підпис під сіткою вчив коду, якого в сітці немає.
- *
- * Разом із ним пішли `.sched-cell-heart`, `.sched-cell-who`,
- * `.sched-cell-letter--work/--off`, `.heat-summary` і `.sched-boards--*`
- * — жодного з цих класів у коді вже немає (ADR-0055).
- */
-.heat-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
-  justify-content: center;
-  margin-top: 14px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.heat-legend span { display: inline-flex; align-items: center; gap: 5px; }
-.heat-swatch { width: 12px; height: 12px; border-radius: var(--radius-hair); display: inline-block; }
-/* Свотчі беруть ТІ САМІ токени, що й клітинки. Це не охайність: доки
-   вони були окремими числами, легенда могла розійтись із сіткою — і
-   розійшлась. */
-.heat-swatch--both-off { background: var(--sched-both); }
-.heat-swatch--lena-off { background: var(--sched-her); }
-.heat-swatch--dima-off { background: var(--sched-him); }
-/* inline-flex — значок стоїть у рядку з назвою, а не над нею; flex:0 0
-   auto на svg, бо в flex-контейнері він інакше стискається. */
-.notif-item-title { font-weight: 600; display: inline-flex; align-items: center; gap: 7px; }
 .pcal-upload-btn, .pcal-replace-btn {
   border: 1px dashed color-mix(in srgb, var(--text) 20%, transparent);
   background: transparent;
@@ -2383,11 +2156,6 @@ textarea::placeholder {
 .media-search-modal-poster { width: 60px; border-radius: var(--radius-sm); }
 .media-search-modal-title { font-weight: 700; }
 .media-search-modal-year { font-size: 13px; color: var(--muted); }
-
-.media-stats { margin-bottom: 12px; }
-.media-stat { display: inline-flex; flex-direction: column; align-items: center; background: var(--surface); border-radius: var(--radius-md); padding: 8px 16px; }
-.media-stat-num { font-weight: 700; color: var(--accent); }
-.media-stat-label { font-size: 11px; color: var(--muted); }
 
 .media-filters { display: flex; gap: 6px; overflow-x: auto; margin-bottom: 14px; }
 .media-filter-btn { white-space: nowrap; border: 0; border-radius: var(--radius-pill); padding: 7px 12px; background: var(--surface); color: var(--muted); font: inherit; cursor: pointer; }
@@ -2693,7 +2461,6 @@ textarea::placeholder {
 .swipe-act-right { background: var(--swipe-watching); }
 .swipe-act-left { background: var(--swipe-want); }
 .swipe-act-down { background: var(--swipe-skip); }
-.swipe-empty { display: grid; place-items: center; gap: 12px; height: 100%; }
 
 /* Деталі свайпу */
 .detail-modal { max-width: 480px; }
@@ -2794,8 +2561,6 @@ textarea::placeholder {
    що й у решті порталу, і його поворот читається як «розгорнуто». */
 .rcp-toggle-arrow { display: grid; place-items: center; color: var(--muted); transition: transform .2s; }
 .rcp-toggle-arrow.open { transform: rotate(180deg); }
-.fin-acc-arrow { transition: transform 0.2s; }
-.fin-acc-arrow.open { transform: rotate(90deg); }
 .rcp-editor { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .rcp-editor label { font-size: 13px; color: var(--muted); }
 .rcp-editor input, .rcp-editor textarea, .rcp-editor select {
@@ -2902,7 +2667,6 @@ textarea::placeholder {
 }
 .dish-row-btn:hover { background: color-mix(in srgb, var(--text) 7%, transparent); color: var(--text); }
 .dish-row-btn--danger:hover { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
-.dish-edit-btn { border: 0; background: transparent; font-size: 16px; cursor: pointer; padding: 4px; }
 
 /* ============================================================
    ГОЛОВНА (home) — presentation accepted 3D-артефактів Amore.

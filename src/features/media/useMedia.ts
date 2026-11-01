@@ -58,35 +58,6 @@ export function useMediaItems(type: MediaType) {
   return useQuery({ queryKey: qk.media(type), queryFn: () => loadItems(type) });
 }
 
-/**
- * Films, series and books the couple has finished.
- *
- * Only `status = 'done'`, and only the three columns the Evolution Engine can
- * use. It used to be a head-count query — the crystal wanted a number for the
- * dust drifting around the artifact and nothing else — but media is now the
- * seventh event source, so a year needs to know *when* things were finished
- * and not merely how many. The sparkle count is `rows.length` at the call site.
- *
- * `finished_at` is the completion date the portal now writes; `created_at`
- * remains only as the fallback for rows that predate it. See `adaptMedia`.
- */
-export function useFinishedMedia() {
-  return useQuery({
-    queryKey: [...qk.media(), 'finished'],
-    staleTime: 5 * 60_000,
-    queryFn: async (): Promise<
-      Pick<MediaItemRow, 'id' | 'status' | 'created_at' | 'finished_at'>[]
-    > => {
-      const { data, error } = await supabase
-        .from('media_items')
-        .select('id,status,created_at,finished_at')
-        .eq('status', 'done');
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-}
-
 /** Постер: HEIC → JPEG → compress → Storage. Повертає public URL або null. */
 export async function uploadPoster(file: File, type: MediaType, itemId: number): Promise<string | null> {
   let normalized: File;

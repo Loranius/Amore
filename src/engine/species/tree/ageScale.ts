@@ -31,7 +31,8 @@
 // ============================================================
 import type { OrganicSkeletonState } from '../../labs/organic';
 export { treeDaysTogether } from './growthLaw';
-import { treeAgeProgress, treeTrunkHeightScale } from './growthLaw';
+import { treeAgeProgress } from './growthLaw';
+import { round6 } from '../../kernel';
 
 /**
  * Висота скелета дорослого дерева, поділена на висоту стовбура з закону.
@@ -43,7 +44,7 @@ import { treeAgeProgress, treeTrunkHeightScale } from './growthLaw';
  * `trunkHeight`, — тобто дерева різних пар лишаються різними, а кожне
  * окреме росте строго з віком.
  */
-export const TREE_SKELETON_HEIGHT_PER_TRUNK = 1.79;
+const TREE_SKELETON_HEIGHT_PER_TRUNK = 1.79;
 
 /**
  * Цільова висота скелета для дерева цього віку, в одиницях рушія.
@@ -68,7 +69,7 @@ export function treeSkeletonTargetHeight(lawTrunkHeight: number): number {
  * працювала. Відколи розмір іде за віком, вона стала вадою з протилежного
  * кінця: на ростку заввишки 0.71 листок 0.32 — це половина дерева.
  */
-export const TREE_FOLIAGE_TUNED_HEIGHT = 4.4;
+const TREE_FOLIAGE_TUNED_HEIGHT = 4.4;
 
 /**
  * Множник довжин листя й згустків для дерева цього віку.
@@ -106,11 +107,6 @@ export function treeFoliageScale(lawTrunkHeight: number): number {
  */
 export function treeCrownNarrowing(daysTogether: number): number {
   return Math.min(1, 0.37 + 0.97 * treeAgeProgress(daysTogether));
-}
-
-/** Наскільки дерево цього віку менше за доросле — частка закону. */
-export function treeAgeSizeShare(daysTogether: number): number {
-  return treeTrunkHeightScale(daysTogether);
 }
 
 /**
@@ -199,10 +195,6 @@ export function scaleLeafGeometryConfigToAge<T extends {
   };
 }
 
-function round6(value: number): number {
-  return Math.round(value * 1e6) / 1e6;
-}
-
 /**
  * Розтягує чи стискає готовий скелет до висоти, яку задав вік.
  *
@@ -252,7 +244,7 @@ export function treeSlenderness(daysTogether: number): number {
     + (SLENDERNESS_MATURE - SLENDERNESS_YOUNG) * treeAgeProgress(daysTogether);
 }
 
-export interface ScaledTreeSkeleton {
+interface ScaledTreeSkeleton {
   skeleton: OrganicSkeletonState;
   /**
    * Множник, який ФАКТИЧНО застосовано до довжин скелета.

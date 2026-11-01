@@ -43,8 +43,6 @@ const POLICIES: Record<LodLevel, LodPolicy> = {
   low: { id: 'low', segmentScale: 0.5, minSegments: 4 },
 };
 
-export const lodPolicy = (level: LodLevel): LodPolicy => POLICIES[level];
-
 /** Кількість граней тіла на заданому рівні. */
 export function lodSegments(baseSegments: number, level: LodLevel): number {
   const policy = POLICIES[level];

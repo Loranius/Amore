@@ -40,7 +40,6 @@ export default defineConfig({
           'assets/index-*.css',
         ],
         globIgnores: [
-          '**/models/school_of_fish_reef.glb',
           '**/models/coral_reef_set_cc0.glb',
           '**/textures/reef/*.webp',
         ],
@@ -69,7 +68,7 @@ export default defineConfig({
             },
           },
           {
-            urlPattern: /\/(?:models\/(?:school_of_fish_reef|coral_reef_set_cc0)\.glb|models\/glow_whale_native\/part-\d+\.txt|textures\/reef\/[^/]+\.webp|assets\/reef\/volcano\/[^/]+\.webp)$/,
+            urlPattern: /\/(?:models\/coral_reef_set_cc0\.glb|textures\/reef\/[^/]+\.webp)$/,
             handler: 'CacheFirst',
             options: {
               cacheName: 'reef-visual-assets',

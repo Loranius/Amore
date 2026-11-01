@@ -481,25 +481,6 @@
   background: var(--surface);
 }
 
-.cal-entry-cancel {
-  min-height: 44px;
-  padding-inline: 8px;
-  border: 0;
-  background: none;
-  color: var(--muted);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.cal-entry-save {
-  min-height: 44px;
-  padding-inline: 22px;
-  border-radius: var(--radius-pill);
-  background: var(--cal-entry-accent);
-}
-
 /* ── Вузькі й низькі екрани ──────────────────────────────── */
 
 @media (min-width: 640px) {

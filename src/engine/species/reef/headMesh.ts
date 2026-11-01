@@ -97,7 +97,7 @@ export interface ReefMeshData {
  * тисячі понад неї) здешевлене піщане дно, деталь якого лежала за
  * серпанком і не бачив її ніхто.
  */
-export const AZIMUTH_SEGMENTS = 36;
+const AZIMUTH_SEGMENTS = 36;
 const HEIGHT_RINGS = 12;
 
 /**

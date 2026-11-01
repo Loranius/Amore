@@ -4,12 +4,9 @@ import type {
   BuildTreeBarkSurfaceInput,
   TreeBarkSurfaceState,
 } from './types';
+import { clamp01 } from '../kernel';
 
 const EPSILON = 1e-9;
-
-function clamp01(value: number): number {
-  return Math.max(0, Math.min(1, value));
-}
 
 function quantize01(value: number, steps: number): number {
   const levels = Math.max(2, Math.floor(steps));

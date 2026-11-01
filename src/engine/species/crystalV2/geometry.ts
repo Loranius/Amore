@@ -178,7 +178,7 @@ function crown(
  * Кільце — те саме кільце плеча, стиснуте й зсунуте, тож ребра сусідніх
  * кілець паралельні і кожна грань між ними ПЛАСКА за побудовою.
  */
-export interface ProfileRing {
+interface ProfileRing {
   at: number;
   scale: number;
   shift: readonly [number, number];
@@ -564,9 +564,9 @@ function monarchBody(
 const FACE_TONES = [0.74, 1.0, 1.3] as const;
 
 /** Нахил тіл року в друзі — частка модельного (ADR-0245). */
-export const CHILD_LEAN = 0.5;
+const CHILD_LEAN = 0.5;
 /** На скільки радіусів тіла року його основа відходить від монарха. */
-export const CHILD_STEP_OUT = 0.35;
+const CHILD_STEP_OUT = 0.35;
 
 /**
  * Форма кристала (ADR-0237 §4.3): ТОЙ САМИЙ ріст — монарх, кристал на рік,

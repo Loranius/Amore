@@ -108,24 +108,6 @@ export function GiftIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
-/** Стрілки перестановки — ручний порядок у «Спогадах». */
-export function ArrowUpIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M12 19.4V5.2M5.8 11.4 12 5.2l6.2 6.2" />
-    </svg>
-  );
-}
-
-export function ExpandIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <path d="M14.6 4.6h4.8v4.8M19.4 4.6l-6 6" />
-      <path d="M9.4 19.4H4.6v-4.8M4.6 19.4l6-6" />
-    </svg>
-  );
-}
-
 /** Стрілка з рамки — зовнішнє посилання. */
 export function ExternalLinkIcon({ size = 24, className = '' }: IconProps) {
   return (
@@ -270,20 +252,7 @@ export function LayersIcon({ size = 24, className = '' }: IconProps) {
   );
 }
 
-/** Картка — вільний ліміт. Не гаманець: гаманець уже позначає весь
-    розділ «Фінанси» в навігації, і всередині нього він нічого не
-    розрізняє. */
-export function CreditCardIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <rect x="2.8" y="5.6" width="18.4" height="12.8" rx="2.4" />
-      <path d="M2.8 10h18.4" />
-      <path d="M6.4 14.6h3.4" />
-    </svg>
-  );
-}
-
-/** Хмарка — обговорення цілі. */
+/** Дві риски — пауза: статус плану «Відкладено». */
 export function PauseIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>

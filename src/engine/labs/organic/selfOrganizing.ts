@@ -979,7 +979,4 @@ export function buildSelfOrganizingSkeleton(
   };
 }
 
-/** Стеля світла в комірці — щоб тести могли спиратись на неї, а не вгадувати. */
-export const SHADOW_CELL_MAXIMUM = 1;
-
 export { clamp01 };

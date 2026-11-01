@@ -1,5 +1,5 @@
 export { buildArtifactBlueprint } from './engine';
-export { artifactSeed, stableHash32 } from './seed';
+export { stableHash32 } from './seed';
 export {
   EVOLUTION_CHANNELS,
   type ArtifactBlueprint,

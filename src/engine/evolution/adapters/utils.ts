@@ -1,4 +1,4 @@
-import { parseCalendarDate, parseEvolutionInstant } from '../calendar';
+import { parseEvolutionInstant } from '../calendar';
 import type { EvolutionEventInput, EvolutionPressureVector } from '../types';
 import type {
   AdapterDiagnostic,
@@ -35,22 +35,13 @@ export function eventOccursBy(
   return epoch === null ? null : epoch <= asOfEpoch;
 }
 
-export function dateKeyInTimeZone(value: string, timeZone: string): string | null {
-  const date = parseCalendarDate(value, timeZone);
-  if (!date) return null;
-  const year = String(date.year).padStart(4, '0');
-  const month = String(date.month).padStart(2, '0');
-  const day = String(date.day).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
 export function withPressure(
   channels: Partial<EvolutionPressureVector>,
 ): Partial<EvolutionPressureVector> {
   return { ...channels };
 }
 
-export function compareAdapterDiagnostics(left: AdapterDiagnostic, right: AdapterDiagnostic): number {
+function compareAdapterDiagnostics(left: AdapterDiagnostic, right: AdapterDiagnostic): number {
   return byCodePoint(left.source, right.source)
     || byCodePoint(left.recordId, right.recordId)
     || byCodePoint(left.code, right.code)
@@ -62,7 +53,7 @@ export function compareAdapterDiagnostics(left: AdapterDiagnostic, right: Adapte
     || byNormalizedText(left.message, right.message);
 }
 
-export function compareEvolutionInputs(left: EvolutionEventInput, right: EvolutionEventInput): number {
+function compareEvolutionInputs(left: EvolutionEventInput, right: EvolutionEventInput): number {
   return byCodePoint(left.occurredAt, right.occurredAt)
     || byCodePoint(left.source, right.source)
     || byCodePoint(left.id, right.id);

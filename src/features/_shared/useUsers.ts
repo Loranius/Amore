@@ -105,12 +105,6 @@ export function usePeople(): Person[] {
   );
 }
 
-/** Людина за ідентифікатором — або `null`, поки список не приїхав. */
-export function usePerson(userId: number): Person | null {
-  const people = usePeople();
-  return people.find((one) => one.id === userId) ?? null;
-}
-
 /**
  * id → ПІДПИС. Зручно для авторів («від Діма»).
  *

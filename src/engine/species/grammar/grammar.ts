@@ -24,11 +24,11 @@ import {
 } from '../crystalV2/model';
 
 /** Активність, на якій рік уже «повний»: далі добриво не додає. */
-export const YEAR_ACTIVITY_FULL = 40;
+const YEAR_ACTIVITY_FULL = 40;
 /** Стеля: найактивніший рік більший за тихий не більш ніж у стільки разів. */
 export const YEAR_BOOST_CAP = 1.35;
 
-export interface YearElement {
+interface YearElement {
   /** Номер року разом: 0 — перший. */
   year: number;
   /** Скільки років минуло від початку цього року до знімка (вік елемента). */
@@ -96,7 +96,7 @@ export function tierSize(seed: string, tier: number): 3 | 4 {
   return unit(seed, `tier${tier}:size`) < 0.5 ? 3 : 4;
 }
 
-export interface TierSlot {
+interface TierSlot {
   /** Ярус, 0 — нижній. */
   tier: number;
   /** Місце гілки в ярусі, 0…size−1. */

@@ -33,9 +33,6 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Materialize optimized reef fish asset
-        run: bash scripts/reef/materialize_school_fish.sh
-
       - name: Install dependencies
         run: npm ci
 

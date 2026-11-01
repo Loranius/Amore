@@ -85,13 +85,6 @@ export function reefStoneTextures(): ReefStoneTextures | null {
   return cached;
 }
 
-/** Тестовий шов: дає набору початись із нуля. */
-export function disposeReefStoneTextures(): void {
-  cached?.normal.dispose();
-  cached?.roughness.dispose();
-  cached = null;
-}
-
 export const REEF_STONE_VERTEX_PARS = `
 varying vec3 vReefStonePosition;
 varying vec3 vReefStoneNormal;

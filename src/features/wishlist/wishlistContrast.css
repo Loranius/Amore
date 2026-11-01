@@ -66,10 +66,6 @@
   color: var(--wl-text-secondary);
 }
 
-.wishlist .wl-card-v3-status:not(.wl-card-v3-status--owner) {
-  color: var(--wl-text-secondary);
-}
-
 /* Filters and tabs should still read as interactive when they are inactive. */
 .wishlist .wl-board-toolbar {
   border-color: color-mix(in srgb, var(--accent) 20%, transparent);
@@ -111,11 +107,6 @@
   border-color: var(--wl-control-border-hover);
   background: var(--wl-control-bg);
   color: var(--text);
-}
-
-.wishlist .wl-card-v3 {
-  border-color: color-mix(in srgb, var(--accent) 18%, transparent);
-  box-shadow: 0 14px 34px rgba(4, 2, 10, 0.48);
 }
 
 .wishlist .wl-priority-picker-trigger {

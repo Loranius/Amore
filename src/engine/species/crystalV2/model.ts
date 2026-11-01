@@ -34,7 +34,7 @@ import {
 } from './calendar';
 import { unit } from './hash';
 
-export const CRYSTAL_V2_VERSION = 'crystal-v2/2026-09-28b';
+const CRYSTAL_V2_VERSION = 'crystal-v2/2026-09-28b';
 
 const SIDES = 6;
 
@@ -155,7 +155,7 @@ function zeroCounts(): ActivityCounts {
   return { memories: 0, plans: 0, wishes: 0, events: 0, milestones: 0, places: 0, media: 0, daysOff: 0 };
 }
 
-export interface Dated {
+interface Dated {
   kind: ActivityKind;
   day: CivilDay;
 }

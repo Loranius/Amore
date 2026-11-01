@@ -23,7 +23,7 @@ function stageFor(ageDays: number): TreeLifeStage {
   return 'ancient';
 }
 
-export function relationshipAgeDays(artifact: ArtifactBlueprint, asOf: string): number {
+function relationshipAgeDays(artifact: ArtifactBlueprint, asOf: string): number {
   const ageDays = daysBetweenExplicit(artifact.relationshipStartedAt, asOf);
   if (ageDays === null) {
     throw new Error(
@@ -33,7 +33,7 @@ export function relationshipAgeDays(artifact: ArtifactBlueprint, asOf: string): 
   return ageDays;
 }
 
-export function completedRelationshipYears(
+function completedRelationshipYears(
   artifact: ArtifactBlueprint,
   asOf: string,
 ): number {
