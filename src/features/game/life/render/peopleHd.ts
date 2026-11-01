@@ -132,8 +132,11 @@ const SHEETS: HdSheet[] = [
   { url: lenaAdultUrl, fall: { url: lenaAdultFallUrl }, poses: { url: lenaAdultPosesUrl, hands: { chest: { x: 16.1, y: 30 }, low: { x: 13.1, y: 17 }, high: { x: 13, y: 37 } } }, front: { up: 19, l: -10, r: 9 }, cell: 92, frames: 4, footX: 46, footY: 76, outfit: { base: LENA_ADULT, garments: ADULT_DRESS }, match: (l) => isLenaAdult(l) },
   // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).
   { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
-  // Персонаж PixelLab «Діма HD» (ff0178ab-…), власник 2026-10-06: «Діму давай далі».
-  { url: dimaUrl, cell: 92, frames: 4, footX: 46, footY: 75, match: (l) => l.hairStyle === DIMA.hairStyle && l.top === DIMA.top && !!l.hoodie },
+  // Персонаж PixelLab «Діма HD (фото)» (cd7ead7c-…), власник 2026-11-01: «Ось
+  // Діма, перероби його персонажа в піксель лаб схожим на фото». Фото описано
+  // словами, саме фото в PixelLab не відправлено. Упізнається за волоссям,
+  // безрукавкою й штанями — таких нема ні в кого з мешканців чи перехожих.
+  { url: dimaUrl, cell: 92, frames: 4, footX: 46.5, footY: 79, match: (l) => l.hair === DIMA.hair && l.top === DIMA.top && l.bottom === DIMA.bottom },
   // Оля — подружка Лєни в Жилинцях (власник 2026-10-31: «Починай з Олі»):
   // мала до 6 тижня, підліток до 11-го, дорослою в грі не буває. Персонажі
   // PixelLab «Оля мала HD (2)» (f95cea47-…) і «Оля підліток HD (50)»

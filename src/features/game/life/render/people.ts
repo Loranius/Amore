@@ -53,7 +53,8 @@ const WHITE = '#ffffff';
 export const LENA_KID: Look = { skin: SKIN, hair: '#9c7a45', hairStyle: 'pigtails', top: '#f2a5c0', bottom: '#f2a5c0', dress: true, shoes: '#c2494f', eyes: '#5a3a26', kid: true, bow: '#ff5d8f' };
 export const LENA_TEEN: Look = { skin: SKIN, hair: '#9c7a45', hairStyle: 'ponytail', top: '#f4f4f7', bottom: '#3d4a6e', shoes: '#3a2f28', eyes: '#5a3a26', accent: '#5aa7e0' };
 export const LENA_ADULT: Look = { skin: SKIN, hair: '#a5804a', hairStyle: 'long', top: '#5aa7e0', bottom: '#f4f4f7', dress: true, shoes: '#f4f4f7', eyes: '#5a3a26' };
-export const DIMA: Look = { skin: SKIN, hair: '#8f6d3e', hairStyle: 'spiky', top: '#c0503a', bottom: '#3a4560', shoes: '#3a2f28', eyes: '#4a90d9', hoodie: true };
+/** Діма — за фото власника (2026-11-01): русяве волосся набік, коричнева в'язана безрукавка поверх білої сорочки, бежеві штани. */
+export const DIMA: Look = { skin: SKIN, hair: '#865b3c', hairStyle: 'short', top: '#553d40', bottom: '#cca074', shoes: '#402324', eyes: '#6a8aa8', accent: '#e7e2dd' };
 export const MOM: Look = { skin: SKIN, hair: '#6e4a2a', hairStyle: 'bun', top: '#b8323a', bottom: '#3a3550', dress: true, shoes: '#3a2f28', eyes: '#3a2a22', accent: '#f6f1e6' };
 export const OLYA: Look = { skin: SKIN, hair: '#3a2b1a', hairStyle: 'bob', top: '#7fd9c4', bottom: '#3d5a8c', shoes: '#f4f4f7', eyes: '#3a2a22' };
 
