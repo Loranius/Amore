@@ -44,9 +44,9 @@ interface Joints {
 
 /** Стоїть (етап 1). Анімації — інші набори суглобів того самого скелета. */
 const IDLE: Readonly<Record<'front' | 'side', Joints>> = {
-  front: { neck: { x: 16, y: 18 }, shoulderL: { x: 7, y: 22 }, shoulderR: { x: 24, y: 22 }, hipL: { x: 12, y: 34 }, hipR: { x: 19, y: 34 } },
+  front: { neck: { x: 16, y: 17 }, shoulderL: { x: 6, y: 21 }, shoulderR: { x: 25, y: 21 }, hipL: { x: 11, y: 35 }, hipR: { x: 20, y: 35 } },
   // Профіль: L — дальні рука й нога, R — ближні.
-  side: { neck: { x: 16, y: 18 }, shoulderL: { x: 15, y: 22 }, shoulderR: { x: 15, y: 22 }, hipL: { x: 14, y: 34 }, hipR: { x: 15, y: 34 } },
+  side: { neck: { x: 16, y: 17 }, shoulderL: { x: 15, y: 21 }, shoulderR: { x: 16, y: 21 }, hipL: { x: 14, y: 35 }, hipR: { x: 16, y: 35 } },
 };
 
 /** Частина на суглобі. `dim` — дальня (на тон темніша), `outline` — обвести. */
@@ -83,7 +83,7 @@ export function placements(layer: LayerName, dir: DollDir, face: FaceKind): Plac
     case 'head':
       if (side) return [{ part: HEAD_SIDE, at: j.neck, outline: true }];
       return dir === 0
-        ? [{ part: HEAD_FRONT, at: j.neck, outline: true }, { part: NOSE_FRONT, at: { x: 16, y: 13 }, outline: false }]
+        ? [{ part: HEAD_FRONT, at: j.neck, outline: true }, { part: NOSE_FRONT, at: { x: 16, y: 12 }, outline: false }]
         : [{ part: HEAD_FRONT, at: j.neck, outline: true }];
     case 'eyes':
       if (dir === 3) return [];
