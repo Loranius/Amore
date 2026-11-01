@@ -8,9 +8,8 @@
 // експортів лишились незмінними — переїзд не мав ставати міграцією.
 //
 // Фото: HEIC-normalize + compress → Storage. Місто дотягується зворотним
-// геокодом при збереженні; для старих міток без `city` — лінивий бекфіл.
+// геокодом при збереженні.
 // ============================================================
-import { useEffect, useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase, publicUrl } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
@@ -151,38 +150,4 @@ export function useMapPinMutations() {
   });
 
   return { add, update, remove };
-}
-
-/** Лінивий бекфіл міста/країни для пінів, збережених без них. */
-export function useCityBackfill(pins: MapPinRow[]) {
-  const client = useQueryClient();
-  const running = useRef(false);
-
-  useEffect(() => {
-    const todo = pins.filter((p) => !p.city || !p.country);
-    if (!todo.length || running.current) return;
-    running.current = true;
-    let cancelled = false;
-
-    (async () => {
-      for (const pin of todo) {
-        if (cancelled) break;
-        const geo = await reverseGeocode(pin.lat, pin.lng);
-        const patch: { city?: string; country?: string } = {};
-        if (!pin.city && geo.city) patch.city = geo.city;
-        if (!pin.country && geo.country) patch.country = geo.country;
-        if (Object.keys(patch).length) await supabase.from('map_pins').update(patch).eq('id', pin.id);
-        await new Promise((r) => setTimeout(r, 300)); // не спамимо геокодер
-      }
-      if (!cancelled) void client.invalidateQueries({ queryKey: qk.mapPins() });
-      running.current = false;
-    })();
-
-    return () => {
-      cancelled = true;
-      running.current = false;
-    };
-    // Лише коли змінюється множина «без міста/країни».
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pins.map((p) => (!p.city || !p.country ? p.id : '')).join(',')]);
 }
