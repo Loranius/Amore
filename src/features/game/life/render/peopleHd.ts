@@ -1,31 +1,48 @@
 // ============================================================
-// Люди у 32×32 (ADR-0239, власник 2026-10-06: «люди з PixelLab, решта
-// кодом»). Аркуші зібрано з персонажів PixelLab (`scripts/pixellab/
-// build_sheet.py`): рядки — напрям (вниз, ліворуч, праворуч, угору),
-// стовпці — стоїть, далі кадри ходи. Піксель аркуша — піксель малюнка,
-// тобто пів світового: людина малюється вдвічі меншою за аркуш, і на
-// парному масштабі сцени жоден піксель не розпливається.
+// Люди гри (ADR-0239). Усі — аркуші Godot-порту «Дєвочки в городі»
+// (власник 2026-11-03: «адаптувати в новому стилі Лєну, маму, Діму й Олю»),
+// їх збирає `scripts/port/import_game1.py`: рядки — напрям (вниз, ліворуч,
+// праворуч, угору), стовпці — стоїть і 8 кадрів ходи. Піксель аркуша —
+// піксель малюнка, тобто пів світового, як у будинків і декору: дорослий —
+// 37 пікселів малюнка при клітинці мапи 32, трохи вищий за клітинку.
 //
-// Гра лише в 32×32 (власник 2026-10-31): кого малює аркуш (`hasHdSheet`),
-// того ніде не малюють 16-піксельним спрайтом — поки аркуш вантажиться,
-// людини ще не видно (`hasHdLook` тоді каже «ні»). 16-піксельні спрайти
-// лишаються тим, для кого аркушів ще нема (мешканці, перехожі).
+// Поки аркуш вантажиться, людини ще не видно (`hasHdLook` тоді каже «ні»);
+// 16-піксельних людей у грі нема (власник 2026-10-31).
 // ============================================================
 import lenaKidUrl from './assets/hd/lena-kid.png';
 import lenaTeenUrl from './assets/hd/lena-teen.png';
 import lenaAdultUrl from './assets/hd/lena-adult.png';
+import lenaKidMaskUrl from './assets/hd/lena-kid-mask.png';
+import lenaTeenMaskUrl from './assets/hd/lena-teen-mask.png';
+import lenaAdultMaskUrl from './assets/hd/lena-adult-mask.png';
 import lenaKidFallUrl from './assets/hd/lena-kid-fall.png';
 import lenaTeenFallUrl from './assets/hd/lena-teen-fall.png';
 import lenaAdultFallUrl from './assets/hd/lena-adult-fall.png';
+import lenaKidFallMaskUrl from './assets/hd/lena-kid-fall-mask.png';
+import lenaTeenFallMaskUrl from './assets/hd/lena-teen-fall-mask.png';
+import lenaAdultFallMaskUrl from './assets/hd/lena-adult-fall-mask.png';
 import lenaKidPosesUrl from './assets/hd/lena-kid-poses.png';
 import lenaTeenPosesUrl from './assets/hd/lena-teen-poses.png';
 import lenaAdultPosesUrl from './assets/hd/lena-adult-poses.png';
+import lenaKidPosesMaskUrl from './assets/hd/lena-kid-poses-mask.png';
+import lenaTeenPosesMaskUrl from './assets/hd/lena-teen-poses-mask.png';
+import lenaAdultPosesMaskUrl from './assets/hd/lena-adult-poses-mask.png';
 import dimaUrl from './assets/hd/dima.png';
 import olyaKidUrl from './assets/hd/olya-kid.png';
 import olyaTeenUrl from './assets/hd/olya-teen.png';
 import momUrl from './assets/hd/mom.png';
-import { recolorByPalette, recolorOutfit, type Garment, type OutfitColors, type Tone } from './outfitHd';
+import dimaKidUrl from './assets/hd/dima-kid.png';
+import vladKidUrl from './assets/hd/vlad-kid.png';
+import dimaMomUrl from './assets/hd/dima-mom.png';
+import dimaDadUrl from './assets/hd/dima-dad.png';
+import PORT from './assets/hd/port.json';
+import { maskReference, recolorByMask, type OutfitColors } from './outfitHd';
 import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, type Dir, type HairStyle, type Look } from './people';
+
+/** Клітинка аркуша порту, точка між стопами в ній, кадри ходи й їхня частота (як у порту). */
+export const PORT_CELL = 56;
+const PORT_FOOT = { footX: 27.5, footY: 52 } as const;
+const PORT_WALK = { frames: 8, fps: 11 } as const;
 
 interface HdSheet {
   url: string;
@@ -34,15 +51,18 @@ interface HdSheet {
   frames: number;
   /** Кадрів ходи за секунду (типово 8). */
   fps?: number;
-  /** Зріст у світових пікселях — над ним емоція (типово 26 дитина, 31 дорослий). */
-  height?: number;
+  /** Зріст із зачіскою, пікселі малюнка (кадр «стоїть, униз») — над ним емоція. */
+  height: number;
   /** Точка між стопами в клітинці аркуша. */
   footX: number;
   footY: number;
   /** Чий це аркуш. */
   match(look: Look): boolean;
-  /** Одяг, що перефарбовується під речі з шафи (`outfitHd.ts`), і вбрання, яке намальоване. */
-  outfit?: { base: Look; garments: readonly Garment[] };
+  /**
+   * Одяг з шафи (лише Лєна): вбрання, яке намальоване, і маска одягу поруч
+   * з аркушем (`outfitHd.ts`).
+   */
+  outfit?: { base: Look; mask: string; maskImg?: HTMLImageElement };
   img?: HTMLImageElement;
   ready?: boolean;
   /** Аркуш завантажився (`true`) чи ні (`false`, причину сказано в консолі). */
@@ -53,13 +73,13 @@ interface HdSheet {
   dressed?: Map<string, HTMLCanvasElement>;
   /**
    * Падіння від Басі (лише Лєна): смуга кадрів «праворуч» на тому самому
-   * полотні — `FALL_DOWN_FRAMES` падіння навзнак, далі `FALL_UP_FRAMES` підйому
-   * (PixelLab, шаблони `falling-back-death` і `getting-up`).
+   * полотні — `FALL_DOWN_FRAMES` падіння навзнак, далі `FALL_UP_FRAMES`
+   * підйому (кадр «праворуч», повернутий навколо стоп, `import_game1.py`).
    */
   fall?: Strip;
   /**
    * Пози з руками перед собою (лише Лєна, міні-ігри садиби): кадри
-   * «праворуч» у порядку `POSE_NAMES` (PixelLab `skeleton-v3`). `hands` —
+   * «праворуч» у порядку `POSE_NAMES` з домальованим передпліччям. `hands` —
    * де долоні в кожній позі: пікселі малюнка від точки між стопами, `x`
    * уперед, `y` угору (низ долоні).
    */
@@ -76,10 +96,12 @@ interface Box {
   h: number;
 }
 
-/** Смуга кадрів одного напряму («праворуч») на полотні людини. */
+/** Смуга кадрів одного напряму («праворуч») на полотні людини з маскою одягу. */
 interface Strip {
   url: string;
+  mask: string;
   img?: HTMLImageElement;
+  maskImg?: HTMLImageElement;
   ready?: boolean;
   dressed?: Map<string, HTMLCanvasElement>;
 }
@@ -94,59 +116,48 @@ export const POSE_FRAME: Readonly<Record<PoseName, number>> = { chest: 0, low: 1
 export const FALL_DOWN_FRAMES = 7;
 export const FALL_UP_FRAMES = 5;
 
-// Де лежить одяг на аркушах Лєни — заміряно за барвою по рядках силуету
-// в усіх кадрах (ADR-0239). Смуги — частки зросту від маківки до стоп;
-// банти, гумка, очі й взуття — поза ними.
-const KID_PINK: readonly Tone[] = [{ hue: [0.88, 0.955], minS: 0.4, minV: 0.45 }, { hue: [0.88, 0.99], minS: 0.15, maxS: 0.4, minV: 0.85 }];
-export const KID_DRESS: readonly Garment[] = [
-  // Рожева сукня зі світлими відблисками. Черевички рожевіші (барва 0.97)
-  // й насиченіші, а піднятий у ході черевичок сягає колін — тому спідниця
-  // закінчується вище.
-  { part: 'top', band: [0.36, 0.62], tones: KID_PINK },
-  { part: 'bottom', band: [0.62, 0.84], tones: KID_PINK },
-];
-export const TEEN_CLOTHES: readonly Garment[] = [
-  // Біла футболка: світло й сірі тіні майже без барви, тінь збоку — сіро-бузкова.
-  { part: 'top', band: [0.38, 0.65], tones: [{ maxS: 0.1, minV: 0.45 }, { hue: [0.55, 0.8], maxS: 0.3, minV: 0.45 }] },
-  // Блакитні комір і манжети з їхньою тінню; гумка на хвості — вище смуги.
-  { part: 'accent', band: [0.36, 0.56], tones: [{ hue: [0.5, 0.64], minS: 0.3, minV: 0.4 }] },
-  // Сині джинси з поясом, світлішим підворотом і темною обвідкою; кросівки — нижче.
-  { part: 'bottom', band: [0.56, 0.93], tones: [{ hue: [0.55, 0.66], minS: 0.3, maxV: 0.75 }] },
-];
-// Блакитна сукня з найсвітлішими, майже білими відблисками (у кадрах збоку
-// ними вкрита вся спина); чисто білі бретельки, поділ і туфлі — без барви,
-// тож лишаються білими.
-const ADULT_BLUE: readonly Tone[] = [{ hue: [0.55, 0.7], minS: 0.12, minV: 0.3 }, { hue: [0.55, 0.7], minS: 0.05, minV: 0.85 }];
-export const ADULT_DRESS: readonly Garment[] = [
-  { part: 'top', band: [0.4, 0.6], tones: ADULT_BLUE },
-  { part: 'bottom', band: [0.6, 0.93], tones: ADULT_BLUE },
-];
+/** Аркуш порту з точкою опори й ходою порту. */
+function port(url: string, height: number, match: (l: Look) => boolean): HdSheet {
+  return { url, cell: PORT_CELL, ...PORT_FOOT, ...PORT_WALK, height, match };
+}
 
-// Пози з руками перед собою (`poses`) — персонажі PixelLab тих самих Лєн,
-// `skeleton-v3` «reaches both empty hands forward» «праворуч», 2026-10-31;
-// точки долонь і `front` (долоні в кадрі «униз») заміряв `build_sheet.py`.
+/** Лєна: аркуш, маска одягу, падіння й пози з точками долонь (`port.json`). */
+function lena(
+  name: keyof typeof PORT,
+  urls: { sheet: string; mask: string; fall: string; fallMask: string; poses: string; posesMask: string },
+  base: Look,
+  height: number,
+  match: (l: Look) => boolean,
+): HdSheet {
+  const meta = PORT[name];
+  return {
+    ...port(urls.sheet, height, match),
+    outfit: { base, mask: urls.mask },
+    fall: { url: urls.fall, mask: urls.fallMask },
+    poses: { url: urls.poses, mask: urls.posesMask, hands: meta.hands },
+    front: meta.front,
+  };
+}
+
 const SHEETS: HdSheet[] = [
-  // Персонаж PixelLab «Лєна мала HD (48)» (a046bd5b-…).
-  { url: lenaKidUrl, fall: { url: lenaKidFallUrl }, poses: { url: lenaKidPosesUrl, hands: { chest: { x: 11.5, y: 22 }, low: { x: 9.1, y: 13 }, high: { x: 10.2, y: 27 } } }, front: { up: 14, l: -7.5, r: 6.5 }, cell: 68, frames: 4, footX: 34, footY: 56, outfit: { base: LENA_KID, garments: KID_DRESS }, match: (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle },
-  // Персонаж PixelLab «Лєна підліток HD (2)» (10065427-…), власник 2026-10-11:
-  // «дуже різниться між дитиною і дорослою, перемалюй» — кругле обличчя й
-  // великі очі, як у малої й дорослої, світло-каштанове волосся, зріст між ними.
-  { url: lenaTeenUrl, fall: { url: lenaTeenFallUrl }, poses: { url: lenaTeenPosesUrl, hands: { chest: { x: 14.9, y: 26 }, low: { x: 12, y: 15 }, high: { x: 11.1, y: 32 } } }, front: { up: 16, l: -8.5, r: 7.5 }, cell: 80, frames: 4, footX: 40, footY: 67, outfit: { base: LENA_TEEN, garments: TEEN_CLOTHES }, match: (l) => isLenaTeen(l) },
-  // Персонаж PixelLab «Лєна доросла HD» (2ddf3605-…), власник 2026-10-06: «Доросла Лєна».
-  { url: lenaAdultUrl, fall: { url: lenaAdultFallUrl }, poses: { url: lenaAdultPosesUrl, hands: { chest: { x: 16.1, y: 30 }, low: { x: 13.1, y: 17 }, high: { x: 13, y: 37 } } }, front: { up: 19, l: -10, r: 9 }, cell: 92, frames: 4, footX: 46, footY: 76, outfit: { base: LENA_ADULT, garments: ADULT_DRESS }, match: (l) => isLenaAdult(l) },
-  // Персонаж PixelLab «Мама Лєни HD» (0a699035-…).
-  { url: momUrl, cell: 92, frames: 4, footX: 46, footY: 78, match: (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent },
-  // Персонаж PixelLab «Діма HD (фото)» (cd7ead7c-…), власник 2026-11-01: «Ось
-  // Діма, перероби його персонажа в піксель лаб схожим на фото». Фото описано
-  // словами, саме фото в PixelLab не відправлено. Упізнається за волоссям,
-  // безрукавкою й штанями — таких нема ні в кого з мешканців чи перехожих.
-  { url: dimaUrl, cell: 92, frames: 4, footX: 46.5, footY: 79, match: (l) => l.hair === DIMA.hair && l.top === DIMA.top && l.bottom === DIMA.bottom },
-  // Оля — подружка Лєни в Жилинцях (власник 2026-10-31: «Починай з Олі»):
-  // мала до 6 тижня, підліток до 11-го, дорослою в грі не буває. Персонажі
-  // PixelLab «Оля мала HD (2)» (f95cea47-…) і «Оля підліток HD (50)»
-  // (7dcf2e6a-…): каре з рожевою заколкою, м'ятна футболка, джинси.
-  { url: olyaKidUrl, cell: 68, frames: 4, footX: 34, footY: 57, match: (l) => !!l.kid && isOlya(l) },
-  { url: olyaTeenUrl, cell: 72, frames: 4, footX: 36, footY: 63, match: (l) => !l.kid && isOlya(l) },
+  lena('lena-kid', { sheet: lenaKidUrl, mask: lenaKidMaskUrl, fall: lenaKidFallUrl, fallMask: lenaKidFallMaskUrl, poses: lenaKidPosesUrl, posesMask: lenaKidPosesMaskUrl }, LENA_KID, 27,
+    (l) => !!l.kid && l.bow === LENA_KID.bow && l.hairStyle === LENA_KID.hairStyle),
+  lena('lena-teen', { sheet: lenaTeenUrl, mask: lenaTeenMaskUrl, fall: lenaTeenFallUrl, fallMask: lenaTeenFallMaskUrl, poses: lenaTeenPosesUrl, posesMask: lenaTeenPosesMaskUrl }, LENA_TEEN, 34,
+    (l) => isLenaTeen(l)),
+  lena('lena-adult', { sheet: lenaAdultUrl, mask: lenaAdultMaskUrl, fall: lenaAdultFallUrl, fallMask: lenaAdultFallMaskUrl, poses: lenaAdultPosesUrl, posesMask: lenaAdultPosesMaskUrl }, LENA_ADULT, 37,
+    (l) => isLenaAdult(l)),
+  port(momUrl, 41, (l) => l.hairStyle === MOM.hairStyle && l.top === MOM.top && l.accent === MOM.accent),
+  // Діма впізнається за волоссям, верхом і штанями — таких нема ні в кого з
+  // мешканців чи перехожих.
+  port(dimaUrl, 38, (l) => !l.kid && l.hair === DIMA.hair && l.top === DIMA.top && l.bottom === DIMA.bottom),
+  // Оля — подружка Лєни в Жилинцях: мала до 6 тижня, підліток до 11-го.
+  port(olyaKidUrl, 27, (l) => !!l.kid && isOlya(l)),
+  port(olyaTeenUrl, 34, (l) => !l.kid && isOlya(l)),
+  // Історія Діми (Вишневе): він малий, його друг Влад, мама й тато.
+  port(dimaKidUrl, 27, (l) => l.who === 'dima-kid'),
+  port(vladKidUrl, 27, (l) => l.who === 'vlad-kid'),
+  port(dimaMomUrl, 39, (l) => l.who === 'dima-mom'),
+  port(dimaDadUrl, 37, (l) => l.who === 'dima-dad'),
 ];
 
 /**
@@ -177,23 +188,20 @@ export function isLenaAdult(l: Look): boolean {
   return isLenaAt(l, LENA_ADULT);
 }
 
-// Мешканці й перехожі (етап 2, власник 2026-11-03: «Публікуй персонажів в
-// гру») — люди Godot-порту «Дєвочки в городі»: вбрання й зачіска зведені в
-// один аркуш (`scripts/folk/import_game1.py`), піксель порту — світовий
-// піксель, тобто 2×2 пікселі малюнка; 8 кадрів ходи, 11 за секунду, як у
-// порту. Хто кого малює — за виглядом: діти — дитячими аркушами, коротка чи
-// їжаком зачіска — чоловічими (як у `townsfolkLook`), з тією самою зачіскою,
-// сиві — бабусею чи сивим чоловіком, а котрий саме — за хешем кольорів, тож
-// та сама людина завжди та сама.
+// Мешканці й перехожі — люди Godot-порту (етап 2): вбрання й зачіска одним
+// аркушем (`scripts/port/import_game1.py`), жоден не носить вбрання Лєни,
+// Олі чи батьків Діми. Хто кого малює — за виглядом: діти — дитячими
+// аркушами, коротка чи їжаком зачіска — чоловічими (як у `townsfolkLook`),
+// з тією самою зачіскою, сиві — бабусею чи сивим чоловіком, а котрий саме —
+// за хешем кольорів, тож та сама людина завжди та сама.
 const FOLK_URLS = import.meta.glob<string>('./assets/hd/folk/*.png', { eager: true, query: '?url', import: 'default' });
 type FolkKind = 'man' | 'woman' | 'boy' | 'girl';
-/** Аркуш мешканця: хто, яка зачіска й зріст із зачіскою у світових пікселях (кадр «стоїть, униз»). Підлітки — серед дорослих. */
+/** Аркуш мешканця: хто, яка зачіска й зріст із зачіскою в пікселях малюнка (кадр «стоїть, униз»). Підлітки — серед дорослих. */
 export const FOLK: Readonly<Record<string, { kind: FolkKind; hair: HairStyle; height: number }>> = {
-  'man-jeans': { kind: 'man', hair: 'short', height: 37 },
   'man-blue': { kind: 'man', hair: 'short', height: 38 },
+  'man-brown': { kind: 'man', hair: 'short', height: 38 },
   'man-grey': { kind: 'man', hair: 'spiky', height: 40 },
   'teen-boy': { kind: 'man', hair: 'spiky', height: 37 },
-  'woman-flowers': { kind: 'woman', hair: 'long', height: 39 },
   'woman-green': { kind: 'woman', hair: 'bob', height: 38 },
   'woman-navy': { kind: 'woman', hair: 'ponytail', height: 37 },
   'woman-granny': { kind: 'woman', hair: 'bun', height: 41 },
@@ -205,22 +213,21 @@ export const FOLK: Readonly<Record<string, { kind: FolkKind; hair: HairStyle; he
   'kid-boy-summer': { kind: 'boy', hair: 'short', height: 27 },
   'kid-boy-casual': { kind: 'boy', hair: 'short', height: 27 },
   'kid-boy-formal': { kind: 'boy', hair: 'short', height: 27 },
-  'kid-girl-mustard': { kind: 'girl', hair: 'pigtails', height: 27 },
-  'kid-girl-plain': { kind: 'girl', hair: 'bob', height: 27 },
+  'kid-girl-green': { kind: 'girl', hair: 'pigtails', height: 27 },
   'kid-girl-summer': { kind: 'girl', hair: 'pigtails', height: 27 },
   'kid-girl-casual': { kind: 'girl', hair: 'bob', height: 27 },
+  'kid-girl-formal': { kind: 'girl', hair: 'long', height: 27 },
 };
 type FolkSheet = HdSheet & { name: string };
 const FOLK_SHEETS: Readonly<Record<FolkKind, readonly FolkSheet[]>> = (() => {
   const pools: Record<FolkKind, FolkSheet[]> = { man: [], woman: [], boy: [], girl: [] };
   for (const [name, f] of Object.entries(FOLK)) {
     const url = FOLK_URLS[`./assets/hd/folk/${name}.png`];
-    if (!url) throw new Error(`Люди 32×32: нема аркуша мешканця ${name}`);
-    pools[f.kind].push({ name, url, cell: 112, frames: 8, fps: 11, height: f.height, footX: 55, footY: 104, match: () => false });
+    if (!url) throw new Error(`Люди: нема аркуша мешканця ${name}`);
+    pools[f.kind].push({ name, ...port(url, f.height, () => false) });
   }
   return pools;
 })();
-
 /** Сиве волосся мешканців і перехожих (`residents.ts`, `townsfolkLook`). */
 const GREY_HAIR = new Set(['#c8c4bc', '#8a8a8a']);
 
@@ -253,15 +260,16 @@ export function folkSheetName(look: Look): string | null {
 
 function sheetOf(look: Look): HdSheet | null {
   const s = SHEETS.find((x) => x.match(look)) ?? folkSheet(look);
-  if (!s) return null;
   if (!s.img && typeof Image !== 'undefined') {
     const img = new Image();
     s.img = img;
-    s.loaded = new Promise((resolve) => {
-      img.onload = () => { s.ready = true; resolve(true); };
-      img.onerror = () => { console.error(`Люди 32×32: не вдалося завантажити аркуш ${s.url}`); resolve(false); };
+    const mask = s.outfit ? loadImage(s.outfit.mask, 'маску одягу') : Promise.resolve(null);
+    s.loaded = Promise.all([loadImage(s.url, 'аркуш', img), mask]).then(([sheet, m]) => {
+      if (!sheet || (s.outfit && !m)) return false;
+      if (s.outfit && m) s.outfit.maskImg = m;
+      s.ready = true;
+      return true;
     });
-    img.src = s.url;
     // Падіння й пози вантажаться разом з аркушем, щоб бути готовими до першого ж падіння чи міні-гри.
     if (s.fall) loadStrip(s.fall, 'падіння');
     if (s.poses) loadStrip(s.poses, 'пози');
@@ -269,13 +277,23 @@ function sheetOf(look: Look): HdSheet | null {
   return s;
 }
 
-function loadStrip(st: Strip, what: string): void {
-  st.img = new Image();
-  st.img.onload = () => { st.ready = true; };
-  st.img.onerror = () => console.error(`Люди 32×32: не вдалося завантажити ${what} ${st.url}`);
-  st.img.src = st.url;
+/** Завантажити зображення; `null` — не вдалося (причину сказано в консолі). */
+function loadImage(url: string, what: string, img = new Image()): Promise<HTMLImageElement | null> {
+  return new Promise((resolve) => {
+    img.onload = () => resolve(img);
+    img.onerror = () => { console.error(`Люди: не вдалося завантажити ${what} ${url}`); resolve(null); };
+    img.src = url;
+  });
 }
 
+function loadStrip(st: Strip, what: string): void {
+  st.img = new Image();
+  void Promise.all([loadImage(st.url, what, st.img), loadImage(st.mask, `маску (${what})`)]).then(([img, mask]) => {
+    if (!img || !mask) return;
+    st.maskImg = mask;
+    st.ready = true;
+  });
+}
 /**
  * Почати вантажити аркуш людини з падінням і позами наперед — перед
  * міні-грою, щоб Лєна з кошиком була готова до першого ж кадру.
@@ -431,9 +449,10 @@ function drawStrip(g: CanvasRenderingContext2D, s: HdSheet, src: CanvasImageSour
   g.restore();
 }
 
-/** Зріст людини з аркуша у світових пікселях, якщо аркуш його знає. */
+/** Зріст людини з аркуша у світових пікселях (пів зросту в пікселях малюнка), або `undefined`, якщо аркуша нема. */
 export function hdHeight(look: Look): number | undefined {
-  return sheetOf(look)?.height;
+  const s = sheetOf(look);
+  return s ? s.height / 2 : undefined;
 }
 
 /**
@@ -477,22 +496,24 @@ function dressedStrip(s: HdSheet, f: Strip, look: Look): CanvasImageSource {
   f.dressed ??= new Map();
   let c = f.dressed.get(key);
   if (!c) {
-    const frames = pixelsOf(img);
-    const base = pixelsOf(s.img!);
-    recolorByPalette(
-      { data: frames.data, width: frames.width, height: frames.height, cell: s.cell },
-      { data: base.data, width: base.width, height: base.height, cell: s.cell },
-      s.outfit.garments,
-      colors,
-    );
-    c = document.createElement('canvas');
-    c.width = frames.width;
-    c.height = frames.height;
-    const g = c.getContext('2d');
-    if (!g) throw new Error('Люди 32×32: немає 2D-контексту для перевдягання');
-    g.putImageData(frames, 0, 0);
+    // Основні тони — з аркуша ходи: лежачи й у позах одягу видно менше.
+    const ref = maskReference(pixelsOf(s.img!).data, pixelsOf(s.outfit.maskImg!).data);
+    c = recolored(img, f.maskImg!, colors, ref);
     f.dressed.set(key, c);
   }
+  return c;
+}
+
+/** Копія зображення з одягом, перефарбованим за маскою. */
+function recolored(img: HTMLImageElement, mask: HTMLImageElement, colors: OutfitColors, ref?: readonly number[]): HTMLCanvasElement {
+  const data = pixelsOf(img);
+  recolorByMask(data.data, pixelsOf(mask).data, colors, ref);
+  const c = document.createElement('canvas');
+  c.width = data.width;
+  c.height = data.height;
+  const g = c.getContext('2d');
+  if (!g) throw new Error('Люди: немає 2D-контексту для перевдягання');
+  g.putImageData(data, 0, 0);
   return c;
 }
 
@@ -519,15 +540,7 @@ function dressedSheet(s: HdSheet, look: Look): CanvasImageSource {
   s.dressed ??= new Map();
   let c = s.dressed.get(key);
   if (!c) {
-    c = document.createElement('canvas');
-    c.width = img.naturalWidth;
-    c.height = img.naturalHeight;
-    const g = c.getContext('2d');
-    if (!g) throw new Error('Люди 32×32: немає 2D-контексту для перевдягання');
-    g.drawImage(img, 0, 0);
-    const data = g.getImageData(0, 0, c.width, c.height);
-    recolorOutfit(data.data, c.width, c.height, s.cell, s.outfit.garments, colors);
-    g.putImageData(data, 0, 0);
+    c = recolored(img, s.outfit.maskImg!, colors);
     s.dressed.set(key, c);
   }
   return c;

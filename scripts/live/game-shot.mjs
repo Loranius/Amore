@@ -81,7 +81,7 @@ async function lineup() {
     frames.forEach((f, i) => at(x0 + CELL / 2 + i * CELL, y + ROW - 8, f.d, f.draw));
   };
   const DIRS = [0, 1, 2, 3];
-  title('PixelLab 32×32 (вниз, ліворуч, праворуч, угору, далі хода вниз)');
+  title('Люди з власними аркушами (вниз, ліворуч, праворуч, угору, далі хода вниз)');
   for (let i = 0; i < hd.length; i += 2) {
     for (let j = 0; j < 2 && i + j < hd.length; j += 1) {
       const [name, look] = hd[i + j];
@@ -99,7 +99,7 @@ async function lineup() {
   title('Перехожі (випадкові)');
   strip('', 16, folk.map((look) => ({ d: 2, draw: pxHd(look, 0, 0) })));
   y += ROW + 10;
-  title('Поруч: Лєна, мама й Діма з PixelLab, мешканці й перехожі з порту');
+  title('Поруч: Лєна, мама й Діма, мешканці й перехожі');
   const mixed = [P.LENA_ADULT, R.RESIDENT_LOOKS.hanna, R.RESIDENT_LOOKS.petro, P.MOM, R.RESIDENT_LOOKS.sofia, P.DIMA, R.RESIDENT_LOOKS.marko, folk[3]];
   strip('', 16, mixed.map((look) => ({ d: 2, draw: pxHd(look, 0, 0) })));
   y += ROW + 10;

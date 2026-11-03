@@ -5,7 +5,7 @@ import { ITEMS } from '../sim/content';
 import { newLife } from '../sim/life';
 import { rngFor } from '../sim/rng';
 import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, townsfolkLook } from './people';
-import { FOLK, folkSheetName, hasHdSheet, hdCell, isLenaAdult, isLenaTeen, outfitColors } from './peopleHd';
+import { FOLK, folkSheetName, hasHdSheet, hdCell, isLenaAdult, isLenaTeen, outfitColors, PORT_CELL } from './peopleHd';
 import { RESIDENT_LOOKS } from './residents';
 
 // Власник 2026-10-31: «повністю відмовляємось від 16×16». Лєна (будь-якого
@@ -34,8 +34,8 @@ describe('Хто малюється аркушем PixelLab', () => {
     const teen = { ...OLYA, kid: false };
     expect(hasHdSheet(kid)).toBe(true);
     expect(hasHdSheet(teen)).toBe(true);
-    expect(hdCell(kid)).toBe(68);
-    expect(hdCell(teen)).toBe(72);
+    expect(hdCell(kid)).toBe(PORT_CELL);
+    expect(hdCell(teen)).toBe(PORT_CELL);
     for (const look of [kid, teen]) {
       expect(isLenaTeen(look)).toBe(false);
       expect(isLenaAdult(look)).toBe(false);
@@ -139,10 +139,9 @@ describe('Кольори перевдягання', () => {
     expect(outfitColors(LENA_TEEN, look)).toEqual({ top: '#f6f1e6', bottom: '#b8323a', accent: '#b8323a' });
   });
 
-  it('річ без оздоблення забирає й блакитний комір — він стає кольору верху', () => {
-    const { accent: _gone, ...noAccent } = LENA_TEEN;
-    const hoodie = { ...noAccent, top: '#c46b8f', bottom: '#3d5a8c' };
-    expect(outfitColors(LENA_TEEN, hoodie)).toEqual({ top: '#c46b8f', bottom: '#3d5a8c', accent: '#c46b8f' });
+  it('у підлітка порту оздоблення нема — річ без оздоблення його й не додає', () => {
+    const hoodie = { ...LENA_TEEN, top: '#c46b8f', bottom: '#3d5a8c' };
+    expect(outfitColors(LENA_TEEN, hoodie)).toEqual({ top: '#c46b8f', bottom: '#3d5a8c', accent: undefined });
   });
 
   it('незмінна частина лишається намальованою', () => {
