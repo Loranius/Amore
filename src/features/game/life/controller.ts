@@ -28,6 +28,8 @@ import {
   propose,
   proposalCheck,
   sleep,
+  storyEnded,
+  storySeen,
   today,
   travel,
   visitLyceum,
@@ -44,14 +46,15 @@ import { SAVE_KEY, SaveError, parseSave, serialize } from './sim/save';
 import { dayPlan, farmPlan, friendsGame, makeGame, type PlannedGame } from './games/day';
 import { farmSummary, isFarmGame } from './sim/farm';
 import { Kit, type MiniGame } from './games/kit';
-import { lenaLook } from './look';
-import { DIMA, MOM, OLYA, townsfolkLook, type Look } from './render/people';
+import { heroLook, heroWords } from './look';
+import { DIMA, DIMA_DAD, DIMA_MOM, MOM, OLYA, VLAD_KID, townsfolkLook, type Look } from './render/people';
 import { preloadHd } from './render/peopleHd';
 import { renderScene, type Actor, type Weather } from './render/scene';
 import { sfx, unlockAudio } from './sound';
 import { birdCanStand, birdFeet, colliderFor, tileFeet, zoneAt } from './world/collide';
 import { HATA_MOM_BED, homeInterior, momHata, placeTitle } from './world/interior';
 import { cityMap, homeYard } from './world/maps';
+import { familyAt, type FamilyId } from './world/vyshneve';
 import { MOM_DOORS, MOM_SPOTS, YARD_ID } from './world/yard';
 import { CELLAR_ID, cellarMap } from './world/cellar';
 import { KITCHEN_ID, KITCHEN_MOM_SPOTS, summerKitchenMap } from './world/kitchen';
@@ -83,6 +86,21 @@ export type Panel =
 
 export type Speaker = 'n' | 'l' | 'd' | 'm' | 'o';
 export interface Line { who: Speaker; text: string }
+
+/** Сюжетні сторінки історії Діми (з Godot-порту гри, власник 2026-11-02). */
+const STORY_PAGES: Record<NonNullable<LifeState['story']>, readonly string[]> = {
+  intro: [
+    '23 січня 2003 року. Вишневе, Київська область. Народився Діма.',
+    'П\'ятиповерхівка біля центру міста, п\'ятий поверх. У мами кучеряве темно-руде волосся. У тата коротка стрижка із залисинами.',
+    'Через два роки народився молодший брат Владік: світлі кучері й блакитні очі, як у Діми. Тільки в Діми волосся пряме, русяве.',
+    'Вересень 2008 року. Час іти в садочок «Чебурашка».',
+  ],
+  divorce: [
+    'Літо 2012 року. Третій клас позаду.',
+    'Мама з татом розлучаються.',
+    'Діма переїжджає в село, до бабусі по маминій лінії.',
+  ],
+};
 
 export interface Card {
   title: string;
@@ -139,7 +157,7 @@ export class GameController {
   private kit = new Kit();
 
   map: GameMap = cityMap('zhylyntsi');
-  private player: Actor = { id: 'lena', x: 0, y: 0, dir: 0, moving: false, t: 0, look: lenaLook(newLife(0)) };
+  private player: Actor = { id: 'lena', x: 0, y: 0, dir: 0, moving: false, t: 0, look: heroLook(newLife(0)) };
   private folk: Walker[] = [];
   /** Мешканці, з якими можна познайомитись: стоять біля свого місця. */
   private residents: (Walker & { home: { x: number; y: number } })[] = [];
@@ -232,7 +250,7 @@ export class GameController {
 
   private commit(next: LifeState): void {
     this.life = next;
-    this.player.look = lenaLook(next);
+    this.player.look = heroLook(next);
     this.syncDima();
     this.persist();
     this.emit();
@@ -324,7 +342,7 @@ export class GameController {
   async start(life: LifeState, fresh: boolean): Promise<void> {
     unlockAudio();
     this.life = life;
-    this.player.look = lenaLook(life);
+    this.player.look = heroLook(life);
     this.persist();
     this.setUi({ screen: 'world', panel: null, card: null, dialog: null, activity: null });
     if (life.city === life.home) this.enterHome('wake');
@@ -353,7 +371,17 @@ export class GameController {
   }
 
   private async intro(): Promise<void> {
-    const info = today(this.life!);
+    const life = this.life!;
+    const info = today(life);
+    if (life.story === 'intro') {
+      await this.storyPages('intro');
+      this.commit(storySeen(this.life!));
+      await this.say([
+        ['m', 'Дімочко, вставай! Садочок чекає.'],
+        ['n', 'Кожен тиждень у грі — це рік життя. Ходи: тягни палець по екрану або стрілки/WASD. Біля дверей з\'явиться кнопка дії.'],
+      ]);
+      return;
+    }
     if (info.stage === 'sadok') {
       await this.say([
         ['n', 'Десь на Хмельниччині є село Жилинці.'],
@@ -375,7 +403,7 @@ export class GameController {
   // Мапи.
   // ------------------------------------------------------------
   private place(spawn: { x: number; y: number }): void {
-    if (this.life) this.player.look = lenaLook(this.life);
+    if (this.life) this.player.look = heroLook(this.life);
     const f = tileFeet(spawn.x, spawn.y);
     this.player.x = f.x;
     this.player.y = f.y;
@@ -504,6 +532,17 @@ export class GameController {
     }
     // Мама з'являється сама — за розкладом (`updateMom`).
     this.momA = null;
+    // Родина Діми вдома — там, куди її поставив розклад (`familyAt`).
+    if (this.map.id.startsWith('home:dima-flat')) {
+      const family = familyAt(life.minute, info);
+      const looks: Record<FamilyId, Look> = { mom: DIMA_MOM, dad: DIMA_DAD, vlad: VLAD_KID };
+      for (const id of Object.keys(family) as FamilyId[]) {
+        const spot = family[id].spot;
+        if (!spot) continue;
+        const f = tileFeet(spot[0], spot[1]);
+        this.extras.push({ id: `family:${id}`, x: f.x, y: f.y, dir: 0, moving: false, t: 0, look: looks[id] });
+      }
+    }
     if (this.map.id === 'zhylyntsi') {
       if (info.week < 12) {
         const o = tileFeet(36, 10);
@@ -998,7 +1037,7 @@ export class GameController {
     const ty = mh <= vh ? -(vh - mh) / 2 : Math.max(0, Math.min(mh - vh, this.player.y - vh / 2));
     this.cameraX += (tx - this.cameraX) * 0.15;
     this.cameraY += (ty - this.cameraY) * 0.15;
-    const info = dayInfo(life?.day ?? 3);
+    const info = life ? today(life) : dayInfo(3);
     const actors: Actor[] = [...this.folk, ...this.residents, ...this.extras];
     if (this.momA) actors.push(this.momA);
     if (this.ui.screen === 'world') actors.push(this.fallLeft > 0 ? { ...this.player, fall: LENA_TRIP_S - this.fallLeft, fallDir: this.fallDir } : this.player);
@@ -1291,7 +1330,8 @@ export class GameController {
 
   private async passOut(): Promise<void> {
     this.busy = true;
-    await this.showCard({ title: 'Лєна заснула від утоми', body: 'Наступного разу краще лягти вчасно.' });
+    const who = heroWords(this.life!);
+    await this.showCard({ title: `${who.name} ${who.fell} від утоми`, body: 'Наступного разу краще лягти вчасно.' });
     this.busy = false;
     await this.sleepNow(true);
   }
@@ -1306,11 +1346,11 @@ export class GameController {
       throw e;
     }
     const before = today(life);
-    const after = dayInfo(outcome.state.day);
+    const after = today(outcome.state);
     this.commit(outcome.state);
     this.minuteAcc = 0;
     const lines = [`${after.dayName}, ${after.monthName} ${after.calendarYear}`];
-    if (after.week !== before.week) lines.push(`Новий рік життя: Лєні ${after.age}`);
+    if (after.week !== before.week) lines.push(`Новий рік життя: ${heroWords(outcome.state).dative} ${after.age}`);
     await this.showCard({ title: 'Добраніч…', lines, button: 'Прокинутись' });
     await this.showEvents(outcome.events);
     this.enterHome('wake');
@@ -1320,8 +1360,27 @@ export class GameController {
   /** Сцени справжньої історії, коли настає їхній час. */
   async checkStory(): Promise<void> {
     const life = this.life;
-    if (!life || this.map.interior) return;
+    if (!life) return;
+    if (storyEnded(life)) { await this.divorceScene(); return; }
+    if (this.map.interior) return;
     if (meetingDue(life) && this.map.city === 'vinnytsia') await this.meetScene();
+  }
+
+  /**
+   * Сюжетні сторінки історії Діми (з Godot-порту гри): вступ і розлучення
+   * батьків після 3 класу.
+   */
+  private async storyPages(id: NonNullable<LifeState['story']>): Promise<void> {
+    await this.say(STORY_PAGES[id].map((text) => ['n', text] as [Speaker, string]));
+  }
+
+  /** Літо 2012-го: Діма переїжджає до бабусі в село. Далі гри поки нема — назад у меню. */
+  private async divorceScene(): Promise<void> {
+    this.busy = true;
+    await this.storyPages('divorce');
+    await this.showCard({ title: 'Далі буде', body: 'Історія Діми продовжиться в селі в бабусі.', button: 'У головне меню' });
+    this.busy = false;
+    this.toTitle();
   }
 
   private async meetScene(): Promise<void> {

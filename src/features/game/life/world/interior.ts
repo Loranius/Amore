@@ -8,6 +8,7 @@ import { ROOM_FLOOR, spotOf } from '../sim/economy';
 import type { LifeState } from '../sim/life';
 import { dayInfo, stageOfWeek } from '../sim/calendar';
 import { MapBuilder } from './build';
+import { dimaFlat } from './vyshneve';
 import type { GameMap, Ground } from './types';
 
 export type HomeKind = 'hata' | 'dorm' | 'flat';
@@ -216,6 +217,8 @@ export function placeTitle(map: GameMap, homeName: string): string {
 }
 
 export function homeInterior(state: LifeState): GameMap {
+  // Діма живе з батьками й братом у квартирі на п'ятому поверсі.
+  if (state.hero === 'dima') return dimaFlat(state);
   const kind = homeKind(state);
   if (kind === 'hata') return hataInterior(state);
   const W = 16;

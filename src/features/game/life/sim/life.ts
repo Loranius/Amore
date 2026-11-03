@@ -72,8 +72,23 @@ export interface DimaState {
   eta: number | null;
 }
 
+/** За кого грають: Лєна чи Діма (власник 2026-11-03: «в головному меню вибрати персонажа»). */
+export type Hero = 'lena' | 'dima';
+
+/** Сюжетні сторінки, які ще треба показати: вступ Діми й розлучення батьків після 3 класу. */
+export type StoryId = 'intro' | 'divorce';
+
+/** На скільки років пізніше народився герой (`dayInfo`): Діма — 2003-го, Лєна — 2002-го. */
+export const HERO_YEAR_SHIFT: Record<Hero, number> = { lena: 0, dima: 1 };
+
+/** Після цього класу батьки Діми розлучаються, і його історія поки закінчується. */
+export const DIMA_LAST_GRADE = 3;
+
 export interface LifeState {
   version: typeof SAVE_VERSION;
+  hero: Hero;
+  /** Сюжетні сторінки до показу (`null` — нема). */
+  story: StoryId | null;
   seed: number;
   day: number;
   /** Хвилини від півночі поточного дня; день починається о 7:00. */
@@ -176,13 +191,15 @@ function withMilestone(state: LifeState, id: string, events: LifeEvent[]): LifeS
 // ------------------------------------------------------------
 // Початок.
 // ------------------------------------------------------------
-export type Chapter = 'sadok' | 'school' | 'uni' | 'adult';
+export type Chapter = 'sadok' | 'school' | 'uni' | 'adult' | 'dima';
 
-export const CHAPTER_WEEK: Record<Chapter, number> = { sadok: 0, school: 1, uni: UNI_FIRST_WEEK, adult: ADULT_FIRST_WEEK };
+export const CHAPTER_WEEK: Record<Chapter, number> = { sadok: 0, school: 1, uni: UNI_FIRST_WEEK, adult: ADULT_FIRST_WEEK, dima: 0 };
 
 function baseState(seed: number): LifeState {
   return {
     version: SAVE_VERSION,
+    hero: 'lena',
+    story: null,
     seed: seed >>> 0,
     day: 0,
     minute: DAY_START_MIN,
@@ -219,6 +236,11 @@ export function newLife(seed: number, chapter: Chapter = 'sadok'): LifeState {
   const s = baseState(seed);
   const day = firstDayOfWeek(CHAPTER_WEEK[chapter]);
   if (chapter === 'sadok') return { ...s, milestones: [] };
+  // Діма: народився 23 січня 2003-го у Вишневому, п'ятиповерхівка біля
+  // центру, п'ятий поверх; у вересні 2008-го — садочок «Чебурашка».
+  if (chapter === 'dima') {
+    return { ...s, hero: 'dima', story: 'intro', city: 'vyshneve', home: 'vyshneve', homeName: 'Квартира на п\'ятому поверсі', milestones: [] };
+  }
   if (chapter === 'school') return { ...s, day, money: 40, skills: { knowledge: 4, creativity: 4, sport: 4, charm: 3 }, milestones: ['sadok'] };
   if (chapter === 'uni') {
     return {
@@ -252,7 +274,18 @@ export function newLife(seed: number, chapter: Chapter = 'sadok'): LifeState {
 }
 
 export function today(state: LifeState): DayInfo {
-  return dayInfo(state.day);
+  return dayInfo(state.day, HERO_YEAR_SHIFT[state.hero]);
+}
+
+/** Сюжетні сторінки показано (вступ); розлучення лишається — далі гри поки нема. */
+export function storySeen(state: LifeState): LifeState {
+  if (state.story !== 'intro') throw new LifeRuleError(`Сторінки «${state.story ?? 'нема'}» не закриваються`);
+  return { ...state, story: null };
+}
+
+/** Історія Діми дійшла до кінця, якого гра ще не має. */
+export function storyEnded(state: LifeState): boolean {
+  return state.hero === 'dima' && state.story === 'divorce';
 }
 
 export function education(state: LifeState): Education {
@@ -288,9 +321,11 @@ export const LATE_GRACE_MIN = 150;
 
 export function dutyToday(state: LifeState): Duty | null {
   const info = today(state);
-  if (info.stage === 'sadok' && !info.weekend) return { kind: 'sadok', city: 'zhylyntsi', building: 'sadok', title: 'Садочок', startBy: 9 * 60, minutes: 6 * 60 };
+  // Діма ходить у садочок і школу у Вишневому.
+  const dima = state.hero === 'dima';
+  if (info.stage === 'sadok' && !info.weekend) return { kind: 'sadok', city: dima ? 'vyshneve' : 'zhylyntsi', building: 'sadok', title: 'Садочок', startBy: 9 * 60, minutes: 6 * 60 };
   if (info.stage === 'school' && !info.weekend) {
-    const city: CityId = info.level <= 9 ? 'zhylyntsi' : 'pravdivka';
+    const city: CityId = dima ? 'vyshneve' : info.level <= 9 ? 'zhylyntsi' : 'pravdivka';
     return { kind: 'school', city, building: 'school', title: `${info.level} клас`, startBy: 8 * 60 + 30, minutes: 5 * 60 + 30 };
   }
   if (info.stage === 'uni' && !info.weekend) return { kind: 'uni', city: 'vinnytsia', building: 'vtei', title: `${info.level} курс ВДПУ`, startBy: 9 * 60, minutes: 5 * 60 };
@@ -853,6 +888,10 @@ function newYear(state: LifeState, before: DayInfo, after: DayInfo, events: Life
   }
   next = { ...next, yearScores: [] };
 
+  // Літо 2012-го: третій клас позаду, батьки Діми розлучаються.
+  // Сторінки глави показує гра (`controller.ts`); тут лише позначка.
+  if (state.hero === 'dima' && before.stage === 'school' && before.level === DIMA_LAST_GRADE) return { ...next, story: 'divorce' };
+
   if (before.stage === 'school' && after.stage === 'uni') {
     next = withMilestone(next, 'graduation', events);
     next = withMilestone({ ...next, home: 'vinnytsia', homeName: 'Гуртожиток ВДПУ', city: 'vinnytsia', rent: 0 }, 'student', events);
@@ -901,9 +940,12 @@ export const RENT: Record<CityId, number> = {
   kyiv: 1600,
   lviv: 1200,
   odesa: 1300,
+  // Вишневе — лише історія Діми, переїхати туди не можна (`moveHome`).
+  vyshneve: 900,
 };
 
 export function moveHome(state: LifeState, city: CityId): Outcome {
+  if (CITIES[city].only) throw new LifeRuleError(`${CITIES[city].name} — не для переїзду`);
   if (studying(state)) throw new LifeRuleError('Переїзд — після диплома');
   if (state.city !== city) throw new LifeRuleError('Квартиру дивляться на місці');
   if (state.home === city) throw new LifeRuleError('Ти вже тут живеш');

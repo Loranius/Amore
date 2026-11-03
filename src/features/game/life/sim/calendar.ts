@@ -71,7 +71,7 @@ export interface DayInfo {
   stage: Stage;
   /** Клас 1..11 або курс 1..4; 0 для садочка й дорослого життя. */
   level: number;
-  /** Скільки Лєні років цього дня (народилась 2002-го). */
+  /** Скільки героєві років цього дня (Лєна народилась 2002-го, Діма — 2003-го). */
   age: number;
 }
 
@@ -84,12 +84,17 @@ export function stageOfWeek(week: number): { stage: Stage; level: number } {
   return { stage: 'adult', level: 0 };
 }
 
-export function dayInfo(day: number): DayInfo {
+/**
+ * День життя. `yearShift` — на скільки років пізніше народився герой: Діма
+ * (2003) іде в садочок на рік пізніше за Лєну (2002), тиждень життя той
+ * самий, календар — на рік далі.
+ */
+export function dayInfo(day: number, yearShift = 0): DayInfo {
   if (!Number.isInteger(day) || day < 0) throw new Error(`dayInfo: день має бути цілим ≥ 0, отримано ${day}`);
   const week = Math.floor(day / DAYS_PER_WEEK);
   const dow = day % DAYS_PER_WEEK;
   const rule = DAYS[dow]!;
-  const startYear = FIRST_YEAR + week;
+  const startYear = FIRST_YEAR + week + yearShift;
   const calendarYear = rule.nextYear ? startYear + 1 : startYear;
   const { stage, level } = stageOfWeek(week);
   return {
@@ -105,7 +110,7 @@ export function dayInfo(day: number): DayInfo {
     weekend: dow >= 5,
     stage,
     level,
-    age: calendarYear - BIRTH_YEAR - (rule.month < 6 ? 1 : 0),
+    age: calendarYear - BIRTH_YEAR - yearShift - (rule.month < 6 ? 1 : 0),
   };
 }
 

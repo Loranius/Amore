@@ -7,7 +7,7 @@ import { useState, type ReactNode } from 'react';
 import { DAY_END_MIN, clockLabel, dayInfo } from '../sim/calendar';
 import {
   CITIES,
-  CITY_IDS,
+  TRAVEL_CITY_IDS,
   EDUCATION_NAME,
   ITEMS,
   JOBS,
@@ -50,6 +50,7 @@ import {
   shiftPay,
   studying,
   takeJob,
+  HERO_YEAR_SHIFT,
   today,
   travelCheck,
   wear,
@@ -95,7 +96,7 @@ import {
 } from '../sim/economy';
 import { UA_OUTLINE } from '../games/banks';
 import type { GameController, Panel } from '../controller';
-import { lenaLook } from '../look';
+import { heroLook, heroWords } from '../look';
 import { isMuted, setMuted } from '../sound';
 import { PixelIcon, Portrait } from './pixels';
 
@@ -215,7 +216,7 @@ function TravelPanel({ c, life }: { c: GameController; life: LifeState }) {
             <rect x={REGION_DOT[0] * W - 22} y={REGION_DOT[1] * H - 14} width="44" height="28" fill="#fff4dc" fillOpacity="0.85" stroke="#5a3218" strokeWidth="2" strokeDasharray="4 2" />
             <text x={REGION_DOT[0] * W} y={REGION_DOT[1] * H + 4} textAnchor="middle" fontSize="10" fontWeight="900" fill="#4a2a14">Поділля</text>
           </g>
-          {CITY_IDS.filter((id) => !CITIES[id].local).map((id) => marker(id, CITIES[id].pos[0] * W, CITIES[id].pos[1] * H, false))}
+          {TRAVEL_CITY_IDS.filter((id) => !CITIES[id].local).map((id) => marker(id, CITIES[id].pos[0] * W, CITIES[id].pos[1] * H, false))}
         </svg>
       ) : (
         <svg className="lg-map" viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Мапа Поділля">
@@ -254,7 +255,7 @@ function TravelPanel({ c, life }: { c: GameController; life: LifeState }) {
       )}
       {/* Список — завжди: місто можна обрати й без влучання в мапу. */}
       <div className="lg-city-list">
-        {CITY_IDS.map((id) => (
+        {TRAVEL_CITY_IDS.map((id) => (
           <button key={id} type="button" className={`lg-btn is-small${pick === id ? '' : ' is-paper'}`} disabled={id === life.city} onClick={() => choose(id)}>{CITIES[id].name}</button>
         ))}
       </div>
@@ -439,7 +440,7 @@ function PersonPanel({ c, life, id }: { c: GameController; life: LifeState; id: 
   return (
     <Sheet title={known ? r.name : r.female ? 'Незнайомка' : 'Незнайомець'} sub={known ? `${r.role} · ${relationName(life, id)}` : r.role} onClose={() => c.closePanel()}>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-        <Portrait look={lenaLook(life)} scale={4} />
+        <Portrait look={heroLook(life)} scale={4} />
         <Portrait look={c.residentLook(id)} scale={4} />
       </div>
       <p className="lg-quote">«{lineFor(life, id)}»</p>
@@ -539,7 +540,7 @@ function WardrobePanel({ c, life }: { c: GameController; life: LifeState }) {
   return (
     <Sheet title="Шафа" sub="Що вдягнути сьогодні?" onClose={() => c.closePanel()}>
       <div style={{ display: 'grid', placeItems: 'center', padding: 6, background: 'linear-gradient(#bfe3f5,#e8f4fb)', border: '3px solid #5a3218', borderRadius: 6 }}>
-        <Portrait look={lenaLook(life)} scale={6} crop={false} />
+        <Portrait look={heroLook(life)} scale={6} crop={false} />
       </div>
       <div className="lg-grid">
         <button type="button" className={`lg-btn is-paper${life.outfit === null ? ' is-green' : ''}`} onClick={() => c.commitWear(wear(life, null))}>Звичайний одяг</button>
@@ -588,7 +589,7 @@ function AlbumPanel({ c, life }: { c: GameController; life: LifeState }) {
           <h3 style={{ margin: '6px 0 0' }}>Оцінки за роки</h3>
           <div className="lg-grid">
             {life.marks.map((m) => {
-              const info = dayInfo(m.week * 7);
+              const info = dayInfo(m.week * 7, HERO_YEAR_SHIFT[life.hero]);
               return <div key={m.week} className="lg-tile">{info.stage === 'uni' ? `${info.level} курс` : `${info.level} клас`}<span style={{ fontSize: 18 }}>{m.mark}</span></div>;
             })}
           </div>
@@ -612,7 +613,7 @@ function PhonePanel({ c, life }: { c: GameController; life: LifeState }) {
   const [muted, setMute] = useState(isMuted());
   const avg = life.marks.length ? Math.round((life.marks.reduce((a, m) => a + m.mark, 0) / life.marks.length) * 10) / 10 : null;
   return (
-    <Sheet title="Телефон" sub={`Лєні ${info.age} · ${info.schoolYear}`} onClose={() => c.closePanel()}>
+    <Sheet title="Телефон" sub={`${heroWords(life).dative} ${info.age} · ${info.schoolYear}`} onClose={() => c.closePanel()}>
       <div className="lg-bars">
         {(Object.keys(SKILL_NAME) as SkillId[]).map((k) => (
           <div key={k}>
@@ -709,7 +710,7 @@ function DatePanel({ c, life }: { c: GameController; life: LifeState }) {
   return (
     <Sheet title="Побачення з Дімою" sub={done ? 'Сьогодні вже бачились — завтра ще' : 'Куди підемо?'} onClose={() => c.closePanel()}>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-        <Portrait look={lenaLook(life)} scale={4} />
+        <Portrait look={heroLook(life)} scale={4} />
         <Portrait look={c.dimaLook()} scale={4} />
       </div>
       <Hearts n={life.hearts.dima} />
@@ -736,7 +737,7 @@ function DimaPanel({ c, life }: { c: GameController; life: LifeState }) {
   return (
     <Sheet title="Діма" sub={along ? 'Ходить із тобою' : 'Чекає вдома'} onClose={() => c.closePanel()}>
       <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-        <Portrait look={lenaLook(life)} scale={4} />
+        <Portrait look={heroLook(life)} scale={4} />
         <Portrait look={c.dimaLook()} scale={4} />
       </div>
       <Hearts n={life.hearts.dima} />

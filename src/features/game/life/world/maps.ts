@@ -6,13 +6,15 @@
 //   Вінниця — вокзал, ВДПУ, фонтан над Бугом, кав'ярня, офіс;
 //   Київ — Хрещатик із каштанами, Лавра, студія дизайну, трамвай;
 //   Львів — бруківка, ратуша, шоколадна майстерня, пекарня;
-//   Одеса — вокзал, місто й пляж Отрада з Жовтим каменем.
+//   Одеса — вокзал, місто й пляж Отрада з Жовтим каменем;
+//   Вишневе — місто Діми (`vyshneve.ts`).
 // ============================================================
 import { cellarMap } from './cellar';
 import { summerKitchenMap } from './kitchen';
 import type { CityId } from '../sim/content';
 import { MapBuilder } from './build';
 import type { GameMap } from './types';
+import { vyshnevePlan } from './vyshneve';
 import { yardMap } from './yard';
 
 const homeZone = { type: 'home' } as const;
@@ -314,7 +316,7 @@ function odesa(): GameMap {
   return m.build();
 }
 
-const BUILDERS: Record<CityId, () => GameMap> = { zhylyntsi, pravdivka, khmelnytskyi, vinnytsia, kyiv, lviv, odesa };
+const BUILDERS: Record<CityId, () => GameMap> = { zhylyntsi, pravdivka, khmelnytskyi, vinnytsia, kyiv, lviv, odesa, vyshneve: vyshnevePlan };
 const built = new Map<CityId, GameMap>();
 
 export function cityMap(city: CityId): GameMap {

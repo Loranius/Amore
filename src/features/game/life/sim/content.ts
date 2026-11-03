@@ -7,7 +7,7 @@
 // Київ і Львів. Ціни — гривні, як у житті, але м'якші.
 // ============================================================
 
-export type CityId = 'zhylyntsi' | 'pravdivka' | 'khmelnytskyi' | 'vinnytsia' | 'kyiv' | 'lviv' | 'odesa';
+export type CityId = 'zhylyntsi' | 'pravdivka' | 'khmelnytskyi' | 'vinnytsia' | 'kyiv' | 'lviv' | 'odesa' | 'vyshneve';
 
 export interface City {
   id: CityId;
@@ -24,6 +24,8 @@ export interface City {
    */
   local?: [number, number];
   blurb: string;
+  /** Місто лише одного героя: квитків туди нема (Вишневе — історія Діми). */
+  only?: 'dima';
 }
 
 export const CITIES: Record<CityId, City> = {
@@ -34,9 +36,13 @@ export const CITIES: Record<CityId, City> = {
   kyiv: { id: 'kyiv', name: 'Київ', toName: 'до Києва', kind: 'city', pos: [0.47, 0.25], blurb: 'Столиця: Хрещатик, Лавра, кар\'єра й метро.' },
   lviv: { id: 'lviv', name: 'Львів', toName: 'до Львова', kind: 'city', pos: [0.115, 0.32], blurb: 'Бруківка, ратуша, кава й шоколад.' },
   odesa: { id: 'odesa', name: 'Одеса', toName: 'до Одеси', kind: 'city', pos: [0.485, 0.74], blurb: 'Море, Отрада, Жовтий камінь.' },
+  vyshneve: { id: 'vyshneve', name: 'Вишневе', toName: 'до Вишневого', kind: 'city', pos: [0.46, 0.27], blurb: 'Місто під Києвом: п\'ятиповерхівки, стадіон, садочок «Чебурашка».', only: 'dima' },
 };
 
 export const CITY_IDS = Object.keys(CITIES) as CityId[];
+
+/** Куди можна купити квиток: без міст лише одного героя. */
+export const TRAVEL_CITY_IDS = CITY_IDS.filter((id) => !CITIES[id].only);
 
 /** Міста детальної мапи Поділля. */
 export const REGION_CITY_IDS = CITY_IDS.filter((id) => CITIES[id].local);
@@ -113,6 +119,8 @@ export const CITY_SHOPS: Record<CityId, readonly ShopId[]> = {
   kyiv: ['grocery', 'clothes', 'home', 'tech', 'books', 'souvenirs', 'cafe'],
   lviv: ['grocery', 'clothes', 'books', 'souvenirs', 'cafe'],
   odesa: ['grocery', 'clothes', 'souvenirs', 'flowers', 'cafe'],
+  // Вишневе: магазин продуктів на вулиці біля дому Діми.
+  vyshneve: ['grocery'],
 };
 
 export type ItemKind = 'food' | 'outfit' | 'decor' | 'book' | 'gift' | 'gadget' | 'souvenir';

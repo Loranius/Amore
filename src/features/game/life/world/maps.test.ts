@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
+import { CITIES, CITY_SHOPS, JOBS, SIGHTS } from '../sim/content';
 import { BIRD_RANGE_X, BIRD_RANGE_Y } from '../sim/birds';
 import { ROOM_FLOOR } from '../sim/economy';
 import { newLife } from '../sim/life';
@@ -11,6 +11,7 @@ import { cellarMap } from './cellar';
 import { MOM_SPOTS, YARD, YARD_BIRDS } from './yard';
 import { summerKitchenMap } from './kitchen';
 import { ALL_CITY_IDS, cityMap, homeYard } from './maps';
+import { DIMA_DOOR } from './vyshneve';
 import { TILE, buildingParts, type GameMap } from './types';
 
 // ============================================================
@@ -48,7 +49,9 @@ describe('міста', () => {
       expect(cityMap(sight.city).zones.some((z) => (z.action.type === 'sight' && z.action.sight === sight.id) || (sight.id === 'yellowStone' && z.action.type === 'stone')), sight.id).toBe(true);
     }
     for (const city of ALL_CITY_IDS) {
-      expect(cityMap(city).zones.some((z) => z.action.type === 'station' || z.action.type === 'walk'), city).toBe(true);
+      const road = cityMap(city).zones.some((z) => z.action.type === 'station' || z.action.type === 'walk');
+      // Вишневе — лише історія Діми (малого): квитків звідти й туди нема.
+      expect(road, city).toBe(!CITIES[city].only);
     }
   });
 
@@ -567,5 +570,25 @@ describe('садиба Лєни в Жилинцях (власник, 2026-10-06,
     expect(yard.zones.find((z) => z.id === 'cellar')!.action.type).toBe('cellar');
     assertReachable(yard);
     expect(yard.spawns.cellar).toBeDefined();
+  });
+});
+
+// Історія Діми (власник 2026-11-03): квартира на п'ятому поверсі з родиною,
+// що вдома за розкладом, і під'їзд у Вишневому, що веде саме туди.
+describe('Квартира Діми', () => {
+  it.each([[0, 10 * 60], [0, 23 * 60], [5, 10 * 60], [5, 19 * 60]])('день %i, хвилина %i: кожна зона й точка появи досяжні', (dow, minute) => {
+    const s = { ...newLife(3, 'dima'), story: null, day: 3 * 7 + dow, minute };
+    const flat = homeInterior(s);
+    expect(flat.id.startsWith('home:dima-flat')).toBe(true);
+    assertReachable(flat);
+  });
+
+  it('у Вишневому «додому» — лише під\'їзд Діми, і він веде у квартиру', () => {
+    const v = cityMap('vyshneve');
+    const home = v.zones.filter((z) => z.action.type === 'home');
+    expect(home).toHaveLength(1);
+    expect([home[0]!.x, home[0]!.y]).toEqual([DIMA_DOOR.x, DIMA_DOOR.y]);
+    expect(homeInterior(newLife(3, 'dima')).id.startsWith('home:dima-flat')).toBe(true);
+    expect(homeInterior(newLife(3, 'sadok')).id.startsWith('home:dima-flat')).toBe(false);
   });
 });

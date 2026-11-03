@@ -105,8 +105,13 @@ export function parseSave(text: string): LifeState {
     if (typeof id !== 'string' || ITEM_BY_ID.get(id)?.decor !== slot) fail(`decor.${slot}`);
     decorOut[slot as keyof LifeState['decor']] = id;
   }
+  // Герой і сюжетні сторінки — з історією Діми (2026-11-03); старі сейви — Лєнині.
+  const hero = raw.hero === undefined ? 'lena' : raw.hero === 'lena' || raw.hero === 'dima' ? raw.hero : fail('hero');
+  const story = raw.story === undefined || raw.story === null ? null : raw.story === 'intro' || raw.story === 'divorce' ? raw.story : fail('story');
   return {
     version: SAVE_VERSION,
+    hero,
+    story,
     seed: num(raw.seed, 'seed', 0, 2 ** 32),
     day: num(raw.day, 'day', 0, 100000),
     minute: num(raw.minute, 'minute', 0, 26 * 60),

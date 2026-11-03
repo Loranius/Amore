@@ -4,7 +4,17 @@
 // ============================================================
 import { itemById } from './sim/content';
 import { today, type LifeState } from './sim/life';
-import { LENA_ADULT, LENA_KID, LENA_TEEN, type Look } from './render/people';
+import { DIMA_KID, LENA_ADULT, LENA_KID, LENA_TEEN, type Look } from './render/people';
+
+/** Як виглядає той, за кого грають: Лєна (`lenaLook`) чи малий Діма (його історія поки до 3 класу). */
+export function heroLook(state: LifeState): Look {
+  return state.hero === 'dima' ? DIMA_KID : lenaLook(state);
+}
+
+/** Ім'я героя в називному й давальному відмінку та дієслово минулого часу за родом. */
+export function heroWords(state: LifeState): { name: string; dative: string; fell: string } {
+  return state.hero === 'dima' ? { name: 'Діма', dative: 'Дімі', fell: 'заснув' } : { name: 'Лєна', dative: 'Лєні', fell: 'заснула' };
+}
 
 /** До 6 класу Лєна — дитина (менший спрайт). */
 export const KID_UNTIL_WEEK = 6;

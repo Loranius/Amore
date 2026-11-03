@@ -6,9 +6,9 @@
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { freshSeed } from '@/lib/entropy';
 import { SEASON_NAME, clockLabel, dayInfo } from '../sim/calendar';
-import { CHAPTER_WEEK, type Chapter } from '../sim/life';
+import { CHAPTER_WEEK, today, type Chapter } from '../sim/life';
 import { GameController, type Speaker } from '../controller';
-import { lenaLook } from '../look';
+import { heroLook } from '../look';
 import { DIMA, MOM, OLYA, type Look } from '../render/people';
 import type { Zone } from '../world/types';
 import { Panels } from './panels';
@@ -53,9 +53,11 @@ export function LifeGame() {
 
 // ------------------------------------------------------------
 function Title({ c }: { c: GameController }) {
-  const [choose, setChoose] = useState(false);
+  // Нове життя: спершу за кого грати (власник 2026-11-03: «щоб в головному
+  // меню можна було вибрати персонажа»), для Лєни — ще й з якого розділу.
+  const [choose, setChoose] = useState<'hero' | 'lena' | null>(null);
   const saved = c.saved.state;
-  const savedInfo = saved ? dayInfo(saved.day) : null;
+  const savedInfo = saved ? today(saved) : null;
   const chapters: [Chapter, string][] = [['sadok', 'Садочок'], ['school', 'Школа'], ['uni', 'ВДПУ'], ['adult', 'Доросле життя']];
   const begin = (chapter: Chapter) => {
     if (saved && !window.confirm('Почати нове життя? Збережене буде замінене.')) return;
@@ -73,10 +75,28 @@ function Title({ c }: { c: GameController }) {
               </button>
             )}
             {c.saved.problem && <p className="lg-note" style={{ color: '#b8323a' }}>{c.saved.problem}</p>}
-            <button type="button" className="lg-btn" onClick={() => setChoose(true)}>Нове життя</button>
+            <button type="button" className="lg-btn" onClick={() => setChoose('hero')}>Нове життя</button>
           </>
         )}
-        {choose && (
+        {choose === 'hero' && (
+          <>
+            <p className="lg-note">За кого грати?</p>
+            <div className="lg-chapters">
+              <button type="button" className="lg-btn is-paper" onClick={() => setChoose('lena')}>
+                Лєна
+                <br />
+                <small style={{ fontWeight: 800 }}>Жилинці, 2002</small>
+              </button>
+              <button type="button" className="lg-btn is-paper" onClick={() => begin('dima')}>
+                Діма
+                <br />
+                <small style={{ fontWeight: 800 }}>Вишневе, 2003</small>
+              </button>
+            </div>
+            <button type="button" className="lg-btn is-small is-paper" onClick={() => setChoose(null)}>Назад</button>
+          </>
+        )}
+        {choose === 'lena' && (
           <>
             <p className="lg-note">З чого почати? Кожен розділ — з прожитим минулим.</p>
             <div className="lg-chapters">
@@ -88,7 +108,7 @@ function Title({ c }: { c: GameController }) {
                 </button>
               ))}
             </div>
-            <button type="button" className="lg-btn is-small is-paper" onClick={() => setChoose(false)}>Назад</button>
+            <button type="button" className="lg-btn is-small is-paper" onClick={() => setChoose('hero')}>Назад</button>
           </>
         )}
         <p className="lg-foot">для Лєни · з любов'ю, Діма</p>
@@ -110,7 +130,7 @@ function Meter({ icon, value, color, label }: { icon: 'bolt' | 'smile'; value: n
 function Hud({ c }: { c: GameController }) {
   const { ui } = c;
   const life = c.life!;
-  const info = dayInfo(life.day);
+  const info = today(life);
   const night = life.minute >= 20 * 60 || life.minute < 6 * 60;
   const near = ui.near;
   const blocked = !!ui.panel || !!ui.dialog || !!ui.card || ui.ask;
@@ -148,10 +168,10 @@ function Hud({ c }: { c: GameController }) {
 // ------------------------------------------------------------
 function speakerLook(c: GameController, who: Speaker): Look | null {
   const life = c.life;
-  if (who === 'l') return life ? lenaLook(life) : null;
+  if (who === 'l') return life ? heroLook(life) : null;
   if (who === 'd') return DIMA;
   if (who === 'm') return MOM;
-  if (who === 'o') return { ...OLYA, kid: life ? dayInfo(life.day).week <= 6 : true };
+  if (who === 'o') return { ...OLYA, kid: life ? today(life).week <= 6 : true };
   return null;
 }
 
