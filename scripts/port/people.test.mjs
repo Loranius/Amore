@@ -16,15 +16,16 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { decodePng } from '../live/luminance.mjs';
-import { FALL_DOWN_FRAMES, FALL_UP_FRAMES, FOLK, PORT_CELL, POSE_NAMES } from '../../src/features/game/life/render/peopleHd.ts';
+import { FALL_DOWN_FRAMES, FALL_UP_FRAMES, FOLK, PORT_CELL, PORT_SCALE, POSE_NAMES } from '../../src/features/game/life/render/peopleHd.ts';
 
 const DIR = 'src/features/game/life/render/assets/hd';
 const PORT = JSON.parse(readFileSync(`${DIR}/port.json`, 'utf8'));
 const CELL = PORT_CELL;
 const COLS = 9;
-const FOOT_X = 27.5;
-const FOOT_Y = 52;
-const HEAD_ROWS = 13;
+const K = PORT_SCALE;
+const FOOT_X = 27.5 * K;
+const FOOT_Y = 52 * K;
+const HEAD_ROWS = 13 * K;
 const LENA = ['lena-kid', 'lena-teen', 'lena-adult'];
 const MAIN = [...LENA, 'mom', 'dima', 'olya-kid', 'olya-teen', 'dima-kid', 'vlad-kid', 'dima-mom', 'dima-dad'];
 
@@ -70,8 +71,8 @@ describe('Аркуші людей порту', () => {
         // чи нижче, стоячи — рівно на лінії.
         if (col === 0) expect(b.y1 + 1, `${name} ${row}: стопи`).toBe(FOOT_Y);
         else {
-          expect(b.y1 + 1, `${name} ${row}/${col}: стопи`).toBeGreaterThanOrEqual(FOOT_Y - 2);
-          expect(b.y1 + 1, `${name} ${row}/${col}: стопи`).toBeLessThanOrEqual(FOOT_Y + 1);
+          expect(b.y1 + 1, `${name} ${row}/${col}: стопи`).toBeGreaterThanOrEqual(FOOT_Y - 2 * K);
+          expect(b.y1 + 1, `${name} ${row}/${col}: стопи`).toBeLessThanOrEqual(FOOT_Y + K);
         }
       }
     }
@@ -79,7 +80,24 @@ describe('Аркуші людей порту', () => {
 
   it.each(Object.keys(FOLK))('folk/%s: зріст як у таблиці', (name) => {
     const b = boxOf(load(`folk/${name}`), 0);
-    expect(b.y1 + 1 - b.y0).toBe(FOLK[name].height);
+    expect(b.y1 + 1 - b.y0).toBe(FOLK[name].height * K);
+  });
+});
+
+describe('Піксель порту', () => {
+  it.each([...MAIN, ...Object.keys(FOLK).map((n) => `folk/${n}`), ...LENA.flatMap((n) => [`${n}-mask`, `${n}-fall`, `${n}-fall-mask`, `${n}-poses`, `${n}-poses-mask`])])('%s: кожен піксель порту — однорідний квадрат K×K', (name) => {
+    const img = load(name);
+    for (let y = 0; y < img.height; y += K) {
+      for (let x = 0; x < img.width; x += K) {
+        const p = (y * img.width + x) * 4;
+        for (let dy = 0; dy < K; dy += 1) {
+          for (let dx = 0; dx < K; dx += 1) {
+            const q = ((y + dy) * img.width + x + dx) * 4;
+            for (let c = 0; c < 4; c += 1) if (img.data[p + c] !== img.data[q + c]) throw new Error(`${name}: квадрат у (${x}, ${y}) не однорідний`);
+          }
+        }
+      }
+    }
   });
 });
 
@@ -104,8 +122,8 @@ describe('Маска одягу Лєни', () => {
           }
         }
         // Зі спини (рядок 3) малої верх майже весь під кучерями — там хоч піксель.
-        expect(top, `${name} ${row}/${col}: верх`).toBeGreaterThan(row === 3 ? 0 : 5);
-        expect(bottom, `${name} ${row}/${col}: низ`).toBeGreaterThan(4);
+        expect(top, `${name} ${row}/${col}: верх`).toBeGreaterThan(row === 3 ? 0 : 5 * K * K);
+        expect(bottom, `${name} ${row}/${col}: низ`).toBeGreaterThan(4 * K * K);
       }
     }
   });
@@ -143,7 +161,7 @@ describe('Пози Лєни й долоні', () => {
   it.each(LENA)('%s: у кожній позі в точці долоні — шкіра, обличчям до нас — теж', (name) => {
     const strip = load(`${name}-poses`);
     expect([strip.width, strip.height]).toEqual([CELL * POSE_NAMES.length, CELL]);
-    const near = (img, cx, cy, col, row, reach = 2) => {
+    const near = (img, cx, cy, col, row, reach = 2 * K) => {
       for (let dy = -reach; dy <= reach; dy += 1) {
         for (let dx = -2; dx <= 2; dx += 1) {
           const x = Math.round(cx + dx), y = Math.round(cy + dy);
@@ -161,7 +179,7 @@ describe('Пози Лєни й долоні', () => {
     const front = PORT[name].front;
     const sheet = load(name);
     // Висота — середня для обох рук (руки висять не завжди на одній), тож допуск ширший.
-    expect(near(sheet, FOOT_X + front.l, FOOT_Y - 1 - front.up, 0, 0, 3), `${name}: ліва долоня`).toBe(true);
-    expect(near(sheet, FOOT_X + front.r, FOOT_Y - 1 - front.up, 0, 0, 3), `${name}: права долоня`).toBe(true);
+    expect(near(sheet, FOOT_X + front.l, FOOT_Y - 1 - front.up, 0, 0, 3 * K), `${name}: ліва долоня`).toBe(true);
+    expect(near(sheet, FOOT_X + front.r, FOOT_Y - 1 - front.up, 0, 0, 3 * K), `${name}: права долоня`).toBe(true);
   });
 });

@@ -3,7 +3,10 @@
 Люди порту — аркуші 56×56: 9 стовпців (стоїть і 8 кадрів ходи), рядки
 південь, північ, захід, схід; вбрання й зачіска — окремі шари. Тут шари
 зводяться в один аркуш у порядку рядків гри (униз, ліворуч, праворуч,
-угору). Піксель порту — піксель малюнка (пів світового), як у решти світу.
+угору). Піксель порту — `SCALE`×`SCALE` пікселів малюнка: власник
+2026-11-03 спершу попросив людей менших («завеликі для декорацій»), а
+побачивши піксель у піксель — «вдвічі збільш, вони тепер дуже дрібні».
+Усе рахується в пікселях порту, а пишеться збільшеним, точки долонь теж.
 
 Для Лєни ще:
 - маска одягу (`-mask.png`: червоний — верх, зелений — низ) з шару вбрання,
@@ -26,6 +29,8 @@ from PIL import Image
 
 HD = Path(__file__).resolve().parents[2] / 'src/features/game/life/render/assets/hd'
 CELL = 56
+# Піксель порту — стільки пікселів малюнка (див. вище); Бася й кури PixelLab намальовані під цей зріст.
+SCALE = 2
 COLS = 9
 FLOOR = 51
 FOOT_X = 27.5
@@ -331,8 +336,8 @@ def lena_extras(name, sheet, mask):
     """Падіння, пози й точки долонь з кадру «праворуч» (рядок 2 гри)."""
     east, east_mask = cell_of(sheet, 0, 2), cell_of(mask, 0, 2)
     fall, fall_mask = fall_strip(east, east_mask)
-    fall.save(HD / f'{name}-fall.png', optimize=True)
-    fall_mask.save(HD / f'{name}-fall-mask.png', optimize=True)
+    out(fall, HD / f'{name}-fall.png')
+    out(fall_mask, HD / f'{name}-fall-mask.png')
     # Рука найдалі позаду — у кадрі ходи з найменшим x долоні.
     donor_col = min(range(1, COLS), key=lambda c: skin_hand(cell_of(sheet, c, 2))[0])
     donor, donor_mask = cell_of(sheet, donor_col, 2), cell_of(mask, donor_col, 2)
@@ -347,8 +352,8 @@ def lena_extras(name, sheet, mask):
         poses.append((f, m))
         hands[pose_name] = hand
     img, img_mask = strip(poses)
-    img.save(HD / f'{name}-poses.png', optimize=True)
-    img_mask.save(HD / f'{name}-poses-mask.png', optimize=True)
+    out(img, HD / f'{name}-poses.png')
+    out(img_mask, HD / f'{name}-poses-mask.png')
     return {'hands': hands, 'front': front_hands(cell_of(sheet, 0, 0))}
 
 
@@ -358,6 +363,18 @@ def shifted(img, dy):
     return out
 
 
+def out(img, path):
+    """Записати збільшеним: кожен піксель порту — квадрат `SCALE`×`SCALE`."""
+    img.resize((img.width * SCALE, img.height * SCALE), Image.NEAREST).save(path, optimize=True)
+
+
+def scaled(meta):
+    """Точки долонь — у пікселях малюнка, як аркуш."""
+    if isinstance(meta, dict):
+        return {k: scaled(v) for k, v in meta.items()}
+    return round(meta * SCALE, 1)
+
+
 def main(root):
     src = Path(root) / 'assets' / 'people56'
     (HD / 'folk').mkdir(parents=True, exist_ok=True)
@@ -365,16 +382,16 @@ def main(root):
     for name, layers in PEOPLE.items():
         sheet, outfit, hair = layered(src, layers)
         sheet = reorder(sheet)
-        sheet.save(HD / f'{name}.png', optimize=True)
+        out(sheet, HD / f'{name}.png')
         if name in LENA:
             mask = reorder(garment_mask(name, outfit, hair))
-            mask.save(HD / f'{name}-mask.png', optimize=True)
+            out(mask, HD / f'{name}-mask.png')
             meta[name] = lena_extras(name, sheet, mask)
         print(name)
     for name, (layers, tint) in FOLK.items():
-        reorder(layered(src, layers, tint)[0]).save(HD / 'folk' / f'{name}.png', optimize=True)
+        out(reorder(layered(src, layers, tint)[0]), HD / 'folk' / f'{name}.png')
         print(name)
-    (HD / 'port.json').write_text(json.dumps(meta, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    (HD / 'port.json').write_text(json.dumps(scaled(meta), ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 
 if __name__ == '__main__':

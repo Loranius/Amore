@@ -2,9 +2,10 @@
 // Люди гри (ADR-0239). Усі — аркуші Godot-порту «Дєвочки в городі»
 // (власник 2026-11-03: «адаптувати в новому стилі Лєну, маму, Діму й Олю»),
 // їх збирає `scripts/port/import_game1.py`: рядки — напрям (вниз, ліворуч,
-// праворуч, угору), стовпці — стоїть і 8 кадрів ходи. Піксель аркуша —
-// піксель малюнка, тобто пів світового, як у будинків і декору: дорослий —
-// 37 пікселів малюнка при клітинці мапи 32, трохи вищий за клітинку.
+// праворуч, угору), стовпці — стоїть і 8 кадрів ходи. Піксель порту —
+// 2×2 пікселі малюнка, тобто світовий піксель (власник 2026-11-03: «вдвічі
+// збільш людей, вони тепер дуже дрібні»): дорослий — 74 пікселі малюнка,
+// трохи більше за дві клітинки мапи; Бася й кури PixelLab — під цей зріст.
 //
 // Поки аркуш вантажиться, людини ще не видно (`hasHdLook` тоді каже «ні»);
 // 16-піксельних людей у грі нема (власник 2026-10-31).
@@ -39,9 +40,11 @@ import PORT from './assets/hd/port.json';
 import { maskReference, recolorByMask, type OutfitColors } from './outfitHd';
 import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, type Dir, type HairStyle, type Look } from './people';
 
-/** Клітинка аркуша порту, точка між стопами в ній, кадри ходи й їхня частота (як у порту). */
-export const PORT_CELL = 56;
-const PORT_FOOT = { footX: 27.5, footY: 52 } as const;
+/** Скільки пікселів малюнка на піксель порту (`scripts/port/import_game1.py`, `SCALE`). */
+export const PORT_SCALE = 2;
+/** Клітинка аркуша порту, точка між стопами в ній (пікселі малюнка), кадри ходи й їхня частота (як у порту). */
+export const PORT_CELL = 56 * PORT_SCALE;
+const PORT_FOOT = { footX: 27.5 * PORT_SCALE, footY: 52 * PORT_SCALE } as const;
 const PORT_WALK = { frames: 8, fps: 11 } as const;
 
 interface HdSheet {
@@ -116,9 +119,9 @@ export const POSE_FRAME: Readonly<Record<PoseName, number>> = { chest: 0, low: 1
 export const FALL_DOWN_FRAMES = 7;
 export const FALL_UP_FRAMES = 5;
 
-/** Аркуш порту з точкою опори й ходою порту. */
+/** Аркуш порту з точкою опори й ходою порту; `height` — зріст у пікселях порту. */
 function port(url: string, height: number, match: (l: Look) => boolean): HdSheet {
-  return { url, cell: PORT_CELL, ...PORT_FOOT, ...PORT_WALK, height, match };
+  return { url, cell: PORT_CELL, ...PORT_FOOT, ...PORT_WALK, height: height * PORT_SCALE, match };
 }
 
 /** Лєна: аркуш, маска одягу, падіння й пози з точками долонь (`port.json`). */
@@ -196,7 +199,7 @@ export function isLenaAdult(l: Look): boolean {
 // за хешем кольорів, тож та сама людина завжди та сама.
 const FOLK_URLS = import.meta.glob<string>('./assets/hd/folk/*.png', { eager: true, query: '?url', import: 'default' });
 type FolkKind = 'man' | 'woman' | 'boy' | 'girl';
-/** Аркуш мешканця: хто, яка зачіска й зріст із зачіскою в пікселях малюнка (кадр «стоїть, униз»). Підлітки — серед дорослих. */
+/** Аркуш мешканця: хто, яка зачіска й зріст із зачіскою в пікселях порту (кадр «стоїть, униз»). Підлітки — серед дорослих. */
 export const FOLK: Readonly<Record<string, { kind: FolkKind; hair: HairStyle; height: number }>> = {
   'man-blue': { kind: 'man', hair: 'short', height: 38 },
   'man-brown': { kind: 'man', hair: 'short', height: 38 },
