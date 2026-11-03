@@ -8,8 +8,8 @@
 // ============================================================
 import type { Rng } from '../sim/rng';
 import { drawBitmap, ICONS } from '../render/icons';
-import { sheetFor, type Dir, type Look } from '../render/people';
-import { drawPersonHdFrame, hasHdLook, hasHdSheet } from '../render/peopleHd';
+import { type Dir, type Look } from '../render/people';
+import { drawPersonHdFrame, hasHdLook, hdWalkCol } from '../render/peopleHd';
 import { disc, ellipse, rect, setDensity, shade, type Ctx } from '../render/pixel';
 
 /**
@@ -150,22 +150,16 @@ export class Kit {
    * спрайти, доки для них нема аркушів (етап 2).
    */
   person(look: Look, x: number, y: number, scale = 2, dir: Dir = 0, frame = 0): void {
-    const hd = hasHdSheet(look);
-    if (hd && !hasHdLook(look)) return;
+    if (!hasHdLook(look)) return;
     ellipse(this.g, x, y, (look.kid ? 4 : 5) * scale, 2 * scale, 'rgba(28,20,40,0.25)');
-    if (hd) {
-      const g = this.g;
-      const a = hdArtScale(this.s, scale);
-      g.save();
-      g.translate(Math.round(x * this.s) / this.s, Math.round(y * this.s) / this.s);
-      // Аркуш малюється у світових пікселях — два пікселі малюнка.
-      g.scale(2 * a, 2 * a);
-      drawPersonHdFrame(g, look, 0, 0, dir, frame);
-      g.restore();
-      return;
-    }
-    const img = sheetFor(look)[dir]![frame]!;
-    this.g.drawImage(img, Math.round(x - (img.width * scale) / 2), Math.round(y - img.height * scale + 2 * scale), img.width * scale, img.height * scale);
+    const g = this.g;
+    const a = hdArtScale(this.s, scale);
+    g.save();
+    g.translate(Math.round(x * this.s) / this.s, Math.round(y * this.s) / this.s);
+    // Аркуш малюється у світових пікселях — два пікселі малюнка.
+    g.scale(2 * a, 2 * a);
+    drawPersonHdFrame(g, look, 0, 0, dir, hdWalkCol(look, frame));
+    g.restore();
   }
 
   /** Текст у пікселях екрана, але координати — віртуальні. */

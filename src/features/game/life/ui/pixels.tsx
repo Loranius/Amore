@@ -3,8 +3,8 @@
 // ============================================================
 import { useEffect, useRef, useState } from 'react';
 import { ICONS, bitmapSize, iconUrl } from '../render/icons';
-import { sheetFor, type Look } from '../render/people';
-import { hasHdLook, hasHdSheet, hdPortrait, hdReady } from '../render/peopleHd';
+import { type Look } from '../render/people';
+import { hasHdLook, hdPortrait, hdReady } from '../render/peopleHd';
 
 export function PixelIcon({ name, size = 2, label }: { name: keyof typeof ICONS; size?: number; label?: string }) {
   const [w, h] = bitmapSize(name);
@@ -22,10 +22,9 @@ export function PixelIcon({ name, size = 2, label }: { name: keyof typeof ICONS;
  */
 export function Portrait({ look, scale = 4, crop = true }: { look: Look; scale?: number; crop?: boolean }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const hd = hasHdSheet(look);
-  const ready = useHdReady(look, hd);
-  const pic = hd ? (ready ? hdPortrait(look, crop) : null) : pixelPortrait(look, crop);
-  const k = hd ? Math.max(1, Math.round(scale / 2)) : scale;
+  const ready = useHdReady(look);
+  const pic = ready ? hdPortrait(look, crop) : null;
+  const k = Math.max(1, Math.round(scale / 2));
   useEffect(() => {
     const c = ref.current;
     if (!c || !pic) return;
@@ -38,23 +37,17 @@ export function Portrait({ look, scale = 4, crop = true }: { look: Look; scale?:
   return <canvas ref={ref} width={pic.w * k} height={pic.h * k} style={{ imageRendering: 'pixelated' }} aria-hidden />;
 }
 
-/** 16-піксельний портрет: перший кадр «униз», голова й плечі — верхні рядки спрайта. */
-function pixelPortrait(look: Look, crop: boolean): { src: CanvasImageSource; x: number; y: number; w: number; h: number } {
-  const img = sheetFor(look)[0]![0]!;
-  return { src: img, x: 0, y: 0, w: img.width, h: crop ? Math.min(img.height, look.kid ? 17 : 21) : img.height };
-}
-
 /** Чи готовий аркуш PixelLab цієї людини; коли довантажиться — перемалювати. */
-function useHdReady(look: Look, hd: boolean): boolean {
+function useHdReady(look: Look): boolean {
   const key = JSON.stringify(look);
-  const ready = hd && hasHdLook(look);
+  const ready = hasHdLook(look);
   const [, loaded] = useState(0);
   useEffect(() => {
-    if (!hd || ready) return;
+    if (ready) return;
     let live = true;
     void hdReady(look).then((ok) => { if (live && ok) loaded((n) => n + 1); });
     return () => { live = false; };
     // `look` — свіжий об'єкт щоразу; той самий вигляд — той самий `key`.
-  }, [key, hd, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [key, ready]); // eslint-disable-line react-hooks/exhaustive-deps
   return ready;
 }

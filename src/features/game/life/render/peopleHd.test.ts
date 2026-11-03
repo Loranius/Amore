@@ -5,14 +5,14 @@ import { ITEMS } from '../sim/content';
 import { newLife } from '../sim/life';
 import { rngFor } from '../sim/rng';
 import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, townsfolkLook } from './people';
-import { hasHdSheet, hdCell, isLenaAdult, isLenaTeen, outfitColors } from './peopleHd';
+import { FOLK, folkSheetName, hasHdSheet, hdCell, isLenaAdult, isLenaTeen, outfitColors } from './peopleHd';
 import { RESIDENT_LOOKS } from './residents';
 
 // Власник 2026-10-31: «повністю відмовляємось від 16×16». Лєна (будь-якого
 // тижня, у будь-якому вбранні з шафи), мама, Діма й Оля («Починай з Олі»)
 // малюються лише аркушами PixelLab — на мапі (`scene.ts`), у міні-іграх
-// (`Kit.person`) і в портретах (`Portrait`). 16-піксельні спрайти лишаються
-// мешканцям і перехожим, доки для них нема аркушів (етап 2).
+// (`Kit.person`) і в портретах (`Portrait`). Мешканці й перехожі (етап 2,
+// власник 2026-11-03: «Публікуй персонажів в гру») — людьми Godot-порту.
 describe('Хто малюється аркушем PixelLab', () => {
   it('Лєна будь-якого тижня в будь-якому вбранні, мама й Діма', () => {
     const outfits = [null, ...ITEMS.filter((i) => i.outfit).map((i) => i.id)];
@@ -42,21 +42,45 @@ describe('Хто малюється аркушем PixelLab', () => {
     }
   });
 
-  it('мешканці — ще 16-піксельні (етап 2)', () => {
-    for (const look of Object.values(RESIDENT_LOOKS)) expect(hasHdSheet(look), JSON.stringify(look)).toBe(false);
+  it('мешканці — людьми порту, сиві — бабусею й сивим чоловіком', () => {
+    for (const look of Object.values(RESIDENT_LOOKS)) {
+      expect(hasHdSheet(look), JSON.stringify(look)).toBe(true);
+      expect(folkSheetName(look), JSON.stringify(look)).not.toBeNull();
+    }
+    expect(folkSheetName(RESIDENT_LOOKS.hanna!)).toBe('woman-granny');
+  });
+
+  it('аркуш перехожого — за виглядом: діти дитячим, чоловіки чоловічим, та сама зачіска, сиві — сивими, той самий щоразу', () => {
+    const kinds = new Set<string>();
+    for (let k = 0; k < 2000; k += 1) {
+      const look = townsfolkLook(rngFor(3, 'перехожі в тесті', k));
+      const name = folkSheetName(look)!;
+      expect(folkSheetName({ ...look })).toBe(name);
+      const male = look.hairStyle === 'short' || look.hairStyle === 'spiky';
+      expect(FOLK[name]!.kind, JSON.stringify(look)).toBe(look.kid ? (male ? 'boy' : 'girl') : male ? 'man' : 'woman');
+      const grey = !look.kid && (look.hair === '#8a8a8a' || look.hair === '#c8c4bc');
+      if (grey) expect(name).toBe(male ? 'man-grey' : 'woman-granny');
+      else expect(['man-grey', 'woman-granny']).not.toContain(name);
+      const kind = FOLK[name]!.kind;
+      const hairs = Object.entries(FOLK).filter(([n, f]) => f.kind === kind && n !== 'man-grey' && n !== 'woman-granny').map(([, f]) => f.hair);
+      if (!grey && hairs.includes(look.hairStyle)) expect(FOLK[name]!.hair, JSON.stringify(look)).toBe(look.hairStyle);
+      kinds.add(name);
+    }
+    // Кожен аркуш хтось та й носить.
+    expect([...kinds].sort()).toEqual(Object.keys(FOLK).sort());
   });
 
   // Регресія: перехожий з Лєниним волоссям, хвостом, шкірою й очима (з кості
   // — раз на ~1600) малювався аркушем Лєни-підлітка, тобто другою Лєною.
   // Перевіряємо й так, як перехожих беруть міні-ігри: суперник у забігу й
   // друзі на майданчику — той самий вигляд з іншим `kid`.
-  it('жоден перехожий не малюється аркушем Лєни, мами чи Діми', () => {
+  it('жоден перехожий не малюється аркушем Лєни, мами, Діми чи Олі', () => {
     let doubles = 0;
     for (let seed = 1; seed <= 40; seed += 1) {
       for (let k = 0; k < 400; k += 1) {
         const look = townsfolkLook(rngFor(seed, 'перехожі в тесті', k));
         if (look.hair === LENA_TEEN.hair && look.skin === LENA_TEEN.skin && look.eyes === LENA_TEEN.eyes) doubles += 1;
-        for (const l of [look, { ...look, kid: true }, { ...look, kid: false }]) expect(hasHdSheet(l), `${seed}/${k}: ${JSON.stringify(l)}`).toBe(false);
+        for (const l of [look, { ...look, kid: true }, { ...look, kid: false }]) expect(folkSheetName(l), `${seed}/${k}: ${JSON.stringify(l)}`).not.toBeNull();
       }
     }
     // Схожі волоссям, шкірою й очима трапляються — відрізняє їх зачіска.

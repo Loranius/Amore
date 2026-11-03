@@ -16,11 +16,11 @@
 // - перевдягання (`outfitHd.ts`) мусить знайти одяг у КОЖНОМУ кадрі —
 //   збоку й зі спини теж — і не зачепити голову чи взуття.
 // ============================================================
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { decodePng } from '../live/luminance.mjs';
 import { recolorOutfit } from '../../src/features/game/life/render/outfitHd.ts';
-import { ADULT_DRESS, KID_DRESS, PORTRAIT_CROP, TEEN_CLOTHES, silhouette } from '../../src/features/game/life/render/peopleHd.ts';
+import { ADULT_DRESS, FOLK, KID_DRESS, PORTRAIT_CROP, TEEN_CLOTHES, silhouette } from '../../src/features/game/life/render/peopleHd.ts';
 
 const DIR = 'src/features/game/life/render/assets/hd';
 /** Рядки аркуша: униз, ліворуч, праворуч, угору. */
@@ -628,5 +628,50 @@ describe('Пози Лєни з руками перед собою 32×32', () =>
 
   it.each(POSES)('$name: куплений одяг перефарбовується й у позах, а шкіра й волосся — ні', ({ name, cell, garments }) => {
     expect(paintedSkinOrHair(name, `${name}-poses`, cell, POSE_NAMES.length, garments), 'шкіра й волосся не фарбуються').toEqual([]);
+  });
+});
+
+// Мешканці й перехожі — люди Godot-порту (`scripts/folk/import_game1.py`):
+// піксель порту — квадрат 2×2 пікселів малюнка, стопи всіх кадрів на одній
+// лінії, середина між стопами — там, де `peopleHd.ts` ставить точку опори.
+// Зріст у таблиці `FOLK` (кадр «стоїть, униз», із зачіскою) — той, над яким
+// малюється емоція.
+describe('Аркуші мешканців і перехожих', () => {
+  const FOLK_CELL = 112;
+  const names = Object.keys(FOLK);
+
+  it('кожен аркуш із таблиці є, і зайвих нема', () => {
+    expect(readdirSync(`${DIR}/folk`).filter((f) => f.endsWith('.png')).map((f) => f.slice(0, -4)).sort()).toEqual([...names].sort());
+  });
+
+  it.each(names)('%s: 9 кадрів × 4 напрямки, пікселі 2×2, стопи на лінії, зріст як у таблиці', (name) => {
+    const img = load(`folk/${name}`);
+    expect([img.width, img.height]).toEqual([FOLK_CELL * 9, FOLK_CELL * 4]);
+    const a = (x, y) => img.data[(y * img.width + x) * 4 + 3];
+    for (let y = 0; y < img.height; y += 2) {
+      for (let x = 0; x < img.width; x += 2) {
+        const p = (y * img.width + x) * 4;
+        for (const [dx, dy] of [[1, 0], [0, 1], [1, 1]]) {
+          const q = ((y + dy) * img.width + x + dx) * 4;
+          for (let c = 0; c < 4; c += 1) if (img.data[p + c] !== img.data[q + c]) throw new Error(`${name}: блок 2×2 у (${x}, ${y}) не однорідний`);
+        }
+      }
+    }
+    for (let row = 0; row < 4; row += 1) {
+      for (let col = 0; col < 9; col += 1) {
+        let top = -1, bottom = -1;
+        for (let y = 0; y < FOLK_CELL; y += 1) {
+          for (let x = 0; x < FOLK_CELL; x += 1) {
+            if (!a(col * FOLK_CELL + x, row * FOLK_CELL + y)) continue;
+            if (top < 0) top = y;
+            bottom = y;
+          }
+        }
+        expect(top, `${name} ${row}/${col}: порожній кадр`).toBeGreaterThanOrEqual(0);
+        expect(bottom + 1, `${name} ${row}/${col}: стопи`).toBeGreaterThanOrEqual(102);
+        expect(bottom + 1).toBeLessThanOrEqual(106);
+        if (row === 0 && col === 0) expect((bottom + 1 - top) / 2, `${name} ${row}: зріст`).toBe(FOLK[name].height);
+      }
+    }
   });
 });

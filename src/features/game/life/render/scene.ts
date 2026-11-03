@@ -12,9 +12,9 @@ import { TILE, type GameMap, type Zone } from '../world/types';
 import { buildingSprite, drawBuildingShadow } from './buildings';
 import { drawLeafLitter, drawTreeShadow, treeSprite, TREE_BASE } from './nature';
 import { ambientAt, lightsOn } from './palette';
-import { sheetFor, walkFrame, type Dir, type Look } from './people';
+import { type Dir, type Look } from './people';
 import { ART_DENSITY, cellHash, drawSprite, ellipse, rect, setDensity, shade, worldSize, type Ctx } from './pixel';
-import { drawPersonHd, hasHdLook, hasHdSheet } from './peopleHd';
+import { drawPersonHd, hasHdLook, hdHeight } from './peopleHd';
 import { drawProp, propBase, propLight } from './props';
 import { drawWater, groundCanvas } from './tiles';
 import { drawBitmap } from './icons';
@@ -179,27 +179,10 @@ export function renderScene(g: Ctx, map: GameMap, actors: readonly Actor[], env:
     items.push({ y: propBase(p), draw: () => drawProp(g, p, season, env.time) });
   }
   for (const a of actors) {
-    // Лєна, мама й Діма — лише аркушами PixelLab (`peopleHd.ts`): поки аркуш
-    // вантажиться (мить на початку гри), їх ще не видно.
-    if (hasHdSheet(a.look)) {
-      if (hasHdLook(a.look)) items.push({ y: a.y, draw: () => drawActorHd(g, a, env.time) });
-      continue;
-    }
-    // Мешканці й перехожі, поки для них нема аркушів PixelLab, — 16-піксельні
-    // спрайти (піксель спрайта — два пікселі малюнка). Падає лише Лєна, у
-    // ліжку лежить лише мама — обидві вище.
-    const img = sheetFor(a.look)[a.dir]![walkFrame(a.moving, a.t)]!;
-    items.push({
-      y: a.y,
-      draw: () => {
-        ellipse(g, a.x, a.y, a.look.kid ? 4 : 5, 2, 'rgba(28,20,40,0.28)');
-        g.drawImage(img, Math.round(a.x - img.width / 2), Math.round(a.y - img.height + 2));
-        if (a.emote) {
-          const bob = Math.round(Math.sin(env.time * 5) * 1.5);
-          drawBitmap(g, a.emote === 'heart' ? 'heart' : a.emote === 'sleep' ? 'sleep' : 'star', Math.round(a.x - 3), Math.round(a.y - img.height - 8 + bob));
-        }
-      },
-    });
+    // Усі люди — аркушами 32×32 (`peopleHd.ts`): Лєна, мама, Діма й Оля —
+    // своїми, мешканці й перехожі — людьми порту. Поки аркуш вантажиться
+    // (мить на початку гри), людини ще не видно.
+    if (hasHdLook(a.look)) items.push({ y: a.y, draw: () => drawActorHd(g, a, env.time) });
   }
   for (const pet of opts.pets ?? []) {
     items.push({
@@ -343,7 +326,7 @@ function drawActorHd(g: Ctx, a: Actor, time: number): void {
   }
   drawPersonHd(g, a.look, a.x, a.y, a.dir, a.moving, a.t);
   if (a.emote) {
-    const top = a.look.kid ? 26 : 31;
+    const top = hdHeight(a.look) ?? (a.look.kid ? 26 : 31);
     drawBitmap(g, a.emote === 'heart' ? 'heart' : a.emote === 'sleep' ? 'sleep' : 'star', Math.round(a.x - 3), Math.round(a.y - top - 8 + Math.sin(time * 5) * 1.5));
   }
 }

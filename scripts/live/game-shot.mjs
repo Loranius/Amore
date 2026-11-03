@@ -11,7 +11,7 @@ mkdirSync(OUT, { recursive: true });
 const vite = spawn('npx', ['vite', '--port', '5199', '--strictPort'], { cwd: ROOT, stdio: 'ignore', detached: true });
 for (let i = 0; i < 60; i += 1) { try { const r = await fetch('http://localhost:5199/game.html'); if (r.ok) break; } catch {} await new Promise((r) => setTimeout(r, 1000)); }
 // Аркуш усіх персонажів (сценарій `lineup:<ім'я>`): виконується в сторінці гри.
-// Аркуші PixelLab і ще 16-піксельні мешканці й перехожі (до етапу 2) —
+// Аркуші PixelLab і мешканці й перехожі з людей Godot-порту (етап 2) —
 // в одному світовому масштабі (4 пікселі екрана на світовий), тож видно, хто
 // з ким не в парі; Лєна з міні-ігор — там само. Для «до й після», коли
 // перемальовуються люди.
@@ -27,7 +27,10 @@ async function lineup() {
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const hd = [['Лєна мала', P.LENA_KID], ['Лєна-підліток', P.LENA_TEEN], ['Лєна доросла', P.LENA_ADULT], ['Мама', P.MOM], ['Діма', P.DIMA], ['Оля мала', { ...P.OLYA, kid: true }], ['Оля-підліток', P.OLYA]];
   const lenas = [P.LENA_KID, P.LENA_TEEN, P.LENA_ADULT];
-  for (let k = 0; k < 80 && !(hd.every(([, l]) => H.hasHdLook(l)) && lenas.every((l) => H.hasHdPoses(l))); k += 1) await sleep(100);
+  const res = Object.entries(R.RESIDENT_LOOKS);
+  const folk = Array.from({ length: 16 }, (_, k) => P.townsfolkLook(rngFor(7, 'lineup', k)));
+  const everyone = [...hd.map(([, l]) => l), ...res.map(([, l]) => l), ...folk];
+  for (let k = 0; k < 80 && !(everyone.every((l) => H.hasHdLook(l)) && lenas.every((l) => H.hasHdPoses(l))); k += 1) await sleep(100);
   const S = 4;
   const W = 1500;
   const c = document.createElement('canvas');
@@ -67,11 +70,6 @@ async function lineup() {
     g.setTransform(1, 0, 0, 1, 0, 0);
   };
   const shadow = (look) => X.ellipse(g, 0, 0, look.kid ? 4 : 5, 2, 'rgba(28,20,40,0.28)');
-  const px16 = (look, dir, frame) => () => {
-    shadow(look);
-    const img = P.sheetFor(look)[dir][frame];
-    g.drawImage(img, Math.round(-img.width / 2), Math.round(-img.height + 2));
-  };
   const pxHd = (look, dir, frame) => () => {
     shadow(look);
     H.drawPersonHd(g, look, 0, 0, dir, frame > 0, frame > 0 ? (frame - 1) / 8 + 0.01 : 0);
@@ -93,19 +91,17 @@ async function lineup() {
   }
   strip('Бася', 16, DIRS.map((d) => ({ d: 2, draw: () => D.drawDog(g, 0, 0, d, false, 0) })));
   y += ROW + 10;
-  title('Ще 16×16 до етапу 2: мешканці (вниз і праворуч)');
-  const res = Object.entries(R.RESIDENT_LOOKS);
+  title('Мешканці — люди порту (вниз, праворуч, крок)');
   for (let i = 0; i < res.length; i += 5) {
-    res.slice(i, i + 5).forEach(([id, look], j) => strip(id, 16 + j * 296, [{ d: 1, draw: px16(look, 0, 0) }, { d: 1, draw: px16(look, 2, 0) }, { d: 1, draw: px16(look, 0, 1) }]));
+    res.slice(i, i + 5).forEach(([id, look], j) => strip(`${id}: ${H.folkSheetName(look)}`, 16 + j * 296, [{ d: 2, draw: pxHd(look, 0, 0) }, { d: 2, draw: pxHd(look, 2, 0) }, { d: 2, draw: pxHd(look, 0, 2) }]));
     y += ROW + 10;
   }
-  title('Перехожі (16×16, випадкові)');
-  const folk = Array.from({ length: 16 }, (_, k) => P.townsfolkLook(rngFor(7, 'lineup', k)));
-  strip('', 16, folk.map((look) => ({ d: 1, draw: px16(look, 0, 0) })));
+  title('Перехожі (випадкові)');
+  strip('', 16, folk.map((look) => ({ d: 2, draw: pxHd(look, 0, 0) })));
   y += ROW + 10;
-  title('У 32×32 поруч: Лєна й мама з PixelLab, мешканці — 16-піксельні');
-  const mixed = [[P.LENA_ADULT, true], [R.RESIDENT_LOOKS.hanna, false], [R.RESIDENT_LOOKS.petro, false], [P.MOM, true], [R.RESIDENT_LOOKS.sofia, false], [P.DIMA, true], [R.RESIDENT_LOOKS.marko, false], [folk[3], false]];
-  strip('', 16, mixed.map(([look, isHd]) => ({ d: isHd ? 2 : 1, draw: isHd ? pxHd(look, 0, 0) : px16(look, 0, 0) })));
+  title('Поруч: Лєна, мама й Діма з PixelLab, мешканці й перехожі з порту');
+  const mixed = [P.LENA_ADULT, R.RESIDENT_LOOKS.hanna, R.RESIDENT_LOOKS.petro, P.MOM, R.RESIDENT_LOOKS.sofia, P.DIMA, R.RESIDENT_LOOKS.marko, folk[3]];
+  strip('', 16, mixed.map((look) => ({ d: 2, draw: pxHd(look, 0, 0) })));
   y += ROW + 10;
   title('Міні-ігри (як на телефоні): сад, курник угорі й унизу, рибалка, мама в городі');
   const kc = document.createElement('canvas');

@@ -25,13 +25,17 @@ import olyaKidUrl from './assets/hd/olya-kid.png';
 import olyaTeenUrl from './assets/hd/olya-teen.png';
 import momUrl from './assets/hd/mom.png';
 import { recolorByPalette, recolorOutfit, type Garment, type OutfitColors, type Tone } from './outfitHd';
-import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, type Dir, type Look } from './people';
+import { DIMA, LENA_ADULT, LENA_KID, LENA_TEEN, MOM, OLYA, type Dir, type HairStyle, type Look } from './people';
 
 interface HdSheet {
   url: string;
   cell: number;
   /** Кадрів ходи (0 — лише «стоїть»). */
   frames: number;
+  /** Кадрів ходи за секунду (типово 8). */
+  fps?: number;
+  /** Зріст у світових пікселях — над ним емоція (типово 26 дитина, 31 дорослий). */
+  height?: number;
   /** Точка між стопами в клітинці аркуша. */
   footX: number;
   footY: number;
@@ -173,8 +177,82 @@ export function isLenaAdult(l: Look): boolean {
   return isLenaAt(l, LENA_ADULT);
 }
 
+// Мешканці й перехожі (етап 2, власник 2026-11-03: «Публікуй персонажів в
+// гру») — люди Godot-порту «Дєвочки в городі»: вбрання й зачіска зведені в
+// один аркуш (`scripts/folk/import_game1.py`), піксель порту — світовий
+// піксель, тобто 2×2 пікселі малюнка; 8 кадрів ходи, 11 за секунду, як у
+// порту. Хто кого малює — за виглядом: діти — дитячими аркушами, коротка чи
+// їжаком зачіска — чоловічими (як у `townsfolkLook`), з тією самою зачіскою,
+// сиві — бабусею чи сивим чоловіком, а котрий саме — за хешем кольорів, тож
+// та сама людина завжди та сама.
+const FOLK_URLS = import.meta.glob<string>('./assets/hd/folk/*.png', { eager: true, query: '?url', import: 'default' });
+type FolkKind = 'man' | 'woman' | 'boy' | 'girl';
+/** Аркуш мешканця: хто, яка зачіска й зріст із зачіскою у світових пікселях (кадр «стоїть, униз»). Підлітки — серед дорослих. */
+export const FOLK: Readonly<Record<string, { kind: FolkKind; hair: HairStyle; height: number }>> = {
+  'man-jeans': { kind: 'man', hair: 'short', height: 37 },
+  'man-blue': { kind: 'man', hair: 'short', height: 38 },
+  'man-grey': { kind: 'man', hair: 'spiky', height: 40 },
+  'teen-boy': { kind: 'man', hair: 'spiky', height: 37 },
+  'woman-flowers': { kind: 'woman', hair: 'long', height: 39 },
+  'woman-green': { kind: 'woman', hair: 'bob', height: 38 },
+  'woman-navy': { kind: 'woman', hair: 'ponytail', height: 37 },
+  'woman-granny': { kind: 'woman', hair: 'bun', height: 41 },
+  'woman-casual': { kind: 'woman', hair: 'long', height: 37 },
+  'woman-summer': { kind: 'woman', hair: 'bob', height: 38 },
+  'woman-formal': { kind: 'woman', hair: 'ponytail', height: 37 },
+  'teen-girl': { kind: 'woman', hair: 'long', height: 34 },
+  'kid-boy-red': { kind: 'boy', hair: 'spiky', height: 28 },
+  'kid-boy-summer': { kind: 'boy', hair: 'short', height: 27 },
+  'kid-boy-casual': { kind: 'boy', hair: 'short', height: 27 },
+  'kid-boy-formal': { kind: 'boy', hair: 'short', height: 27 },
+  'kid-girl-mustard': { kind: 'girl', hair: 'pigtails', height: 27 },
+  'kid-girl-plain': { kind: 'girl', hair: 'bob', height: 27 },
+  'kid-girl-summer': { kind: 'girl', hair: 'pigtails', height: 27 },
+  'kid-girl-casual': { kind: 'girl', hair: 'bob', height: 27 },
+};
+type FolkSheet = HdSheet & { name: string };
+const FOLK_SHEETS: Readonly<Record<FolkKind, readonly FolkSheet[]>> = (() => {
+  const pools: Record<FolkKind, FolkSheet[]> = { man: [], woman: [], boy: [], girl: [] };
+  for (const [name, f] of Object.entries(FOLK)) {
+    const url = FOLK_URLS[`./assets/hd/folk/${name}.png`];
+    if (!url) throw new Error(`Люди 32×32: нема аркуша мешканця ${name}`);
+    pools[f.kind].push({ name, url, cell: 112, frames: 8, fps: 11, height: f.height, footX: 55, footY: 104, match: () => false });
+  }
+  return pools;
+})();
+
+/** Сиве волосся мешканців і перехожих (`residents.ts`, `townsfolkLook`). */
+const GREY_HAIR = new Set(['#c8c4bc', '#8a8a8a']);
+
+function folkSheet(look: Look): FolkSheet {
+  const male = look.hairStyle === 'short' || look.hairStyle === 'spiky';
+  const pool = FOLK_SHEETS[look.kid ? (male ? 'boy' : 'girl') : male ? 'man' : 'woman'];
+  // Сиві дорослі — бабуся з гулькою чи сивий чоловік, і лише вони.
+  const grey = !look.kid && GREY_HAIR.has(look.hair);
+  if (grey) return pool.find((s) => s.name === (male ? 'man-grey' : 'woman-granny'))!;
+  const young = pool.filter((s) => s.name !== 'man-grey' && s.name !== 'woman-granny');
+  // Спершу аркуші з тією самою зачіскою; нема такої — будь-який своєї статі й віку.
+  const same = young.filter((s) => FOLK[s.name]!.hair === look.hairStyle);
+  const choice = same.length > 0 ? same : young;
+  // FNV-1a за кольорами й зачіскою з перемішуванням бітів наприкінці:
+  // без випадковості й без порядку ключів.
+  let h = 0x811c9dc5;
+  for (const ch of [look.skin, look.hair, look.hairStyle, look.top, look.bottom, look.shoes, look.eyes].join('|')) {
+    h = Math.imul(h ^ ch.charCodeAt(0), 0x01000193) >>> 0;
+  }
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b) >>> 0;
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35) >>> 0;
+  h = (h ^ (h >>> 16)) >>> 0;
+  return choice[h % choice.length]!;
+}
+
+/** Котрий аркуш мешканця чи перехожого малює цей вигляд (`FOLK`), або `null` для Лєни, мами, Діми й Олі. */
+export function folkSheetName(look: Look): string | null {
+  return SHEETS.some((x) => x.match(look)) ? null : folkSheet(look).name;
+}
+
 function sheetOf(look: Look): HdSheet | null {
-  const s = SHEETS.find((x) => x.match(look));
+  const s = SHEETS.find((x) => x.match(look)) ?? folkSheet(look);
   if (!s) return null;
   if (!s.img && typeof Image !== 'undefined') {
     const img = new Image();
@@ -269,7 +347,7 @@ export function hasHdLook(look: Look): boolean {
 export function drawPersonHd(g: CanvasRenderingContext2D, look: Look, x: number, y: number, dir: Dir, moving: boolean, t: number): void {
   const s = sheetOf(look);
   if (!s) return;
-  drawPersonHdFrame(g, look, x, y, dir, moving && s.frames > 0 ? 1 + (Math.floor(t * 8) % s.frames) : 0);
+  drawPersonHdFrame(g, look, x, y, dir, moving && s.frames > 0 ? 1 + (Math.floor(t * (s.fps ?? 8)) % s.frames) : 0);
 }
 
 /**
@@ -351,6 +429,22 @@ function drawStrip(g: CanvasRenderingContext2D, s: HdSheet, src: CanvasImageSour
   g.scale(-1, 1);
   g.drawImage(src, frame * s.cell, 0, s.cell, s.cell, -s.footX / 2, dy, half, half);
   g.restore();
+}
+
+/** Зріст людини з аркуша у світових пікселях, якщо аркуш його знає. */
+export function hdHeight(look: Look): number | undefined {
+  return sheetOf(look)?.height;
+}
+
+/**
+ * Кадр ходи міні-ігор (`Kit.person`: 0 стоїть, далі кадри 4-кадрового кроку)
+ * у стовпець аркуша: у 4-кадрових аркушах той самий, у 8-кадрових людей
+ * порту — кожен другий.
+ */
+export function hdWalkCol(look: Look, frame: number): number {
+  const s = sheetOf(look);
+  if (!s || frame <= 0 || s.frames === 0) return 0;
+  return 1 + Math.floor(((frame - 1) * s.frames) / 4);
 }
 
 /** Розмір клітинки аркуша цієї людини (пікселі малюнка), або 0, якщо аркуша нема. */
