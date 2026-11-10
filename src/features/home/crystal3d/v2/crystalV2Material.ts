@@ -56,6 +56,27 @@ const FRAGMENT = /* glsl */ `
       mix(mix(hash3(i + vec3(0, 0, 1)), hash3(i + vec3(1, 0, 1)), f.x), mix(hash3(i + vec3(0, 1, 1)), hash3(i + vec3(1, 1, 1)), f.x), f.y),
       f.z);
   }
+  vec3 hash33(vec3 p) {
+    p = fract(p * vec3(0.1031, 0.1030, 0.0973));
+    p += dot(p, p.yxz + 33.33);
+    return fract((p.xxy + p.yxx) * p.zyx);
+  }
+  // Межі комірок Вороного в 3D: тонкі пласкі листи — тріщини в товщі каменю.
+  float cellGap(vec3 x) {
+    vec3 i = floor(x);
+    vec3 f = fract(x);
+    float f1 = 8.0;
+    float f2 = 8.0;
+    for (int z = -1; z <= 1; z++)
+    for (int y = -1; y <= 1; y++)
+    for (int k = -1; k <= 1; k++) {
+      vec3 g = vec3(float(k), float(y), float(z));
+      vec3 r = g + hash33(i + g) - f;
+      float d = dot(r, r);
+      if (d < f1) { f2 = f1; f1 = d; } else if (d < f2) { f2 = d; }
+    }
+    return sqrt(f2) - sqrt(f1);
+  }
   varying vec3 vWorld;
   varying float vTone;
   varying vec3 vEdge;
@@ -112,7 +133,15 @@ const FRAGMENT = /* glsl */ `
     float rim = max(near.x, max(near.y, near.z));
     colour = mix(colour, mix(uColour, vec3(1.0, 0.9, 0.96), 0.3) * 1.05, rim * 0.42);
     vec3 halfway = normalize(uKey + view);
-    float spec = pow(max(0.0, dot(n, halfway)), 56.0);
+    /*
+     * БЛИСК (ADR-0259, власник: «яскравіші блиски на гранях»). Два пелюстки
+     * замість одного: вузький яскравий — дзеркальний спалах грані, що
+     * дивиться між світлом і нами, і широкий тихий — щоб сусідні грані теж
+     * ловили світло на обороті. Грань пласка, тож спалах заливає її всю —
+     * low-poly блищить гранню, а не плямою.
+     */
+    float hv = max(0.0, dot(n, halfway));
+    float spec = pow(hv, 160.0) * 1.6 + pow(hv, 18.0) * 0.3;
     float facing = max(0.0, dot(n, view));
     // Перлинна оболонка — лише на самому силуеті (ADR-0258): у степені 2.5
     // вона вибілювала всю бічну грань до насиченості 0.2–0.4, і камінь
@@ -151,6 +180,25 @@ const FRAGMENT = /* glsl */ `
     float sparkle = 0.3 * streaks * axial + 0.8 * motes;
     vec3 glowTint = mix(uColour, vec3(1.0, 0.9, 0.96), 0.55 + 0.3 * motes);
     colour += glowTint * sparkle * 0.8 * glowScale;
+    /*
+     * ТРІЩИНКИ Й ВІЗЕРУНКИ В ТОВЩІ (ADR-0259, власник: «внутрішнє свічення,
+     * тріщинки та легкі візерунки всередині»). Обидва — 3D-поля, узяті ще
+     * глибше вздовж погляду, тож живуть усередині й рухаються з поглядом
+     * інакше, ніж грань; малюнком на поверхні ребро вони не перетинають
+     * (навичка crystal-look).
+     *   * тріщини — межі комірок Вороного: тонкі пласкі листи, що ловлять
+     *     світло; видно лише частину листів, решта гасне під маскою;
+     *   * вуаль — м'яка хмарність ±9 % світла, не малюнок.
+     */
+    vec3 deeper = vWorld * uInvScale - view * (0.3 + 0.45 * facing);
+    float crack = 1.0 - smoothstep(0.0, 0.04, cellGap(deeper * 1.3 + vec3(7.3, 1.9, 4.1)));
+    crack *= smoothstep(0.5, 0.72, noise3(deeper * 0.7 + vec3(11.0)));
+    colour += glowTint * crack * 0.34 * facing * (1.0 - rim);
+    colour *= 0.91 + 0.18 * noise3(deeper * 1.7 + vec3(3.0, -drift * 0.5, 5.0));
+    // Іскристість (ADR-0259): рідкі блищики лише там, де грань майже ловить
+    // світло, — на обороті вони спалахують і гаснуть.
+    float grain = smoothstep(0.93, 0.99, noise3(vWorld * uInvScale * 46.0));
+    colour += pearl * grain * pow(hv, 10.0) * 0.9;
     float alpha = mix(0.9, 1.0, max(rim, fresnel));
     alpha = max(alpha, clamp(glint * 1.5, 0.0, 1.0));
     gl_FragColor = vec4(colour, alpha);

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildCrystalV2Geometry, FOLD_DEG, monarchCrownHeight, monarchProfile, monarchSplits } from './geometry';
+import { buildCrystalV2Geometry, FOLD_DEG, monarchCrownHeight, monarchProfile, monarchSplits, yearHabit } from './geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from './model';
 
 // ============================================================
@@ -109,6 +109,56 @@ describe('кристал v2: геометрія', () => {
       const edges = sharedEdges(buildCrystalV2Geometry(buildCrystalV2Model(fixture(name))).crystals);
       for (const e of edges) if (!e.sameFacet && e.fold < 25) expect(e.sameTone).toBe(false);
     }
+  });
+
+  it('тіло замкнене: відкриті ребра — лише в заглибленій основі (ADR-0259, правило цілісності кріплення)', () => {
+    // Огранена вершина кристала року (зірка, клини, кінчик) не лишає щілин:
+    // кожне ребро вище землі ділять рівно два трикутники.
+    for (const name of FIXTURE_NAMES) {
+      const { positions, triangles } = buildCrystalV2Geometry(buildCrystalV2Model(fixture(name))).crystals;
+      const key = (p: V3) => p.map((x) => x.toFixed(5)).join(',');
+      const count = new Map<string, { n: number; y: number }>();
+      for (let t = 0; t < triangles; t += 1) {
+        for (let s = 0; s < 3; s += 1) {
+          const a = point(positions, t * 3 + ((s + 1) % 3));
+          const b = point(positions, t * 3 + ((s + 2) % 3));
+          const k = key(a) < key(b) ? `${key(a)}|${key(b)}` : `${key(b)}|${key(a)}`;
+          const was = count.get(k);
+          count.set(k, { n: (was?.n ?? 0) + 1, y: Math.max(a[1], b[1]) });
+        }
+      }
+      for (const { n, y } of count.values()) if (n !== 2) expect(y).toBeLessThan(0);
+    }
+  });
+
+  it('вершина кристала року — огранена, а не піраміда (ADR-0259): щонайменше 8 граней, що дивляться вгору', () => {
+    // Регресія: стара вершина — 5–7 граней від плеча до 1–2 точок кінчика
+    // (busy), нова — 8–16 на всіх фікстурах.
+    for (const name of FIXTURE_NAMES) {
+      const model = buildCrystalV2Model(fixture(name));
+      const monarch = buildCrystalV2Geometry({ ...model, children: [] }).crystals.triangles;
+      for (const child of model.children) {
+        const mesh = buildCrystalV2Geometry({ ...model, children: [{ ...child, lean: 0 }] }).crystals;
+        const facets = new Set<number>();
+        for (let t = monarch; t < mesh.triangles; t += 1) {
+          const a = point(mesh.positions, t * 3);
+          const n = cross(sub(point(mesh.positions, t * 3 + 1), a), sub(point(mesh.positions, t * 3 + 2), a));
+          if (n[1] / norm(n) > 0.2) facets.add(mesh.faceTone[t * 3]!);
+        }
+        expect(facets.size).toBeGreaterThanOrEqual(8);
+      }
+    }
+  });
+
+  it('кристали років — різного габітусу (ADR-0259): гострота вістря розходиться між роками', () => {
+    // Власник, 2026-11-10: «різноманіття форм — різні нахили граней».
+    const tips = Array.from({ length: 12 }, (_, k) => yearHabit(busy.startDate, `year${k}`).tip);
+    expect(Math.max(...tips) - Math.min(...tips)).toBeGreaterThan(0.75 / 2);
+    for (const tip of tips) {
+      expect(tip).toBeGreaterThanOrEqual(0.8);
+      expect(tip).toBeLessThanOrEqual(1.55);
+    }
+    expect(yearHabit(busy.startDate, 'year3')).toEqual(yearHabit(busy.startDate, 'year3'));
   });
 
   it('монарх спереду — не стовп (ADR-0258): з будь-якого боку видно ≥ 4 граней стовбура, найширша ≤ 40 %', () => {

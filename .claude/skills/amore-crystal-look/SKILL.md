@@ -222,6 +222,16 @@ is ≥ 12°. Two things the first attempt got wrong, both caught on the frame:
 Weigh tone clashes by the square of the fold's cosine: on a steep edge light
 separates the faces anyway; on a flat one tone is all there is.
 
+## Cracks are a cellular pattern until proven otherwise
+
+2026-11-10 (ADR-0259). Internal fractures drawn as 3D Voronoi cell borders
+sampled with parallax are the right mechanism — they live inside and do not
+draw on a facet — but at a cell size near the body's radius they covered every
+face in a net and read as hide, exactly like the cellular albedo this skill
+removed. What reads as "a few cracks inside": cells ~2× the body, lines a
+third as wide, and a low-frequency mask that leaves only a fraction of sheets
+lit. Look at the frame before raising the strength.
+
 ## What we implemented from it, and how
 
 **Facet rims, procedurally.** We can never use their method directly — they have a UV

@@ -309,6 +309,37 @@ const CHILD_PROFILE: readonly ProfileRing[] = [
   { at: 1, scale: 1, shift: [0, 0] },
 ];
 
+/**
+ * Габітус кристала року (ADR-0259): той самий ріст, інший малюнок вершини.
+ * Власник, 2026-11-10: «різноманіття форм — додаткові кристали з різними
+ * нахилами граней». З хешу року:
+ *   * `tip` — гострота вістря: 0.8 (тупе) … 1.55 (гостре) від кварцових 52°;
+ *   * `wedge` — як глибоко грані вершини врізаються в призму клинами;
+ *   * `starAt`, `starReach` — висота й ширина зірки граней між плечем і
+ *     вістрям: низька широка зірка — масивна вершина, висока вузька — стрімка.
+ */
+export function yearHabit(seed: string, tag: string): { tip: number; wedge: number; starAt: number; starReach: number } {
+  return {
+    tip: 0.8 + 0.75 * unit(seed, `${tag}:habit:tip`),
+    wedge: 0.12 + 0.3 * unit(seed, `${tag}:habit:wedge`),
+    starAt: 0.32 + 0.22 * unit(seed, `${tag}:habit:star`),
+    starReach: 0.46 + 0.2 * unit(seed, `${tag}:habit:reach`),
+  };
+}
+
+/**
+ * Кристал року (ADR-0259): огранена вершина замість піраміди.
+ *
+ * Власник, 2026-11-10: «реалістична вершина — замість простої піраміди
+ * природна гранована форма з нерівними площинами». Як корона монарха
+ * (ADR-0247), але легша:
+ *   1. шов клинами — кути призми опущені кожен на свою глибину, тож грані
+ *      вершини врізаються в тіло клинами різної довжини;
+ *   2. зірка — над серединою кожної сторони точка на своїй висоті й відступі:
+ *      трикутник над стороною й клин над кутом, грані зчеплені;
+ *   3. кінчик — 1–2 точки над зміщеною вершиною (`crown`), від зірки.
+ * Кожна грань — один трикутник, тож пласка за побудовою.
+ */
 function body(
   seed: string,
   tag: string,
@@ -321,19 +352,53 @@ function body(
   profile: readonly ProfileRing[] = CHILD_PROFILE,
 ): Tri[] {
   const base = ring(sides);
+  const n = base.length;
+  const habit = yearHabit(seed, tag);
+  // Висота кристала та сама (модель): габітус лише перерозподіляє її між
+  // призмою й вершиною, і вершина не забирає більше 45 % тіла.
+  const tipHeight = Math.min(tip * habit.tip, height * 0.45);
   const y0 = -bury;
-  const y1 = height - tip;
+  const y1 = height - tipHeight;
   const radius = Math.max(...base.map((p) => Math.hypot(p[0], p[2])));
-  const shaft = brokenShaft(seed, tag, base, profile, y0, y1, radius, 0);
+  const drops = base.map((_, i) => tipHeight * (0.04 + habit.wedge * unit(seed, `${tag}:crown:drop${i}`)));
+  const shaft = brokenShaft(seed, tag, base, profile, y0, y1, radius, 0, drops);
   const tris = shaft.tris;
   let face = shaft.face;
   const top = shaft.rings[shaft.rings.length - 1]!;
   const shoulder = profile[profile.length - 1]!;
+  const sx = shoulder.shift[0] * radius;
+  const sz = shoulder.shift[1] * radius;
+  const R = radius * shoulder.scale;
   // Кінчик іде за плечем: зсунуте плече з кінчиком на осі читалось би зламом.
-  const tipAt: [number, number] = [apex[0] + shoulder.shift[0] * radius, apex[1] + shoulder.shift[1] * radius];
-  // Кінчик рахується від найвищої точки плеча: вершини плеча тепер на різній висоті.
-  const topY = Math.max(...top.map((p) => p[1]));
-  for (const points of crown(seed, tag, top, topY, height - topY, tipAt, ridge, radius * shoulder.scale)) {
+  const tipAt: [number, number] = [apex[0] + sx, apex[1] + sz];
+  const angle = (p: V3) => Math.atan2(p[2] - sz, p[0] - sx);
+  const star: V3[] = Array.from({ length: n }, (_, i) => {
+    const a0 = angle(top[i]!);
+    const a1 = angle(top[(i + 1) % n]!);
+    const gap = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
+    const a = a0 + gap * (0.5 + 0.24 * (unit(seed, `${tag}:star${i}:a`) - 0.5));
+    const reach = R * (habit.starReach + 0.1 * (unit(seed, `${tag}:star${i}:r`) - 0.5));
+    const lift = tipHeight * (habit.starAt + 0.16 * (unit(seed, `${tag}:star${i}:y`) - 0.5));
+    // Зірка тягнеться до зміщеної вершини разом із висотою.
+    const pull = lift / tipHeight;
+    return [sx + (tipAt[0] - sx) * pull + Math.cos(a) * reach, y1 + lift, sz + (tipAt[1] - sz) * pull + Math.sin(a) * reach];
+  });
+  const inside: V3 = [sx, y1 - 0.2 * tipHeight, sz];
+  const facing = (a: V3, b: V3, c: V3): [V3, V3, V3] => {
+    const e1: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+    const e2: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+    const nrm: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const d: V3 = [(a[0] + b[0] + c[0]) / 3 - inside[0], (a[1] + b[1] + c[1]) / 3 - inside[1], (a[2] + b[2] + c[2]) / 3 - inside[2]];
+    return nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2] >= 0 ? [a, b, c] : [a, c, b];
+  };
+  for (let i = 0; i < n; i += 1) {
+    const j = (i + 1) % n;
+    tris.push({ points: facing(top[i]!, top[j]!, star[i]!), face, edges: TRI });
+    tris.push({ points: facing(top[j]!, star[j]!, star[i]!), face: face + 1, edges: TRI });
+    face += 2;
+  }
+  const starTop = Math.max(...star.map((p) => p[1]));
+  for (const points of crown(seed, tag, star, starTop, height - starTop, tipAt, ridge, R * habit.starReach)) {
     tris.push({ points, face, edges: TRI });
     face += 1;
   }
@@ -510,16 +575,16 @@ function monarchBody(
     R * (0.88 + 0.06 * unit(seed, `monarch:crown:shoulder${i}:r`)),
     y1 + crownHeight * (0.12 + 0.08 * unit(seed, `monarch:crown:shoulder${i}:y`)),
   ));
-  // Зірка: над серединою кожної сторони (півкроку), 0.50…0.58 радіуса,
-  // 0.50…0.62 корони, з легким зсувом по колу — грані зірки різні.
+  // Зірка: над серединою кожної сторони (півкроку), 0.47…0.61 радіуса,
+  // 0.45…0.65 корони, з легким зсувом по колу — грані зірки різні.
   const star: V3[] = Array.from({ length: n }, (_, i) => {
     const a0 = sideAngle(i);
     const a1 = sideAngle((i + 1) % n);
     const gap = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
     return at(
-      halfway(a0, a1) + gap * 0.18 * (unit(seed, `monarch:crown:star${i}:a`) - 0.5),
-      R * (0.5 + 0.08 * unit(seed, `monarch:crown:star${i}:r`)),
-      y1 + crownHeight * (0.5 + 0.12 * unit(seed, `monarch:crown:star${i}:y`)),
+      halfway(a0, a1) + gap * 0.26 * (unit(seed, `monarch:crown:star${i}:a`) - 0.5),
+      R * (0.47 + 0.14 * unit(seed, `monarch:crown:star${i}:r`)),
+      y1 + crownHeight * (0.45 + 0.2 * unit(seed, `monarch:crown:star${i}:y`)),
     );
   });
   // Плече → плечі корони: на стороні з ребром — три грані, без нього — дві,

@@ -156,19 +156,61 @@ def monarch_profile(seed):
     return (foot, on(0.32 + jitter("belly:at", 0.08)), on(0.68 + jitter("upper:at", 0.06)), shoulder)
 
 
+def year_habit(seed, tag):
+    """Габітус кристала року — як `yearHabit` у `geometry.ts` (ADR-0259)."""
+    return {
+        "tip": 0.8 + 0.75 * unit(seed, f"{tag}:habit:tip"),
+        "wedge": 0.12 + 0.3 * unit(seed, f"{tag}:habit:wedge"),
+        "starAt": 0.32 + 0.22 * unit(seed, f"{tag}:habit:star"),
+        "starReach": 0.46 + 0.2 * unit(seed, f"{tag}:habit:reach"),
+    }
+
+
 def body(seed, tag, sides, height, tip, apex, ridge, bury, profile=CHILD_PROFILE) -> list[tuple]:
-    """Трикутники тіла як (3×3 вершини, номер грані, які ребра справжні,
-    тонова група). Ребро k — навпроти вершини k."""
+    """Кристал року з ограненою вершиною — як `body` у `geometry.ts`
+    (ADR-0259): шов клинами, зірка граней, кінчик від зірки. Трикутники як
+    (3×3 вершини, номер грані, які ребра справжні, тонова група)."""
     ring0 = _ring(sides)
+    n = len(ring0)
+    habit = year_habit(seed, tag)
+    tip_height = min(tip * habit["tip"], height * 0.45)
     y0 = -bury
-    y1 = height - tip
+    y1 = height - tip_height
     radius = max(math.hypot(p[0], p[2]) for p in ring0)
-    faces, rings, face = broken_shaft(seed, tag, ring0, profile, y0, y1, radius, 0)
+    drops = [tip_height * (0.04 + habit["wedge"] * unit(seed, f"{tag}:crown:drop{i}")) for i in range(n)]
+    faces, rings, face = broken_shaft(seed, tag, ring0, profile, y0, y1, radius, 0, drops)
     top = rings[-1]
-    _, shoulder_scale, (sx, sz) = profile[-1]
-    tip_at = (apex[0] + sx * radius, apex[1] + sz * radius)
-    top_y = max(p[1] for p in top)
-    for tri in crown(seed, tag, list(top), top_y, height - top_y, tip_at, ridge, radius * shoulder_scale):
+    _, shoulder_scale, (shx, shz) = profile[-1]
+    sx, sz = shx * radius, shz * radius
+    big_r = radius * shoulder_scale
+    tip_at = (apex[0] + sx, apex[1] + sz)
+
+    def angle(p):
+        return math.atan2(p[2] - sz, p[0] - sx)
+
+    star = []
+    for i in range(n):
+        a0, a1 = angle(top[i]), angle(top[(i + 1) % n])
+        gap = math.atan2(math.sin(a1 - a0), math.cos(a1 - a0))
+        a = a0 + gap * (0.5 + 0.24 * (unit(seed, f"{tag}:star{i}:a") - 0.5))
+        reach = big_r * (habit["starReach"] + 0.1 * (unit(seed, f"{tag}:star{i}:r") - 0.5))
+        lift = tip_height * (habit["starAt"] + 0.16 * (unit(seed, f"{tag}:star{i}:y") - 0.5))
+        pull = lift / tip_height
+        star.append(np.array([sx + (tip_at[0] - sx) * pull + math.cos(a) * reach, y1 + lift,
+                              sz + (tip_at[1] - sz) * pull + math.sin(a) * reach]))
+    inside = np.array([sx, y1 - 0.2 * tip_height, sz])
+
+    def facing(a, b, c):
+        nrm = np.cross(b - a, c - a)
+        return (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
+
+    for i in range(n):
+        j = (i + 1) % n
+        faces.append((np.array(facing(top[i], top[j], star[i])), face, TRI, None))
+        faces.append((np.array(facing(top[j], star[j], star[i])), face + 1, TRI, None))
+        face += 2
+    star_top = max(p[1] for p in star)
+    for tri in crown(seed, tag, star, star_top, height - star_top, tip_at, ridge, big_r * habit["starReach"]):
         faces.append((np.array(tri), face, TRI, None))
         face += 1
     return faces
@@ -280,9 +322,9 @@ def monarch_body(seed, sides, height, tip, ridge, bury, profile):
     for i in range(n):
         a0, a1 = side_angle(i), side_angle((i + 1) % n)
         gap = math.atan2(math.sin(a1 - a0), math.cos(a1 - a0))
-        star.append(at(halfway(a0, a1) + gap * 0.18 * (unit(seed, f"monarch:crown:star{i}:a") - 0.5),
-                       big_r * (0.5 + 0.08 * unit(seed, f"monarch:crown:star{i}:r")),
-                       y1 + crown_height * (0.5 + 0.12 * unit(seed, f"monarch:crown:star{i}:y"))))
+        star.append(at(halfway(a0, a1) + gap * 0.26 * (unit(seed, f"monarch:crown:star{i}:a") - 0.5),
+                       big_r * (0.47 + 0.14 * unit(seed, f"monarch:crown:star{i}:r")),
+                       y1 + crown_height * (0.45 + 0.2 * unit(seed, f"monarch:crown:star{i}:y"))))
     for i in range(n):
         j = (i + 1) % n
         c0, c1 = shoulder[corner_at[i]], shoulder[corner_at[j]]

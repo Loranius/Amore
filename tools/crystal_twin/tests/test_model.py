@@ -245,6 +245,18 @@ class Geometry(unittest.TestCase):
                     elif s1 != s2:
                         self.assertLess(fold, FOLD_DEG)
 
+    def test_year_crystal_tip_is_faceted(self):
+        """Вершина кристала року огранена (ADR-0259), як у `geometry.test.ts`:
+        щонайменше 8 граней дивляться вгору (стара піраміда — 5–7)."""
+        for name in ("busy", "empty", "gifts_red", "leap_day"):
+            for b in colony(build_model(fixture(name)))[1:]:
+                up = set()
+                for tri, _, _, shade in b["faces"]:
+                    n = np.cross(tri[1] - tri[0], tri[2] - tri[0])
+                    if n[1] / np.linalg.norm(n) > 0.2:
+                        up.add(shade)
+                self.assertGreaterEqual(len(up), 8, b["kind"])
+
     def test_monarch_crown_is_a_gem_not_a_cap(self):
         """Корона самоцвіта (ADR-0247): та сама висота, корона — 20…30 %,
         шов клинами, плечі майже на всю ширину тіла."""

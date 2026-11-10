@@ -17,7 +17,7 @@ interface CrystalV2ObjectProps {
 }
 
 /**
- * Колонія, жеода й іскри віх — три виклики малювання на весь кристал.
+ * Колонія, жеода, іскри віх і сяйво — чотири виклики малювання на весь кристал.
  *
  * Стоїть на тій самій лінії землі, що й старий артефакт
  * (`CRYSTAL_GROUND_BASELINE`), тож острів, храм і вода порталу не знають,
@@ -101,6 +101,55 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     `,
   }), [rgb, sparkLift]);
 
+  /*
+   * М'яке сяйво (ADR-0259, власник: «м'яке сяйво»): ореол кольору колонії за
+   * монархом. Один квадрат, завжди обличчям до камери, з радіальним спадом;
+   * додається до кадру й не пише глибину, а тест глибини ховає його за
+   * гранями, що ближче, — тож він світить ДОВКОЛА силуету, а не поверх
+   * каменю. Сила — від сяйва моделі (медіа, ADR-0217) і теми: на світлому
+   * небі він тихіший.
+   */
+  const haloSize = useMemo(() => [geometry.reach * 1.25, geometry.height * 0.75] as const, [geometry]);
+  const haloMaterial = useMemo(() => new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uColour: { value: linearColour(rgb) },
+      uSize: { value: new THREE.Vector2(haloSize[0], haloSize[1]) },
+      uStrength: { value: (theme === 'dark' ? 0.42 : 0.24) * (0.6 + 0.4 * glow) },
+      uPulse: { value: 1 },
+    },
+    vertexShader: /* glsl */ `
+      uniform vec2 uSize;
+      varying vec2 vUv;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(0.0, 0.0, 0.0, 1.0);
+        float scale = length(modelViewMatrix[0].xyz);
+        mv.xy += position.xy * uSize * scale;
+        vUv = position.xy;
+        gl_Position = projectionMatrix * mv;
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColour;
+      uniform float uStrength;
+      uniform float uPulse;
+      varying vec2 vUv;
+      void main() {
+        float r = length(vUv);
+        float a = pow(1.0 - smoothstep(0.0, 1.0, r), 2.2) * uStrength * uPulse;
+        gl_FragColor = vec4(uColour * a, a);
+      }
+    `,
+  }), [rgb, glow, theme, haloSize]);
+  const haloQuad = useMemo(() => new THREE.PlaneGeometry(2, 2), []);
+
+  useEffect(() => () => {
+    haloQuad.dispose();
+    haloMaterial.dispose();
+  }, [haloQuad, haloMaterial]);
+
   useEffect(() => () => {
     crystals.dispose();
     rocks.dispose();
@@ -123,6 +172,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     const value = 0.85 + 0.15 * Math.sin(t * 0.9);
     const pulse = crystalMaterial.uniforms.uPulse;
     if (pulse) pulse.value = value;
+    haloMaterial.uniforms.uPulse!.value = 0.9 + 0.1 * Math.sin(t * 0.9);
     crystalMaterial.uniforms.uTime!.value = t;
     sparkMaterial.uniforms.uOpacity!.value = 0.7 + 0.3 * Math.sin(t * 1.7);
   });
@@ -133,6 +183,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
       {/* Суцільний гранчастий кристал (ADR-0227); іскри віх — після нього. */}
       <mesh geometry={crystals} material={crystalMaterial} castShadow />
       {sparks && <points geometry={sparks} material={sparkMaterial} renderOrder={2} />}
+      <mesh geometry={haloQuad} material={haloMaterial} position={[0, geometry.height * 0.55, 0]} renderOrder={1} frustumCulled={false} />
     </group>
   );
 }
