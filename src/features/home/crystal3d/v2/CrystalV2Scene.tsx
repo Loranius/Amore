@@ -65,6 +65,10 @@ export default function CrystalV2Scene() {
     return () => reportGrowth(null);
   }, [growth, reportGrowth]);
 
+  // Відгук кристала на нове з минулого візиту (ADR-0261). Перший візит
+  // нового не має (`firstVisit`), а в хроніці росту кристал показує іншу
+  // дату — там відповідати нема на що.
+  const celebrateKinds = growth && !growth.firstVisit ? growth.kinds : undefined;
   const geometry = state?.geometry;
   const frame = useMemo(() => (geometry ? crystalV2Frame(geometry) : null), [geometry]);
   const noBearings = useMemo<readonly number[]>(() => [], []);
@@ -156,6 +160,7 @@ export default function CrystalV2Scene() {
             reduceMotion={reduceMotion}
             shadows={castsShadows(quality)}
             tap={chronicle.tap}
+            {...(celebrateKinds && !chronicle.asOf ? { celebrate: celebrateKinds } : {})}
           />
         </PortalStage>
         <EvolutionRuntimeProbe onMetrics={onRuntimeMetrics} />

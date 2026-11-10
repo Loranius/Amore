@@ -1,6 +1,6 @@
 import { softNormals, softScalar } from '@/features/home/diorama/softNormals';
 import { ISLAND_CREASE_DEG } from './CrystalIsland';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import type { CrystalV2Geometry } from '@/engine/species/crystalV2/geometry';
@@ -8,6 +8,9 @@ import type { CrystalV2Model } from '@/engine/species/crystalV2/model';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
 import { unit } from '@/engine/species/crystalV2/hash';
 import { createCrystalV2Material, createGeodeMaterial, linearColour } from './crystalV2Material';
+import { celebrationAt, celebrationEnd, celebrationTimeline } from './celebration';
+
+const NO_KINDS: readonly string[] = [];
 
 interface CrystalV2ObjectProps {
   model: CrystalV2Model;
@@ -15,6 +18,16 @@ interface CrystalV2ObjectProps {
   scale: number;
   theme: 'light' | 'dark';
   reduceMotion: boolean;
+  /**
+   * Види подій, нових з минулого візиту (ADR-0261, `GrowthSummary.kinds`):
+   * кристал відповідає на них коротким відгуком один раз за монтування.
+   */
+  celebrate?: readonly string[];
+  /**
+   * Лише лабораторія: зупинити відгук на цій миті (секунди від появи), щоб
+   * кадр можна було зняти. Без нього відгук іде за годинником сцени.
+   */
+  celebrateAt?: number;
 }
 
 /**
@@ -24,7 +37,7 @@ interface CrystalV2ObjectProps {
  * (`CRYSTAL_GROUND_BASELINE`), тож острів, храм і вода порталу не знають,
  * котра зі сцен кристала зараз у них стоїть.
  */
-export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }: CrystalV2ObjectProps) {
+export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion, celebrate = NO_KINDS, celebrateAt }: CrystalV2ObjectProps) {
   const rgb = model.colour.rgb;
   const glow = model.monarch.glow;
 
@@ -110,6 +123,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
    * каменю. Сила — від сяйва моделі (медіа, ADR-0217) і теми: на світлому
    * небі він тихіший.
    */
+  const haloStrength = (theme === 'dark' ? 0.5 : 0.3) * (0.6 + 0.4 * glow);
   const haloSize = useMemo(() => [geometry.reach * 1.25, geometry.height * 0.75] as const, [geometry]);
   const haloMaterial = useMemo(() => new THREE.ShaderMaterial({
     transparent: true,
@@ -118,7 +132,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     uniforms: {
       uColour: { value: linearColour(rgb) },
       uSize: { value: new THREE.Vector2(haloSize[0], haloSize[1]) },
-      uStrength: { value: (theme === 'dark' ? 0.5 : 0.3) * (0.6 + 0.4 * glow) },
+      uStrength: { value: haloStrength },
       uPulse: { value: 1 },
     },
     vertexShader: /* glsl */ `
@@ -143,7 +157,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
         gl_FragColor = vec4(uColour * a, a);
       }
     `,
-  }), [rgb, glow, theme, haloSize]);
+  }), [rgb, haloStrength, haloSize]);
   const haloQuad = useMemo(() => new THREE.PlaneGeometry(2, 2), []);
 
   /*
@@ -178,31 +192,37 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
       uSize: { value: 0.06 },
       uHalfHeight: { value: 400 },
       uStrength: { value: theme === 'dark' ? 1.0 : 0.8 },
+      uLift: { value: 0 },
+      uBurst: { value: 0 },
     },
     vertexShader: /* glsl */ `
       attribute float phase;
       uniform float uTime;
+      uniform float uLift;
+      uniform float uBurst;
       uniform float uRise;
       uniform float uSize;
       uniform float uHalfHeight;
       varying float vFade;
       void main() {
-        float t = fract(phase + uTime * 0.025);
+        // Сплеск (ADR-0261): порошинки на мить пришвидшуються й світять яскравіше.
+        float t = fract(phase + uTime * 0.025 + uLift);
         vec3 p = position + vec3(sin(uTime * 0.3 + phase * 6.28) * 0.05, t * uRise, cos(uTime * 0.25 + phase * 6.28) * 0.05);
         vFade = smoothstep(0.0, 0.15, t) * (1.0 - smoothstep(0.6, 1.0, t));
         vec4 mv = modelViewMatrix * vec4(p, 1.0);
         float scale = length(modelViewMatrix[0].xyz);
         gl_Position = projectionMatrix * mv;
-        gl_PointSize = uSize * scale * uHalfHeight / -mv.z * (0.6 + 0.8 * fract(phase * 7.0));
+        gl_PointSize = uSize * scale * uHalfHeight / -mv.z * (0.6 + 0.8 * fract(phase * 7.0)) * (1.0 + 1.6 * uBurst);
       }
     `,
     fragmentShader: /* glsl */ `
       uniform vec3 uColour;
       uniform float uStrength;
+      uniform float uBurst;
       varying float vFade;
       void main() {
         float r = length(gl_PointCoord - 0.5) * 2.0;
-        float a = smoothstep(1.0, 0.0, r) * vFade * uStrength;
+        float a = smoothstep(1.0, 0.0, r) * vFade * uStrength * (1.0 + 3.0 * uBurst);
         gl_FragColor = vec4(uColour * a, a);
       }
     `,
@@ -235,7 +255,30 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
   useEffect(() => { sparkMaterial.uniforms.uHalfHeight!.value = halfHeight; }, [sparkMaterial, halfHeight]);
   useEffect(() => { moteMaterial.uniforms.uHalfHeight!.value = halfHeight; }, [moteMaterial, halfHeight]);
 
-  useFrame(({ clock }) => {
+  /*
+   * Відгук на нове (ADR-0261): розклад — від видів подій, час — від першого
+   * кадру після монтування. Зменшений рух (§47) лишає кристал тихим: це
+   * рух, і він не несе інформації, якої немає в підписі «N нових митей».
+   */
+  const timeline = useMemo(() => celebrationTimeline(celebrate), [celebrate]);
+  const celebrationStart = useRef<number | null>(null);
+  const moteLift = useRef(0);
+  useFrame(({ clock }, delta) => {
+    const playing = timeline.length > 0 && (!reduceMotion || celebrateAt !== undefined);
+    if (playing) {
+      if (celebrationStart.current === null) celebrationStart.current = clock.getElapsedTime();
+      const t = celebrateAt ?? clock.getElapsedTime() - celebrationStart.current;
+      const now = t <= celebrationEnd(timeline) ? celebrationAt(timeline, t) : null;
+      const u = crystalMaterial.uniforms;
+      u.uWave!.value = now?.wave ?? 0;
+      u.uWaveAt!.value = now?.waveAt ?? 0;
+      u.uCrown!.value = now?.crown ?? 0;
+      u.uFlush!.value = now?.flush ?? 0;
+      haloMaterial.uniforms.uStrength!.value = haloStrength * (1 + 1.2 * (now?.flush ?? 0));
+      moteMaterial.uniforms.uBurst!.value = now?.burst ?? 0;
+      if (celebrateAt === undefined) moteLift.current += delta * 0.35 * (now?.burst ?? 0);
+      moteMaterial.uniforms.uLift!.value = celebrateAt === undefined ? moteLift.current : 0;
+    }
     if (reduceMotion) return;
     const t = clock.getElapsedTime();
     const value = 0.85 + 0.15 * Math.sin(t * 0.9);

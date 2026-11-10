@@ -20,6 +20,10 @@ interface CrystalHomeWorldProps {
   island: number;
   theme: 'light' | 'dark';
   reduceMotion: boolean;
+  /** Види нових подій для відгуку кристала (ADR-0261). */
+  celebrate?: readonly string[];
+  /** Лише лабораторія: зупинити відгук на цій миті, секунди. */
+  celebrateAt?: number;
   /** Справжні тіні (ADR-0243); полотно мусить бути створене з `shadows`. */
   shadows?: boolean;
   /** Дотик хроніки росту (ADR-0238) — лише на справжній головній. */
@@ -32,7 +36,7 @@ interface CrystalHomeWorldProps {
  * (`crystal-home-lab.html`), тож те, що інспектує DevTools у лабораторії, —
  * ті самі об'єкти, що бачить пара, а не схожа копія.
  */
-export function CrystalHomeWorld({ model, geometry, frame, island, theme, reduceMotion, shadows = false, tap }: CrystalHomeWorldProps) {
+export function CrystalHomeWorld({ model, geometry, frame, island, theme, reduceMotion, shadows = false, tap, celebrate, celebrateAt }: CrystalHomeWorldProps) {
   // Карта тіней малюється лише на зміну (острів нерухомий): колонія на іншу
   // дату хроніки — інша тінь.
   const gl = useThree((state) => state.gl);
@@ -69,6 +73,8 @@ export function CrystalHomeWorld({ model, geometry, frame, island, theme, reduce
           scale={frame.scale}
           theme={theme}
           reduceMotion={reduceMotion}
+          {...(celebrate ? { celebrate } : {})}
+          {...(celebrateAt !== undefined ? { celebrateAt } : {})}
         />
       </group>
     </>

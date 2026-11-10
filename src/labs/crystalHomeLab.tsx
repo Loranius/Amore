@@ -12,6 +12,7 @@
 //   /crystal-home-lab.html?fill=12            — подій на рік
 //   /crystal-home-lab.html?noshadows          — без тіней (A/B, слабкий профіль)
 //   /crystal-home-lab.html?gift=shared        — колір колонії: red (типово) | blue | shared | none (власний тон пари)
+//   /crystal-home-lab.html?celebrate=memory,plan&at=2.4 — відгук на нове (ADR-0261); `at` зупиняє його на миті, с
 //
 // Сторінка не входить у збірку продукту: лише dev-сервер.
 // ============================================================
@@ -87,6 +88,8 @@ function Lab() {
             theme={theme}
             reduceMotion={params.has('still')}
             shadows={!params.has('noshadows')}
+            {...(params.get('celebrate') ? { celebrate: params.get('celebrate')!.split(',') } : {})}
+            {...(params.get('at') !== null ? { celebrateAt: Number(params.get('at')) } : {})}
           />
         </PortalStage>
       </Canvas>

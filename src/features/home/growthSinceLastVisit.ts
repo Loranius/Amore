@@ -42,10 +42,17 @@ export interface GrowthSummary {
    * неправда.
    */
   firstVisit: boolean;
+  /**
+   * Які види подій з'явились (ADR-0261): частина ключа до першої двокрапки
+   * (`memory`, `plan`, `wish`, `place`, `media`, `calendar`), без повторів,
+   * за абеткою. За ними кристал відповідає своїм коротким ефектом на кожен
+   * вид — як модель дає кожному модулю один ефект.
+   */
+  kinds: readonly string[];
 }
 
 /** Порожньо: ні приросту, ні авторів. */
-const NOTHING: GrowthSummary = { newCount: 0, actorIds: [], firstVisit: false };
+const NOTHING: GrowthSummary = { newCount: 0, actorIds: [], firstVisit: false, kinds: [] };
 
 /**
  * Скільки подій з'явилось із минулого разу і хто їх приніс.
@@ -60,11 +67,14 @@ export function summariseGrowth(
   if (seen === null) return { ...NOTHING, firstVisit: true };
 
   const actors = new Set<number>();
+  const kinds = new Set<string>();
   let newCount = 0;
   for (const event of events) {
     if (seen.has(event.id)) continue;
     newCount += 1;
     if (event.actorId !== null) actors.add(event.actorId);
+    const colon = event.id.indexOf(':');
+    if (colon > 0) kinds.add(event.id.slice(0, colon));
   }
   if (newCount === 0) return NOTHING;
 
@@ -75,6 +85,8 @@ export function summariseGrowth(
     newCount,
     actorIds: [...actors].sort((a, b) => a - b),
     firstVisit: false,
+    // Порівняння за кодами символів, а не локаллю: однаково на кожному пристрої.
+    kinds: [...kinds].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0)),
   };
 }
 

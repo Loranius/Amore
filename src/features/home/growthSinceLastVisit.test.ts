@@ -27,6 +27,17 @@ describe('що виросло з минулого разу', () => {
     expect(growthCaption(summary, null, 'crystal')).toBeNull();
   });
 
+  it('види нових подій — для відгуку кристала (ADR-0261): без повторів, сталий порядок, лише нове', () => {
+    const seen = new Set(['memory:1:preserved', 'plan:9:completed']);
+    const summary = summariseGrowth([
+      ev('wish:3:fulfilled'), ev('memory:1:preserved'), ev('memory:2:preserved'),
+      ev('plan:9:completed'), ev('calendar:4:origin'), ev('wish:5:fulfilled'),
+    ], seen);
+    expect(summary.kinds).toEqual(['calendar', 'memory', 'wish']);
+    expect(summariseGrowth([ev('memory:1:preserved')], null).kinds).toEqual([]);
+    expect(summariseGrowth([ev('memory:1:preserved')], seen).kinds).toEqual([]);
+  });
+
   it('нічого нового — мовчить', () => {
     const summary = summariseGrowth([ev('a'), ev('b')], new Set(['a', 'b']));
     expect(summary.newCount).toBe(0);

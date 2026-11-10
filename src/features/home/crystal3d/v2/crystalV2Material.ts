@@ -41,6 +41,11 @@ const FRAGMENT = /* glsl */ `
   uniform float uPulse;
   uniform float uTime;
   uniform float uInvScale;
+  // Відгук на нове з минулого візиту (ADR-0261, \`celebration.ts\`).
+  uniform float uWave;
+  uniform float uWaveAt;
+  uniform float uCrown;
+  uniform float uFlush;
   // Згладжений шум у просторі — для світла всередині тіла.
   float hash3(vec3 p) {
     p = fract(p * 0.3183099 + 0.1);
@@ -222,6 +227,16 @@ const FRAGMENT = /* glsl */ `
     // світло, — на обороті вони спалахують і гаснуть.
     float grain = smoothstep(0.93, 0.99, noise3(vWorld * uInvScale * 46.0));
     colour += pearl * grain * pow(hv, 10.0) * 0.9;
+    /*
+     * ВІДГУК НА НОВЕ (ADR-0261). Один раз за візит, лише для того, що
+     * справді з'явилось: хвиля світла знизу вгору (спогад), спалах граней
+     * вершини (план), наливання кольором (бажання, медіа). Усе — кольором
+     * каменю; поза відгуком уніформи нульові й кадр той самий, що до нього.
+     */
+    float waveBand = exp(-pow((vRise - uWaveAt) / 0.09, 2.0));
+    colour += lineTint * uWave * waveBand * (0.55 + 0.6 * rim) * (0.4 + 0.6 * facing);
+    colour += lineTint * uCrown * smoothstep(0.66, 0.92, vRise) * (0.8 + 1.2 * rim) * (0.4 + 0.6 * facing);
+    colour += mix(rich, uColour, 0.5) * uFlush * 0.45 * (0.3 + 0.7 * facing);
     float alpha = mix(0.9, 1.0, max(rim, fresnel));
     alpha = max(alpha, clamp(glint * 1.5, 0.0, 1.0));
     gl_FragColor = vec4(colour, alpha);
@@ -293,6 +308,10 @@ export function createCrystalV2Material(rgb: readonly [number, number, number], 
       uTime: { value: 0 },
       // Одиниці сцени → одиниці моделі: поле всередині не залежить від масштабу кадру.
       uInvScale: { value: 1 },
+      uWave: { value: 0 },
+      uWaveAt: { value: 0 },
+      uCrown: { value: 0 },
+      uFlush: { value: 0 },
     },
   });
 }
