@@ -198,6 +198,30 @@ And the level does *not* belong in the tint set, however tempting: scaling
 tints exist under — they must vary around the earned colour, not shift it.
 `facets.test.ts` catches that on the first run, and it is right to.
 
+## A rim on a flat fold is a wireframe
+
+2026-11-10 (ADR-0258). The rim was set by *intent*, per edge, as each body was
+built: every triangle of the crown and every tier boundary of the shaft got
+one. Measured by fold angle, a third of all rims (≈86 of ≈250) lay on folds
+under 10° — surfaces the eye reads as one plane — and those lines are what made
+the colony read as a paper model. Real edges sat at 20°+, almost nothing in
+between, so `FOLD_DEG` = 12° separates them cleanly.
+
+The rule now comes from geometry, not intent (`foldFacets`): rim iff the fold
+is ≥ 12°. Two things the first attempt got wrong, both caught on the frame:
+
+- **Merging every flat fold into one face undid ADR-0245.** The tier breaks
+  *are* flat folds (vertices ±2–6 % off the edge line), and without a tone
+  change the sides ran straight from foot to shoulder again. Keep the intended
+  tone boundary; drop only its line.
+- **A split edge at 2–5 % bulge is a 4–8° fold**, so the rule quietly merged
+  the monarch's extra faces back into one wide plane (66 % of the shaft from
+  one side). Specify a split by its *fold angle* (`splitPoint`), not by an
+  offset that only looks meaningful.
+
+Weigh tone clashes by the square of the fold's cosine: on a steep edge light
+separates the faces anyway; on a flat one tone is all there is.
+
 ## What we implemented from it, and how
 
 **Facet rims, procedurally.** We can never use their method directly — they have a UV
@@ -336,7 +360,8 @@ at both ends, grown suspended rather than from a wall), short stubby prism lying
 blocky tabular chunk, and a **fan cluster** — many small crystals of varying length
 radiating from one base. Each also carries a **vertical colour gradient**, one hue at the
 foot and another at the tip. We have the single point, the fan and the
-gradient; the tabular and double-terminated habits are still open.
+gradient; the tabular and double-terminated habits are still open (offered
+to the owner 2026-11-10 and deferred).
 
 ## Two things that turned out to be the same mistake
 

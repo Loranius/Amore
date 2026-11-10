@@ -34,6 +34,7 @@ const VERTEX = /* glsl */ `
 `;
 
 const FRAGMENT = /* glsl */ `
+  #define BODY_LEVEL 0.72
   uniform vec3 uColour;
   uniform vec3 uKey;
   uniform float uGlow;
@@ -85,13 +86,25 @@ const FRAGMENT = /* glsl */ `
      */
     float rise = pow(vRise, 0.8);
     vec3 rich = pow(uColour, vec3(1.8));
-    vec3 inner = mix(rich * 0.5, mix(rich, uColour, 0.35) * 0.88, smoothstep(0.0, 1.0, rise));
+    // Глибина каменю (ADR-0258): біля основи — темне насичене серце, до
+    // вістря тон світлішає. Той самий відтінок, лише світлота й насиченість.
+    vec3 inner = mix(rich * 0.22, mix(rich, uColour, 0.5) * 1.0, smoothstep(0.0, 1.0, rise));
     vec3 pearl = mix(uColour, vec3(1.0, 0.94, 0.97), 0.55);
     // Тон грані в степені 1.6 і серце на 0.7: глибокі грані поруч зі
     // світлими, як в оригінальному монарху (DevTools: найслабша пара 2 % → 17 %).
     vec3 colour = inner * pow(vTone, 1.6) * 0.7 * (0.62 + 0.48 * pow(light, 1.1));
     // Грані вершини ловлять небо: вістря світліше за тіло.
     colour += uColour * pow(max(0.0, n.y), 3.0) * 0.1;
+    /*
+     * Товща й темна сторона (ADR-0258). Грань, що дивиться на нас, показує
+     * камінь наскрізь і світліша; косу світло перетинає коротко — вона темніша
+     * й насиченіша. І все тіло — на рівень нижче: без цього кожна грань стояла
+     * на плечі тонової кривої (медіана яскравості 0.83 від основи до вістря),
+     * і перехід кольору тонув. Кант, блік і оболонка йдуть ПІСЛЯ — темне тіло
+     * з ясним кантом, як у еталонних самоцвітів (навичка crystal-look).
+     */
+    float facingBody = max(0.0, dot(n, view));
+    colour *= (0.62 + 0.5 * facingBody) * BODY_LEVEL;
     // Кант у пікселях екрана. Похідна знизу обмежена: придушене ребро має
     // 1 у всіх кутах, fwidth = 0, і smoothstep(0, 0, x) дав би NaN.
     vec3 width = max(fwidth(vEdge) * 1.2, vec3(1e-5));
@@ -101,10 +114,13 @@ const FRAGMENT = /* glsl */ `
     vec3 halfway = normalize(uKey + view);
     float spec = pow(max(0.0, dot(n, halfway)), 56.0);
     float facing = max(0.0, dot(n, view));
-    float fresnel = pow(1.0 - facing, 2.5);
+    // Перлинна оболонка — лише на самому силуеті (ADR-0258): у степені 2.5
+    // вона вибілювала всю бічну грань до насиченості 0.2–0.4, і камінь
+    // читався цукеркою — насичене серце спереду, бліді боки.
+    float fresnel = pow(1.0 - facing, 4.0);
     float glint = spec * (0.6 + 0.5 * vTone);
     colour += pearl * glint * 0.75;
-    colour = mix(colour, pearl, fresnel * 0.6);
+    colour = mix(colour, pearl, fresnel * 0.45);
     /*
      * ЕНЕРГІЯ, ЩО ПОВІЛЬНО РУХАЄТЬСЯ (ADR-0244). Три тихі шари в товщі, і
      * всі — тривимірні поля, тож не перетинають ребро малюнком на поверхні
@@ -118,7 +134,7 @@ const FRAGMENT = /* glsl */ `
      * світла, тож монарх лишається головним.
      */
     vec3 deep = vWorld * uInvScale - view * (0.15 + 0.35 * facing);
-    float axial = exp(-dot(deep.xz, deep.xz) * 4.0);
+    float axial = exp(-dot(deep.xz, deep.xz) * 2.5);
     float drift = uTime * 0.06;
     float pockets = smoothstep(0.55, 0.85, noise3(deep * 1.3 + vec3(0.0, -drift, 0.0)));
     float streaks = smoothstep(0.62, 0.9, noise3(deep * vec3(3.2, 0.45, 3.2) + vec3(0.0, -drift * 1.6, 0.0)));
@@ -128,7 +144,9 @@ const FRAGMENT = /* glsl */ `
     // Серце світиться КОЛЬОРОМ каменю. Біле світло, додане однаково до всіх
     // граней, вибілювало кристал і зливало грані: виміряно вимиканням у
     // DevTools — насиченість 0.38 → 0.52, кроки граней 11–18 % → 23–35 %.
-    colour += rich * core * (0.7 + 0.6 * pockets) * 0.3 * glowScale;
+    // Світло зсередини (ADR-0258): серце сильніше й ширше, тож товща
+    // каменю світиться крізь грані, що дивляться на нас.
+    colour += rich * core * (0.7 + 0.6 * pockets) * 0.45 * glowScale;
     // Майже біла рожева енергія — лише в рідких патьоках і порошинках.
     float sparkle = 0.3 * streaks * axial + 0.8 * motes;
     vec3 glowTint = mix(uColour, vec3(1.0, 0.9, 0.96), 0.55 + 0.3 * motes);

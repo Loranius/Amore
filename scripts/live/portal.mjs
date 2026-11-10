@@ -75,7 +75,8 @@ export function resolveChromium() {
     .sort()
     .reverse();
   for (const build of builds) {
-    for (const relative of ['chrome-linux/chrome', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium']) {
+    // Новіші збірки Playwright кладуть Chromium у `chrome-linux64` (1243+).
+    for (const relative of ['chrome-linux/chrome', 'chrome-linux64/chrome', 'chrome-mac/Chromium.app/Contents/MacOS/Chromium']) {
       const candidate = join(root, build, relative);
       if (existsSync(candidate)) return candidate;
     }

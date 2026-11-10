@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import json
+import math
 import sys
 import unittest
 from pathlib import Path
@@ -15,7 +16,7 @@ sys.path.insert(0, str(ROOT))
 from crystal_twin.calendar import anniversary, year_index  # noqa: E402
 from crystal_twin.hashing import hash32  # noqa: E402
 from crystal_twin.model import build_model  # noqa: E402
-from crystal_twin.geometry import body, monarch_body, monarch_crown_height, monarch_profile  # noqa: E402
+from crystal_twin.geometry import FOLD_DEG, body, colony, monarch_body, monarch_crown_height, monarch_profile  # noqa: E402
 
 import numpy as np  # noqa: E402
 
@@ -220,6 +221,29 @@ class Geometry(unittest.TestCase):
             smallest = np.linalg.svd(centred, compute_uv=False)[-1]
             self.assertLess(smallest, 1e-9, f"грань {face} не пласка")
 
+
+    def test_rim_only_on_a_real_fold(self):
+        """Кант лише на зламі від FOLD_DEG (ADR-0258), як у `geometry.test.ts`:
+        до правки третина кантів лежала на майже пласкій поверхні."""
+        for name in ("busy", "empty", "gifts_red", "leap_day"):
+            for b in colony(build_model(fixture(name))):
+                owners: dict[str, list] = {}
+                for tri, _, edges, shade in b["faces"]:
+                    n = np.cross(tri[1] - tri[0], tri[2] - tri[0])
+                    n = n / np.linalg.norm(n)
+                    for s in range(3):
+                        a = ",".join(f"{x:.5f}" for x in tri[(s + 1) % 3])
+                        c = ",".join(f"{x:.5f}" for x in tri[(s + 2) % 3])
+                        owners.setdefault(min(a, c) + "|" + max(a, c), []).append((n, edges[s], shade))
+                for pair in owners.values():
+                    if len(pair) != 2:
+                        continue
+                    (n1, rim, s1), (n2, _, s2) = pair
+                    fold = math.degrees(math.acos(min(1.0, float(np.dot(n1, n2)))))
+                    if rim:
+                        self.assertGreaterEqual(fold, FOLD_DEG)
+                    elif s1 != s2:
+                        self.assertLess(fold, FOLD_DEG)
 
     def test_monarch_crown_is_a_gem_not_a_cap(self):
         """Корона самоцвіта (ADR-0247): та сама висота, корона — 20…30 %,

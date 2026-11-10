@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { buildCrystalV2Geometry, monarchCrownHeight, monarchProfile, monarchSplits } from './geometry';
+import { buildCrystalV2Geometry, FOLD_DEG, monarchCrownHeight, monarchProfile, monarchSplits } from './geometry';
 import { buildCrystalV2Model, type CrystalV2Snapshot } from './model';
 
 // ============================================================
@@ -37,21 +37,115 @@ describe('кристал v2: геометрія', () => {
     }
   });
 
-  it('грані пласкі (ADR-0245): трикутник — пласкі за побудовою; пара одного тону зламана менше ніж на 10°', () => {
-    // Стовбур ламається на площини, але грань не стає кривою: два трикутники
-    // з одним тоном — одна грань із легким зламом, решта — окремі грані.
-    const { positions, faceTone, triangles } = geometry.crystals;
-    let pairs = 0;
-    for (let t = 0; t + 1 < triangles; t += 1) {
-      if (faceTone[t * 3] !== faceTone[(t + 1) * 3]) continue;
-      const tri = (k: number): [V3, V3, V3] => [point(positions, k * 3), point(positions, k * 3 + 1), point(positions, k * 3 + 2)];
-      const na = cross(sub(tri(t)[1], tri(t)[0]), sub(tri(t)[2], tri(t)[0]));
-      const nb = cross(sub(tri(t + 1)[1], tri(t + 1)[0]), sub(tri(t + 1)[2], tri(t + 1)[0]));
-      const cos = Math.abs(na[0] * nb[0] + na[1] * nb[1] + na[2] * nb[2]) / (norm(na) * norm(nb));
-      expect((Math.acos(Math.min(1, cos)) * 180) / Math.PI).toBeLessThan(10);
-      pairs += 1;
+  /*
+   * Ребра колонії з двома сусідами: злам між трикутниками, чи є кант, і
+   * чи одна це грань (один тон). Кожне ребро — один раз.
+   */
+  const sharedEdges = (mesh: { positions: Float32Array; faceTone: Float32Array; edge: Float32Array; triangles: number }) => {
+    const key = (p: V3) => p.map((x) => x.toFixed(5)).join(',');
+    const normal = (t: number): V3 => {
+      const a = point(mesh.positions, t * 3);
+      const n = cross(sub(point(mesh.positions, t * 3 + 1), a), sub(point(mesh.positions, t * 3 + 2), a));
+      const l = norm(n);
+      return [n[0] / l, n[1] / l, n[2] / l];
+    };
+    const owners = new Map<string, [number, number][]>();
+    for (let t = 0; t < mesh.triangles; t += 1) {
+      for (let s = 0; s < 3; s += 1) {
+        const a = key(point(mesh.positions, t * 3 + ((s + 1) % 3)));
+        const b = key(point(mesh.positions, t * 3 + ((s + 2) % 3)));
+        const k = a < b ? `${a}|${b}` : `${b}|${a}`;
+        owners.set(k, [...(owners.get(k) ?? []), [t, s]]);
+      }
     }
-    expect(pairs).toBeGreaterThan(5);
+    const tone = (t: number) => [0.74, 1.0, 1.3].findIndex((base) => {
+      const v = mesh.faceTone[t * 3]!;
+      return v >= base * 0.95 - 1e-6 && v <= base * 1.05 + 1e-6;
+    });
+    const out: { fold: number; rim: boolean; sameFacet: boolean; sameTone: boolean }[] = [];
+    for (const list of owners.values()) {
+      if (list.length !== 2) continue;
+      const [[t1, s1], [t2]] = list as [[number, number], [number, number]];
+      const a = normal(t1);
+      const b = normal(t2);
+      const fold = (Math.acos(Math.min(1, a[0] * b[0] + a[1] * b[1] + a[2] * b[2])) * 180) / Math.PI;
+      // Кант на ребрі навпроти кута s: у кута s+1 слот s дорівнює нулю.
+      const rim = mesh.edge[(t1 * 3 + ((s1 + 1) % 3)) * 3 + s1] === 0;
+      out.push({ fold, rim, sameFacet: mesh.faceTone[t1 * 3] === mesh.faceTone[t2 * 3], sameTone: tone(t1) === tone(t2) });
+    }
+    return out;
+  };
+  const FIXTURE_NAMES = ['busy', 'empty', 'gifts_red', 'leap_day'];
+
+  it('кант лише на справжньому зламі (ADR-0258): від FOLD_DEG — кант, менше — ніколи', () => {
+    // Регресія «сітки ліній»: до правки третина кантів лежала на зламах до
+    // 10°, тобто на майже пласкій поверхні, і малювала паперову модель.
+    for (const name of FIXTURE_NAMES) {
+      const edges = sharedEdges(buildCrystalV2Geometry(buildCrystalV2Model(fixture(name))).crystals);
+      for (const e of edges) {
+        if (e.rim) expect(e.fold).toBeGreaterThanOrEqual(FOLD_DEG);
+        if (!e.rim && !e.sameFacet) expect(e.fold).toBeLessThan(FOLD_DEG);
+      }
+      expect(edges.filter((e) => e.rim).length).toBeGreaterThan(100);
+    }
+  });
+
+  it('одна грань — один тон, і вона майже пласка (ADR-0245, ADR-0258)', () => {
+    // Два трикутники однієї грані зламані щонайбільше на поріг з невеликим
+    // запасом: діагональ чотирикутника стовбура (ADR-0245, до ±2 % від прямої)
+    // і злиті грані вершини (до FOLD_DEG).
+    for (const name of FIXTURE_NAMES) {
+      const edges = sharedEdges(buildCrystalV2Geometry(buildCrystalV2Model(fixture(name))).crystals);
+      const inside = edges.filter((e) => e.sameFacet);
+      expect(inside.length).toBeGreaterThan(50);
+      for (const e of inside) expect(e.fold).toBeLessThan(FOLD_DEG + 2);
+    }
+  });
+
+  it('сусідні грані через пологий злам — різного тону (ADR-0176, ADR-0258)', () => {
+    // На пологому зламі грані розводить лише тон: світло падає на обидві
+    // майже однаково. Збіг тону лишається можливим лише на крутому ребрі.
+    for (const name of FIXTURE_NAMES) {
+      const edges = sharedEdges(buildCrystalV2Geometry(buildCrystalV2Model(fixture(name))).crystals);
+      for (const e of edges) if (!e.sameFacet && e.fold < 25) expect(e.sameTone).toBe(false);
+    }
+  });
+
+  it('монарх спереду — не стовп (ADR-0258): з будь-якого боку видно ≥ 4 граней стовбура, найширша ≤ 40 %', () => {
+    // Регресія: з боку сторони без додаткового ребра було видно 2–3 грані, і
+    // середня займала до 66 % ширини стовбура.
+    for (const name of FIXTURE_NAMES) {
+      const model = buildCrystalV2Model(fixture(name));
+      const mesh = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const y = model.monarch.height * 0.5;
+      for (let deg = 0; deg < 360; deg += 15) {
+        const a = (deg * Math.PI) / 180;
+        const view: V3 = [Math.sin(a), 0, Math.cos(a)];
+        const right: V3 = [Math.cos(a), 0, -Math.sin(a)];
+        const spans = new Map<number, [number, number]>();
+        for (let t = 0; t < mesh.triangles; t += 1) {
+          const p = [point(mesh.positions, t * 3), point(mesh.positions, t * 3 + 1), point(mesh.positions, t * 3 + 2)];
+          const n = cross(sub(p[1]!, p[0]!), sub(p[2]!, p[0]!));
+          if (n[0] * view[0] + n[2] * view[2] <= 0) continue;
+          const xs: number[] = [];
+          for (let k = 0; k < 3; k += 1) {
+            const A = p[k]!;
+            const B = p[(k + 1) % 3]!;
+            if (A[1] === B[1] || (A[1] - y) * (B[1] - y) > 0) continue;
+            const s = (y - A[1]) / (B[1] - A[1]);
+            xs.push((A[0] + (B[0] - A[0]) * s) * right[0] + (A[2] + (B[2] - A[2]) * s) * right[2]);
+          }
+          if (xs.length < 2) continue;
+          const facet = mesh.faceTone[t * 3]!;
+          const was = spans.get(facet);
+          spans.set(facet, [Math.min(was?.[0] ?? Infinity, ...xs), Math.max(was?.[1] ?? -Infinity, ...xs)]);
+        }
+        const widths = [...spans.values()].map(([lo, hi]) => hi - lo);
+        const total = widths.reduce((sum, w) => sum + w, 0);
+        expect(widths.filter((w) => w / total > 0.06).length).toBeGreaterThanOrEqual(4);
+        expect(Math.max(...widths) / total).toBeLessThanOrEqual(0.4);
+      }
+    }
   });
 
   it('бічні грані різної довжини: межі граней на багатьох висотах (ADR-0245, еталон low_poly_dirt_crystals)', () => {
@@ -217,8 +311,9 @@ describe('кристал v2: геометрія', () => {
     const alone = buildCrystalV2Geometry({ ...busy, children: [] });
     const sides = busy.monarch.sides.length;
     const splits = monarchSplits(busy.startDate, busy.monarch.sides).filter(Boolean).length;
-    expect(splits).toBeGreaterThanOrEqual(2);
-    expect(splits).toBeLessThan(sides);
+    // Ребро на кожній стороні (ADR-0258): інакше з боку сторони без ребра
+    // монарх читався стовпом.
+    expect(splits).toBe(sides);
     // Стовбур: 3 пояси × грані × 2 трикутники. Корона: плечі (2 на сторону,
     // 3 де є ребро), зірка (2 на сторону), промені до кільця (сторона + крок
     // кільця) і вістря (крок кільця). Кільце — плани + 2.

@@ -169,25 +169,45 @@ def body(seed, tag, sides, height, tip, apex, ridge, bury, profile=CHILD_PROFILE
     tip_at = (apex[0] + sx * radius, apex[1] + sz * radius)
     top_y = max(p[1] for p in top)
     for tri in crown(seed, tag, list(top), top_y, height - top_y, tip_at, ridge, radius * shoulder_scale):
-        faces.append((np.array(tri), face, TRI, face))
+        faces.append((np.array(tri), face, TRI, None))
         face += 1
     return faces
 
 
 def monarch_splits(seed, sides):
-    """Як `monarchSplits` у `geometry.ts`: ребро на половині сторін, але
-    щонайменше на двох і не на всіх."""
-    flags = [unit(seed, f"monarch:split{i}:on") < 0.5 for i in range(len(sides))]
-    order = sorted(range(len(sides)), key=lambda i: unit(seed, f"monarch:split{i}:rank"))
-    for i in order:
-        if sum(flags) >= 2:
-            break
-        flags[i] = True
-    for i in order:
-        if sum(flags) < len(sides):
-            break
-        flags[i] = False
-    return flags
+    """Як `monarchSplits` у `geometry.ts` (ADR-0258): ребро на кожній стороні —
+    у нерівному місці й зі своїм зламом, тож циліндра немає."""
+    return [True for _ in sides]
+
+
+# Місце й злам додаткового ребра — як `SPLIT_T` і `SPLIT_FOLD` (ADR-0258).
+SPLIT_T = (0.35, 0.65)
+SPLIT_FOLD = (20.0, 28.0)
+
+
+def split_point(a, b, t, fold_deg):
+    """Як `splitPoint` у `geometry.ts`: ребро в місці `t` сторони, винесене
+    назовні рівно настільки, щоб половини сторони зламались на `fold_deg`."""
+    dx, dz = b[0] - a[0], b[2] - a[2]
+    length = math.hypot(dx, dz)
+    nx, nz = dz / length, -dx / length
+    mx, mz = a[0] + dx * 0.5, a[2] + dz * 0.5
+    if nx * mx + nz * mz < 0:
+        nx, nz = -nx, -nz
+    target = math.radians(fold_deg)
+
+    def fold(h):
+        return math.atan(h / (t * length)) + math.atan(h / ((1 - t) * length))
+
+    lo, hi = 0.0, length
+    for _ in range(40):
+        mid = (lo + hi) / 2
+        if fold(mid) < target:
+            lo = mid
+        else:
+            hi = mid
+    h = (lo + hi) / 2
+    return np.array([a[0] + dx * t + nx * h, 0.0, a[2] + dz * t + nz * h])
 
 
 def monarch_crown_height(height, tip):
@@ -209,10 +229,10 @@ def monarch_body(seed, sides, height, tip, ridge, bury, profile):
         corner_at.append(len(ring12))
         ring12.append(a)
         if splits[i]:
-            t = 0.25 + 0.5 * unit(seed, f"monarch:split{i}:t")
-            bulge = 1.02 + 0.03 * unit(seed, f"monarch:split{i}:b")
+            t = SPLIT_T[0] + (SPLIT_T[1] - SPLIT_T[0]) * unit(seed, f"monarch:split{i}:t")
+            fold = SPLIT_FOLD[0] + (SPLIT_FOLD[1] - SPLIT_FOLD[0]) * unit(seed, f"monarch:split{i}:b")
             split_at.append(len(ring12))
-            ring12.append((a + (b - a) * t) * bulge)
+            ring12.append(split_point(a, b, t, fold))
         else:
             split_at.append(-1)
     ring12 = np.array(ring12)
@@ -247,7 +267,7 @@ def monarch_body(seed, sides, height, tip, ridge, bury, profile):
         nonlocal face
         nrm = np.cross(b - a, c - a)
         tri = (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
-        faces.append((np.array(tri), face, TRI, face))
+        faces.append((np.array(tri), face, TRI, None))
         face += 1
 
     def at(angle, reach, y):
@@ -315,6 +335,114 @@ def monarch_body(seed, sides, height, tip, ridge, bury, profile):
 FACE_TONES = (0.74, 1.0, 1.3)
 
 
+# Найменший злам, який око бачить ребром — як `FOLD_DEG` (ADR-0258).
+FOLD_DEG = 12.0
+
+
+def fold_facets(faces):
+    """Як `foldFacets` у `geometry.ts` (ADR-0258): кант лише на зламах від
+    `FOLD_DEG`; задумана межа тону (яруси стовбура) лишається; грані вершини,
+    зламані менше за поріг, — одна грань; тон із трьох, сусіди різні, і
+    пологий сусід важить квадрат косинуса злама."""
+    def key(p):
+        return ",".join(f"{float(x):.5f}" for x in p)
+
+    normals = []
+    for tri, _, _, _ in faces:
+        n = np.cross(tri[1] - tri[0], tri[2] - tri[0])
+        length = float(np.linalg.norm(n)) or 1.0
+        normals.append(n / length)
+    owners = {}
+    for t, (tri, _, _, _) in enumerate(faces):
+        for s in range(3):
+            a, b = key(tri[(s + 1) % 3]), key(tri[(s + 2) % 3])
+            k = f"{a}|{b}" if a < b else f"{b}|{a}"
+            owners.setdefault(k, []).append((t, s))
+    min_cos = math.cos(math.radians(FOLD_DEG))
+
+    def group(t):
+        shade = faces[t][3]
+        return shade if shade is not None else -1 - faces[t][1]
+
+    parent = list(range(len(faces)))
+
+    def find(t):
+        r = t
+        while parent[r] != r:
+            r = parent[r]
+        while parent[t] != r:
+            parent[t], t = r, parent[t]
+        return r
+
+    def join(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[max(ra, rb)] = min(ra, rb)
+
+    first = {}
+    for t in range(len(faces)):
+        g = group(t)
+        if g in first:
+            join(first[g], t)
+        else:
+            first[g] = t
+    folded = [list(f[2]) for f in faces]
+    pairs = []
+    for lst in owners.values():
+        if len(lst) != 2:
+            continue
+        (t1, s1), (t2, s2) = lst
+        cos = float(np.dot(normals[t1], normals[t2]))
+        same = group(t1) == group(t2)
+        fold = cos < min_cos and not same
+        folded[t1][s1] = fold
+        folded[t2][s2] = fold
+        if not fold and not same and faces[t1][3] is None and faces[t2][3] is None:
+            join(t1, t2)
+        pairs.append((t1, t2, cos))
+    facet = [find(t) for t in range(len(faces))]
+    weights = {}
+    for t1, t2, cos in pairs:
+        f1, f2 = facet[t1], facet[t2]
+        if f1 == f2:
+            continue
+        w = max(0.0, cos) ** 2
+        for a, b in ((f1, f2), (f2, f1)):
+            near = weights.setdefault(a, {})
+            near[b] = max(near.get(b, 0.0), w)
+    roots = list(dict.fromkeys(facet))
+    tone = {}
+
+    def clash(root, k):
+        return sum(w for f, w in weights.get(root, {}).items() if tone.get(f) == k)
+
+    def best_of(root, start, order):
+        best = start
+        for k in order:
+            if clash(root, k) < clash(root, best) - 1e-9:
+                best = k
+        return best
+
+    for root in roots:
+        wanted = group(root) % 3 if group(root) >= 0 else faces[root][1] % 3
+        order = [wanted, (wanted + 1) % 3, (wanted + 2) % 3]
+        tone[root] = best_of(root, wanted, order)
+    for _ in range(8):
+        changed = False
+        for root in roots:
+            now = tone[root]
+            if clash(root, now) == 0:
+                continue
+            better = best_of(root, now, [0, 1, 2])
+            if better != now:
+                tone[root] = better
+                changed = True
+        if not changed:
+            break
+    return [(tri, f, tuple(folded[t]), facet[t] * 3 + tone[facet[t]])
+            for t, (tri, f, _, _) in enumerate(faces)]
+
+
 def _rotate(points: np.ndarray, lean_deg: float, azimuth_deg: float) -> np.ndarray:
     """Нахил НАЗОВНІ від осі колонії: поворот навколо дотичної осі."""
     az = math.radians(azimuth_deg)
@@ -335,9 +463,9 @@ def colony(model: dict[str, Any]) -> list[dict[str, Any]]:
     m = model["monarch"]
     bodies = [{
         "kind": "monarch",
-        "faces": monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
-                              m["tiers"], 0.12 * m["height"],
-                              monarch_profile(model["startDate"])),
+        "faces": fold_facets(monarch_body(model["startDate"], m["sides"], m["height"], sum(m["tierHeights"]),
+                                          m["tiers"], 0.12 * m["height"],
+                                          monarch_profile(model["startDate"]))),
         "sparks": [],
     }]
     seed = model["startDate"]
@@ -346,8 +474,8 @@ def colony(model: dict[str, Any]) -> list[dict[str, Any]]:
         key = f"year{child['year']}"
         apex = ((unit(seed, f"{key}:apex:x") - 0.5) * 0.5 * child["radius"],
                 (unit(seed, f"{key}:apex:z") - 0.5) * 0.5 * child["radius"])
-        faces = body(seed, key, child["sides"], child["height"], tip, apex,
-                     1 + int(unit(seed, f"{key}:ridge") * 2), bury=0.12 * child["height"])
+        faces = fold_facets(body(seed, key, child["sides"], child["height"], tip, apex,
+                                 1 + int(unit(seed, f"{key}:ridge") * 2), bury=0.12 * child["height"]))
         az = math.radians(child["azimuth"])
         # Друза — щільний пучок майже вертикальних кристалів (ADR-0245).
         lean = child["lean"] * CHILD_LEAN
