@@ -36,6 +36,8 @@ import {
 import { SHOPPING_CATEGORIES } from '@/app/constants';
 import {
   BagIcon,
+  BellIcon,
+  BellOffIcon,
   BoxIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -57,6 +59,7 @@ import {
   parseShoppingInput,
 } from './useShoppingItems';
 import { EditItemModal } from './EditItemModal';
+import { readShoppingNotify, writeShoppingNotify } from './shoppingNotify';
 import {
   TEMPLATE_GROUPS,
   listedKeys,
@@ -140,6 +143,14 @@ export function ShoppingPage() {
   const authorName = (id: number | null) => (id !== null && usersMap[id]) || 'Хтось';
 
   const [input, setInput] = useState('');
+  // Сповіщати в Telegram (ADR-0262) — вибір цього пристрою, пам'ятається між
+  // візитами; без сховища — типово так, як було досі.
+  const [notify, setNotify] = useState(readShoppingNotify);
+  const switchNotify = () => setNotify((current) => {
+    const next = !current;
+    writeShoppingNotify(next);
+    return next;
+  });
   const [adding, setAdding] = useState(false);
   const [templateOpen, setTemplateOpen] = useState(false);
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -188,7 +199,7 @@ export function ShoppingPage() {
     try {
       const lines = await parseShoppingInput(input);
       if (lines.length) {
-        add.mutate(lines);
+        add.mutate({ lines, notify });
         setInput('');
       }
     } finally {
@@ -198,7 +209,7 @@ export function ShoppingPage() {
 
   const toggleItem = (item: ShoppingItemRow) => {
     if (item.bought) {
-      toggleBought.mutate(item);
+      toggleBought.mutate({ item, notify });
       return;
     }
     if (completionTimers.current.has(item.id)) return;
@@ -217,7 +228,7 @@ export function ShoppingPage() {
         next.delete(item.id);
         return next;
       });
-      toggleBought.mutate(item);
+      toggleBought.mutate({ item, notify });
     }, reduceMotion ? 40 : COMPLETE_ANIMATION_MS);
 
     completionTimers.current.set(item.id, timer);
@@ -230,7 +241,7 @@ export function ShoppingPage() {
 
   const addFromTemplate = (item: TemplateItem) => {
     if (listed.has(templateKey(item.title))) return;
-    add.mutate([{ title: item.title, qty: null, category: item.category }]);
+    add.mutate({ lines: [{ title: item.title, qty: null, category: item.category }], notify });
   };
 
   return (
@@ -364,17 +375,31 @@ export function ShoppingPage() {
           </button>
         </div>
 
-        <button
-          type="button"
-          className={`shopping-template-toggle${templateOpen ? ' shopping-template-toggle--open' : ''}`}
-          onClick={() => setTemplateOpen((open) => !open)}
-          aria-expanded={templateOpen}
-          aria-controls="shopping-template-shelf"
-        >
-          <LayersIcon size={16} />
-          <strong>Шаблон</strong>
-          <ChevronDownIcon size={16} />
-        </button>
+        <div className="shopping-dock-tools">
+          <button
+            type="button"
+            className={`shopping-template-toggle${templateOpen ? ' shopping-template-toggle--open' : ''}`}
+            onClick={() => setTemplateOpen((open) => !open)}
+            aria-expanded={templateOpen}
+            aria-controls="shopping-template-shelf"
+          >
+            <LayersIcon size={16} />
+            <strong>Шаблон</strong>
+            <ChevronDownIcon size={16} />
+          </button>
+          {/* Сповіщення в Telegram (ADR-0262): вимкнено — партнер не отримає
+              повідомлення ні про додане, ні про куплене, поки так стоїть. */}
+          <button
+            type="button"
+            className={`shopping-notify-toggle${notify ? '' : ' shopping-notify-toggle--off'}`}
+            onClick={switchNotify}
+            aria-pressed={notify}
+            aria-label={notify ? 'Сповіщення в Telegram увімкнені. Вимкнути' : 'Без сповіщення в Telegram. Увімкнути'}
+          >
+            {notify ? <BellIcon size={16} /> : <BellOffIcon size={16} />}
+            <strong>{notify ? 'Telegram' : 'Тихо'}</strong>
+          </button>
+        </div>
       </div>
 
       {editing && (
@@ -535,3 +560,4 @@ function ShoppingSkeleton() {
     </div>
   );
 }
+

@@ -290,3 +290,25 @@ export function MoonIcon({ size = 24, className = '' }: IconProps) {
     </svg>
   );
 }
+
+/** Дзвоник — сповіщення увімкнені (покупки → Telegram, ADR-0262). */
+export function BellIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M6.2 16.6V11a5.8 5.8 0 0 1 11.6 0v5.6l1.6 1.8H4.6l1.6-1.8Z" />
+      <path d="M10 20.4a2.2 2.2 0 0 0 4 0" />
+    </svg>
+  );
+}
+
+/** Перекреслений дзвоник — тихо, без сповіщення (ADR-0262). */
+export function BellOffIcon({ size = 24, className = '' }: IconProps) {
+  return (
+    <svg {...iconAttrs(size, className)}>
+      <path d="M8.4 6.4A5.8 5.8 0 0 1 17.8 11v4.4" />
+      <path d="M6.2 11v5.6l-1.6 1.8h12.6" />
+      <path d="M10 20.4a2.2 2.2 0 0 0 4 0" />
+      <path d="M4 4l16 16" />
+    </svg>
+  );
+}

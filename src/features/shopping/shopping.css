@@ -76,6 +76,49 @@
   align-items: stretch;
 }
 
+/* ── «Шаблон» і перемикач сповіщень — один ряд під полем ────── */
+.shopping-dock-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+
+/* Перемикач Telegram (ADR-0262): тихіший за «Шаблон», бо міняють його рідко;
+   вимкнений стан — приглушений і перекреслений дзвоник, щоб «тихо» було
+   видно, а не вгадувалось. */
+.shopping-notify-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color .16s ease, border-color .16s ease, color .16s ease;
+}
+
+.shopping-notify-toggle strong {
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.shopping-notify-toggle > svg {
+  color: var(--accent);
+}
+
+.shopping-notify-toggle--off {
+  color: var(--muted);
+  border-style: dashed;
+}
+
+.shopping-notify-toggle--off > svg {
+  color: inherit;
+}
+
 /* ── Кнопка «Шаблон» ─────────────────────────────────────────
    Стоїть ПІД полем, як і просив власник. Полиця, яку вона відкриває, лежить
    у розмітці ВИЩЕ поля — інакше вона розкривалась би вниз, за нижній край

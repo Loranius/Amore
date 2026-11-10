@@ -15,6 +15,7 @@ import { qk } from '@/lib/queryKeys';
 import { toShoppingCategory } from '@/lib/guards';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
+import { uuidV4 } from '@/lib/entropy';
 import type {
   ShoppingItemRow,
   InsertRow,
@@ -71,6 +72,31 @@ export async function parseShoppingInput(raw: string): Promise<ParsedShoppingLin
   return smart ?? parseInputFallback(raw);
 }
 
+// ── Рядки вставлення ─────────────────────────────────────────
+/**
+ * Рядки для одного вводу (ADR-0262). Кілька товарів отримують спільну
+ * партію — `batch_id` і `batch_size`, — і бот надсилає одне повідомлення
+ * списком; один товар партії не має і йде, як раніше. `notify: false` —
+ * Telegram мовчить про весь ввід. `newBatchId` — звідки взяти ідентифікатор
+ * партії (у застосунку — `uuidV4` з `@/lib/entropy`).
+ */
+export function shoppingInsertRows(
+  lines: readonly ParsedShoppingLine[],
+  notify: boolean,
+  createdBy: number,
+  newBatchId: () => string,
+): InsertRow<'shopping_items'>[] {
+  const batch = lines.length > 1 ? { batch_id: newBatchId(), batch_size: lines.length } : { batch_id: null, batch_size: null };
+  return lines.map((l) => ({
+    title: l.title,
+    qty: l.qty,
+    category: l.category,
+    created_by: createdBy,
+    notify,
+    ...batch,
+  }));
+}
+
 // ── Мутації ──────────────────────────────────────────────────
 export function useShoppingMutations() {
   const client = useQueryClient();
@@ -87,18 +113,16 @@ export function useShoppingMutations() {
   const settle = () => void client.invalidateQueries({ queryKey: key });
 
   // ДОДАВАННЯ — оптимістичні temp-рядки (від'ємний id), потім реальні з БД.
+  // Сповіщення (ADR-0262): `notify: false` — Telegram мовчить; кілька товарів
+  // з одного вводу несуть спільний `batch_id`, і бот шле одне повідомлення
+  // списком (`supabase/functions/db-notify/shoppingRules.ts`).
   const add = useMutation({
-    mutationFn: async (lines: ParsedShoppingLine[]) => {
-      const rows: InsertRow<'shopping_items'>[] = lines.map((l) => ({
-        title: l.title,
-        qty: l.qty,
-        category: l.category,
-        created_by: user.id,
-      }));
+    mutationFn: async ({ lines, notify }: { lines: ParsedShoppingLine[]; notify: boolean }) => {
+      const rows: InsertRow<'shopping_items'>[] = shoppingInsertRows(lines, notify, user.id, uuidV4);
       const { error } = await supabase.from('shopping_items').insert(rows);
       if (error) throw error;
     },
-    onMutate: async (lines) => {
+    onMutate: async ({ lines }) => {
       await client.cancelQueries({ queryKey: key });
       const prev = snapshot();
       const now = new Date().toISOString();
@@ -123,9 +147,10 @@ export function useShoppingMutations() {
     onSettled: settle, // підтягуємо реальні id
   });
 
-  // КУПЛЕНО / ПОВЕРНУТИ.
+  // КУПЛЕНО / ПОВЕРНУТИ. `notify` — як стоїть перемикач у мить дії (ADR-0262):
+  // тихо додане можна купити з повідомленням, і навпаки.
   const toggleBought = useMutation({
-    mutationFn: async (item: ShoppingItemRow) => {
+    mutationFn: async ({ item, notify }: { item: ShoppingItemRow; notify: boolean }) => {
       const nowBought = !item.bought;
       const { error } = await supabase
         .from('shopping_items')
@@ -133,11 +158,12 @@ export function useShoppingMutations() {
           bought: nowBought,
           bought_by: nowBought ? user.id : null,
           bought_at: nowBought ? new Date().toISOString() : null,
+          notify,
         })
         .eq('id', item.id);
       if (error) throw error;
     },
-    onMutate: async (item) => {
+    onMutate: async ({ item }) => {
       await client.cancelQueries({ queryKey: key });
       const prev = snapshot();
       const nowBought = !item.bought;

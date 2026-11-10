@@ -336,8 +336,10 @@ function ShoppingComposer({ plan, onDone }: { plan: PlanRow; onDone: () => void 
           className="btn"
           disabled={lines.length === 0 || add.isPending}
           onClick={() => {
+            // З плану — як і раніше, зі сповіщенням; кілька товарів ідуть
+            // одним повідомленням списком (ADR-0262).
             add.mutate(
-              lines.map((title) => ({ title, qty: null, category: 'Інше' as const })),
+              { lines: lines.map((title) => ({ title, qty: null, category: 'Інше' as const })), notify: true },
               { onSuccess: onDone },
             );
           }}

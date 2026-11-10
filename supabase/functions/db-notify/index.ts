@@ -1,5 +1,5 @@
 // ============================================================
-// Supabase Edge Function: db-notify  v6
+// Supabase Edge Function: db-notify  v7 (ADR-0262: покупки тихо й партією)
 // Таблиці: transactions, personal_wishes, wishlist_items,
 //          savings_goals, shopping_items, free_limit,
 //          photo_calendar, dates
@@ -7,6 +7,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { boughtShoppingText, shoppingInsertDecision } from "./shoppingRules.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -80,23 +81,11 @@ function buildMessage(
     return null;
   }
 
-  // Список покупок — новий товар
-  if (table === "shopping_items" && type === "INSERT") {
-    return {
-      text: `🛒 Новий товар у списку покупок:\n<b>${record.title || "без назви"}</b>${record.qty ? ` — ${record.qty}` : ""}${record.category ? `\n📂 ${record.category}` : ""}`,
-      authorName: null,
-    };
-  }
-
-  // Список покупок — куплено
+  // Список покупок — новий товар (тихий, один чи партією) розбирає
+  // головний хендлер (ADR-0262); сюди доходить лише «куплено».
   if (table === "shopping_items" && type === "UPDATE") {
-    if (oldRecord && !oldRecord.bought && record.bought) {
-      return {
-        text: `✅ Куплено: <b>${record.title || "товар"}</b>`,
-        authorName: null,
-      };
-    }
-    return null;
+    const text = boughtShoppingText(record, oldRecord);
+    return text ? { text, authorName: null } : null;
   }
 
   return null;
@@ -584,8 +573,28 @@ serve(async (req) => {
       });
     }
 
+    // Список покупок — новий товар (ADR-0262): тихий рядок мовчить, кілька
+    // товарів з одного вводу — одне повідомлення списком від останнього рядка.
+    let shoppingText: string | null = null;
+    if (table === "shopping_items" && type === "INSERT") {
+      let decision = shoppingInsertDecision(record, null);
+      if (decision.kind === "needsBatch") {
+        const { data: batch, error: batchError } = await sb
+          .from("shopping_items").select("id,title,qty,category,notify,batch_id,batch_size")
+          .eq("couple_id", coupleId).eq("batch_id", decision.batchId);
+        if (batchError) throw batchError;
+        decision = shoppingInsertDecision(record, batch ?? []);
+      }
+      if (decision.kind !== "single" && decision.kind !== "batch") {
+        return new Response(JSON.stringify({ skipped: `shopping_${decision.kind}` }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      shoppingText = decision.text;
+    }
+
     // Всі інші події — широкомовне сповіщення
-    const msg = buildMessage(table, type, record, oldRecord);
+    const msg = shoppingText ? { text: shoppingText, authorName: null } : buildMessage(table, type, record, oldRecord);
     if (!msg) {
       return new Response(JSON.stringify({ skipped: true }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

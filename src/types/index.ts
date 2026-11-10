@@ -332,6 +332,12 @@ export interface ShoppingItemRow {
   bought_at: string | null;
   /** Час створення (серверний default). Читається лише для сортування списку. */
   created_at: string;
+  /** false — Telegram мовчить про цей рядок (ADR-0262). Типово true. */
+  notify?: boolean;
+  /** Спільний для товарів одного вводу — одне повідомлення списком (ADR-0262). */
+  batch_id?: string | null;
+  /** Скільки товарів у партії `batch_id`. */
+  batch_size?: number | null;
 }
 
 /**
