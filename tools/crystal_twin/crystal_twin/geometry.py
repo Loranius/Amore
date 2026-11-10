@@ -34,53 +34,150 @@ def _ring(sides: list[list[float]]) -> np.ndarray:
 TRI = (True, True, True)
 
 
-def crown(seed, tag, top, y1, tip, apex, ridge, radius):
-    """Верхівка як у `geometry.ts` (ADR-0217, поправка «г»): не концентричні
-    яруси, а зміщений кінчик із `ridge` точок на різній висоті; кожна грань —
-    один трикутник, тож пласка за побудовою."""
-    ax, az = apex
-    theta0 = unit(seed, f"{tag}:ridge:turn") * math.pi * 2
-    q = []
-    for k in range(ridge):
-        th = theta0 + k * 2 * math.pi / ridge + (unit(seed, f"{tag}:ridge{k}:a") - 0.5) * (math.pi / ridge) * 0.6
-        rho = 0.0 if ridge == 1 else radius * (0.3 + 0.16 * unit(seed, f"{tag}:ridge{k}:r"))
-        h = y1 + tip if k == 0 else y1 + tip * (0.62 + 0.26 * unit(seed, f"{tag}:ridge{k}:h"))
-        q.append(np.array([ax + math.cos(th) * rho, h, az + math.sin(th) * rho]))
-
-    def angle_of(p):
-        return math.atan2(p[2] - az, p[0] - ax)
-
-    def owner(p):
-        if ridge == 1:
-            return 0
-        gaps = [abs(math.atan2(math.sin(angle_of(p) - angle_of(r)), math.cos(angle_of(p) - angle_of(r)))) for r in q]
-        return gaps.index(min(gaps))
-
-    owners = [owner(p) for p in top]
-    tris = []
-    n = len(top)
-    for i in range(n):
-        j = (i + 1) % n
-        k, b = owners[i], owners[j]
-        guard = 0
-        while k != b and guard < ridge:
-            nxt = (k + 1) % ridge
-            tris.append((top[i], q[k], q[nxt]))
-            k = nxt
-            guard += 1
-        tris.append((top[i], top[j], q[b]))
-    for k in range(1, ridge - 1):
-        tris.append((q[0], q[k], q[k + 1]))
-    inside = np.array([ax * 0.5, y1 - 0.2 * tip, az * 0.5])
+def _clip_half(poly, f):
+    """Як `clipHalf` у `geometry.ts`: частина многокутника, де f ≤ 0."""
     out = []
-    for a, b, c in tris:
+    m = len(poly)
+    for i in range(m):
+        cur = poly[i]
+        prev = poly[(i + m - 1) % m]
+        fc = f(cur[0], cur[1])
+        fp = f(prev[0], prev[1])
+
+        def cross():
+            t = fp / (fp - fc)
+            return (prev[0] + (cur[0] - prev[0]) * t, prev[1] + (cur[1] - prev[1]) * t)
+
+        if fc <= 0:
+            if fp > 0:
+                out.append(cross())
+            out.append(cur)
+        elif fp <= 0:
+            out.append(cross())
+    k = len(out)
+    return [p for i, p in enumerate(out)
+            if k < 2 or math.hypot(p[0] - out[(i + k - 1) % k][0], p[1] - out[(i + k - 1) % k][1]) > 1e-9]
+
+
+def _plane_y(p, x, z):
+    return p[0] + p[1] * x + p[2] * z
+
+
+def termination(seed, tag, ring, sides, apex, height, crown_height, contrast, facets):
+    """Вершина з площин — як `termination` у `geometry.ts` (ADR-0260).
+    Повертає (roof_at, faces): висоту даху й многокутники граней."""
+    n = len(sides)
+    planes, slopes = [], []
+    for i in range(n):
+        p = ring[sides[i]]
+        q = ring[sides[(i + 1) % n]]
+        nx = float(q[2] - p[2])
+        nz = float(-(q[0] - p[0]))
+        length = math.hypot(nx, nz)
+        nx /= length
+        nz /= length
+        mx = float((p[0] + q[0]) / 2 - apex[0])
+        mz = float((p[2] + q[2]) / 2 - apex[1])
+        if nx * mx + nz * mz < 0:
+            nx, nz = -nx, -nz
+        turn = (unit(seed, f"{tag}:roof{i}:turn") - 0.5) * 22 * math.pi / 180
+        dx = nx * math.cos(turn) - nz * math.sin(turn)
+        dz = nx * math.sin(turn) + nz * math.cos(turn)
+        reach = max(1e-6, mx * dx + mz * dz)
+        sign = 1 if i % 2 == 0 else -1
+        factor = 1 + sign * contrast + 0.16 * (unit(seed, f"{tag}:roof{i}:tilt") - 0.5)
+        t = (crown_height / reach) * factor
+        slopes.append(t)
+        planes.append((height + t * (apex[0] * dx + apex[1] * dz), -t * dx, -t * dz))
+
+    def main_roof(x, z):
+        return min(_plane_y(p, x, z) for p in planes)
+
+    mean = sum(slopes) / n
+    order = sorted(((v, i, unit(seed, f"{tag}:facet{i}:rank")) for i, v in enumerate(sides)), key=lambda e: e[2])
+    for v, i, _ in order[:max(0, min(n, facets))]:
+        c = ring[v]
+        dx = float(c[0] - apex[0])
+        dz = float(c[2] - apex[1])
+        length = math.hypot(dx, dz)
+        dx /= length
+        dz /= length
+        drop = crown_height * (0.07 + 0.1 * unit(seed, f"{tag}:facet{i}:drop"))
+        y = main_roof(float(c[0]), float(c[2])) - drop
+        g = mean * (1.25 + 0.3 * unit(seed, f"{tag}:facet{i}:slope"))
+        g = max(g, ((height - y) / length) * 1.15)
+        planes.append((y + g * (float(c[0]) * dx + float(c[2]) * dz), -g * dx, -g * dz))
+
+    def roof_at(x, z):
+        return min(_plane_y(p, x, z) for p in planes)
+
+    base = [(float(p[0]), float(p[2])) for p in ring]
+    faces = []
+    for k, own in enumerate(planes):
+        poly = base
+        for j, other in enumerate(planes):
+            if j == k or len(poly) < 3:
+                continue
+            poly = _clip_half(poly, lambda x, z, own=own, other=other: _plane_y(own, x, z) - _plane_y(other, x, z))
+        if len(poly) < 3:
+            continue
+        area = 0.0
+        for i in range(len(poly)):
+            a, b = poly[i], poly[(i + 1) % len(poly)]
+            area += a[0] * b[1] - b[0] * a[1]
+        if abs(area) < 1e-7 * crown_height * crown_height:
+            continue
+        faces.append([np.array([x, roof_at(x, z), z]) for x, z in poly])
+    return roof_at, faces
+
+
+# Тонова група граней вершини — як `ROOF_SHADE`.
+ROOF_SHADE = 100000
+
+
+def roof_tris(shaft_faces, rings, roof_faces, inside, first_face, shade_base):
+    """Як `roofTris` у `geometry.ts`: грані вершини віялом і стінки призми
+    над верхнім кільцем до лінії даху."""
+    top = rings[-1]
+    n = len(top)
+    tiers = len(rings) - 1
+
+    def facing(a, b, c):
         nrm = np.cross(b - a, c - a)
-        out.append((a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b))
+        return (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
+
+    out = []
+    face = first_face
+    for k, poly in enumerate(roof_faces):
+        for i in range(1, len(poly) - 1):
+            out.append((np.array(facing(poly[0], poly[i], poly[i + 1])), face, TRI, shade_base + k))
+            face += 1
+    corners = [p for poly in roof_faces for p in poly]
+    for i in range(n):
+        a = top[i]
+        b = top[(i + 1) % n]
+        ex = b[0] - a[0]
+        ez = b[2] - a[2]
+        len2 = ex * ex + ez * ez
+        hits = []
+        for p in corners:
+            t = ((p[0] - a[0]) * ex + (p[2] - a[2]) * ez) / len2
+            off = abs((p[0] - a[0]) * ez - (p[2] - a[2]) * ex) / math.sqrt(len2)
+            if off < 1e-7 and 1e-6 < t < 1 - 1e-6:
+                hits.append((t, p))
+        hits.sort(key=lambda h: h[0])
+        line = []
+        for _, p in hits:
+            if not any(math.hypot(q[0] - p[0], q[2] - p[2]) < 1e-7 for q in line):
+                line.append(p)
+        line.append(b)
+        shade = shaft_faces[((tiers - 1) * n + i) * 2][3]
+        for k in range(len(line) - 1):
+            out.append((np.array(facing(a, line[k], line[k + 1])), face, TRI, shade))
+            face += 1
     return out
 
 
-# Кристал року: основа, ледь ширший пояс посередині й плече (ADR-0245).
-# Кільце профілю: (частка шляху від основи до плеча, множник, зсув осі в радіусах).
 CHILD_PROFILE = ((0.0, FOOT, (0.0, 0.0)), (0.5, (FOOT + 1) / 2, (0.0, 0.0)), (1.0, 1.0, (0.0, 0.0)))
 CHILD_LEAN = 0.5
 CHILD_STEP_OUT = 0.35
@@ -157,63 +254,33 @@ def monarch_profile(seed):
 
 
 def year_habit(seed, tag):
-    """Габітус кристала року — як `yearHabit` у `geometry.ts` (ADR-0259)."""
+    """Габітус кристала року — як `yearHabit` у `geometry.ts` (ADR-0260)."""
     return {
         "tip": 0.8 + 0.75 * unit(seed, f"{tag}:habit:tip"),
-        "wedge": 0.12 + 0.3 * unit(seed, f"{tag}:habit:wedge"),
-        "starAt": 0.32 + 0.22 * unit(seed, f"{tag}:habit:star"),
-        "starReach": 0.46 + 0.2 * unit(seed, f"{tag}:habit:reach"),
+        "contrast": 0.12 + 0.2 * unit(seed, f"{tag}:habit:contrast"),
     }
 
 
 def body(seed, tag, sides, height, tip, apex, ridge, bury, profile=CHILD_PROFILE) -> list[tuple]:
-    """Кристал року з ограненою вершиною — як `body` у `geometry.ts`
-    (ADR-0259): шов клинами, зірка граней, кінчик від зірки. Трикутники як
-    (3×3 вершини, номер грані, які ребра справжні, тонова група)."""
+    """Кристал року з вершиною з площин — як `body` у `geometry.ts`
+    (ADR-0260). Трикутники як (3×3 вершини, номер грані, які ребра
+    справжні, тонова група)."""
     ring0 = _ring(sides)
-    n = len(ring0)
     habit = year_habit(seed, tag)
     tip_height = min(tip * habit["tip"], height * 0.45)
     y0 = -bury
     y1 = height - tip_height
     radius = max(math.hypot(p[0], p[2]) for p in ring0)
-    drops = [tip_height * (0.04 + habit["wedge"] * unit(seed, f"{tag}:crown:drop{i}")) for i in range(n)]
-    faces, rings, face = broken_shaft(seed, tag, ring0, profile, y0, y1, radius, 0, drops)
-    top = rings[-1]
-    _, shoulder_scale, (shx, shz) = profile[-1]
-    sx, sz = shx * radius, shz * radius
-    big_r = radius * shoulder_scale
-    tip_at = (apex[0] + sx, apex[1] + sz)
-
-    def angle(p):
-        return math.atan2(p[2] - sz, p[0] - sx)
-
-    star = []
-    for i in range(n):
-        a0, a1 = angle(top[i]), angle(top[(i + 1) % n])
-        gap = math.atan2(math.sin(a1 - a0), math.cos(a1 - a0))
-        a = a0 + gap * (0.5 + 0.24 * (unit(seed, f"{tag}:star{i}:a") - 0.5))
-        reach = big_r * (habit["starReach"] + 0.1 * (unit(seed, f"{tag}:star{i}:r") - 0.5))
-        lift = tip_height * (habit["starAt"] + 0.16 * (unit(seed, f"{tag}:star{i}:y") - 0.5))
-        pull = lift / tip_height
-        star.append(np.array([sx + (tip_at[0] - sx) * pull + math.cos(a) * reach, y1 + lift,
-                              sz + (tip_at[1] - sz) * pull + math.sin(a) * reach]))
-    inside = np.array([sx, y1 - 0.2 * tip_height, sz])
-
-    def facing(a, b, c):
-        nrm = np.cross(b - a, c - a)
-        return (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
-
-    for i in range(n):
-        j = (i + 1) % n
-        faces.append((np.array(facing(top[i], top[j], star[i])), face, TRI, None))
-        faces.append((np.array(facing(top[j], star[j], star[i])), face + 1, TRI, None))
-        face += 2
-    star_top = max(p[1] for p in star)
-    for tri in crown(seed, tag, star, star_top, height - star_top, tip_at, ridge, big_r * habit["starReach"]):
-        faces.append((np.array(tri), face, TRI, None))
-        face += 1
-    return faces
+    _, _, (shx, shz) = profile[-1]
+    tip_at = (apex[0] + shx * radius, apex[1] + shz * radius)
+    _, flat_rings, _ = broken_shaft(seed, tag, ring0, profile, y0, y1, radius, 0)
+    top0 = flat_rings[-1]
+    roof_at, roof_faces = termination(seed, tag, top0, list(range(len(ring0))), tip_at, height, tip_height,
+                                      habit["contrast"], ridge)
+    faces, rings, face = broken_shaft(seed, tag, ring0, profile, y0, y1, radius, 0,
+                                      [float(p[1]) - roof_at(float(p[0]), float(p[2])) for p in top0])
+    inside = np.array([tip_at[0], y1 - 0.2 * tip_height, tip_at[1]])
+    return faces + roof_tris(faces, rings, roof_faces, inside, face, ROOF_SHADE)
 
 
 def monarch_splits(seed, sides):
@@ -259,9 +326,8 @@ def monarch_crown_height(height, tip):
 
 def monarch_body(seed, sides, height, tip, ridge, bury, profile):
     """Монарх як великий гранчастий кристал — те саме, що `monarchBody` у
-    `geometry.ts`: стовбур у три пояси (ADR-0244, ADR-0245) і корона
-    самоцвіта (ADR-0247) — шов клинами, широкі плечі, зірка граней на
-    півкроку, рівне кільце під вістрям."""
+    `geometry.ts`: стовбур у три пояси (ADR-0244, ADR-0245) і корона з
+    площин (ADR-0260)."""
     corners = _ring(sides)
     n = len(corners)
     splits = monarch_splits(seed, sides)
@@ -282,95 +348,16 @@ def monarch_body(seed, sides, height, tip, ridge, bury, profile):
     crown_height = monarch_crown_height(height, tip)
     y1 = height - crown_height
     radius = max(math.hypot(p[0], p[2]) for p in corners)
-    corner_drop = [crown_height * (0.04 + 0.22 * unit(seed, f"monarch:crown:drop{i}")) for i in range(n)]
-    top_drop = []
-    for v in range(len(ring12)):
-        if v in corner_at:
-            top_drop.append(corner_drop[corner_at.index(v)])
-        else:
-            side = split_at.index(v)
-            top_drop.append(0.25 * (corner_drop[side] + corner_drop[(side + 1) % n]) / 2)
-    faces, rings, face = broken_shaft(seed, "monarch", ring12, profile, y0, y1, radius, 0, top_drop)
-    shoulder = rings[-1]
-    _, last_scale, (lx, lz) = profile[-1]
-    sx, sz = lx * radius, lz * radius
-    big_r = radius * last_scale
-
-    def side_angle(i):
-        c0 = shoulder[corner_at[i]]
-        return math.atan2(c0[2] - sz, c0[0] - sx)
-
-    def halfway(a, b):
-        return a + math.atan2(math.sin(b - a), math.cos(b - a)) / 2
-
-    inside = np.array([sx, y1 - crown_height * 0.2, sz])
-
-    def add(a, b, c):
-        nonlocal face
-        nrm = np.cross(b - a, c - a)
-        tri = (a, b, c) if np.dot(nrm, (a + b + c) / 3 - inside) >= 0 else (a, c, b)
-        faces.append((np.array(tri), face, TRI, None))
-        face += 1
-
-    def at(angle, reach, y):
-        return np.array([sx + math.cos(angle) * reach, y, sz + math.sin(angle) * reach])
-
-    shoulders = [at(side_angle(i), big_r * (0.88 + 0.06 * unit(seed, f"monarch:crown:shoulder{i}:r")),
-                    y1 + crown_height * (0.12 + 0.08 * unit(seed, f"monarch:crown:shoulder{i}:y")))
-                 for i in range(n)]
-    star = []
-    for i in range(n):
-        a0, a1 = side_angle(i), side_angle((i + 1) % n)
-        gap = math.atan2(math.sin(a1 - a0), math.cos(a1 - a0))
-        star.append(at(halfway(a0, a1) + gap * 0.26 * (unit(seed, f"monarch:crown:star{i}:a") - 0.5),
-                       big_r * (0.47 + 0.14 * unit(seed, f"monarch:crown:star{i}:r")),
-                       y1 + crown_height * (0.45 + 0.2 * unit(seed, f"monarch:crown:star{i}:y"))))
-    for i in range(n):
-        j = (i + 1) % n
-        c0, c1 = shoulder[corner_at[i]], shoulder[corner_at[j]]
-        v0, v1 = shoulders[i], shoulders[j]
-        if split_at[i] >= 0:
-            sp = shoulder[split_at[i]]
-            add(c0, sp, v0)
-            add(sp, c1, v1)
-            add(sp, v1, v0)
-        elif unit(seed, f"monarch:crown:diag{i}") < 0.5:
-            add(c0, c1, v1)
-            add(c0, v1, v0)
-        else:
-            add(c0, c1, v0)
-            add(c1, v1, v0)
-    for i in range(n):
-        j = (i + 1) % n
-        add(shoulders[i], shoulders[j], star[i])
-        add(shoulders[j], star[j], star[i])
-    count = max(1, ridge) + 2
-    qy = y1 + crown_height * 0.85
-    turn = unit(seed, "monarch:ridge:turn") * math.pi * 2
-    q = [at(turn + k / count * math.pi * 2, big_r * 0.2, qy) for k in range(count)]
-
-    def angle(p):
-        return math.atan2(p[2] - sz, p[0] - sx)
-
-    def owner(p):
-        gaps = [abs(math.atan2(math.sin(angle(p) - angle(r)), math.cos(angle(p) - angle(r)))) for r in q]
-        return gaps.index(min(gaps))
-
-    owners = [owner(p) for p in star]
-    for i in range(n):
-        j = (i + 1) % n
-        k = owners[i]
-        guard = 0
-        while k != owners[j] and guard < count:
-            nxt = (k + 1) % count
-            add(star[i], q[k], q[nxt])
-            k = nxt
-            guard += 1
-        add(star[i], star[j], q[owners[j]])
-    apex_point = np.array([sx, height, sz])
-    for k in range(count):
-        add(q[k], q[(k + 1) % count], apex_point)
-    return faces
+    _, _, (lx, lz) = profile[-1]
+    apex = (lx * radius, lz * radius)
+    _, flat_rings, _ = broken_shaft(seed, "monarch", ring12, profile, y0, y1, radius, 0)
+    top0 = flat_rings[-1]
+    roof_at, roof_faces = termination(seed, "monarch", top0, corner_at, apex, height, crown_height,
+                                      0.2 + 0.1 * unit(seed, "monarch:roof:contrast"), max(1, ridge))
+    faces, rings, face = broken_shaft(seed, "monarch", ring12, profile, y0, y1, radius, 0,
+                                      [float(p[1]) - roof_at(float(p[0]), float(p[2])) for p in top0])
+    inside = np.array([apex[0], y1 - 0.2 * crown_height, apex[1]])
+    return faces + roof_tris(faces, rings, roof_faces, inside, face, ROOF_SHADE)
 
 
 # Тон грані — з трьох (ADR-0244), як `FACE_TONES` у `geometry.ts`.

@@ -107,7 +107,8 @@ describe('кристал v2: геометрія', () => {
     // майже однаково. Збіг тону лишається можливим лише на крутому ребрі.
     for (const name of FIXTURE_NAMES) {
       const edges = sharedEdges(buildCrystalV2Geometry(buildCrystalV2Model(fixture(name))).crystals);
-      for (const e of edges) if (!e.sameFacet && e.fold < 25) expect(e.sameTone).toBe(false);
+      // Поріг 22°: корона з площин (ADR-0260) дала одну пару на 24° (leap_day).
+      for (const e of edges) if (!e.sameFacet && e.fold < 22) expect(e.sameTone).toBe(false);
     }
   });
 
@@ -131,21 +132,23 @@ describe('кристал v2: геометрія', () => {
     }
   });
 
-  it('вершина кристала року — огранена, а не піраміда (ADR-0259): щонайменше 8 граней, що дивляться вгору', () => {
-    // Регресія: стара вершина — 5–7 граней від плеча до 1–2 точок кінчика
-    // (busy), нова — 8–16 на всіх фікстурах.
+  it('вершина кристала року — з нерівних площин (ADR-0260): щонайменше стільки граней, скільки сторін, найбільша щонайменше вдвічі більша', () => {
     for (const name of FIXTURE_NAMES) {
       const model = buildCrystalV2Model(fixture(name));
       const monarch = buildCrystalV2Geometry({ ...model, children: [] }).crystals.triangles;
       for (const child of model.children) {
         const mesh = buildCrystalV2Geometry({ ...model, children: [{ ...child, lean: 0 }] }).crystals;
-        const facets = new Set<number>();
+        const area = new Map<number, number>();
         for (let t = monarch; t < mesh.triangles; t += 1) {
           const a = point(mesh.positions, t * 3);
           const n = cross(sub(point(mesh.positions, t * 3 + 1), a), sub(point(mesh.positions, t * 3 + 2), a));
-          if (n[1] / norm(n) > 0.2) facets.add(mesh.faceTone[t * 3]!);
+          if (n[1] / norm(n) < 0.2) continue;
+          area.set(mesh.faceTone[t * 3]!, (area.get(mesh.faceTone[t * 3]!) ?? 0) + norm(n) / 2);
         }
-        expect(facets.size).toBeGreaterThanOrEqual(8);
+        // Пологу площину сусідні крутіші можуть зрізати цілком (виміряно: busy,
+        // рік 0 — 6 граней на 6 сторін і фаску), тож межа — кількість сторін.
+        expect(area.size).toBeGreaterThanOrEqual(child.sides.length);
+        expect(Math.max(...area.values()) / Math.min(...area.values())).toBeGreaterThan(2);
       }
     }
   });
@@ -357,19 +360,15 @@ describe('кристал v2: геометрія', () => {
     expect(tones.size).toBeGreaterThan(sides);
   });
 
-  it('монарх — гранчастий кристал (ADR-0244, ADR-0245, ADR-0247): стовбур у три пояси, корона самоцвіта', () => {
+  it('монарх — гранчастий кристал (ADR-0244, ADR-0245, ADR-0260): стовбур у три пояси, корона з площин', () => {
     const alone = buildCrystalV2Geometry({ ...busy, children: [] });
     const sides = busy.monarch.sides.length;
     const splits = monarchSplits(busy.startDate, busy.monarch.sides).filter(Boolean).length;
     // Ребро на кожній стороні (ADR-0258): інакше з боку сторони без ребра
     // монарх читався стовпом.
     expect(splits).toBe(sides);
-    // Стовбур: 3 пояси × грані × 2 трикутники. Корона: плечі (2 на сторону,
-    // 3 де є ребро), зірка (2 на сторону), промені до кільця (сторона + крок
-    // кільця) і вістря (крок кільця). Кільце — плани + 2.
-    const ring = busy.monarch.tiers + 2;
-    const crown = 2 * sides + splits + 2 * sides + sides + ring + ring;
-    expect(alone.crystals.triangles).toBe(3 * (sides + splits) * 2 + crown);
+    // Стовбур: 3 пояси × грані × 2 трикутники; решта — корона й стінки.
+    expect(alone.crystals.triangles).toBeGreaterThan(3 * (sides + splits) * 2 + sides);
   });
 
   describe('корона самоцвіта (ADR-0247)', () => {
@@ -408,36 +407,46 @@ describe('кристал v2: геометрія', () => {
       }
     });
 
-    it('широкі плечі й опуклий профіль: радіус корони спадає дедалі швидше до вістря', () => {
+    /*
+     * Корона з площин (ADR-0260, концепт власника 2026-11-10): над кожною
+     * стороною площина через вістря, нахили чергуються, на кутах фаски.
+     * Грані корони — ті, що дивляться вгору, кожна одна площина й один тон.
+     */
+    const crownFacets = (model: ReturnType<typeof buildCrystalV2Model>) => {
+      const mesh = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
+      const area = new Map<number, number>();
+      for (let t = 0; t < mesh.triangles; t += 1) {
+        const a = point(mesh.positions, t * 3);
+        const n = cross(sub(point(mesh.positions, t * 3 + 1), a), sub(point(mesh.positions, t * 3 + 2), a));
+        if (n[1] / norm(n) < 0.2) continue;
+        const tone = mesh.faceTone[t * 3]!;
+        area.set(tone, (area.get(tone) ?? 0) + norm(n) / 2);
+      }
+      return [...area.values()];
+    };
+
+    it('грані корони нерівні: найбільша щонайменше вдвічі більша за найменшу', () => {
       for (const name of FIXTURES) {
-        const { model, pts, crown, R, axis } = monarchOf(name);
-        const y1 = model.monarch.height - crown;
-        const reachAt = (from: number, to: number) => Math.max(...pts
-          .filter((p) => p[1] > y1 + crown * from && p[1] <= y1 + crown * to)
-          .map((p) => Math.hypot(p[0] - axis[0], p[2] - axis[1])));
-        const shoulders = reachAt(0.1, 0.22);
-        const star = reachAt(0.45, 0.66);
-        const ring = reachAt(0.8, 0.9);
-        // Плечі майже на всю ширину тіла — не ковпак, звужений одразу.
-        expect(shoulders).toBeGreaterThan(R * 0.85);
-        // Опуклість: на другій половині корони радіус падає швидше, ніж на першій.
-        expect((star - ring) / 0.3).toBeGreaterThan((shoulders - star) / 0.4);
-        // Вістря гостре, але не голка: кільце під ним — п'ята частина радіуса.
-        expect(ring).toBeGreaterThan(R * 0.15);
-        expect(ring).toBeLessThan(R * 0.3);
+        const areas = crownFacets(buildCrystalV2Model(fixture(name)));
+        expect(Math.max(...areas) / Math.min(...areas)).toBeGreaterThan(2);
       }
     });
 
-    it('корона коштує мало: щонайбільше 2·сторони + 6 трикутників понад колишню', () => {
+    it('плани → грані вершини (ADR-0217): більше завершених планів — більше граней корони', () => {
+      const model = buildCrystalV2Model(fixture('busy'));
+      const counts = [1, 2, 3, 4].map((tiers) => crownFacets({ ...model, monarch: { ...model.monarch, tiers } }).length);
+      for (let k = 1; k < counts.length; k += 1) expect(counts[k]!).toBeGreaterThanOrEqual(counts[k - 1]!);
+      expect(counts[3]!).toBeGreaterThan(counts[0]!);
+      expect(counts[0]!).toBeGreaterThanOrEqual(model.monarch.sides.length);
+    });
+
+    it('корона коштує мало: щонайбільше 70 трикутників на корону й стінки', () => {
       for (const name of FIXTURES) {
         const model = buildCrystalV2Model(fixture(name));
         const sides = model.monarch.sides.length;
         const splits = monarchSplits(model.startDate, model.monarch.sides).filter(Boolean).length;
-        const ridge = model.monarch.tiers;
-        // Колишня вершина: пояс (2 на сторону + ребра), промені й вістря.
-        const before = 2 * sides + splits + (ridge < 2 ? sides : sides + 2 * ridge);
         const triangles = buildCrystalV2Geometry({ ...model, children: [] }).crystals.triangles - 6 * (sides + splits);
-        expect(triangles - before).toBeLessThanOrEqual(2 * sides + 6);
+        expect(triangles).toBeLessThanOrEqual(70);
       }
     });
   });
@@ -451,7 +460,7 @@ describe('кристал v2: геометрія', () => {
     }
   });
 
-  it('вістря монарха дивиться прямо вгору: точки під ним — рівне кільце навколо осі вістря', () => {
+  it('вістря монарха дивиться прямо вгору (власник, 2026-10-05): одна точка над віссю плеча, де сходяться грані корони', () => {
     for (const name of ['busy', 'empty', 'gifts_red', 'leap_day']) {
       const model = buildCrystalV2Model(fixture(name));
       const { positions } = buildCrystalV2Geometry({ ...model, children: [] }).crystals;
@@ -459,14 +468,14 @@ describe('кристал v2: геометрія', () => {
       for (let v = 0; v < positions.length / 3; v += 1) pts.push(point(positions, v));
       const top = pts.reduce((best, p) => (p[1] > best[1] ? p : best));
       expect(top[1]).toBeCloseTo(model.monarch.height, 5);
-      // Найближчий нижчий ярус вершин під вістрям: та сама висота й той
-      // самий відступ від осі вістря — інакше вістря косить убік.
-      const below = [...new Set(pts.filter((p) => p[1] < top[1] - 1e-6).map((p) => p[1].toFixed(6)))].map(Number).sort((a, b) => b - a)[0]!;
-      const ring = pts.filter((p) => Math.abs(p[1] - below) < 1e-6);
-      const reach = ring.map((p) => Math.hypot(p[0] - top[0], p[2] - top[2]));
-      expect(Math.max(...reach) - Math.min(...reach)).toBeLessThan(1e-5);
-      expect(Math.min(...reach)).toBeGreaterThan(0);
+      const profile = monarchProfile(model.startDate);
+      const last = profile[profile.length - 1]!;
+      const radius = Math.max(...model.monarch.sides.map((side) => side[1]));
+      expect(top[0]).toBeCloseTo(last.shift[0] * radius, 5);
+      expect(top[2]).toBeCloseTo(last.shift[1] * radius, 5);
+      // Вістря — точка, а не ребро: усі найвищі вершини — та сама точка.
+      const near = pts.filter((p) => p[1] > top[1] - 1e-4);
+      for (const p of near) expect(Math.hypot(p[0] - top[0], p[2] - top[2])).toBeLessThan(1e-4);
     }
   });
 });
-

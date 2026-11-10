@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import type { CrystalV2Geometry } from '@/engine/species/crystalV2/geometry';
 import type { CrystalV2Model } from '@/engine/species/crystalV2/model';
 import { CRYSTAL_GROUND_BASELINE } from '@/engine/renderer/three';
+import { unit } from '@/engine/species/crystalV2/hash';
 import { createCrystalV2Material, createGeodeMaterial, linearColour } from './crystalV2Material';
 
 interface CrystalV2ObjectProps {
@@ -17,7 +18,7 @@ interface CrystalV2ObjectProps {
 }
 
 /**
- * Колонія, жеода, іскри віх і сяйво — чотири виклики малювання на весь кристал.
+ * Колонія, жеода, іскри віх, сяйво й порошинки — п'ять викликів малювання на весь кристал.
  *
  * Стоїть на тій самій лінії землі, що й старий артефакт
  * (`CRYSTAL_GROUND_BASELINE`), тож острів, храм і вода порталу не знають,
@@ -117,7 +118,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     uniforms: {
       uColour: { value: linearColour(rgb) },
       uSize: { value: new THREE.Vector2(haloSize[0], haloSize[1]) },
-      uStrength: { value: (theme === 'dark' ? 0.42 : 0.24) * (0.6 + 0.4 * glow) },
+      uStrength: { value: (theme === 'dark' ? 0.5 : 0.3) * (0.6 + 0.4 * glow) },
       uPulse: { value: 1 },
     },
     vertexShader: /* glsl */ `
@@ -145,6 +146,73 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
   }), [rgb, glow, theme, haloSize]);
   const haloQuad = useMemo(() => new THREE.PlaneGeometry(2, 2), []);
 
+  /*
+   * Легкі частинки навколо кристала (ADR-0260, концепт власника). Сорок
+   * порошинок кольору каменю повільно піднімаються довкола колонії й гаснуть
+   * угорі. Місця — з хешу дати пари, рух — у шейдері від часу; зменшений рух
+   * (§47) лишає їх нерухомими.
+   */
+  const motes = useMemo(() => {
+    const COUNT = 40;
+    const data = new Float32Array(COUNT * 3);
+    const phase = new Float32Array(COUNT);
+    for (let k = 0; k < COUNT; k += 1) {
+      const a = unit(model.startDate, `mote${k}:a`) * Math.PI * 2;
+      const d = geometry.reach * (0.35 + 0.75 * unit(model.startDate, `mote${k}:d`));
+      data.set([Math.cos(a) * d, 0, Math.sin(a) * d], k * 3);
+      phase[k] = unit(model.startDate, `mote${k}:y`);
+    }
+    const buffer = new THREE.BufferGeometry();
+    buffer.setAttribute('position', new THREE.BufferAttribute(data, 3));
+    buffer.setAttribute('phase', new THREE.BufferAttribute(phase, 1));
+    return buffer;
+  }, [model.startDate, geometry.reach]);
+  const moteMaterial = useMemo(() => new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: {
+      uColour: { value: linearColour(rgb).lerp(new THREE.Color(1, 0.95, 0.98), 0.45) },
+      uTime: { value: 0 },
+      uRise: { value: geometry.height * 1.15 },
+      uSize: { value: 0.06 },
+      uHalfHeight: { value: 400 },
+      uStrength: { value: theme === 'dark' ? 1.0 : 0.8 },
+    },
+    vertexShader: /* glsl */ `
+      attribute float phase;
+      uniform float uTime;
+      uniform float uRise;
+      uniform float uSize;
+      uniform float uHalfHeight;
+      varying float vFade;
+      void main() {
+        float t = fract(phase + uTime * 0.025);
+        vec3 p = position + vec3(sin(uTime * 0.3 + phase * 6.28) * 0.05, t * uRise, cos(uTime * 0.25 + phase * 6.28) * 0.05);
+        vFade = smoothstep(0.0, 0.15, t) * (1.0 - smoothstep(0.6, 1.0, t));
+        vec4 mv = modelViewMatrix * vec4(p, 1.0);
+        float scale = length(modelViewMatrix[0].xyz);
+        gl_Position = projectionMatrix * mv;
+        gl_PointSize = uSize * scale * uHalfHeight / -mv.z * (0.6 + 0.8 * fract(phase * 7.0));
+      }
+    `,
+    fragmentShader: /* glsl */ `
+      uniform vec3 uColour;
+      uniform float uStrength;
+      varying float vFade;
+      void main() {
+        float r = length(gl_PointCoord - 0.5) * 2.0;
+        float a = smoothstep(1.0, 0.0, r) * vFade * uStrength;
+        gl_FragColor = vec4(uColour * a, a);
+      }
+    `,
+  }), [rgb, theme, geometry.height]);
+
+  useEffect(() => () => {
+    motes.dispose();
+    moteMaterial.dispose();
+  }, [motes, moteMaterial]);
+
   useEffect(() => () => {
     haloQuad.dispose();
     haloMaterial.dispose();
@@ -165,6 +233,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
   // лишає його сталим.
   const halfHeight = useThree((state) => (state.size.height * state.viewport.dpr) / 2);
   useEffect(() => { sparkMaterial.uniforms.uHalfHeight!.value = halfHeight; }, [sparkMaterial, halfHeight]);
+  useEffect(() => { moteMaterial.uniforms.uHalfHeight!.value = halfHeight; }, [moteMaterial, halfHeight]);
 
   useFrame(({ clock }) => {
     if (reduceMotion) return;
@@ -173,6 +242,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
     const pulse = crystalMaterial.uniforms.uPulse;
     if (pulse) pulse.value = value;
     haloMaterial.uniforms.uPulse!.value = 0.9 + 0.1 * Math.sin(t * 0.9);
+    moteMaterial.uniforms.uTime!.value = t;
     crystalMaterial.uniforms.uTime!.value = t;
     sparkMaterial.uniforms.uOpacity!.value = 0.7 + 0.3 * Math.sin(t * 1.7);
   });
@@ -184,6 +254,7 @@ export function CrystalV2Object({ model, geometry, scale, theme, reduceMotion }:
       <mesh geometry={crystals} material={crystalMaterial} castShadow />
       {sparks && <points geometry={sparks} material={sparkMaterial} renderOrder={2} />}
       <mesh geometry={haloQuad} material={haloMaterial} position={[0, geometry.height * 0.55, 0]} renderOrder={1} frustumCulled={false} />
+      <points geometry={motes} material={moteMaterial} renderOrder={3} frustumCulled={false} />
     </group>
   );
 }

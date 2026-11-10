@@ -232,6 +232,23 @@ removed. What reads as "a few cracks inside": cells ~2× the body, lines a
 third as wide, and a low-frequency mask that leaves only a fraction of sheets
 lit. Look at the frame before raising the strength.
 
+## A termination is planes, not a fan
+
+2026-11-10 (ADR-0260). Three crowns in a row were built as fans of triangles
+from the shoulder toward a few tip points (ADR-0217 tiers, ADR-0247 star and
+ring, ADR-0259 star for the year crystals); each read as "a pyramid with extra
+triangles". Real quartz ends in planes that run until a neighbour cuts them.
+`termination` does exactly that: one plane per side through the apex, slopes
+alternating steep/shallow, a few steeper corner facets, and the roof is the
+minimum of all planes — each face a convex polygon from half-plane clipping.
+Unequal faces, V-wedges into the prism and a slanted seam all fall out of the
+construction; none of them is drawn by hand.
+
+And a warning measured on the frame: "refraction" as a per-face tint —
+whitening the light faces or deepening the dark ones — cost 0.16 of shaft
+saturation and turned the stone salmon. The three face tones already are the
+refraction; leave it to glints and the silhouette pearl.
+
 ## What we implemented from it, and how
 
 **Facet rims, procedurally.** We can never use their method directly — they have a UV

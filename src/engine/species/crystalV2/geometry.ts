@@ -98,78 +98,209 @@ function ring(sides: readonly (readonly [number, number])[]): V3[] {
 }
 
 /**
- * Верхівка кристала — НЕ концентричні яруси (ADR-0217, поправка «г»).
+ * Вершина кристала — перетин площин, як у справжнього кварцу (ADR-0260).
  *
- * Власник: «мені не подобається верхівка з геометрично рівними гранями».
- * Яруси були кільцями плеча, стиснутими до осі, — звідси однакові
- * паралельні пояси, як у заточеного олівця. Справжній кварц і
- * лоуполі-самоцвіти закінчуються інакше: вершина зміщена від осі, кінчик —
- * не точка, а коротке ребро або кілька точок на різній висоті, і грані
- * мають різний розмір.
+ * Власник, 2026-11-10, за концептом: «природна форма вершини — замість
+ * простої симетричної піраміди складніша кристалічна термінація з кількома
+ * площинами та неоднаковими кутами; різні за розміром трикутні й
+ * багатокутні поверхні». Справжній кварц закінчується не віялом трикутників,
+ * а гранями-площинами, кожна з яких тягнеться, доки її не зріже сусідня:
  *
- * Тут кінчик — `ridge` точок (1…4; у монарха це правило «плани → грані
- * вершини»), розкиданих довкола зміщеної вершини на різній висоті. Кожна
- * вершина плеча дивиться на найближчу точку кінчика; де сусідні вершини
- * плеча дивляться на різні точки, між ними лягає перехідний трикутник.
- * Кожна грань — ОДИН трикутник, тож пласка за побудовою, і кожна своя.
+ *   * над кожною стороною — своя площина через вістря; нахил чергується
+ *     (крутіша / пологіша), тож великі грані сходять у призму клинами, а малі
+ *     лишаються вузькими вгорі — як великі й малі ромбоедри кварцу;
+ *   * напрям кожної площини повернутий від нормалі сторони на кілька
+ *     градусів, тож шов вершини з призмою похилий, а не рівна лінія;
+ *   * на кількох кутах — додаткова маленька фаска: нижче за головні площини
+ *     біля кута й крутіша, тож зрізає лише кут (у монарха їх дають плани —
+ *     ADR-0217: плани → грані вершини);
+ *   * вершина даху — мінімум усіх площин: грань кожної площини — опуклий
+ *     багатокутник, де вона нижча за решту. Кожна грань пласка за побудовою;
+ *     стінки призми над верхнім кільцем стовбура дотягуються до даху.
  */
-function crown(
+interface RoofPlane {
+  /** y = a + b·x + c·z */
+  a: number;
+  b: number;
+  c: number;
+}
+
+type XZ = [number, number];
+
+const planeY = (p: RoofPlane, x: number, z: number) => p.a + p.b * x + p.c * z;
+
+/** Частина многокутника, де f(x, z) ≤ 0 (f лінійна) — Сазерленд — Ходжмен. */
+function clipHalf(poly: readonly XZ[], f: (x: number, z: number) => number): XZ[] {
+  const out: XZ[] = [];
+  for (let i = 0; i < poly.length; i += 1) {
+    const cur = poly[i]!;
+    const prev = poly[(i + poly.length - 1) % poly.length]!;
+    const fc = f(cur[0], cur[1]);
+    const fp = f(prev[0], prev[1]);
+    const cross = (): XZ => {
+      const t = fp / (fp - fc);
+      return [prev[0] + (cur[0] - prev[0]) * t, prev[1] + (cur[1] - prev[1]) * t];
+    };
+    if (fc <= 0) {
+      if (fp > 0) out.push(cross());
+      out.push(cur);
+    } else if (fp <= 0) {
+      out.push(cross());
+    }
+  }
+  return out.filter((p, i) => {
+    const q = out[(i + out.length - 1) % out.length]!;
+    return out.length < 2 || Math.hypot(p[0] - q[0], p[1] - q[1]) > 1e-9;
+  });
+}
+
+interface Termination {
+  /** Висота даху над кожною вершиною верхнього кільця стовбура. */
+  roofAt: (x: number, z: number) => number;
+  /** Грані вершини: кожна — опуклий многокутник на своїй площині. */
+  faces: V3[][];
+}
+
+/**
+ * Площини вершини й многокутники її граней над кільцем `ring` (лише x, z).
+ * `sides` — номери вершин кільця, з яких починається кожна сторона моделі.
+ */
+function termination(
   seed: string,
   tag: string,
-  top: V3[],
-  y1: number,
-  tip: number,
-  apex: readonly [number, number],
-  ridge: number,
-  radius: number,
-): [V3, V3, V3][] {
-  const ax = apex[0];
-  const az = apex[1];
-  const theta0 = unit(seed, `${tag}:ridge:turn`) * Math.PI * 2;
-  const q: V3[] = [];
-  for (let k = 0; k < ridge; k += 1) {
-    const th = theta0 + (k * 2 * Math.PI) / ridge + (unit(seed, `${tag}:ridge${k}:a`) - 0.5) * (Math.PI / ridge) * 0.6;
-    const rho = ridge === 1 ? 0 : radius * (0.3 + 0.16 * unit(seed, `${tag}:ridge${k}:r`));
-    const h = k === 0 ? y1 + tip : y1 + tip * (0.62 + 0.26 * unit(seed, `${tag}:ridge${k}:h`));
-    q.push([ax + Math.cos(th) * rho, h, az + Math.sin(th) * rho]);
-  }
-  const angleOf = (p: V3) => Math.atan2(p[2] - az, p[0] - ax);
-  const owner = top.map((p) => {
-    if (ridge === 1) return 0;
-    let best = 0;
-    let bestGap = Infinity;
-    q.forEach((r, k) => {
-      const d = Math.abs(Math.atan2(Math.sin(angleOf(p) - angleOf(r)), Math.cos(angleOf(p) - angleOf(r))));
-      if (d < bestGap) { bestGap = d; best = k; }
-    });
-    return best;
-  });
-  const tris: [V3, V3, V3][] = [];
-  const n = top.length;
+  ring: readonly V3[],
+  sides: readonly number[],
+  apex: XZ,
+  height: number,
+  crownHeight: number,
+  contrast: number,
+  facets: number,
+): Termination {
+  const n = sides.length;
+  const planes: RoofPlane[] = [];
+  const slopes: number[] = [];
   for (let i = 0; i < n; i += 1) {
-    const j = (i + 1) % n;
-    let k = owner[i]!;
-    const b = owner[j]!;
-    // Кінчик по колу: від точки вершини i до точки вершини j.
-    let guard = 0;
-    while (k !== b && guard < ridge) {
-      const next = (k + 1) % ridge;
-      tris.push([top[i]!, q[k]!, q[next]!]);
-      k = next;
-      guard += 1;
-    }
-    tris.push([top[i]!, top[j]!, q[b]!]);
+    const p = ring[sides[i]!]!;
+    const q = ring[sides[(i + 1) % n]!]!;
+    // Нормаль сторони назовні, повернута на ±11°: шов похилий.
+    let nx = q[2] - p[2];
+    let nz = -(q[0] - p[0]);
+    const len = Math.hypot(nx, nz);
+    nx /= len;
+    nz /= len;
+    const mx = (p[0] + q[0]) / 2 - apex[0];
+    const mz = (p[2] + q[2]) / 2 - apex[1];
+    if (nx * mx + nz * mz < 0) { nx = -nx; nz = -nz; }
+    const turn = ((unit(seed, `${tag}:roof${i}:turn`) - 0.5) * 22 * Math.PI) / 180;
+    const dx = nx * Math.cos(turn) - nz * Math.sin(turn);
+    const dz = nx * Math.sin(turn) + nz * Math.cos(turn);
+    const reach = Math.max(1e-6, mx * dx + mz * dz);
+    // Чергування крутіша / пологіша: великі й малі грані поруч.
+    const sign = i % 2 === 0 ? 1 : -1;
+    const factor = 1 + sign * contrast + 0.16 * (unit(seed, `${tag}:roof${i}:tilt`) - 0.5);
+    const t = (crownHeight / reach) * factor;
+    slopes.push(t);
+    planes.push({ a: height + t * (apex[0] * dx + apex[1] * dz), b: -t * dx, c: -t * dz });
   }
-  for (let k = 1; k + 1 < ridge; k += 1) tris.push([q[0]!, q[k]!, q[k + 1]!]);
-  // Закрут назовні: від точки всередині тіла під плечем.
-  const inside: V3 = [ax * 0.5, y1 - 0.2 * tip, az * 0.5];
-  return tris.map(([a, b, c]) => {
+  const mainRoof = (x: number, z: number) => Math.min(...planes.map((p) => planeY(p, x, z)));
+  const mean = slopes.reduce((s, v) => s + v, 0) / n;
+  // Фаски на кутах: найвищі за рангом хешу, `facets` штук.
+  const corners = sides
+    .map((v, i) => ({ v, i, rank: unit(seed, `${tag}:facet${i}:rank`) }))
+    .sort((a, b) => a.rank - b.rank)
+    .slice(0, Math.max(0, Math.min(n, facets)));
+  for (const { v, i } of corners) {
+    const c = ring[v]!;
+    let dx = c[0] - apex[0];
+    let dz = c[2] - apex[1];
+    const len = Math.hypot(dx, dz);
+    dx /= len;
+    dz /= len;
+    const drop = crownHeight * (0.07 + 0.1 * unit(seed, `${tag}:facet${i}:drop`));
+    const y = mainRoof(c[0], c[2]) - drop;
+    // Крутіша за головні: зрізає кут і закінчується, не дійшовши до вістря.
+    let g = mean * (1.25 + 0.3 * unit(seed, `${tag}:facet${i}:slope`));
+    g = Math.max(g, ((height - y) / len) * 1.15);
+    planes.push({ a: y + g * (c[0] * dx + c[2] * dz), b: -g * dx, c: -g * dz });
+  }
+  const roofAt = (x: number, z: number) => Math.min(...planes.map((p) => planeY(p, x, z)));
+  const base: XZ[] = ring.map((p) => [p[0], p[2]]);
+  const faces: V3[][] = [];
+  planes.forEach((own, k) => {
+    let poly = base;
+    planes.forEach((other, j) => {
+      if (j === k || poly.length < 3) return;
+      poly = clipHalf(poly, (x, z) => planeY(own, x, z) - planeY(other, x, z));
+    });
+    if (poly.length < 3) return;
+    let area = 0;
+    for (let i = 0; i < poly.length; i += 1) {
+      const a = poly[i]!;
+      const b = poly[(i + 1) % poly.length]!;
+      area += a[0] * b[1] - b[0] * a[1];
+    }
+    if (Math.abs(area) < 1e-7 * crownHeight * crownHeight) return;
+    faces.push(poly.map(([x, z]): V3 => [x, roofAt(x, z), z]));
+  });
+  return { roofAt, faces };
+}
+
+/** Тонова група граней вершини — окремо від груп стовбура. */
+const ROOF_SHADE = 100000;
+
+/**
+ * Дах над стовбуром: грані вершини віялом (кожна — одна площина, одна
+ * тонова група) і стінки призми над верхнім кільцем — до лінії даху, у
+ * тоновій групі верхньої грані стовбура під ними.
+ */
+function roofTris(
+  shaft: { tris: Tri[]; rings: V3[][] },
+  roof: Termination,
+  inside: V3,
+  firstFace: number,
+  shadeBase: number,
+): Tri[] {
+  const top = shaft.rings[shaft.rings.length - 1]!;
+  const n = top.length;
+  const tiers = shaft.rings.length - 1;
+  const facing = (a: V3, b: V3, c: V3): [V3, V3, V3] => {
     const e1: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
     const e2: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
     const nrm: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-    const m: V3 = [(a[0] + b[0] + c[0]) / 3 - inside[0], (a[1] + b[1] + c[1]) / 3 - inside[1], (a[2] + b[2] + c[2]) / 3 - inside[2]];
-    return nrm[0] * m[0] + nrm[1] * m[1] + nrm[2] * m[2] >= 0 ? [a, b, c] : [a, c, b];
+    const d: V3 = [(a[0] + b[0] + c[0]) / 3 - inside[0], (a[1] + b[1] + c[1]) / 3 - inside[1], (a[2] + b[2] + c[2]) / 3 - inside[2]];
+    return nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2] >= 0 ? [a, b, c] : [a, c, b];
+  };
+  const out: Tri[] = [];
+  let face = firstFace;
+  roof.faces.forEach((poly, k) => {
+    for (let i = 1; i + 1 < poly.length; i += 1) {
+      out.push({ points: facing(poly[0]!, poly[i]!, poly[i + 1]!), face, edges: TRI, shade: shadeBase + k });
+      face += 1;
+    }
   });
+  // Стінки: точки зламу даху на кожному ребрі кільця.
+  const corners = roof.faces.flat();
+  for (let i = 0; i < n; i += 1) {
+    const a = top[i]!;
+    const b = top[(i + 1) % n]!;
+    const ex = b[0] - a[0];
+    const ez = b[2] - a[2];
+    const len2 = ex * ex + ez * ez;
+    const on = corners
+      .map((p) => ({ p, t: ((p[0] - a[0]) * ex + (p[2] - a[2]) * ez) / len2, off: Math.abs((p[0] - a[0]) * ez - (p[2] - a[2]) * ex) / Math.sqrt(len2) }))
+      .filter((h) => h.off < 1e-7 && h.t > 1e-6 && h.t < 1 - 1e-6)
+      .sort((x, y) => x.t - y.t);
+    const line: V3[] = [];
+    for (const h of on) if (!line.some((q) => Math.hypot(q[0] - h.p[0], q[2] - h.p[2]) < 1e-7)) line.push(h.p);
+    line.push(b);
+    // Чотирикутники стовбура завжди мають тонову групу (`brokenShaft`).
+    const shade = shaft.tris[((tiers - 1) * n + i) * 2]!.shade!;
+    for (let k = 0; k + 1 < line.length; k += 1) {
+      out.push({ points: facing(a, line[k]!, line[k + 1]!), face, edges: TRI, shade });
+      face += 1;
+    }
+  }
+  return out;
 }
 
 /**
@@ -310,35 +441,23 @@ const CHILD_PROFILE: readonly ProfileRing[] = [
 ];
 
 /**
- * Габітус кристала року (ADR-0259): той самий ріст, інший малюнок вершини.
- * Власник, 2026-11-10: «різноманіття форм — додаткові кристали з різними
- * нахилами граней». З хешу року:
+ * Габітус кристала року (ADR-0259, ADR-0260): той самий ріст, інший малюнок
+ * вершини. Власник, 2026-11-10: «різноманіття форм — різні нахили граней».
+ * З хешу року:
  *   * `tip` — гострота вістря: 0.8 (тупе) … 1.55 (гостре) від кварцових 52°;
- *   * `wedge` — як глибоко грані вершини врізаються в призму клинами;
- *   * `starAt`, `starReach` — висота й ширина зірки граней між плечем і
- *     вістрям: низька широка зірка — масивна вершина, висока вузька — стрімка.
+ *   * `contrast` — наскільки великі грані вершини більші за малі: як
+ *     глибоко вони сходять у призму клинами.
  */
-export function yearHabit(seed: string, tag: string): { tip: number; wedge: number; starAt: number; starReach: number } {
+export function yearHabit(seed: string, tag: string): { tip: number; contrast: number } {
   return {
     tip: 0.8 + 0.75 * unit(seed, `${tag}:habit:tip`),
-    wedge: 0.12 + 0.3 * unit(seed, `${tag}:habit:wedge`),
-    starAt: 0.32 + 0.22 * unit(seed, `${tag}:habit:star`),
-    starReach: 0.46 + 0.2 * unit(seed, `${tag}:habit:reach`),
+    contrast: 0.12 + 0.2 * unit(seed, `${tag}:habit:contrast`),
   };
 }
 
 /**
- * Кристал року (ADR-0259): огранена вершина замість піраміди.
- *
- * Власник, 2026-11-10: «реалістична вершина — замість простої піраміди
- * природна гранована форма з нерівними площинами». Як корона монарха
- * (ADR-0247), але легша:
- *   1. шов клинами — кути призми опущені кожен на свою глибину, тож грані
- *      вершини врізаються в тіло клинами різної довжини;
- *   2. зірка — над серединою кожної сторони точка на своїй висоті й відступі:
- *      трикутник над стороною й клин над кутом, грані зчеплені;
- *   3. кінчик — 1–2 точки над зміщеною вершиною (`crown`), від зірки.
- * Кожна грань — один трикутник, тож пласка за побудовою.
+ * Кристал року з вершиною з площин (ADR-0260, `termination`): над кожною
+ * стороною своя площина через зміщене вістря, 1–2 фаски на кутах.
  */
 function body(
   seed: string,
@@ -352,7 +471,6 @@ function body(
   profile: readonly ProfileRing[] = CHILD_PROFILE,
 ): Tri[] {
   const base = ring(sides);
-  const n = base.length;
   const habit = yearHabit(seed, tag);
   // Висота кристала та сама (модель): габітус лише перерозподіляє її між
   // призмою й вершиною, і вершина не забирає більше 45 % тіла.
@@ -360,49 +478,14 @@ function body(
   const y0 = -bury;
   const y1 = height - tipHeight;
   const radius = Math.max(...base.map((p) => Math.hypot(p[0], p[2])));
-  const drops = base.map((_, i) => tipHeight * (0.04 + habit.wedge * unit(seed, `${tag}:crown:drop${i}`)));
-  const shaft = brokenShaft(seed, tag, base, profile, y0, y1, radius, 0, drops);
-  const tris = shaft.tris;
-  let face = shaft.face;
-  const top = shaft.rings[shaft.rings.length - 1]!;
   const shoulder = profile[profile.length - 1]!;
-  const sx = shoulder.shift[0] * radius;
-  const sz = shoulder.shift[1] * radius;
-  const R = radius * shoulder.scale;
   // Кінчик іде за плечем: зсунуте плече з кінчиком на осі читалось би зламом.
-  const tipAt: [number, number] = [apex[0] + sx, apex[1] + sz];
-  const angle = (p: V3) => Math.atan2(p[2] - sz, p[0] - sx);
-  const star: V3[] = Array.from({ length: n }, (_, i) => {
-    const a0 = angle(top[i]!);
-    const a1 = angle(top[(i + 1) % n]!);
-    const gap = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
-    const a = a0 + gap * (0.5 + 0.24 * (unit(seed, `${tag}:star${i}:a`) - 0.5));
-    const reach = R * (habit.starReach + 0.1 * (unit(seed, `${tag}:star${i}:r`) - 0.5));
-    const lift = tipHeight * (habit.starAt + 0.16 * (unit(seed, `${tag}:star${i}:y`) - 0.5));
-    // Зірка тягнеться до зміщеної вершини разом із висотою.
-    const pull = lift / tipHeight;
-    return [sx + (tipAt[0] - sx) * pull + Math.cos(a) * reach, y1 + lift, sz + (tipAt[1] - sz) * pull + Math.sin(a) * reach];
-  });
-  const inside: V3 = [sx, y1 - 0.2 * tipHeight, sz];
-  const facing = (a: V3, b: V3, c: V3): [V3, V3, V3] => {
-    const e1: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const e2: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const nrm: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-    const d: V3 = [(a[0] + b[0] + c[0]) / 3 - inside[0], (a[1] + b[1] + c[1]) / 3 - inside[1], (a[2] + b[2] + c[2]) / 3 - inside[2]];
-    return nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2] >= 0 ? [a, b, c] : [a, c, b];
-  };
-  for (let i = 0; i < n; i += 1) {
-    const j = (i + 1) % n;
-    tris.push({ points: facing(top[i]!, top[j]!, star[i]!), face, edges: TRI });
-    tris.push({ points: facing(top[j]!, star[j]!, star[i]!), face: face + 1, edges: TRI });
-    face += 2;
-  }
-  const starTop = Math.max(...star.map((p) => p[1]));
-  for (const points of crown(seed, tag, star, starTop, height - starTop, tipAt, ridge, R * habit.starReach)) {
-    tris.push({ points, face, edges: TRI });
-    face += 1;
-  }
-  return tris;
+  const tipAt: XZ = [apex[0] + shoulder.shift[0] * radius, apex[1] + shoulder.shift[1] * radius];
+  const flat = brokenShaft(seed, tag, base, profile, y0, y1, radius, 0);
+  const top0 = flat.rings[flat.rings.length - 1]!;
+  const roof = termination(seed, tag, top0, base.map((_, i) => i), tipAt, height, tipHeight, habit.contrast, ridge);
+  const shaft = brokenShaft(seed, tag, base, profile, y0, y1, radius, 0, top0.map((p) => p[1] - roof.roofAt(p[0], p[2])));
+  return [...shaft.tris, ...roofTris(shaft, roof, [tipAt[0], y1 - 0.2 * tipHeight, tipAt[1]], shaft.face, ROOF_SHADE)];
 }
 
 /**
@@ -521,134 +604,20 @@ function monarchBody(
   const crownHeight = monarchCrownHeight(height, tip);
   const y1 = height - crownHeight;
   const radius = Math.max(...corners.map((p) => Math.hypot(p[0], p[2])));
-  // Шов корони — не рівна лінія (ADR-0247): кути призми опущені кожен на
-  // свою глибину (4…26 % корони), а ребра посеред сторін — лише на чверть
-  // від сусідів. Грані корони врізаються в тіло клинами різної довжини, і
-  // тіло переходить у корону, а не впирається в ковпак.
-  const cornerDrop = corners.map((_, i) => crownHeight * (0.04 + 0.22 * unit(seed, `monarch:crown:drop${i}`)));
-  const topDrop = ring12.map((_, v) => {
-    const i = cornerAt.indexOf(v);
-    if (i >= 0) return cornerDrop[i]!;
-    const side = splitAt.indexOf(v);
-    return 0.25 * (cornerDrop[side]! + cornerDrop[(side + 1) % n]!) / 2;
-  });
-  const shaft = brokenShaft(seed, 'monarch', ring12, profile, y0, y1, radius, 0, topDrop);
-  const tris = shaft.tris;
-  let face = shaft.face;
-  const rings = shaft.rings;
-  const shoulder = rings[rings.length - 1]!;
   const last = profile[profile.length - 1]!;
-  const sx = last.shift[0] * radius;
-  const sz = last.shift[1] * radius;
-  // ── Корона самоцвіта (ADR-0247) ─────────────────────────────
-  // Власник, 2026-10-06: «верхівка — маленька піраміда-ковпачок на високому
-  // прямокутному тілі: вежа чи олівець, а не самоцвіт». Тепер корона
-  // виростає з тіла: широкі пологі плечі, зірка граней, повернута на
-  // півкроку, і рівне кільце під вістрям. Профіль опуклий — радіус спадає
-  // дедалі швидше до вершини, тож силует — один камінь, а не ковпак на
-  // стовпі. Кожна вершина плечей і зірки має свою висоту й відступ, тож
-  // кожен трикутник — окрема грань; вістря стоїть точно над віссю плеча.
-  const R = radius * last.scale;
-  const sideAngle = (i: number) => {
-    const c0 = shoulder[cornerAt[i]!]!;
-    return Math.atan2(c0[2] - sz, c0[0] - sx);
-  };
-  const halfway = (a: number, b: number) => a + Math.atan2(Math.sin(b - a), Math.cos(b - a)) / 2;
-  const inside: V3 = [sx, y1 - crownHeight * 0.2, sz];
-  const facing = (a: V3, b: V3, c: V3): [V3, V3, V3] => {
-    const e1: V3 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
-    const e2: V3 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
-    const nrm: V3 = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
-    const d: V3 = [(a[0] + b[0] + c[0]) / 3 - inside[0], (a[1] + b[1] + c[1]) / 3 - inside[1], (a[2] + b[2] + c[2]) / 3 - inside[2]];
-    return nrm[0] * d[0] + nrm[1] * d[1] + nrm[2] * d[2] >= 0 ? [a, b, c] : [a, c, b];
-  };
-  const add = (a: V3, b: V3, c: V3) => {
-    tris.push({ points: facing(a, b, c), face, edges: TRI });
-    face += 1;
-  };
-  const at = (angle: number, reach: number, y: number): V3 => [sx + Math.cos(angle) * reach, y, sz + Math.sin(angle) * reach];
-  // Плечі: над кожним кутом призми, широкі й пологі (0.12…0.20 корони,
-  // 0.88…0.94 радіуса) — корона починається на всю ширину тіла, а не
-  // ламається одразу до вістря.
-  const shoulders: V3[] = Array.from({ length: n }, (_, i) => at(
-    sideAngle(i),
-    R * (0.88 + 0.06 * unit(seed, `monarch:crown:shoulder${i}:r`)),
-    y1 + crownHeight * (0.12 + 0.08 * unit(seed, `monarch:crown:shoulder${i}:y`)),
-  ));
-  // Зірка: над серединою кожної сторони (півкроку), 0.47…0.61 радіуса,
-  // 0.45…0.65 корони, з легким зсувом по колу — грані зірки різні.
-  const star: V3[] = Array.from({ length: n }, (_, i) => {
-    const a0 = sideAngle(i);
-    const a1 = sideAngle((i + 1) % n);
-    const gap = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
-    return at(
-      halfway(a0, a1) + gap * 0.26 * (unit(seed, `monarch:crown:star${i}:a`) - 0.5),
-      R * (0.47 + 0.14 * unit(seed, `monarch:crown:star${i}:r`)),
-      y1 + crownHeight * (0.45 + 0.2 * unit(seed, `monarch:crown:star${i}:y`)),
-    );
-  });
-  // Плече → плечі корони: на стороні з ребром — три грані, без нього — дві,
-  // діагональ у бік із хешу.
-  for (let i = 0; i < n; i += 1) {
-    const j = (i + 1) % n;
-    const c0 = shoulder[cornerAt[i]!]!;
-    const c1 = shoulder[cornerAt[j]!]!;
-    const v0 = shoulders[i]!;
-    const v1 = shoulders[j]!;
-    if (splitAt[i]! >= 0) {
-      const sp = shoulder[splitAt[i]!]!;
-      add(c0, sp, v0);
-      add(sp, c1, v1);
-      add(sp, v1, v0);
-    } else if (unit(seed, `monarch:crown:diag${i}`) < 0.5) {
-      add(c0, c1, v1);
-      add(c0, v1, v0);
-    } else {
-      add(c0, c1, v0);
-      add(c1, v1, v0);
-    }
-  }
-  // Плечі корони → зірка: трикутник зірки над кожною стороною й клин між
-  // сусідніми променями над кожним кутом — грані зчеплені, а не яруси.
-  for (let i = 0; i < n; i += 1) {
-    const j = (i + 1) % n;
-    add(shoulders[i]!, shoulders[j]!, star[i]!);
-    add(shoulders[j]!, star[j]!, star[i]!);
-  }
-  // Кільце під вістрям — рівне (вістря дивиться прямо вгору, власник
-  // 2026-10-05), точок — плани + 2 (ADR-0217: плани дають грані вершини), а
-  // 0.2 радіуса не дають вістрю стати голкою.
-  const count = Math.max(1, ridge) + 2;
-  const qy = y1 + crownHeight * 0.85;
-  const turn = unit(seed, 'monarch:ridge:turn') * Math.PI * 2;
-  const q: V3[] = Array.from({ length: count }, (_, k) => at(turn + (k / count) * Math.PI * 2, R * 0.2, qy));
-  // Кожен промінь зірки сходиться до найближчої точки кільця; де сусіди
-  // дивляться на різні точки — перехідний трикутник (як у `crown`).
-  const angle = (p: V3) => Math.atan2(p[2] - sz, p[0] - sx);
-  const owner = star.map((p) => {
-    let best = 0;
-    let gap = Infinity;
-    q.forEach((r, k) => {
-      const d = Math.abs(Math.atan2(Math.sin(angle(p) - angle(r)), Math.cos(angle(p) - angle(r))));
-      if (d < gap) { gap = d; best = k; }
-    });
-    return best;
-  });
-  for (let i = 0; i < n; i += 1) {
-    const j = (i + 1) % n;
-    let k = owner[i]!;
-    let guard = 0;
-    while (k !== owner[j]! && guard < count) {
-      const next = (k + 1) % count;
-      add(star[i]!, q[k]!, q[next]!);
-      k = next;
-      guard += 1;
-    }
-    add(star[i]!, star[j]!, q[owner[j]!]!);
-  }
-  const apexPoint: V3 = [sx, height, sz];
-  for (let k = 0; k < count; k += 1) add(q[k]!, q[(k + 1) % count]!, apexPoint);
-  return tris;
+  // Вістря — рівно над центром плеча (власник, 2026-10-05): зсув вершини
+  // моделі для монарха не береться.
+  const apex: XZ = [last.shift[0] * radius, last.shift[1] * radius];
+  const flat = brokenShaft(seed, 'monarch', ring12, profile, y0, y1, radius, 0);
+  const top0 = flat.rings[flat.rings.length - 1]!;
+  // Корона з площин (ADR-0260): чергування великих і малих граней сильніше,
+  // ніж у дітей, — монарх головний; фасок на кутах стільки, скільки ярусів
+  // дали плани (ADR-0217).
+  const roof = termination(seed, 'monarch', top0, cornerAt, apex, height, crownHeight,
+    0.2 + 0.1 * unit(seed, 'monarch:roof:contrast'), Math.max(1, ridge));
+  const shaft = brokenShaft(seed, 'monarch', ring12, profile, y0, y1, radius, 0,
+    top0.map((p) => p[1] - roof.roofAt(p[0], p[2])));
+  return [...shaft.tris, ...roofTris(shaft, roof, [apex[0], y1 - 0.2 * crownHeight, apex[1]], shaft.face, ROOF_SHADE)];
 }
 
 /**
