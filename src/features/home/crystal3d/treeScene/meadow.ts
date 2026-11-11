@@ -16,7 +16,7 @@
 import * as THREE from 'three';
 import { metres } from './sceneScale';
 
-export type GroundInstance = {
+type GroundInstance = {
   x: number;
   y: number;
   z: number;
@@ -29,7 +29,7 @@ export type GroundInstance = {
   tone: number;
 };
 
-export type GroundItem = {
+type GroundItem = {
   x: number;
   y: number;
   z: number;
@@ -42,7 +42,7 @@ export type GroundItem = {
 
 export const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
 
-export const smoothStep = (edge0: number, edge1: number, value: number) => {
+const smoothStep = (edge0: number, edge1: number, value: number) => {
   const t = clamp01((value - edge0) / Math.max(0.0001, edge1 - edge0));
   return t * t * (3 - 2 * t);
 };
@@ -52,9 +52,9 @@ export const hash2 = (x: number, z: number, salt: number) => {
   return value - Math.floor(value);
 };
 
-export const hash = (index: number, salt: number) => hash2(index, salt * 0.17, salt);
+const hash = (index: number, salt: number) => hash2(index, salt * 0.17, salt);
 
-export const valueNoise = (x: number, z: number, salt: number) => {
+const valueNoise = (x: number, z: number, salt: number) => {
   const x0 = Math.floor(x);
   const z0 = Math.floor(z);
   const tx = x - x0;
@@ -83,7 +83,7 @@ export const terrainHeight = (x: number, z: number, radius: number) => {
   return dome + (broad + medium + ridge) * summitMask * edgeWeight;
 };
 
-export const groundYAt = (x: number, z: number, radius: number, groundY: number) =>
+const groundYAt = (x: number, z: number, radius: number, groundY: number) =>
   groundY + terrainHeight(x, z, radius);
 
 /**

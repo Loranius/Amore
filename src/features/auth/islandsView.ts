@@ -8,7 +8,7 @@
 // ============================================================
 import type { DemoIsland, DemoSpecies } from './demoIslands';
 
-export type IslandsMode = 'backdrop' | 'choose' | 'grow';
+type IslandsMode = 'backdrop' | 'choose' | 'grow';
 
 /** Порядок острівців у ряду вибору — той самий, що й кнопок під ними. */
 export const CHOICE_ORDER: readonly DemoSpecies[] = ['crystal', 'tree', 'reef'];

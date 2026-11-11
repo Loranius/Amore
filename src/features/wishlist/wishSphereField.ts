@@ -19,9 +19,9 @@ import { mulberry32 } from '@/features/home/mulberry32';
 // на те саме місце.
 // ============================================================
 
-export type WishSphereLayer = 'far' | 'mid' | 'near';
+type WishSphereLayer = 'far' | 'mid' | 'near';
 
-export interface WishSphereSubject {
+interface WishSphereSubject {
   id: number;
   /**
    * Вага мрії. Вона й вирішує розмір кулі.

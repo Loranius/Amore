@@ -12,7 +12,6 @@ import type { WishlistViewMode } from './wishlistBoardView';
 // тому legacy fixed/absolute CSS більше не може витягнути його у кут екрана.
 // ============================================================
 
-export type WishlistWorldTab = 'me' | 'partner' | 'shared';
 export type WishlistVisibilityMode = 'visible' | 'secret';
 
 export interface WishlistWorldNavProps {

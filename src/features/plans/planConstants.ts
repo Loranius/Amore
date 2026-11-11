@@ -18,7 +18,7 @@ import { MapPinIcon } from '@/components/icons/MapIcon';
 import { TicketIcon } from '@/components/icons/NavIcon';
 import type { PlanCategory, PlanDatePrecision, PlanStatus } from '@/types';
 
-export type PlanIconComponent = (props: IconProps) => ReactNode;
+type PlanIconComponent = (props: IconProps) => ReactNode;
 
 export interface PlanCategoryDef {
   label: string;

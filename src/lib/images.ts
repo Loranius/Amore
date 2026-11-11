@@ -16,7 +16,7 @@
 
 // ── Підтримка WebP через canvas ──────────────────────────────
 let webpSupport: boolean | null = null;
-export function supportsWebp(): boolean {
+function supportsWebp(): boolean {
   if (webpSupport !== null) return webpSupport;
   try {
     const c = document.createElement('canvas');
@@ -30,7 +30,7 @@ export function supportsWebp(): boolean {
 }
 
 // ── Детекція HEIC (MIME або розширення) ──────────────────────
-export function isHeic(file: File | null | undefined): boolean {
+function isHeic(file: File | null | undefined): boolean {
   if (!file) return false;
   const t = (file.type || '').toLowerCase();
   if (t.includes('heic') || t.includes('heif')) return true;

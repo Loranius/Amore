@@ -41,7 +41,7 @@ export function useShoppingItems() {
 
 // ── Парсинг вводу ────────────────────────────────────────────
 /** Fallback без ШІ: розділювачі — кома та новий рядок. */
-export function parseInputFallback(raw: string): ParsedShoppingLine[] {
+function parseInputFallback(raw: string): ParsedShoppingLine[] {
   return raw
     .split(/[,\n]/)
     .map((s) => s.trim())

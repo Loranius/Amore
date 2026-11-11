@@ -57,7 +57,7 @@ function prism(p: Painter, a: V3, b: V3, r0: number, r1: number, paint: Paint, t
 // ── Кристал: давній храм у підземеллі ─────────────────────
 /** Фарба кристала: 2 — камінь храму (плющ бере свою). */
 /** Глибина, з якої ростуть колони: далеко в серпанку. */
-export const TEMPLE_DEPTH = -190;
+const TEMPLE_DEPTH = -190;
 const STONE = 2 as Paint;
 
 /** Колона ордера: плінт, фуст, капітель. `broken` — фуст обламаний. */
@@ -158,7 +158,7 @@ const T_CLOUD = 6 as Paint;
 const T_FAR = 7 as Paint;
 
 /** Пухка хмара з кавалків; наполовину світиться сама, щоб не сіріла. */
-export function cloudPuff(p: Painter, seed: string, key: string, c: V3, size: number, flat = 0.6) {
+function cloudPuff(p: Painter, seed: string, key: string, c: V3, size: number, flat = 0.6) {
   const n = 3 + Math.floor(unit(seed, `${key}:n`) * 4);
   for (let k = 0; k < n; k += 1) {
     const t = n === 1 ? 0 : k / (n - 1) - 0.5;
@@ -168,7 +168,7 @@ export function cloudPuff(p: Painter, seed: string, key: string, c: V3, size: nu
 }
 
 /** Летючий острівець: трав'яна шапка, скеля конусом, часом деревце. */
-export function floatingIslet(p: Painter, seed: string, key: string, c: V3, size: number, rock: Paint = T_FAR) {
+function floatingIslet(p: Painter, seed: string, key: string, c: V3, size: number, rock: Paint = T_FAR) {
   const n = 7;
   const turn = unit(seed, `${key}:turn`) * Math.PI;
   const top = Array.from({ length: n }, (_, i): V3 => {

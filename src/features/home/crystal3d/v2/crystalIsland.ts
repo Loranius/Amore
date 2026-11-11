@@ -33,16 +33,14 @@ export {
   Painter,
   box,
   chunk,
-  flower,
   ivy,
   leaf,
   polar,
-  vine,
   type IslandMesh,
   type Paint,
   type V3,
 } from './sanctuary/brushes';
-export { DAYS_PER_DRUSE, MAX_DRUSES, druseAt, druseCount, druseOfDay } from './sanctuary/crystalGround';
+export { druseAt, druseOfDay } from './sanctuary/crystalGround';
 
 export interface CrystalIsland {
   island: IslandMesh;

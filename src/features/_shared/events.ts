@@ -10,7 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { qk } from '@/lib/queryKeys';
 import type { EventRow } from '@/types';
 
-export async function loadEvents(): Promise<EventRow[]> {
+async function loadEvents(): Promise<EventRow[]> {
   const { data, error } = await supabase
     .from('events')
     .select('id,title,description,date,created_by,type,yearly,metadata,significance,is_milestone,person_user_id,star_color')

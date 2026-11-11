@@ -9,7 +9,7 @@
 // supabase/functions/*/index.ts та supabase/migrations.sql
 // старого (vanilla) коду.
 //
-// Runtime-перевірки (type guards: isUserName, isPlanMetadata …)
+// Runtime-перевірки (type guards: isUserName …)
 // живуть у src/lib/guards.ts — тут лише декларації.
 // ============================================================
 
@@ -81,7 +81,7 @@ export type EventType = 'birthday' | 'anniversary' | 'holiday' | 'other';
 export type EventSignificance = 'regular' | 'important' | 'relationship_start' | 'marriage';
 
 /** Ключові події — ті, що можуть бути ядром сузір'я. Одруження старше. */
-export const KEY_SIGNIFICANCE = ['marriage', 'relationship_start'] as const;
+const KEY_SIGNIFICANCE = ['marriage', 'relationship_start'] as const;
 
 export type KeySignificance = (typeof KEY_SIGNIFICANCE)[number];
 

@@ -16,7 +16,6 @@
 // цього атрибута не має, зрушити нічим: острів стоїть нерухомо за
 // будовою, а не за домовленістю.
 // ============================================================
-import type * as THREE from 'three';
 
 /**
  * Розмах, у одиницях острова (радіус острова = 1).
@@ -92,9 +91,4 @@ export function portalLevitation(clocks: { current: { value: number }[] }) {
       .replace('void main() {', `${DECLARATION}\nvoid main() {`)
       .replace('#include <begin_vertex>', `#include <begin_vertex>\n${PORTAL_DRIFT_OFFSET_GLSL}`);
   };
-}
-
-/** Чи несе цей меш атрибут руху взагалі. */
-export function floats(geometry: THREE.BufferGeometry): boolean {
-  return geometry.getAttribute('portalFloat') !== undefined;
 }

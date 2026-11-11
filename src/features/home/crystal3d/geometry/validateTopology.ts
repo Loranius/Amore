@@ -24,7 +24,7 @@ import { worldVertices } from './junctionTrim';
 import type { ShellEntry } from './validateShell';
 import { byCodePoint } from '@/engine/ordering';
 
-export type TopologyViolationKind =
+type TopologyViolationKind =
   /** Грань нульової площі — сміття, що дає NaN-нормалі й z-fighting. */
   | 'degenerate-face'
   /** Та сама трійка вершин двічі в одному тілі. */

@@ -178,7 +178,7 @@ export function frameWidth(leaves: number): number {
  * один URL, тож кадр уже в кеші, коли він виростає в обкладинку
  * (`coverMorph.ts`).
  */
-export const THREAD_FRAME_CSS_WIDTH = 152;
+const THREAD_FRAME_CSS_WIDTH = 152;
 
 /**
  * Та сама ширина, але від ширини вікна (ADR-0254).
@@ -187,7 +187,7 @@ export const THREAD_FRAME_CSS_WIDTH = 152;
  * сягає ~280px — кадр, попрошений на 152, там розтягувався й розмивався.
  * Поріг той самий, що в альбомі сторінки спогаду (720px).
  */
-export const THREAD_FRAME_CSS_WIDTH_WIDE = 260;
+const THREAD_FRAME_CSS_WIDTH_WIDE = 260;
 
 export function threadFrameCssWidth(viewportWidth: number): number {
   return viewportWidth >= 720 ? THREAD_FRAME_CSS_WIDTH_WIDE : THREAD_FRAME_CSS_WIDTH;
@@ -201,7 +201,7 @@ export function currentFrameCssWidth(): number {
 /** Скільки листів віяла показує вузол нитки. */
 export const THREAD_FAN_LEAVES = 2;
 /** Крок повороту листа, у градусах. */
-export const THREAD_FAN_STEP_DEG = 6;
+const THREAD_FAN_STEP_DEG = 6;
 
 export interface ThreadFanLeaf {
   /** Градуси; знак веде НАЗОВНІ від нитки. */

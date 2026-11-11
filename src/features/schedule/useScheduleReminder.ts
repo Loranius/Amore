@@ -13,9 +13,6 @@ import {
 
 import { useToast } from '@/providers/ToastProvider';
 
-export { parseScheduleReminderResult };
-export type { ScheduleReminderResult };
-
 interface ScheduleReminderInput {
   recipientId: number;
   month: string;

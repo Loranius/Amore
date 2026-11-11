@@ -18,7 +18,6 @@ import type { EventRow, EnrichedEvent, EventType } from '@/types';
 // `export … from`: реекспорт не вводить імені в область файлу, і
 // formatUaDate нижче його не побачив би.
 import { MONTHS_UA_GENITIVE as MONTHS } from '@/features/_shared/month';
-export { MONTHS };
 
 /**
  * Тип події → значок і дві фарби.

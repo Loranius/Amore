@@ -30,7 +30,8 @@ describe('кожне завантаження йде через couplePath (ре
     'features/profile/useProfile.ts',
     'features/media/useMedia.ts',
     'features/memories/useMoments.ts',
-    'features/memories/useMapPins.ts',
+    // `useMapPins.ts` більше нічого не завантажує: `uploadPinPhoto` жив лише в
+    // мертвому `useMapPinMutations` і прибраний разом із ним (ADR-0263).
     'features/memories/useMemories.ts',
     'features/wishlist/wishlistProcessedImagePersistence.ts',
   ];

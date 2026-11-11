@@ -85,7 +85,7 @@ export function reefStoneTextures(): ReefStoneTextures | null {
   return cached;
 }
 
-export const REEF_STONE_VERTEX_PARS = `
+const REEF_STONE_VERTEX_PARS = `
 varying vec3 vReefStonePosition;
 varying vec3 vReefStoneNormal;
 `;
@@ -99,7 +99,7 @@ varying vec3 vReefStoneNormal;
  * ADR-0195 §7 записав це названою межею («триплан у світових координатах
  * для інстансів рахує не те»). Гілка закриває межу трьома рядками.
  */
-export const REEF_STONE_VERTEX_BODY = `
+const REEF_STONE_VERTEX_BODY = `
   vec4 reefStoneLocal = vec4(transformed, 1.0);
   vec3 reefStoneNormalLocal = objectNormal;
   #ifdef USE_INSTANCING
@@ -110,7 +110,7 @@ export const REEF_STONE_VERTEX_BODY = `
   vReefStoneNormal = normalize(mat3(modelMatrix) * reefStoneNormalLocal);
 `;
 
-export const REEF_STONE_FRAGMENT_PARS = `
+const REEF_STONE_FRAGMENT_PARS = `
 uniform sampler2D uReefStoneNormal;
 uniform sampler2D uReefStoneRough;
 uniform float uReefStoneScale;
@@ -150,7 +150,7 @@ vec3 reefStoneBlend(vec3 worldNormal) {
  * Рахувати їх двічі теж не можна: дві копії тієї самої арифметики
  * розійшлись би, і зерно шорсткості поїхало б відносно зерна рельєфу.
  */
-export const REEF_STONE_SETUP_FRAGMENT = `
+const REEF_STONE_SETUP_FRAGMENT = `
   vec3 stoneWorldNormal = normalize(vReefStoneNormal);
   vec3 stoneBlend = reefStoneBlend(stoneWorldNormal);
   vec2 stoneUvX = vReefStonePosition.zy * uReefStoneScale;
@@ -158,7 +158,7 @@ export const REEF_STONE_SETUP_FRAGMENT = `
   vec2 stoneUvZ = vReefStonePosition.xy * uReefStoneScale;
 `;
 
-export const REEF_STONE_NORMAL_FRAGMENT = `
+const REEF_STONE_NORMAL_FRAGMENT = `
   vec3 stoneNx = texture2D(uReefStoneNormal, stoneUvX).xyz * 2.0 - 1.0;
   vec3 stoneNy = texture2D(uReefStoneNormal, stoneUvY).xyz * 2.0 - 1.0;
   vec3 stoneNz = texture2D(uReefStoneNormal, stoneUvZ).xyz * 2.0 - 1.0;
@@ -172,7 +172,7 @@ export const REEF_STONE_NORMAL_FRAGMENT = `
   normal = normalize((viewMatrix * vec4(stoneNormal, 0.0)).xyz);
 `;
 
-export const REEF_STONE_ROUGHNESS_FRAGMENT = `
+const REEF_STONE_ROUGHNESS_FRAGMENT = `
   float stoneRough =
     texture2D(uReefStoneRough, stoneUvX).g * stoneBlend.x
     + texture2D(uReefStoneRough, stoneUvY).g * stoneBlend.y
@@ -307,21 +307,21 @@ export function applyReefStoneSurface(
 
 const HAZE_VERSION = 'reef-haze-1';
 
-export const REEF_HAZE_VERTEX_PARS = `
+const REEF_HAZE_VERTEX_PARS = `
 varying vec2 vReefHazeGround;
 `;
 
-export const REEF_HAZE_VERTEX_BODY = `
+const REEF_HAZE_VERTEX_BODY = `
   vReefHazeGround = (modelMatrix * vec4(transformed, 1.0)).xz;
 `;
 
-export const REEF_HAZE_FRAGMENT_PARS = `
+const REEF_HAZE_FRAGMENT_PARS = `
 uniform float uReefHazeFrom;
 uniform float uReefHazeTo;
 varying vec2 vReefHazeGround;
 `;
 
-export const REEF_HAZE_FRAGMENT_BODY = `
+const REEF_HAZE_FRAGMENT_BODY = `
   float reefHaze = 1.0 - smoothstep(uReefHazeFrom, uReefHazeTo, length(vReefHazeGround));
   diffuseColor.rgb *= reefHaze;
 `;

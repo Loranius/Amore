@@ -26,10 +26,10 @@ const h01 = (i: number, j: number, k: number) => cellHash(i, j, k + 900) / 42949
 // ------------------------------------------------------------
 
 /** Пороги поля `lawnField`: густа тінь, тінь, сонце, яскраве сонце (≈10/15/15/10% трави). */
-export const DEEP = 0.66;
-export const LUSH = 0.58;
-export const SUNNY = 0.4;
-export const SUNNIER = 0.33;
+const DEEP = 0.66;
+const LUSH = 0.58;
+const SUNNY = 0.4;
+const SUNNIER = 0.33;
 
 const smooth = (t: number) => t * t * (3 - 2 * t);
 
@@ -566,7 +566,7 @@ export function rutHd(g: Ctx, x: number, y: number, i: number, j: number, base: 
  * торкається води: стебла пучками, влітку й восени — коричневі качалки,
  * узимку — сухі, зі снігом на кінчиках.
  */
-export function reedsHd(g: Ctx, x: number, y: number, i: number, j: number, side: 'left' | 'right' | 'top' | 'bottom', P: SeasonPalette): void {
+function reedsHd(g: Ctx, x: number, y: number, i: number, j: number, side: 'left' | 'right' | 'top' | 'bottom', P: SeasonPalette): void {
   const winter = P.snow;
   const autumn = P === PALETTES.autumn;
   const stem = winter ? '#c8b48a' : autumn ? '#9a9a4a' : P.blade;

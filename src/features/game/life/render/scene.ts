@@ -44,7 +44,7 @@ export interface Actor {
 }
 
 /** Тварина на мапі (Бася). */
-export interface Pet {
+interface Pet {
   x: number;
   y: number;
   dir: Dir;

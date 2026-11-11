@@ -26,12 +26,3 @@ export function isRetryable(err: unknown): boolean {
     (status !== undefined && status >= 500)
   );
 }
-
-/** Читабельне повідомлення з довільної помилки (для тостів / логів). */
-export function errorMessage(err: unknown): string {
-  if (typeof err === 'string') return err;
-  if (err && typeof err === 'object' && 'message' in err) {
-    return String((err as { message: unknown }).message);
-  }
-  return 'Невідома помилка';
-}

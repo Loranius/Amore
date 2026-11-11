@@ -89,7 +89,7 @@ interface MemoriesMapProps {
 }
 
 /** Мітки карти, збагачені спогадом, якщо той на них посилається. */
-export function buildPins(
+function buildPins(
   places: readonly MomentPlace[],
   moments: readonly Moment[],
 ): MapPin[] {

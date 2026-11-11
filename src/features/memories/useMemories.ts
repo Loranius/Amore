@@ -19,7 +19,7 @@ import type { MemoryDayRow, MemoryLinkRow, MemoryPrecision, MemoryRow, MemorySou
 import { randomToken } from '@/lib/entropy';
 import { couplePath } from '@/lib/couplePath';
 
-export const MEMORIES_BUCKET = 'photo-calendar';
+const MEMORIES_BUCKET = 'photo-calendar';
 
 const COLUMNS = 'id,photo_url,storage_bucket,storage_path,memory_date,date_precision,taken_at,caption,uploaded_by,sort_order,created_at';
 

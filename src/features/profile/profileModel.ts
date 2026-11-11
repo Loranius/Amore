@@ -23,7 +23,7 @@
 // іменем із профілю, а РОЗРІЗНЯЄ людей ключем — і одне не заважає
 // другому.
 // ============================================================
-import type { AppUser, UserName } from '@/types';
+import type { AppUser } from '@/types';
 
 /** Профіль, як він лежить у `settings`. Обидва поля необов'язкові. */
 export interface UserProfile {
@@ -156,6 +156,3 @@ export function toPerson(
 export function personInitial(displayName: string): string {
   return (displayName.trim()[0] ?? '?').toUpperCase();
 }
-
-/** Ім'я-ключ лишається тим, чим було: розвилки коду дивляться сюди. */
-export type PersonKey = UserName;

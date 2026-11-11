@@ -40,7 +40,7 @@ function isoDaysAgo(days: number): string {
  *  виду підігнані під один набір даних. */
 export type DataVolume = 'sparse' | 'typical' | 'rich' | 'backfilled';
 
-export function makeInput(seed: string, volume: DataVolume = 'typical'): ArtifactInput {
+function makeInput(seed: string, volume: DataVolume = 'typical'): ArtifactInput {
   if (volume === 'sparse') return sparseInput(seed);
   if (volume === 'rich') return richInput(seed);
   if (volume === 'backfilled') return backfilledInput(seed);
@@ -216,7 +216,7 @@ function richInput(seed: string): ArtifactInput {
   };
 }
 
-export interface BuiltBody {
+interface BuiltBody {
   branch: ClusterBranch;
   solid: HostSolid;
   geometry: THREE.BufferGeometry;

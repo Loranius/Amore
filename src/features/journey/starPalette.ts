@@ -211,7 +211,7 @@ export function shadeHue(shade: StarShade): number {
  * Ядро дістає світлішу версію ВЛАСНОГО відтінку, а не окремий колір: воно
  * головне не барвою, а розміром, сяйвом і місцем у нулі осі.
  */
-export function starRgb(star: StarColourSource & { core: boolean }): [number, number, number] {
+function starRgb(star: StarColourSource & { core: boolean }): [number, number, number] {
   const colour = starColour(star);
   return hslToRgb(star.core ? coreColour(colour) : colour);
 }

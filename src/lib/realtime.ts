@@ -22,7 +22,7 @@ const SUPPRESS_MS = 2500;
 const selfWrites: Record<string, number> = {};
 
 /** Позначити таблицю щойно зміненою цим клієнтом. */
-export function markSelf(table: string): void {
+function markSelf(table: string): void {
   selfWrites[table] = Date.now();
 }
 function isSelfEcho(table: string): boolean {

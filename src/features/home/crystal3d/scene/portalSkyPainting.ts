@@ -26,7 +26,7 @@
 export type Rgb = readonly [number, number, number];
 
 /** Зупинка градієнта: висота кадру (0 — верх) і колір. */
-export interface SkyStop {
+interface SkyStop {
   at: number;
   color: string;
 }
@@ -163,7 +163,7 @@ function valueNoise(x: number, y: number, seed: number): number {
  * без повороту купчасті хмари вишиковувались уздовж осей, і небо
  * виглядало вишитим, а не намальованим.
  */
-export function fbm(x: number, y: number, octaves: number, seed: number): number {
+function fbm(x: number, y: number, octaves: number, seed: number): number {
   let sum = 0;
   let amplitude = 0.5;
   let norm = 0;
@@ -240,7 +240,6 @@ export const PORTAL_SKY_SHAPES = {
   tall: { width: PORTAL_SKY_PAINT_WIDTH, height: PORTAL_SKY_PAINT_HEIGHT },
   wide: { width: 640, height: 400 },
 } as const;
-export type PortalSkyShape = keyof typeof PORTAL_SKY_SHAPES;
 
 /**
  * Хмарне поле в точці кадру.

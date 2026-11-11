@@ -19,7 +19,7 @@ import { PAINT, Painter, polar, type IslandMesh, type V3 } from './brushes';
  * Шпиль-друза: два-три шестигранні шпилі, що виходять із щілини між
  * плитами. Вершина гостра, як у кварцу; кожен шпиль у свій бік.
  */
-export function druse(p: Painter, seed: string, key: string, c: V3, size: number, glow = 0.35) {
+function druse(p: Painter, seed: string, key: string, c: V3, size: number, glow = 0.35) {
   const spikes = 2 + Math.floor(unit(seed, `${key}:n`) * 2);
   for (let s = 0; s < spikes; s += 1) {
     const k = `${key}:s${s}`;
@@ -42,9 +42,9 @@ export function druse(p: Painter, seed: string, key: string, c: V3, size: number
 }
 
 /** Друз менше (власник, 2026-10-06): одна на три спільні вихідні, не більше восьми. */
-export const DAYS_PER_DRUSE = 3;
-export const MAX_DRUSES = 8;
-export function druseCount(days: number): number {
+const DAYS_PER_DRUSE = 3;
+const MAX_DRUSES = 8;
+function druseCount(days: number): number {
   return Math.min(MAX_DRUSES, Math.ceil(Math.max(0, days) / DAYS_PER_DRUSE));
 }
 export function druseOfDay(k: number): number {

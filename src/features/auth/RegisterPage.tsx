@@ -392,5 +392,3 @@ function registerErrorText(code: string): string {
   if (code === 'bad_pin') return REGISTER_PROBLEM_TEXT['no-first-pin'];
   return 'Не вдалося створити портал. Спробуйте ще раз.';
 }
-
-export default RegisterPage;

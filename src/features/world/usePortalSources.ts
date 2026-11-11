@@ -32,7 +32,7 @@ import {
   type PortalSources,
 } from './portalSources';
 
-export { COUPLE_TIME_ZONE, ENGINE_VERSION, coupleDay } from './portalSources';
+export { COUPLE_TIME_ZONE, ENGINE_VERSION } from './portalSources';
 export type { PortalSources } from './portalSources';
 
 const SOURCE_CACHE_VERSION = 1;

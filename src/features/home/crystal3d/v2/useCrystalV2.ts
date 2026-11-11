@@ -21,7 +21,7 @@ import { buildCrystalV2Model, type CrystalV2Model, type CrystalV2Snapshot } from
 import { resolveCrystalColorPartners } from '../evolution/sourceSnapshot';
 import { crystalV2SnapshotFrom } from './crystalV2Sources';
 
-export interface CrystalV2State {
+interface CrystalV2State {
   snapshot: CrystalV2Snapshot;
   model: CrystalV2Model;
   geometry: CrystalV2Geometry;

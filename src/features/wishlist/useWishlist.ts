@@ -12,12 +12,11 @@ import { compress, normalize } from '@/lib/images';
 import { burstConfetti } from '@/lib/confetti';
 import { useToast } from '@/providers/ToastProvider';
 import { useCurrentUser } from '@/providers/AuthProvider';
-import { useUsers, usePartner } from '@/features/_shared/useUsers';
+import { useUsers } from '@/features/_shared/useUsers';
 import {
   cancelWishlistReservation,
   completeWishlistGift,
   createWishlistItem,
-  fetchFulfilledWishlistV3,
   fetchSecretWishlistV1,
   fetchWishlistStatsV3,
   fetchWishlistV3,
@@ -27,7 +26,6 @@ import {
   reserveWishlistItem,
   softDeleteWishlistItem,
   updateWishlistItem,
-  type GiftMemoryArchiveItem,
   type WishlistItemV3,
 } from './wishlistRpc';
 import {
@@ -39,8 +37,6 @@ import type { WishlistImagePreference } from './wishlistImagePreference';
 import type { WishlistItemRow } from '@/types';
 
 const BUCKET = 'wishlist-photos';
-const ARCHIVE_SIGNED_URL_REFRESH_MS = 5 * 60 * 60 * 1000;
-const ARCHIVE_STALE_TIME_MS = 4 * 60 * 60 * 1000;
 
 /*
  * ТУТ БУЛА ДРУГА КОПІЯ `partnerGenitive` — із власною таблицею відмінків
@@ -54,9 +50,6 @@ const ARCHIVE_STALE_TIME_MS = 4 * 60 * 60 * 1000;
  * шляху не проявлялась — вона просто чекала. Реекспорт лишається, щоб
  * імпорт звідси не зламався, але правило живе в одному місці.
  */
-export { partnerGenitive } from './partnerLabel';
-
-export { usePartner };
 
 // ── Запити ───────────────────────────────────────────────────
 export function useWishlistItems(ownerId: number | null) {
@@ -90,19 +83,6 @@ export function useCoupleWishStats() {
   return useQuery({
     queryKey: qk.wishlistStats(),
     queryFn: fetchWishlistStatsV3,
-  });
-}
-
-export function useFulfilledWishes(ownerId: number | null, enabled: boolean) {
-  return useQuery({
-    queryKey: qk.wishlistFulfilled(ownerId ?? -1),
-    enabled: enabled && ownerId !== null,
-    queryFn: async (): Promise<GiftMemoryArchiveItem[]> =>
-      fetchFulfilledWishlistV3(ownerId!),
-    staleTime: ARCHIVE_STALE_TIME_MS,
-    refetchInterval: enabled ? ARCHIVE_SIGNED_URL_REFRESH_MS : false,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: true,
   });
 }
 

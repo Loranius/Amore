@@ -27,7 +27,7 @@ export interface DatedPhoto<T = unknown> {
   takenAt: string | null;
 }
 
-export interface PhotoDay<T = unknown> {
+interface PhotoDay<T = unknown> {
   /** `YYYY-MM-DD` — день зйомки. */
   day: string;
   /** Номер року стосунків, якому цей день належить. */

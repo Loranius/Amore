@@ -32,9 +32,9 @@ export const ATTACHMENT_JUNCTION_VERSION = '1.0.0';
 export const MATERIAL_BLEND_RATIO = 0.35;
 
 /** Політика вирізання геометрії в зоні стику (Vol V). */
-export type TrimPolicy = 'analytic-clip' | 'local-boolean' | 'junction-mesh';
+type TrimPolicy = 'analytic-clip' | 'local-boolean' | 'junction-mesh';
 /** Політика ущільнення шва (Vol V). */
-export type SeamPolicy = 'weld' | 'sealed-transition';
+type SeamPolicy = 'weld' | 'sealed-transition';
 
 /**
  * Канонічний запис кріплення. Семантично еквівалентний §3 профілю; поля
@@ -104,7 +104,7 @@ function projectOnAxis(body: JunctionBody, p: Vec3): { t: number; axisPoint: Vec
  * композиція встигла посунути/нахилити/вкоротити тіла — запис мусить
  * описувати те, що реально піде в геометрію.
  */
-export function buildJunction(host: JunctionBody, child: JunctionBody): AttachmentJunction {
+function buildJunction(host: JunctionBody, child: JunctionBody): AttachmentJunction {
   // Точка контакту — основа дитини, спроєктована на поверхню господаря.
   const { t, axisPoint } = projectOnAxis(host, child.anchor);
   const radial = sub(child.anchor, axisPoint);

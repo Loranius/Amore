@@ -34,7 +34,7 @@ export function useUsers() {
  * Лежать у `settings` рядками `profile:<id>`, бо `users` клієнтові
  * відкрита лише на читання — див. `profileModel.ts`.
  */
-export function useProfiles() {
+function useProfiles() {
   return useQuery({
     queryKey: [...qk.settings(), 'profiles'],
     /*
@@ -72,7 +72,7 @@ export function useProfiles() {
  * показують його самі. Копія в профілі розійшлася б із подією того дня,
  * коли хтось поправить одну.
  */
-export function useBirthdays() {
+function useBirthdays() {
   return useQuery({
     queryKey: [...qk.events(), 'birthdays'],
     staleTime: 5 * 60_000, // та сама причина, що й у `useProfiles`

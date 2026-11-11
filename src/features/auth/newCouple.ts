@@ -35,7 +35,7 @@ import {
 export const NAME_MAX = 40;
 
 /** Найраніша дата початку, яку приймає і сервер (`create_couple_for`). */
-export const EARLIEST_START = '1950-01-01';
+const EARLIEST_START = '1950-01-01';
 
 export type NameProblem = 'empty' | 'long';
 

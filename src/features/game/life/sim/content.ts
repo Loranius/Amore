@@ -123,7 +123,7 @@ export const CITY_SHOPS: Record<CityId, readonly ShopId[]> = {
   vyshneve: ['grocery'],
 };
 
-export type ItemKind = 'food' | 'outfit' | 'decor' | 'book' | 'gift' | 'gadget' | 'souvenir';
+type ItemKind = 'food' | 'outfit' | 'decor' | 'book' | 'gift' | 'gadget' | 'souvenir';
 export type SkillId = 'knowledge' | 'creativity' | 'sport' | 'charm';
 
 export const SKILL_NAME: Record<SkillId, string> = {
@@ -133,7 +133,7 @@ export const SKILL_NAME: Record<SkillId, string> = {
   charm: 'Чарівність',
 };
 
-export interface Outfit {
+interface Outfit {
   top: string;
   bottom: string;
   /** Сукня малюється суцільно від плечей. */
@@ -251,7 +251,7 @@ export const EDUCATION_NAME: Record<Education, string> = {
   diploma: 'диплом ВДПУ',
 };
 
-export type ShiftGame = 'barista' | 'cashier' | 'accountant' | 'florist' | 'teacher' | 'designer' | 'baker' | 'guide' | 'post';
+type ShiftGame = 'barista' | 'cashier' | 'accountant' | 'florist' | 'teacher' | 'designer' | 'baker' | 'guide' | 'post';
 
 export interface Job {
   id: string;

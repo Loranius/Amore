@@ -56,8 +56,6 @@ export interface GameContext {
   lena: Look;
 }
 
-export type GameFactory = (ctx: GameContext) => MiniGame;
-
 export interface Hit {
   id: string;
   x: number;

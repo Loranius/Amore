@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 
-export interface WishlistLinkPreviewData {
+interface WishlistLinkPreviewData {
   title: string | null;
   imageUrl: string | null;
   price: number | null;

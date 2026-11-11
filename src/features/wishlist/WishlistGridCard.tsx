@@ -21,7 +21,7 @@ import type { WishlistItemRow } from '@/types';
 import './wishlistGridView.css';
 
 /** Ціна словами, які пара розуміє без підказки. */
-export function formatWishlistGridPrice(price: number | null | undefined): string {
+function formatWishlistGridPrice(price: number | null | undefined): string {
   if (price == null) return 'Ціни ще немає';
   return `${Math.round(price).toLocaleString('uk-UA')} ₴`;
 }
@@ -33,7 +33,7 @@ export function formatWishlistGridPrice(price: number | null | undefined): strin
  * там уже нічого. Спільний знаменник обох рядків і є цим типом, тож
  * активні та виконані мрії справді малює ОДНА картка, а не дві схожі.
  */
-export interface WishlistGridCardItem {
+interface WishlistGridCardItem {
   id: number;
   title: string;
   price: number | null;

@@ -59,7 +59,7 @@ export function useMediaItems(type: MediaType) {
 }
 
 /** Постер: HEIC → JPEG → compress → Storage. Повертає public URL або null. */
-export async function uploadPoster(file: File, type: MediaType, itemId: number): Promise<string | null> {
+async function uploadPoster(file: File, type: MediaType, itemId: number): Promise<string | null> {
   let normalized: File;
   try {
     normalized = await normalize(file);

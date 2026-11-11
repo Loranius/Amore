@@ -20,7 +20,7 @@ import { yardMap } from './yard';
 const homeZone = { type: 'home' } as const;
 
 /** Автобусна зупинка в Жилинцях (клітинка, де стоїть навіс). */
-export const BUS_STOP = { x: 37, y: 13 } as const;
+const BUS_STOP = { x: 37, y: 13 } as const;
 
 function zhylyntsi(): GameMap {
   const m = new MapBuilder('zhylyntsi', 'zhylyntsi', 'с. Жилинці', 42, 30);

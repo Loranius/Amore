@@ -126,7 +126,7 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-export function rgbToHex(r: number, g: number, b: number): string {
+function rgbToHex(r: number, g: number, b: number): string {
   const c = (v: number) => Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
   return `#${c(r)}${c(g)}${c(b)}`;
 }
@@ -314,17 +314,6 @@ function rampDark(c: [number, number, number], palette: [number, number, number]
     if (dd < bestD) { bestD = dd; best = p; }
   }
   return best ?? want;
-}
-
-export function flipX(src: HTMLCanvasElement): HTMLCanvasElement {
-  const out = canvas(src.width, src.height);
-  const dens = canvasDensity.get(src);
-  if (dens) canvasDensity.set(out, dens);
-  const g = ctx2d(out);
-  g.translate(src.width, 0);
-  g.scale(-1, 1);
-  g.drawImage(src, 0, 0);
-  return out;
 }
 
 export { cellHash } from '../world/hash';

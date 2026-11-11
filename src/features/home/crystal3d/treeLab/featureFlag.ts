@@ -1,9 +1,9 @@
 import type { OrganicMeshLod } from '@/engine/labs/organic';
 
-export const TREE_LAB_RENDERER_QUERY_KEY = 'engine';
-export const TREE_LAB_RENDERER_QUERY_VALUE = 'tree-lab';
-export const TREE_LAB_LOD_QUERY_KEY = 'treeLod';
-export const TREE_LAB_SOURCE_QUERY_KEY = 'treeSource';
+const TREE_LAB_RENDERER_QUERY_KEY = 'engine';
+const TREE_LAB_RENDERER_QUERY_VALUE = 'tree-lab';
+const TREE_LAB_LOD_QUERY_KEY = 'treeLod';
+const TREE_LAB_SOURCE_QUERY_KEY = 'treeSource';
 
 export type TreeLabSource = 'fixture' | 'portal';
 

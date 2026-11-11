@@ -84,7 +84,7 @@ export interface JourneySceneProps {
 }
 
 /** Секунди від початку сцени, у рефі. */
-export type Clock = { current: number };
+type Clock = { current: number };
 
 export interface JourneyRuntime {
   drawCalls: number;

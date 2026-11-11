@@ -29,7 +29,7 @@ export type LodLevel = 'high' | 'medium' | 'low';
 /** Усі публіковані рівні — саме їх зобов'язана перевіряти валідація. */
 export const LOD_LEVELS: readonly LodLevel[] = ['high', 'medium', 'low'] as const;
 
-export interface LodPolicy {
+interface LodPolicy {
   readonly id: LodLevel;
   /** Множник кількості граней тіла. */
   readonly segmentScale: number;

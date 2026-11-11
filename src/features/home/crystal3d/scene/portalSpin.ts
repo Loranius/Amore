@@ -25,7 +25,7 @@
 // ============================================================
 
 /** Напівперіод, за який видимий кут проходить половину шляху до пальця, с. */
-export const FOLLOW_HALF_LIFE = 0.05;
+const FOLLOW_HALF_LIFE = 0.05;
 
 /** Кутова швидкість, з якої свайп вважається різким, рад/с. */
 export const FLICK_SPEED = 3.5;
@@ -37,13 +37,13 @@ export const FLICK_SNAP = Math.PI / 4;
  * Скільки інерція несе після різкого свайпу: шлях = швидкість × τ.
  * 0.32 с — рух помітно «допливає», але не крутить острів дзигою.
  */
-export const FLICK_GLIDE = 0.32;
+const FLICK_GLIDE = 0.32;
 
 /** Найдовший шлях інерції — пів оберту; далі різкий свайп не несе. */
 export const FLICK_MAX_TRAVEL = Math.PI;
 
 /** Коротке допливання після звичайного (не різкого) відпускання, с. */
-export const SOFT_GLIDE = 0.1;
+const SOFT_GLIDE = 0.1;
 
 /** Вікно, за яким міряється швидкість пальця, с. */
 const VELOCITY_WINDOW = 0.1;
@@ -55,7 +55,7 @@ const STILL_BEFORE_RELEASE = 0.08;
 const MIN_OMEGA = 2.2;
 const MAX_OMEGA = 16;
 
-export interface PortalSpinGlide {
+interface PortalSpinGlide {
   /** Куди пружина веде кут. */
   readonly goal: number;
   /** Коли відпущено, с. */

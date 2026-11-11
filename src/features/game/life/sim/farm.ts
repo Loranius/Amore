@@ -16,10 +16,10 @@ export function isFarmGame(id: string): id is FarmGameId {
 /** Ціна на продаж (власник: «1 яблуко на продаж коштує 1 гривню, слива — 2, груша — 3»). */
 export const FRUIT_PRICE = { apple: 1, plum: 2, pear: 3 } as const;
 export type Fruit = keyof typeof FRUIT_PRICE;
-export const FRUITS: readonly Fruit[] = ['apple', 'plum', 'pear'];
+const FRUITS: readonly Fruit[] = ['apple', 'plum', 'pear'];
 /** Власник: «за одну гру можна зібрати максимум 15 фруктів в кошик». */
 export const BASKET_MAX = 15;
-export const FRUIT_NAME: Record<Fruit, string> = { apple: 'яблука', plum: 'сливи', pear: 'груші' };
+const FRUIT_NAME: Record<Fruit, string> = { apple: 'яблука', plum: 'сливи', pear: 'груші' };
 
 /** Скільки коштує зібране. */
 export function fruitEarnings(tally: Readonly<Record<string, number>>): number {
@@ -29,7 +29,7 @@ export function fruitEarnings(tally: Readonly<Record<string, number>>): number {
 // ── Город ────────────────────────────────────────────────────
 export const CROPS = ['potato', 'cabbage', 'carrot', 'beet', 'corn'] as const;
 export type Crop = (typeof CROPS)[number];
-export const CROP_NAME: Record<Crop, string> = { potato: 'картопля', cabbage: 'капуста', carrot: 'морква', beet: 'буряк', corn: 'кукурудза' };
+const CROP_NAME: Record<Crop, string> = { potato: 'картопля', cabbage: 'капуста', carrot: 'морква', beet: 'буряк', corn: 'кукурудза' };
 
 // ── Курник ───────────────────────────────────────────────────
 /** Власник: «максимум за раунд 20 яєць, які починаються котитись швидше з кожним 5 яйцем». */

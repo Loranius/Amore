@@ -24,7 +24,7 @@ import type { AttachmentJunction } from '../composition/attachment';
  * вид (дерево/корал) підставить власне тіло, а мeханіка рушія лишиться та
  * сама. Псевдонім тримає термінологію Volume III, не дублюючи тип.
  */
-export type GrowthBody = DepositedCrystal;
+type GrowthBody = DepositedCrystal;
 
 /** Явний вихід Growth Engine (Vol III: «Growth State»). */
 export interface GrowthState {

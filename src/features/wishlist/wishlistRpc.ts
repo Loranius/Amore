@@ -21,7 +21,7 @@ export type WishlistStatus =
   | 'gifted'
   | 'archived';
 
-export type WishlistCompletionMode = 'gift' | 'shared';
+type WishlistCompletionMode = 'gift' | 'shared';
 export type WishlistArchiveScope = 'personal' | 'shared';
 
 export interface WishlistItemV3 extends WishlistItemRow {

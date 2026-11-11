@@ -42,7 +42,7 @@ export const WISHLIST_IMAGE_MODEL_TIMEOUT_MS = 30_000;
 export const WISHLIST_IMAGE_TASK_TIMEOUT_MS = 45_000;
 
 /** Кадр анімації є сенс чекати лише мить; далі однаково працюємо. */
-export const WISHLIST_IMAGE_FRAME_TIMEOUT_MS = 250;
+const WISHLIST_IMAGE_FRAME_TIMEOUT_MS = 250;
 
 export class WishlistImageTimeoutError extends Error {
   constructor(code: string) {

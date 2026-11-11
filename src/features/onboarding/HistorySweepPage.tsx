@@ -33,5 +33,3 @@ export function HistorySweepPage() {
   const navigate = useNavigate();
   return <HistorySweepView sweep={sweep} onDone={() => void navigate('/')} world={worldVisible} />;
 }
-
-export default HistorySweepPage;

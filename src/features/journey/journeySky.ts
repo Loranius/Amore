@@ -98,7 +98,7 @@ function fade(t: number): number {
 }
 
 /** Тривимірний value noise: без шва на сфері, бо сфера лежить у просторі. */
-export function valueNoise3(x: number, y: number, z: number, seed: number): number {
+function valueNoise3(x: number, y: number, z: number, seed: number): number {
   const x0 = Math.floor(x);
   const y0 = Math.floor(y);
   const z0 = Math.floor(z);
@@ -115,7 +115,7 @@ export function valueNoise3(x: number, y: number, z: number, seed: number): numb
   return y0v + (y1v - y0v) * fz;
 }
 
-export function fbm3(x: number, y: number, z: number, octaves: number, seed: number): number {
+function fbm3(x: number, y: number, z: number, octaves: number, seed: number): number {
   let sum = 0;
   let amplitude = 0.5;
   let norm = 0;
@@ -163,7 +163,7 @@ function mix(a: readonly number[], b: readonly number[], t: number): [number, nu
  * Напрям ядра галактики — точка на самій смузі (перпендикуляр до її нормалі),
  * куди світло смуги тепліє й густішає.
  */
-export const JOURNEY_CORE_DIRECTION: readonly [number, number, number] = (() => {
+const JOURNEY_CORE_DIRECTION: readonly [number, number, number] = (() => {
   const [nx, , nz] = JOURNEY_BAND_NORMAL;
   // cross(N, up) лежить у площині смуги.
   const raw = [-nz, 0, nx];
@@ -310,7 +310,7 @@ export function journeyStarField(count = JOURNEY_STAR_COUNT): JourneyStarField {
 }
 
 /** Яскраві зірки з променями — окремий каталог, окремий шейдер. */
-export const JOURNEY_HERO_COUNT = 56;
+const JOURNEY_HERO_COUNT = 56;
 
 export interface JourneyHeroStars {
   positions: Float32Array;

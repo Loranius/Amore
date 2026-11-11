@@ -25,7 +25,7 @@ import { cellHash } from './hash';
 export const YARD_ID = 'zhylyntsi:yard';
 
 /** Ділянки городу (x1–30, y1–8; стежка — x15): культура, x, y, w, h. */
-export const GARDEN: readonly (readonly [CropKind, number, number, number, number])[] = [
+const GARDEN: readonly (readonly [CropKind, number, number, number, number])[] = [
   ['potato', 1, 1, 9, 5],
   ['cabbage', 10, 1, 5, 3],
   ['beet', 10, 4, 5, 2],

@@ -75,7 +75,7 @@ const HANDLE_LIGHT = '#c89050';
  * `w` — ширина. `items` — кольори того, що лежить зверху (яйця — білі,
  * фрукти — свої), видно останні дев'ять.
  */
-export function drawBasketArt(g: CanvasRenderingContext2D, cx: number, top: number, w: number, items: readonly string[]): void {
+function drawBasketArt(g: CanvasRenderingContext2D, cx: number, top: number, w: number, items: readonly string[]): void {
   const px = (x: number, y: number, c: string, ww = 1, hh = 1) => { g.fillStyle = c; g.fillRect(x, y, ww, hh); };
   const x0 = Math.round(cx - w / 2);
   const h = basketBody(w);

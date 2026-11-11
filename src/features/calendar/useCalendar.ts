@@ -14,7 +14,7 @@ import type { EventRow, EventSignificance, InsertRow } from '@/types';
 
 // Запит подій живе у _shared (спільний із головною). Реекспорт — щоб
 // наявні імпорти календаря не мінялися.
-export { useEvents, loadEvents } from '@/features/_shared/events';
+export { useEvents } from '@/features/_shared/events';
 
 // ── Мутації подій/планів ─────────────────────────────────────
 export interface NewEventInput {

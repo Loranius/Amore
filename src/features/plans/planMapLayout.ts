@@ -25,7 +25,7 @@ export interface MapRect {
   height: number;
 }
 
-export interface MapPoint {
+interface MapPoint {
   x: number;
   y: number;
 }

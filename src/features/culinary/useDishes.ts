@@ -39,7 +39,7 @@ export function useDishes() {
 }
 
 /** Категорія улюбленої страви з відповідей конструктора. */
-export function mapDishCategory(answers: CulinaryAnswers): DishCategory {
+function mapDishCategory(answers: CulinaryAnswers): DishCategory {
   const bases = (answers.base ?? []).join(' ').toLowerCase();
   if (/курка|свинина|яловичина|риба|морепродукти/.test(bases)) return 'meat';
   if (/овочі|гриби|боби/.test(bases)) return 'vegan';

@@ -50,7 +50,7 @@ export function growthSeenStorageKey(species: HomeArtifact): string {
  * прочитати рядок. Миттєвий запис зробив би підпис правдивим рівно до
  * першого перезавантаження — тобто інколи його не побачили б узагалі.
  */
-export const GROWTH_SETTLE_MS = 2000;
+const GROWTH_SETTLE_MS = 2000;
 
 /**
  * Розбір збереженого списку.

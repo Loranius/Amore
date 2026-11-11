@@ -16,7 +16,7 @@ import { buildReefColonyMesh } from '@/engine/species/reef/bodyMesh';
 import type { ReefPlan } from '@/engine/species/reef/reefAssembly';
 import { reefGeometryOf } from './reefGeometry';
 
-export interface ReefColonyRender {
+interface ReefColonyRender {
   id: string;
   geometry: BufferGeometry;
   /** Наповненість свого року, 0..1 — нею ведеться насиченість кольору. */

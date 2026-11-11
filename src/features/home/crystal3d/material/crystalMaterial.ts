@@ -52,7 +52,7 @@ const WARMTH_COLOR = new THREE.Color('#ff8a3d');
 const MOVIE_COLOR = new THREE.Color('#4fd1e0');
 
 /** Домішує тон (рецепти/фільми) у колір гілки. */
-export function tintBranchColors(
+function tintBranchColors(
   branch: ClusterBranch,
   material: Pick<ClusterMaterial, 'warmthMix' | 'movieMix'>,
 ): { colorA: THREE.Color; colorB: THREE.Color } {

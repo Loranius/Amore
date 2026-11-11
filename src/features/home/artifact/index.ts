@@ -11,47 +11,29 @@ export type {
   ColonyRole,
   CompositionTier,
   CrystalArchetype,
-  DatedItem,
-  DepositedCrystal,
-  DepositionEvent,
   DominantSystem,
-  AttachmentContact,
   EvolutionPressures,
   GrowthDomainId,
-  LifeCycleStage,
   NodeKind,
 } from './artifactTypes';
 
 // Attachment Junction (Volume IV, `CAI-REQ-004`).
-export type { AttachmentJunction, JunctionBody, TrimPolicy, SeamPolicy } from './composition/attachment';
-export { buildJunctions, buildJunction, findOrphans, ATTACHMENT_JUNCTION_VERSION } from './composition/attachment';
-export type { Vec3 } from './vec3';
-export type { CompositionScore } from './composition/score';
-export { composeMineralCluster } from './composition/mineralPreset';
+export type { JunctionBody } from './composition/attachment';
+export { buildJunctions, findOrphans, ATTACHMENT_JUNCTION_VERSION } from './composition/attachment';
 
 // Evolution Engine (Volume I) — універсальна історія і канонічні сили.
-export type {
-  EvolutionCategory,
-  EvolutionEvent,
-  EvolutionForces,
-  EvolutionHistoryCounts,
-  EvolutionSource,
-  EvolutionTimeline,
-} from './evolution';
 export { buildEvolutionTimeline, historyAt, solveForces } from './evolution';
 
 // Species Layer (Volume II) — SDK виду: перекладач історії у Growth Instructions.
-export type { GrowthInstruction, Species, CrystalConstraints, CrystalInstruction, CrystalState } from './species';
 export { crystalSpecies } from './species';
 
 export { generateArtifactDNA } from './artifactDNA';
-export { maturityCurve } from './maturity';
+
 export { computeEvolutionPressures } from './evolutionPressure';
 export { isArtifactEmpty, bucketByFixedSize } from './growthEvents';
 export { MATURITY_HEIGHT_SCALE, MATURITY_RADIUS_SCALE, distanceToSurface } from './growthSurface';
 
 // Growth Engine (Volume III) — ЯК росте: Growth Instructions → Growth State.
-export type { GrowthState, GrowthBody } from './growth';
 export { runGrowth, depositMineralMass, depositMineralMassWithScore } from './growth';
 
 /** Історичний псевдонім публічного API: рендерери викликали buildArtifactNodes —

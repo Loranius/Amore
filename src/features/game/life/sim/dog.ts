@@ -42,7 +42,7 @@ const ARRIVE_PX = 18;
 const ROAM_SPEED = 95;
 const CHASE_SPEED = 118;
 
-export type DogMode = 'roam' | 'chase';
+type DogMode = 'roam' | 'chase';
 
 export interface Dog {
   x: number;

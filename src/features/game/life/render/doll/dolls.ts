@@ -18,7 +18,7 @@ export interface Doll extends DollShape {
   readonly lips: string;
 }
 
-export function dollOf(name: string, look: Look, face: FaceKind, hairStyle: HairName): Doll {
+function dollOf(name: string, look: Look, face: FaceKind, hairStyle: HairName): Doll {
   return { name, face, hairStyle, skin: look.skin, eyes: look.eyes, hair: look.hair, lips: face === 'girl' ? '#d2706f' : mix(look.skin, '#5c2e2e', 0.5) };
 }
 

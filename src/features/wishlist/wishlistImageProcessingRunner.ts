@@ -2,7 +2,6 @@ import {
   remoteImageFile,
   resolveWishlistImage,
 } from './wishlistImageCutout';
-import type { WishlistImageDisplayMode } from './wishlistImageModes';
 import {
   wishlistImageProcessingSteps,
   type WishlistImagePreference,
@@ -243,5 +242,3 @@ export async function runWishlistImageProcessing(input: {
   pendingRuns.set(key, task);
   return task;
 }
-
-export type { WishlistImageDisplayMode };

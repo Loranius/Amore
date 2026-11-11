@@ -18,8 +18,8 @@ import { qk } from '@/lib/queryKeys';
 // перемикання нічого в історії пари не змінює.
 // ============================================================
 
-export const ARTIFACT_FORMS_KEY = 'artifact_forms';
-export const ARTIFACT_FORMS_STORAGE_KEY = 'amore:artifact-forms';
+const ARTIFACT_FORMS_KEY = 'artifact_forms';
+const ARTIFACT_FORMS_STORAGE_KEY = 'amore:artifact-forms';
 
 export interface ArtifactForms {
   crystal: CrystalForm;
@@ -64,7 +64,7 @@ function cache(forms: ArtifactForms): void {
   }
 }
 
-export const artifactFormsKey = [...qk.settings(), ARTIFACT_FORMS_KEY] as const;
+const artifactFormsKey = [...qk.settings(), ARTIFACT_FORMS_KEY] as const;
 
 /** Форми пари; поки запит іде — місцевий кеш, а без нього — форми за замовчуванням. */
 export function useArtifactForms(): ArtifactForms {

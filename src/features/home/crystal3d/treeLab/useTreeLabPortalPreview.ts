@@ -22,7 +22,7 @@ const ENGINE_VERSION = '1.0.0';
 const COUPLE_TIME_ZONE = 'Europe/Kyiv';
 const TREE_PORTAL_RULES_VERSION = 'tree-species-portal-v1.0.0';
 
-export interface TreeLabPortalPreview {
+interface TreeLabPortalPreview {
   build: TreeLabPreviewBuild;
   diagnostics: AdapterDiagnostic[];
   normalizedEventCount: number;

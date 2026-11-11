@@ -11,8 +11,8 @@
 // натискання кнопки: так правило видно, а не вгадується.
 // ============================================================
 
-export const PASSWORD_MIN = 8;
-export const PASSWORD_MAX = 64;
+const PASSWORD_MIN = 8;
+const PASSWORD_MAX = 64;
 
 /** Код із листа: рівно шість цифр. */
 export const CODE_RE = /^\d{6}$/;

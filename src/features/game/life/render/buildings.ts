@@ -23,7 +23,7 @@ export interface BuildingSprite {
 
 type Material = 'plaster' | 'brick' | 'wood' | 'panel' | 'glass' | 'stone';
 type RoofKind = 'thatch' | 'tile' | 'flat' | 'metal' | 'none';
-export type Flush = 'left' | 'right' | null;
+type Flush = 'left' | 'right' | null;
 
 export interface StyleRule {
   rise: number;
@@ -80,7 +80,7 @@ function storeyOf(style: BuildingStyle): number {
 }
 
 /** Висота стіни фасаду для сліду глибиною `h` клітинок. */
-export function wallOf(style: BuildingStyle, h: number): number {
+function wallOf(style: BuildingStyle, h: number): number {
   return Math.max(storeyOf(style), Math.round(h * TILE * (1 - STYLES[style].roofFrac)));
 }
 
@@ -91,7 +91,7 @@ export function wallOf(style: BuildingStyle, h: number): number {
  * тіні), гребінь іде вглиб. Міські житлові будинки — завжди; хата й літня
  * кухня Лєни — за `Building.gable`.
  */
-export function hasGable(b: Building): boolean {
+function hasGable(b: Building): boolean {
   return b.gable ?? b.style === 'house';
 }
 
@@ -133,7 +133,7 @@ function frontGable(g: Ctx, W: number, top: number, bottom: number, roofColor: s
 }
 
 /** Двері — на зріст людини. */
-export const DOOR_H = 25;
+const DOOR_H = 25;
 
 // ------------------------------------------------------------
 // Дах.
@@ -516,7 +516,7 @@ export function buildingSprite(b: Building, season: Season): BuildingSprite {
  *     звичайний край (там кут крила, що виступає);
  *   • стіна без краю, лише якщо фасади на одній лінії.
  */
-export function joinOpts(b: Building): PartOpts {
+function joinOpts(b: Building): PartOpts {
   const opts: PartOpts = { flush: b.join ?? null, chimney: b.chimney !== false };
   const n = b.joinTo;
   if (!b.join || !n) return opts;
@@ -563,7 +563,7 @@ function ellSprite(b: Building, season: Season): BuildingSprite {
   return { img, ox: -3, oy: -(Ht - b.h * TILE), windows, smoke: A.smoke ? { x: A.smoke.x + ax, y: A.smoke.y } : null };
 }
 
-export interface PartOpts {
+interface PartOpts {
   /** Висота стіни фасаду (px) — спільна для крил Г-подібної хати. */
   wallPx?: number;
   /** Бік стику для даху. */

@@ -73,7 +73,7 @@ function line(kit: Kit, x0: number, y0: number, x1: number, y1: number, color: s
  * Збільшення сцени: на високому екрані телефона (поле вище за 300
  * віртуальних пікселів) Лєну, кошик, курей і рибу видно лише вдвічі більшими.
  */
-export function sceneZoom(kit: Kit): number {
+function sceneZoom(kit: Kit): number {
   return kit.H - TOP >= 300 && kit.W >= 200 ? 2 : 1;
 }
 
@@ -135,7 +135,7 @@ export type BasketPose = 'front' | 'ul' | 'dl' | 'ur' | 'dr';
  * Кольори, зачіска й зріст — з її теперішнього вигляду. Повертає, де верх
  * кошика: туди падають фрукти й скочуються яйця.
  */
-export function lenaWithBasket(kit: Kit, look: Look, x: number, y: number, pose: BasketPose, t: number, happy: boolean, items: readonly string[] = [], z = 1): { bx: number; by: number; half: number } {
+function lenaWithBasket(kit: Kit, look: Look, x: number, y: number, pose: BasketPose, t: number, happy: boolean, items: readonly string[] = [], z = 1): { bx: number; by: number; half: number } {
   zoomed(kit, x, y, z, () => drawLena(kit, look, Math.round(x), Math.round(y), pose, t, happy, items));
   return basketAt(look, x, y, pose, z);
 }
@@ -834,7 +834,7 @@ function drawMole(kit: Kit, x: number, y: number, t: number): void {
 /** Жолоби: ліворуч угорі, ліворуч унизу, праворуч угорі, праворуч унизу. */
 export const CHUTES: readonly CoopPose[] = ['ul', 'dl', 'ur', 'dr'];
 /** Кроків по жолобу, перш ніж яйце скотиться в кошик (чи на підлогу). */
-export const EGG_STEPS = 5;
+const EGG_STEPS = 5;
 
 /**
  * Скільки триває крок яйця по жолобу для `n`-го яйця (з 0). Власник: «які

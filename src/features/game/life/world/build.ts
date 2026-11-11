@@ -9,11 +9,11 @@ import { cellHash } from './hash';
 import { buildingParts, type BirdHome, type Building, type BuildingStyle, type CropKind, type CropPlot, type GameMap, type Ground, type Notch, type Prop, type PropType, type SignIcon, type Tree, type TreeKind, type Zone, type ZoneAction } from './types';
 
 /** Меблі, що в домі малюються більшими (`Prop.scale`). */
-export const INTERIOR_FURNITURE: ReadonlySet<PropType> = new Set<PropType>([
+const INTERIOR_FURNITURE: ReadonlySet<PropType> = new Set<PropType>([
   'bed', 'wardrobe', 'table', 'desk', 'sofa', 'shelf', 'tv', 'fridge', 'stove', 'floorLamp', 'plant', 'rug', 'chair', 'crates',
   'lava', 'chest',
 ]);
-export const INTERIOR_FURNITURE_SCALE = 1.25;
+const INTERIOR_FURNITURE_SCALE = 1.25;
 
 export interface BuildingSpec {
   id: string;

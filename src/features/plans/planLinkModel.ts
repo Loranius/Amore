@@ -12,7 +12,7 @@ import type { PlanLinkRow, PlanLinkTarget, PlanRow } from '@/types';
 
 /** Що показати про ціль зв'язку. Модуль планів не тягне до себе типи
  *  вішлиста, карти й архіву — йому досить компактного preview-контракту. */
-export interface LinkTargetInfo {
+interface LinkTargetInfo {
   title: string;
   subtitle?: string | null;
   imageUrl?: string | null;

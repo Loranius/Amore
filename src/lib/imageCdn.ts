@@ -102,7 +102,7 @@ const THRIFTY_PIXEL_RATIO = 2;
  * тож функція мусить чесно повертати `false` там, де відповіді немає:
  * відсутність сигналу — це не «економити».
  */
-export function savingData(): boolean {
+function savingData(): boolean {
   if (typeof navigator === 'undefined') return false;
   const connection = (navigator as { connection?: { saveData?: boolean; effectiveType?: string } })
     .connection;

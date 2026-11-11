@@ -24,7 +24,7 @@ export const DOLL_DIRS: readonly DollDir[] = [0, 1, 2, 3];
  * Шари знизу вгору (власник 2026-11-01). Намальовано тіло, голову, очі,
  * обличчя й зачіски; одяг і аксесуари з'являться в цьому ж порядку.
  */
-export const LAYERS = ['hairBack', 'body', 'head', 'eyes', 'face', 'pants', 'shoes', 'shirt', 'hairFront', 'accessory'] as const;
+const LAYERS = ['hairBack', 'body', 'head', 'eyes', 'face', 'pants', 'shoes', 'shirt', 'hairFront', 'accessory'] as const;
 export type LayerName = (typeof LAYERS)[number];
 /** Шари, які вже намальовано, — у порядку накладання. */
 export const DRAWN_LAYERS: readonly LayerName[] = ['hairBack', 'body', 'head', 'eyes', 'face', 'hairFront'];
@@ -60,7 +60,7 @@ const IDLE: Readonly<Record<'front' | 'side', Joints>> = {
  * Частина на суглобі. `dim` — дальня (на тон темніша), `outline` — обвести,
  * `ink` — чим: `o` обвідка шкіри (типово), `O` обвідка волосся.
  */
-export interface Placement {
+interface Placement {
   readonly part: Part;
   readonly at: Point;
   readonly dim?: boolean;
@@ -69,7 +69,7 @@ export interface Placement {
 }
 
 /** Що малює шар у кадрі «праворуч», «до нас» чи «від нас» (ліворуч — дзеркало «праворуч»). */
-export function placements(layer: LayerName, dir: DollDir, who: DollShape): Placement[] {
+function placements(layer: LayerName, dir: DollDir, who: DollShape): Placement[] {
   if (dir === 1) throw new Error('Люди: «ліворуч» — дзеркало «праворуч», окремих частин нема');
   const side = dir === 2;
   const j = side ? IDLE.side : IDLE.front;

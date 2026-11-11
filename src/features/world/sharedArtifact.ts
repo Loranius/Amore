@@ -48,7 +48,7 @@ function cache(artifact: HomeArtifact): void {
   }
 }
 
-export const sharedArtifactKey = [...qk.settings(), SHARED_ARTIFACT_KEY] as const;
+const sharedArtifactKey = [...qk.settings(), SHARED_ARTIFACT_KEY] as const;
 
 /**
  * Що обрала пара, або `null`, поки невідомо.

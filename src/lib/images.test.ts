@@ -28,7 +28,8 @@ const IMAGES = read('./images.ts');
 /** Два місця, де портал кладе фото в сховище (полароїд прибрано, ADR-0248). */
 const UPLOADERS: ReadonlyArray<readonly [string, string]> = [
   ['спогади', read('../features/memories/useMemories.ts')],
-  ['мітки на карті', read('../features/memories/useMapPins.ts')],
+  // «Мітки на карті» прибрано (ADR-0263): `uploadPinPhoto` жив лише в
+  // `useMapPinMutations`, у якого не було жодного споживача.
 ];
 
 describe('стиснення не здається мовчки', () => {
@@ -94,18 +95,5 @@ describe('жоден шлях завантаження не ллє оригін�
     // Без цього зелений тест вище нічого не доводить.
     expect(MUTABLE_BLOB.test('  let blob: Blob = normalized;')).toBe(true);
     expect(MUTABLE_BLOB.test('  const { blob } = await compress(file);')).toBe(false);
-  });
-
-  it('мітка на карті більше не ковтає помилку мовчки', () => {
-    const pins = UPLOADERS.find(([name]) => name === 'мітки на карті')![1];
-    /*
-     * Тут було три проковтнуті помилки поспіль, і всі три віддавали
-     * `null`: невдалий HEIC, невдале стиснення, невдале завантаження.
-     * Викликач бачив `null` і йшов далі, тож мітка зберігалась без фото
-     * й без жодного слова парі.
-     */
-    expect(pins).toContain('uploadPinPhoto(file: File, pinId: number): Promise<string>');
-    expect(pins, 'падіння фото не має вдавати, що місце не збереглося')
-      .toContain('Місце збережено, але фото не вдалося підготувати');
   });
 });

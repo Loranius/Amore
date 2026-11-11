@@ -24,7 +24,7 @@ export interface PlannedGame {
   key: string;
 }
 
-export const PLAYGROUND_NAME: Record<string, string> = {
+const PLAYGROUND_NAME: Record<string, string> = {
   rope: 'Скакалка', classics: 'Класики', hide: 'Хованки', ball: 'М\'яч у кошик', memory: 'Пам\'ять',
   tower: 'Башта з кубиків', butterflies: 'Метелики', shapes: 'Фігури', simon: 'Хоровод',
 };

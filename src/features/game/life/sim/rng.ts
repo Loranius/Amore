@@ -21,7 +21,7 @@ export function hashString(text: string): number {
 }
 
 /** Mulberry32 від зерна. */
-export function rngFromSeed(seed: number): Rng {
+function rngFromSeed(seed: number): Rng {
   let a = seed >>> 0;
   return () => {
     a = (a + 0x6d2b79f5) >>> 0;

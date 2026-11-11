@@ -5,5 +5,9 @@
 // Competition ../growthField) лишаються на рівні artifact/ як бібліотека,
 // яку рушій оркеструє й на яку Species Layer замикає instruction.fieldAt.
 // ============================================================
-export type { GrowthState, GrowthBody } from './growthTypes';
-export { runGrowth, depositMineralMass, depositMineralMassWithScore, makeNucleus } from './growthEngine';
+export {
+  runGrowth,
+  depositMineralMass,
+  depositMineralMassWithScore,
+  makeNucleus,
+} from './growthEngine';

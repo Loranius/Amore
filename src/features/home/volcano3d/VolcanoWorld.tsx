@@ -34,13 +34,13 @@ import { lavaProximity } from './lavaProximity';
 // Темно-фіолетовий, не червоний (власник, 2026-10-05: «темно-фіолетовий
 // вулкан + рожево-помаранчева лава + глибокий синій океан»): відрізняється
 // від яскраво-лілового кристала й лишається в гамі Amore.
-export const VOLCANO_ROCK: Record<'light' | 'dark', string> = { light: '#3f2a6e', dark: '#33235e' };
+const VOLCANO_ROCK: Record<'light' | 'dark', string> = { light: '#3f2a6e', dark: '#33235e' };
 
 /** Грані конуса не згладжуються: «8–12 великих фасетів» (власник). */
 const VOLCANO_CREASE_DEG = 18;
 
 /** Подвійний удар серця: два поштовхи й пауза, період 1.6 с. */
-export function heartbeat(t: number): number {
+function heartbeat(t: number): number {
   const p = ((t % 1.6) + 1.6) % 1.6;
   const beat = (c: number) => Math.exp(-((p - c) ** 2) / 0.004);
   return beat(0.1) + 0.7 * beat(0.35);

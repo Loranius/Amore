@@ -17,7 +17,7 @@ export function heroWords(state: LifeState): { name: string; dative: string; fel
 }
 
 /** До 6 класу Лєна — дитина (менший спрайт). */
-export const KID_UNTIL_WEEK = 6;
+const KID_UNTIL_WEEK = 6;
 
 export function lenaLook(state: LifeState): Look {
   const week = today(state).week;

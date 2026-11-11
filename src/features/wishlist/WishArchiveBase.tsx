@@ -135,7 +135,7 @@ function actorNameFor(item: GiftMemoryArchiveItem, usersMap: UsersMap): string {
   return item.fulfilled_by != null ? usersMap[item.fulfilled_by] ?? 'Партнер' : 'Партнер';
 }
 
-export function archiveCountText(count: number, shared: boolean): string {
+function archiveCountText(count: number, shared: boolean): string {
   const lastTwo = count % 100;
   const last = count % 10;
   const one = shared ? 'здійснена мрія' : 'подарований спогад';

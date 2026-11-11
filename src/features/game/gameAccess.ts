@@ -9,7 +9,7 @@ import type { NavItem } from '@/app/nav';
 import { useCoupleId } from '@/features/_shared/useCoupleId';
 
 /** Пара, для якої зроблено гру: Діма й Лєна. */
-export const GAME_COUPLE_ID = 1;
+const GAME_COUPLE_ID = 1;
 export const GAME_PATH = '/game';
 
 export function canPlayGame(coupleId: number | null | undefined): boolean {

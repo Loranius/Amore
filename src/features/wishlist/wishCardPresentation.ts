@@ -7,7 +7,7 @@ import { HeartIcon } from '@/components/icons/NavIcon';
 import type { WishlistStatus } from './wishlistRpc';
 
 export type WishCardContext = 'me' | 'partner' | 'shared';
-export type WishCardStatusTone = 'personal' | 'available' | 'planned' | 'purchased' | 'shared';
+type WishCardStatusTone = 'personal' | 'available' | 'planned' | 'purchased' | 'shared';
 
 export interface WishCardStatusChip {
   label: string;

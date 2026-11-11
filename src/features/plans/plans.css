@@ -8,18 +8,6 @@
 
 .plans { padding-bottom: 32px; }
 
-/* ── Форма створення ───────────────────────────────────────── */
-/* minmax(0, 1fr) — обов'язково: у grid елемент за замовчуванням не
-   вужчий за свій вміст, і довгий підпис категорії розпирав би колонку. */
-.plan-cat-grid {
-  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px;
-}
-.plan-cat-btn.active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
-  color: var(--accent); font-weight: 700;
-}
-
 /* ── Сторінка плану ────────────────────────────────────────── */
 .plan-page { padding-bottom: 32px; }
 .plan-back {

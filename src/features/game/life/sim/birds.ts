@@ -13,7 +13,7 @@
 import { rngFor } from './rng';
 
 export type BirdKind = 'white' | 'brown' | 'rooster';
-export type BirdState = 'stand' | 'peck' | 'walk' | 'flee';
+type BirdState = 'stand' | 'peck' | 'walk' | 'flee';
 
 /** Як далеко від свого місця птаха ходить (px): уздовж — далі, ніж угору-вниз. */
 export const BIRD_RANGE_X = 26;
@@ -70,7 +70,7 @@ export function birdDir(kind: BirdKind, dx: number, dy: number, was: Bird['dir']
 }
 
 /** Як часто півень, зупинившись, обертається до глядача. */
-export const ROOSTER_FACES = 0.35;
+const ROOSTER_FACES = 0.35;
 
 /** Один крок птахи. */
 export function stepBird(b: Bird, dt: number, w: BirdWorld): Bird {

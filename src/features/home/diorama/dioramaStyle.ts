@@ -91,7 +91,7 @@ export const DIORAMA_SHADE = /* glsl */ `
  * забракло місця (`need` — скільки просить сам вид), тож з роками острів
  * росте разом із тим, що на ньому стоїть, а не за примхою виду.
  */
-export const DIORAMA_ISLAND_RADIUS = 1.3;
+const DIORAMA_ISLAND_RADIUS = 1.3;
 
 export function dioramaIslandRadius(need: number): number {
   return Math.max(DIORAMA_ISLAND_RADIUS, Number.isFinite(need) ? need : 0);
@@ -103,7 +103,7 @@ export function dioramaIslandRadius(need: number): number {
  * однакові острівці виглядали різними. Окремо кадр росте лише тоді, коли
  * предмет з роками переріс спільну висоту.
  */
-export const DIORAMA_FRAME_HEIGHT = 1.7;
+const DIORAMA_FRAME_HEIGHT = 1.7;
 
 export function dioramaFrameHeight(own: number): number {
   return Math.max(DIORAMA_FRAME_HEIGHT, Number.isFinite(own) ? own : 0);

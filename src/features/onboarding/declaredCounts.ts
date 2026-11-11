@@ -52,7 +52,7 @@ import type { EvolutionSourceSnapshot } from '@/engine/evolution/adapters';
  */
 export type DeclaredKind = 'photos' | 'movies' | 'series' | 'places' | 'milestones' | 'wishes';
 
-export const DECLARED_KINDS: readonly DeclaredKind[] = [
+const DECLARED_KINDS: readonly DeclaredKind[] = [
   'photos', 'movies', 'series', 'places', 'milestones', 'wishes',
 ];
 

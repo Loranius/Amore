@@ -20,8 +20,8 @@ export const BIRD_WALK_FRAMES = 4;
 export const BIRD_PECK_FRAMES = 6;
 /** Клітинка аркуша (пікселі малюнка) і нижній рядок лап у ній (середина — посередині клітинки). */
 export const BIRD_CELL = 40;
-export const BIRD_FOOT_X = 20;
-export const BIRD_FOOT_Y = 34;
+const BIRD_FOOT_X = 20;
+const BIRD_FOOT_Y = 34;
 /** Кадрів на секунду: хода, втеча. */
 const WALK_FPS = 8;
 const FLEE_FPS = 16;

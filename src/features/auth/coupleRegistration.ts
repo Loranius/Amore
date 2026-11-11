@@ -36,7 +36,7 @@ export type RegisterProblem =
   | 'no-start-date'
   | 'start-date-in-future';
 
-export interface RegisterMemberDraft {
+interface RegisterMemberDraft {
   name: string;
   pin: string;
 }

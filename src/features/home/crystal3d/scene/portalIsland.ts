@@ -100,7 +100,7 @@ export function portalIslandScale(cameraDistance: number): number {
  * масштабу острова тихо завела брили ВСЕРЕДИНУ кільця — 6.67 проти
  * колишніх 3.33, — і жодне з тих 4.6 про це не сказало (ADR-0164).
  */
-export const PORTAL_CAMERA_RING = PORTAL_ISLAND_RADIUS / ISLAND_SCALE_PER_DISTANCE;
+const PORTAL_CAMERA_RING = PORTAL_ISLAND_RADIUS / ISLAND_SCALE_PER_DISTANCE;
 
 /** Скільки клинів у круга острова. */
 export const PORTAL_ISLAND_SEGMENTS = 72;

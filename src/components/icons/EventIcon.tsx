@@ -16,7 +16,7 @@ import { iconAttrs, type IconProps } from './iconBase';
 import type { EventType } from '@/types';
 
 /** Торт зі свічкою — день народження. */
-export function CakeIcon({ size = 24, className = '' }: IconProps) {
+function CakeIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
       <path d="M4 20.5h16" />
@@ -37,7 +37,7 @@ export function CakeIcon({ size = 24, className = '' }: IconProps) {
  * малює пару сердець, але копіювати його немає причини: у наборі
  * серце одне, і жодної двозначності воно не створює.
  */
-export function HeartsIcon({ size = 24, className = '' }: IconProps) {
+function HeartsIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
       <path d="M12 20.3c-.35.22-.79.22-1.14 0C9 19.06 3.6 15.3 3.6 10.6a4.1 4.1 0 0 1 7.83-1.72A4.1 4.1 0 0 1 19.26 10.6c0 4.7-5.4 8.46-7.26 9.7Z" />
@@ -57,7 +57,7 @@ export function SparkIcon({ size = 24, className = '' }: IconProps) {
 }
 
 /** Прапорець — плани. */
-export function FlagIcon({ size = 24, className = '' }: IconProps) {
+function FlagIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
       {/* Коротше древко й ширший полотнище: у першій версії значок був

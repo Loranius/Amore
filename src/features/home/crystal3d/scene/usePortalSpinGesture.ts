@@ -21,8 +21,8 @@ import {
 // ============================================================
 
 /** Межі підйому — ті самі, що тримав `OrbitControls` (полярний кут 0.22π…0.5π). */
-export const PORTAL_SPIN_ELEVATION_MIN = 0;
-export const PORTAL_SPIN_ELEVATION_MAX = Math.sin(Math.PI * (0.5 - 0.22));
+const PORTAL_SPIN_ELEVATION_MIN = 0;
+const PORTAL_SPIN_ELEVATION_MAX = Math.sin(Math.PI * (0.5 - 0.22));
 
 export interface PortalSpinHandle {
   state: PortalSpinState;

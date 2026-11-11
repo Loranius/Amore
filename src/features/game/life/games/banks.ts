@@ -178,7 +178,7 @@ export const SORT_SETS: readonly SortSet[] = [
 // ------------------------------------------------------------
 // Англійська.
 // ------------------------------------------------------------
-export const ENGLISH: readonly [string, string, number][] = [
+const ENGLISH: readonly [string, string, number][] = [
   ['cat', 'кіт', 2], ['dog', 'собака', 2], ['apple', 'яблуко', 2], ['sun', 'сонце', 2], ['house', 'будинок', 2], ['book', 'книга', 2],
   ['friend', 'друг', 4], ['school', 'школа', 3], ['water', 'вода', 3], ['flower', 'квітка', 3], ['winter', 'зима', 4], ['sea', 'море', 3],
   ['beautiful', 'гарний', 6], ['journey', 'подорож', 8], ['happiness', 'щастя', 8], ['knowledge', 'знання', 9], ['love', 'кохання', 5],

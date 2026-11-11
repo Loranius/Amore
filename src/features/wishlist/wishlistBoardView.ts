@@ -1,7 +1,7 @@
 import type { WishlistItemV3 } from './wishlistRpc';
 
 export type WishlistPriorityFilter = 'all' | 'high' | 'medium' | 'low';
-export type WishlistSort = 'newest' | 'priority' | 'price';
+type WishlistSort = 'newest' | 'priority' | 'price';
 /*
  * Два вигляди, не три.
  *

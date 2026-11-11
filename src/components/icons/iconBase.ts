@@ -17,7 +17,7 @@ export interface IconProps {
   className?: string;
 }
 
-export const STROKE = 1.7;
+const STROKE = 1.7;
 
 export function iconAttrs(size: number, className: string) {
   return {

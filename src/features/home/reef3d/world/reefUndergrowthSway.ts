@@ -40,7 +40,7 @@ const REEF_GROWTH_GRAIN: Readonly<Record<string, ReefStoneOptions>> = {
   pebble: { scale: 30, strength: 0.85, roughness: 0.8 },
 };
 
-export const REEF_SWAY_VERSION = 'reef-undergrowth-sway-v1';
+const REEF_SWAY_VERSION = 'reef-undergrowth-sway-v1';
 
 /** Ім'я атрибута інстанса: фаза гойдання цього тіла. */
 export const REEF_SWAY_ATTRIBUTE = 'aReefSway';
@@ -73,13 +73,13 @@ export interface ReefSwayUniforms {
  * після неї: після неї це був би поворот у просторі сцени, і вся зелень
  * лягла б в один бік світу замість того, щоб кожна хилилась у свій.
  */
-export const REEF_SWAY_VERTEX_PARS = /* glsl */ `
+const REEF_SWAY_VERTEX_PARS = /* glsl */ `
 attribute float ${REEF_SWAY_ATTRIBUTE};
 uniform float uReefSwayTime;
 uniform float uReefSwayAmplitude;
 `;
 
-export const REEF_SWAY_VERTEX_BODY = /* glsl */ `
+const REEF_SWAY_VERTEX_BODY = /* glsl */ `
 #ifdef USE_INSTANCING
   float reefLean = sin( uReefSwayTime * ${REEF_SWAY_RATE.toFixed(6)} + ${REEF_SWAY_ATTRIBUTE} )
     * uReefSwayAmplitude;

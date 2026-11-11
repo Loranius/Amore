@@ -194,7 +194,7 @@ function groundTexture(theme: Theme, hillRadius: number, soilRadius: number) {
  * Квадрат спаду (`t * t`) навмисно: лінійний дає видиме кільце там, де
  * градієнт закінчується, а квадратичний згасає непомітно.
  */
-export function createContactShadowTexture() {
+function createContactShadowTexture() {
   const size = 128;
   const el = canvas(size, size);
   const ctx = el.getContext('2d');

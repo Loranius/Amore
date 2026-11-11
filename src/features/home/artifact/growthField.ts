@@ -41,7 +41,7 @@ const DOMAIN_IDS: GrowthDomainId[] = ['exploration', 'memory', 'connection', 'cr
 const WEDGE_WIDTH = (Math.PI * 2) / DOMAIN_IDS.length;
 
 /** М'який переважний азимут домену — центр колишнього клину (dna.domainOrder). */
-export function domainAzimuth(dna: ArtifactDNA, domain: GrowthDomainId): number {
+function domainAzimuth(dna: ArtifactDNA, domain: GrowthDomainId): number {
   return dna.domainOrder.indexOf(domain) * WEDGE_WIDTH + WEDGE_WIDTH / 2;
 }
 
@@ -138,7 +138,7 @@ export function surfaceStress(seedNum: number, point: Vec3): number {
  * дочірні кристали виходять з-під підніжжя головного і тягнуться вгору) —
  * щільний курган замість «гілок на гілках».
  */
-export function growthPotential(t: number): number {
+function growthPotential(t: number): number {
   const d = (t - 0.14) / 0.18;
   return 0.18 + 0.82 * Math.exp(-d * d);
 }
@@ -146,7 +146,7 @@ export function growthPotential(t: number): number {
 /** Тяжіння до «ґрунту» маси: підніжжя привабливіше, але не настільки, щоб
  *  усе злипалось в одну точку — дочірні шпилі чіпляються й трохи вище,
  *  утворюючи об'ємне віяло. */
-export function groundTerm(y: number): number {
+function groundTerm(y: number): number {
   return 1 / (1 + Math.max(0, y + 0.3) * 1.3);
 }
 
@@ -155,7 +155,7 @@ export function groundTerm(y: number): number {
 const bodyMid = (c: DepositedCrystal): Vec3 => add(c.anchor, scale(c.direction, c.length * 0.5));
 
 /** Скільки мінеральної маси вже зібралось навколо точки (гладка сума). */
-export function localDensity(point: Vec3, substrate: readonly DepositedCrystal[]): number {
+function localDensity(point: Vec3, substrate: readonly DepositedCrystal[]): number {
   let acc = 0;
   for (const c of substrate) acc += Math.exp(-distSq(point, bodyMid(c)) / 0.36);
   return acc;

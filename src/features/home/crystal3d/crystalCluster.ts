@@ -114,7 +114,7 @@ function basePalette(node: ArtifactNode): [string, string] {
 }
 
 /** Обертає відтінок (H у HSL) на hueRotationDeg — «вид» цієї пари. */
-export function applyFamilyHue(hex: string, hueRotationDeg: number): string {
+function applyFamilyHue(hex: string, hueRotationDeg: number): string {
   const c = new THREE.Color(hex);
   const hsl = { h: 0, s: 0, l: 0 };
   c.getHSL(hsl);

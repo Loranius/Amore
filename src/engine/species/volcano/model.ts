@@ -104,7 +104,7 @@ const smooth = (a: number, b: number, x: number) => {
 };
 
 /** Стадія пробудження 0…1 за роками разом (неперервна, без стрибків). */
-export function volcanoAwakening(years: number): { glow: number; streams: number; crater: number; inner: number } {
+function volcanoAwakening(years: number): { glow: number; streams: number; crater: number; inner: number } {
   return {
     glow: smooth(0.5, VOLCANO_STAGES.glow + 1, years),
     streams: smooth(VOLCANO_STAGES.streams - 0.5, VOLCANO_STAGES.streams + 3, years),

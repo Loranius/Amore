@@ -85,7 +85,7 @@ export type Panel =
   | { kind: 'dog' };
 
 export type Speaker = 'n' | 'l' | 'd' | 'm' | 'o';
-export interface Line { who: Speaker; text: string }
+interface Line { who: Speaker; text: string }
 
 /** Сюжетні сторінки історії Діми (з Godot-порту гри, власник 2026-11-02). */
 const STORY_PAGES: Record<NonNullable<LifeState['story']>, readonly string[]> = {
@@ -110,7 +110,7 @@ export interface Card {
   tone?: 'gold' | 'love' | 'plain' | undefined;
 }
 
-export interface ActivityUi {
+interface ActivityUi {
   plans: PlannedGame[];
   index: number;
   phase: 'intro' | 'play' | 'between';
@@ -134,7 +134,7 @@ export interface UiState {
 }
 
 /** Хвилин гри за секунду ходіння: день 7:00–2:00 ≈ 12 хвилин гри. */
-export const MINUTES_PER_SECOND = 1.5;
+const MINUTES_PER_SECOND = 1.5;
 
 interface Walker extends Actor {
   target: { x: number; y: number } | null;

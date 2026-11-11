@@ -6,7 +6,7 @@ import type { WishCardContext } from './wishCardPresentation';
 import { WishDetailsSheet } from './WishDetailsSheet';
 import type { WishlistItemV3 } from './wishlistRpc';
 
-export interface WishCardTriggerRenderProps {
+interface WishCardTriggerRenderProps {
   detailsOpen: boolean;
   openDetails: () => void;
 }

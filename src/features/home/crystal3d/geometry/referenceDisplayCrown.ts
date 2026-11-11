@@ -78,7 +78,7 @@ function chooseHero(branches: readonly ClusterBranch[]): ClusterBranch | null {
 
 /** Leaf-тіла можна замінити display-mesh без видимої сироти. Hero може
  * мати нащадків — їхні canonical mesh також не входять у renderable. */
-export function selectReferenceDisplaySources(
+function selectReferenceDisplaySources(
   branches: readonly ClusterBranch[],
   accentKeys: ReadonlySet<string>,
 ): ReferenceDisplaySelection {

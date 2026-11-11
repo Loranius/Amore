@@ -88,7 +88,7 @@ export function distanceToSurface(body: SurfaceBody, p: Vec3): number {
  * цілком: вістря вище вершини господаря — це «зовні», хоча за бічною
  * поверхнею воно рахувалось би зануреним.
  */
-export function isOutsideBody(body: SurfaceBody, p: Vec3): boolean {
+function isOutsideBody(body: SurfaceBody, p: Vec3): boolean {
   const rel = sub(p, body.anchor);
   const along = dot(rel, body.direction);
   if (along < 0 || along > body.length) return true;

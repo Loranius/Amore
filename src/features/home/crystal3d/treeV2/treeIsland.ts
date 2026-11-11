@@ -21,10 +21,10 @@ import { Painter, chunk, ivy, polar, type IslandMesh, type V3 } from '../v2/crys
 export const TREE_PAINT = { grass: 0, cliff: 1, boulder: 2, ivy: 3, flower: 4, soil: 5, cloud: 6, far: 7 } as const;
 
 /** Купол трави: наскільки центр вищий за край, у частках радіуса. */
-export const TREE_ISLAND_DOME = 0.07;
+const TREE_ISLAND_DOME = 0.07;
 
 /** Плаский верх купола в частках радіуса: на ньому стоїть дерево з корінням. */
-export const TREE_ISLAND_PLATEAU = 0.4;
+const TREE_ISLAND_PLATEAU = 0.4;
 
 /**
  * Висота трави над точкою на відстані `r` від осі. Купол гладкий, тож

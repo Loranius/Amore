@@ -91,7 +91,7 @@ function cornerAverage(
   return count > 0 ? { r: r / count, g: g / count, b: b / count } : { r: 255, g: 255, b: 255 };
 }
 
-export function estimateUniformBackground(
+function estimateUniformBackground(
   pixels: Uint8ClampedArray,
   width: number,
   height: number,
@@ -384,7 +384,7 @@ async function fetchImageBlob(src: string): Promise<Blob> {
   throw new Error('image_proxy_empty');
 }
 
-export function isWishlistCutoutUrl(src: string | null | undefined): boolean {
+function isWishlistCutoutUrl(src: string | null | undefined): boolean {
   return Boolean(src && (src.includes('wish-cutout-') || src.startsWith('data:image/')));
 }
 

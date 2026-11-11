@@ -25,7 +25,7 @@ import { HeartIcon } from './NavIcon';
  * цятку, а на 18px читалась молекулою, тобто тим самим, що й
  * «Бульбашки» через два ряди в тій самій панелі.
  */
-export function FeatherIcon({ size = 24, className = '' }: IconProps) {
+function FeatherIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
       <path d="M19.6 4.4a6.6 6.6 0 0 0-9.4 0L5 9.6v9.4h9.4l5.2-5.2a6.6 6.6 0 0 0 0-9.4Z" />
@@ -52,23 +52,12 @@ export function TogetherIcon({ size = 24, className = '' }: IconProps) {
 }
 
 /** Бульбашки — «жива хмара мрій». */
-export function BubblesIcon({ size = 24, className = '' }: IconProps) {
+function BubblesIcon({ size = 24, className = '' }: IconProps) {
   return (
     <svg {...iconAttrs(size, className)}>
       <circle cx="9.4" cy="13.6" r="5.4" />
       <circle cx="17" cy="7.6" r="3.4" />
       <circle cx="17.8" cy="16.8" r="2.1" />
-    </svg>
-  );
-}
-
-/** Полароїд — знімок із широким полем унизу. */
-export function PolaroidIcon({ size = 24, className = '' }: IconProps) {
-  return (
-    <svg {...iconAttrs(size, className)}>
-      <rect x="4.2" y="3.6" width="15.6" height="16.8" rx="1.8" />
-      <rect x="6.8" y="6.2" width="10.4" height="8.4" rx="1" />
-      <path d="M9 17.6h6" />
     </svg>
   );
 }
@@ -101,8 +90,8 @@ export const WISH_ALL_ICON: WishIconComponent = LayersIcon;
  * Два вигляди вішліста, два значки.
  *
  * `feed` і `polaroid` жили тут, поки виглядів було три; вони показували
- * те саме різними обгортками (ADR-0056). `PolaroidIcon` лишається в
- * наборі — його носять «Спогади».
+ * те саме різними обгортками (ADR-0056). `PolaroidIcon` прибрано
+ * (ADR-0263): полароїда в «Спогадах» більше немає (ADR-0248).
  */
 export const WISH_VIEW_ICON = {
   bubbles: BubblesIcon,

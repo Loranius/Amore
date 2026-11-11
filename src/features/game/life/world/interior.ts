@@ -11,9 +11,9 @@ import { MapBuilder } from './build';
 import { dimaFlat } from './vyshneve';
 import type { GameMap, Ground } from './types';
 
-export type HomeKind = 'hata' | 'dorm' | 'flat';
+type HomeKind = 'hata' | 'dorm' | 'flat';
 
-export function homeKind(state: LifeState): HomeKind {
+function homeKind(state: LifeState): HomeKind {
   if (state.home === 'zhylyntsi') return 'hata';
   if (state.homeName.includes('Гуртожиток')) return 'dorm';
   return 'flat';

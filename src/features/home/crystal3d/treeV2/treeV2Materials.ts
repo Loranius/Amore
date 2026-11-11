@@ -63,7 +63,7 @@ export const TREE_PALETTES: Record<'light' | 'dark', TreePalette> = {
 };
 
 /** Ключ — ліворуч згори спереду, як у кристала й у двійника. */
-export const TREE_KEY = new THREE.Vector3(-0.55, 0.75, 0.4).normalize();
+const TREE_KEY = new THREE.Vector3(-0.55, 0.75, 0.4).normalize();
 
 const colour = (hex: string) => new THREE.Color(hex);
 
@@ -197,7 +197,7 @@ export function createLeafMaterial(p: TreePalette, ground: number): THREE.Shader
 }
 
 /** Квіти бажань: колір каналу (червоний, блакитний, зелений). */
-export const BLOSSOM_COLOURS = ['#ff5f7e', '#6ea8ff', '#a8f07a', '#ffffff'] as const;
+const BLOSSOM_COLOURS = ['#ff5f7e', '#6ea8ff', '#a8f07a', '#ffffff'] as const;
 /** Польові квіти вихідних: біла ромашка, жовтець, дзвоник, конюшина. */
 export const FLOWER_COLOURS = ['#fff6e8', '#ffd24a', '#b58cff', '#ff8fb1'] as const;
 

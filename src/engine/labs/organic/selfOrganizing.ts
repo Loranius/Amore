@@ -60,7 +60,6 @@
 import {
   add,
   clamp,
-  clamp01,
   cross,
   dot,
   lengthSquared,
@@ -978,5 +977,3 @@ export function buildSelfOrganizingSkeleton(
     },
   };
 }
-
-export { clamp01 };

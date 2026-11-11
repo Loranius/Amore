@@ -66,7 +66,7 @@ function chooseMonarchKey(streams: readonly DepositionStream[], daysTogether: nu
   return bestKey;
 }
 
-export type CrystalInstruction = GrowthInstruction<
+type CrystalInstruction = GrowthInstruction<
   DepositionStream,
   PlacementField,
   EvolutionPressures,

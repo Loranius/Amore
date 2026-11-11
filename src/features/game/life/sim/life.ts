@@ -48,13 +48,13 @@ import { economyNight, economyWeek, type OwnedBusiness } from './economy';
  */
 export const SAVE_VERSION = 2;
 
-export interface JobState {
+interface JobState {
   id: string;
   rank: number;
   shifts: number;
 }
 
-export interface LifeFlags {
+interface LifeFlags {
   metDima: boolean;
   livingWithDima: boolean;
   proposed: boolean;
@@ -67,7 +67,7 @@ export interface LifeFlags {
  * `home` — чекає вдома; `follow` — з Лєною. `eta` — хвилина дня, коли він
  * дійде після дзвінка (`null` — уже поруч).
  */
-export interface DimaState {
+interface DimaState {
   mode: 'home' | 'follow';
   eta: number | null;
 }
@@ -76,7 +76,7 @@ export interface DimaState {
 export type Hero = 'lena' | 'dima';
 
 /** Сюжетні сторінки, які ще треба показати: вступ Діми й розлучення батьків після 3 класу. */
-export type StoryId = 'intro' | 'divorce';
+type StoryId = 'intro' | 'divorce';
 
 /** На скільки років пізніше народився герой (`dayInfo`): Діма — 2003-го, Лєна — 2002-го. */
 export const HERO_YEAR_SHIFT: Record<Hero, number> = { lena: 0, dima: 1 };
@@ -134,7 +134,7 @@ export interface LifeState {
   people: Record<string, number>;
 }
 
-export type LifeEventKind = 'toast' | 'card' | 'milestone' | 'story';
+type LifeEventKind = 'toast' | 'card' | 'milestone' | 'story';
 export interface LifeEvent {
   kind: LifeEventKind;
   text: string;
@@ -303,7 +303,7 @@ export function studying(state: LifeState): boolean {
 // ------------------------------------------------------------
 // Обов'язок дня: садочок, школа, пари, робота.
 // ------------------------------------------------------------
-export type DutyKind = 'sadok' | 'school' | 'uni' | 'work';
+type DutyKind = 'sadok' | 'school' | 'uni' | 'work';
 
 export interface Duty {
   kind: DutyKind;
@@ -317,7 +317,7 @@ export interface Duty {
   minutes: number;
 }
 
-export const LATE_GRACE_MIN = 150;
+const LATE_GRACE_MIN = 150;
 
 export function dutyToday(state: LifeState): Duty | null {
   const info = today(state);
@@ -397,7 +397,7 @@ export function attendStudy(state: LifeState, scores: readonly number[]): Outcom
 }
 
 /** Частка 0..1 → бал 1..12. */
-export function markOf(score: number): number {
+function markOf(score: number): number {
   return clamp(Math.round(1 + score * 11), 1, 12);
 }
 
@@ -408,7 +408,7 @@ export type JobCheck = { ok: true } | { ok: false; reason: string };
 
 const EDU_RANK: Record<Education, number> = { none: 0, school: 1, diploma: 2 };
 /** З якого тижня (класу) можна підробляти. */
-export const PART_TIME_WEEK = 8;
+const PART_TIME_WEEK = 8;
 
 export function jobCheck(state: LifeState, job: Job): JobCheck {
   const week = today(state).week;
@@ -442,7 +442,7 @@ export function quitJob(state: LifeState): Outcome {
 }
 
 /** Скільки змін до наступного рівня (ранги 0 → 1 → 2). */
-export const SHIFTS_PER_RANK = [5, 12, 24] as const;
+const SHIFTS_PER_RANK = [5, 12, 24] as const;
 
 export function shiftPay(job: Job, rank: number, score: number, mood: number): number {
   const base = job.pay * (1 + 0.25 * rank);
@@ -554,7 +554,7 @@ export function routePlan(from: CityId, to: CityId): TravelPlan | null {
 }
 
 /** До 9 класу далеко — лише з мамою, вихідними, і мама платить. */
-export const ALONE_TRAVEL_WEEK = 9;
+const ALONE_TRAVEL_WEEK = 9;
 
 export type TravelCheck = { ok: true; plan: TravelPlan; withMom: boolean } | { ok: false; reason: string };
 
@@ -638,7 +638,7 @@ export const DATE_PRICE: Record<DateKind, number> = { walk: 0, cafe: 160, cinema
 const DATE_MOOD: Record<DateKind, number> = { walk: 10, cafe: 14, cinema: 16 };
 
 /** Дім Діми: спільна квартира, якщо живуть разом, інакше — Вінниця. */
-export function dimaHome(state: LifeState): CityId {
+function dimaHome(state: LifeState): CityId {
   return state.flags.livingWithDima ? state.home : 'vinnytsia';
 }
 
@@ -692,7 +692,7 @@ export function hugDima(state: LifeState): Outcome {
 }
 
 /** Скільки йти Дімі до Лєни: містом — пів години, з іншого міста — дорога. */
-export function dimaTravelMinutes(state: LifeState): number {
+function dimaTravelMinutes(state: LifeState): number {
   const from = dimaHome(state);
   if (from === state.city) return 30;
   return (routePlan(from, state.city)?.minutes ?? 240) + 20;
@@ -794,7 +794,7 @@ export function meetDima(state: LifeState): Outcome {
   return { state: next, events };
 }
 
-export const PROPOSAL_HEARTS = 7;
+const PROPOSAL_HEARTS = 7;
 
 export type ProposalCheck = { ok: true } | { ok: false; reason: string };
 

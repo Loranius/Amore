@@ -41,7 +41,7 @@ export interface EvolutionRuntimeMetrics {
  * ТІЛЬКИ dev. У продакшн-збірці рядок вирізається разом із гілкою, тож пара
  * ніколи не отримує посилання на сцену в глобальному просторі.
  */
-export const EVOLUTION_SCENE_HANDLE = '__amoreEvolutionScene';
+const EVOLUTION_SCENE_HANDLE = '__amoreEvolutionScene';
 
 /**
  * Крива тонування й експозиція — ті, що застосовані НАСПРАВДІ.
@@ -51,7 +51,7 @@ export const EVOLUTION_SCENE_HANDLE = '__amoreEvolutionScene';
  * Припускати її не можна: R3F ставить ACES за замовчуванням, але `flat` на
  * полотні це вимикає, і жодного попередження при цьому не буде.
  */
-export const EVOLUTION_TONE_HANDLE = '__amoreEvolutionTone';
+const EVOLUTION_TONE_HANDLE = '__amoreEvolutionTone';
 
 /**
  * Хто малюється в цьому кадрі, згрупований за родом.

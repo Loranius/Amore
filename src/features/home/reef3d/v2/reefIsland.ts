@@ -35,7 +35,7 @@ export const REEF_WILD_PAINTS: readonly number[] = [REEF_PAINT.orange, REEF_PAIN
  * Верхівка ПЛАСКА й ледь нижча за нуль моделі: морські зірки й молюски
  * моделі (ADR-0219) лежать на y = 0, і купол їх ховав (регресійний тест).
  */
-export const REEF_ISLAND_DOME = 0;
+const REEF_ISLAND_DOME = 0;
 const RIM_Y = -0.004;
 const SEG = 24;
 /** Підошва — великими гранями: удвічі менше сегментів, ніж по краю. */

@@ -47,7 +47,7 @@ import {
   type SweepEntryRows,
 } from './sweepEntries';
 
-export type { SweepEntry, SweepEntryKind };
+export type { SweepEntry };
 
 /** Річниця так, як її бачить пара: назва, а не самий рядок дати. */
 export interface SweepAnniversary {
@@ -106,24 +106,22 @@ async function fetchSweepEntries(): Promise<SweepEntryRows & {
   };
 }
 
-export type { SweepStep };
-
-export interface AnniversaryDraft {
+interface AnniversaryDraft {
   title: string;
   date: string;
 }
 
-export interface MilestoneDraft {
+interface MilestoneDraft {
   milestone: Milestone;
   year: RelationshipYearFill;
 }
 
-export interface PlaceDraft {
+interface PlaceDraft {
   place: PlaceCandidate;
   year: RelationshipYearFill;
 }
 
-export interface WatchedDraft {
+interface WatchedDraft {
   item: TmdbSearchResult;
   type: MediaType;
   year: RelationshipYearFill;
@@ -487,11 +485,11 @@ export function useHistorySweep(): HistorySweep {
     return relationshipYearFills(data, asOf, `couple:${data.userIds.join('-')}`);
   }, [data, relationshipStartedAt, asOf]);
 
-
-
-
   const entryRows = entries.data;
   const entriesFor = useCallback(
+
+
+
     (year: RelationshipYearFill) => (
       entryRows
         ? sweepEntriesFor(entryRows, year)

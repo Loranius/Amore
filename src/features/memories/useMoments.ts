@@ -23,7 +23,7 @@ import { couplePath } from '@/lib/couplePath';
 // коштували б більше за все інше в модулі разом.
 // ============================================================
 
-export const MEMORIES_BUCKET = 'photo-calendar';
+const MEMORIES_BUCKET = 'photo-calendar';
 
 const MOMENT_COLUMNS =
   'id,title,note,memory_date,cover_photo_id,place_pin_id,created_by,created_at,updated_at';
@@ -399,7 +399,7 @@ export function useMomentMutations() {
  * дати — а мітка без `visited_at` невидима рушієві (`adapters/map.ts`).
  *
  * Цей шлях — ЄДИНИЙ живий спосіб створити мітку в порталі: другий, у
- * `useMapPinMutations`, не має жодного споживача. Тож без цього рядка
+ * `useMapPinMutations`, не мав жодного споживача й прибраний (ADR-0263). Тож без цього рядка
  * карта — один із шести модулів року — переставала б заробляти з кожною
  * новою міткою.
  */

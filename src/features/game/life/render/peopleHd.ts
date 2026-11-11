@@ -323,7 +323,7 @@ export function hdReady(look: Look): Promise<boolean> {
 }
 
 /** Частка зросту, яку показує портрет «голова й плечі»: у дитини голова більша. */
-export const PORTRAIT_CROP = { kid: 0.6, grown: 0.52 } as const;
+const PORTRAIT_CROP = { kid: 0.6, grown: 0.52 } as const;
 
 /**
  * Портрет з аркуша: кадр «стоїть, униз» у теперішньому одязі, обрізаний до
@@ -340,7 +340,7 @@ export function hdPortrait(look: Look, crop: boolean): { src: CanvasImageSource 
 }
 
 /** Межі непрозорих пікселів першої клітинки аркуша (кадр «стоїть, униз»): RGBA-пікселі аркуша. */
-export function silhouette(px: { data: ArrayLike<number>; width: number }, cell: number): Box {
+function silhouette(px: { data: ArrayLike<number>; width: number }, cell: number): Box {
   let x0 = cell;
   let y0 = cell;
   let x1 = -1;

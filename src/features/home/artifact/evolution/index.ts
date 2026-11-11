@@ -4,11 +4,7 @@
 // геометрії, матеріалів чи форми — це територія шарів нижче.
 // ============================================================
 export type {
-  EvolutionCategory,
-  EvolutionEvent,
-  EvolutionForces,
   EvolutionHistoryCounts,
-  EvolutionSource,
   EvolutionTimeline,
 } from './evolutionTypes';
 export { buildEvolutionTimeline } from './evolutionEvents';

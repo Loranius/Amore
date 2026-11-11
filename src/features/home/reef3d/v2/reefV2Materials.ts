@@ -76,9 +76,9 @@ export function seasonalReefPalette(p: ReefPalette, season: Season, theme: 'ligh
  * помпон рожевий, гіллястий помаранчевий, леза зелені, трубки бірюзові,
  * пластини жовті, пальці корально-червоні.
  */
-export const CORAL_COLOURS = ['#ff5f9e', '#ff7a36', '#5fd35a', '#3fcfe6', '#ffc629', '#ff5a4f'] as const;
+const CORAL_COLOURS = ['#ff5f9e', '#ff7a36', '#5fd35a', '#3fcfe6', '#ffc629', '#ff5a4f'] as const;
 /** Актинії (хто виконав бажання) і мушля: червоний, блакитний, зелений, перламутр. */
-export const CRITTER_COLOURS = ['#ff5f7e', '#6ea8ff', '#a8f07a', '#f3e6f0'] as const;
+const CRITTER_COLOURS = ['#ff5f7e', '#6ea8ff', '#a8f07a', '#f3e6f0'] as const;
 
 const colour = (hex: string) => new THREE.Color(hex);
 const KEY = new THREE.Vector3(-0.25, 0.92, 0.3).normalize();

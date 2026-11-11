@@ -118,7 +118,7 @@ function rowCenter(
   );
 }
 
-export /** cos(38°): past this a vertex normal is averaging across an edge, not a curve. */
+/** cos(38°): past this a vertex normal is averaging across an edge, not a curve. */
 const SMOOTH_CREASE_COSINE = 0.788;
 
 /** Reference directions for the per-face texture basis; the second covers poles. */

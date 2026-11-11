@@ -21,9 +21,7 @@ import {
   stableEvolutionCoupleId,
 } from './sourceSnapshot';
 
-
-
-export interface EvolutionCrystalMetrics {
+interface EvolutionCrystalMetrics {
   buildMs: number;
   normalizedEventCount: number;
   bodyCount: number;
@@ -34,7 +32,7 @@ export interface EvolutionCrystalMetrics {
   quality: CrystalMaterialQuality;
 }
 
-export interface EvolutionCrystalPipeline {
+interface EvolutionCrystalPipeline {
   artifact: ArtifactBlueprint;
   species: CrystalSpeciesBlueprint;
   growth: GrowthState;

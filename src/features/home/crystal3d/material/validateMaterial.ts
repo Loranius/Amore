@@ -39,7 +39,7 @@ import type { ClusterBranch, ClusterMaterial } from '../crystalCluster';
 import { bindMaterialRegions, type MaterialRegion, type MaterialRegionStats } from './crystalMaterial';
 import { byCodePoint } from '@/engine/ordering';
 
-export type MaterialViolationKind =
+type MaterialViolationKind =
   | 'unbound-material'
   | 'seam-outside-band'
   | 'blend-outside-seam';

@@ -48,7 +48,7 @@ export const SWEEP_STAMP = 'T12:00:00.000Z';
  * й обидва зводить до одного числа; недійсна дата дає `NaN`, а `NaN !== NaN`,
  * тож сміття само собою не збігається ні з чим.
  */
-export function sameInstant(left: string | null, right: string): boolean {
+function sameInstant(left: string | null, right: string): boolean {
   if (typeof left !== 'string' || !ZONED.test(left)) return false;
   const parsed = Date.parse(left);
   return Number.isFinite(parsed) && parsed === Date.parse(right);
@@ -113,7 +113,7 @@ export interface SweepEntryRows {
 const KIND_WORD: Record<string, string> = { movie: 'фільм', series: 'серіал' };
 
 /** Чи має рядок підпис проходу для саме цього року. */
-export function isSweepPlan(
+function isSweepPlan(
   plan: SweepEntryRows['plans'][number],
   middle: string,
 ): boolean {
@@ -123,7 +123,7 @@ export function isSweepPlan(
     && sameInstant(plan.completedAt, `${middle}${SWEEP_STAMP}`);
 }
 
-export function isSweepWatched(
+function isSweepWatched(
   item: SweepEntryRows['watched'][number],
   middle: string,
 ): boolean {
@@ -137,7 +137,7 @@ export function isSweepWatched(
  * заднім числом нічим. Тому зворотна дія тут одна на обидва — зняти
  * дату, — і саме її називає підпис у списку.
  */
-export function isSweepPlace(
+function isSweepPlace(
   place: SweepEntryRows['places'][number],
   middle: string,
 ): boolean {

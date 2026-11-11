@@ -254,7 +254,7 @@ export function upgradeBusiness(state: LifeState, id: BusinessId): Outcome {
 }
 
 /** Скільки справа принесе за ніч. */
-export function businessNight(state: LifeState, owned: OwnedBusiness): number {
+function businessNight(state: LifeState, owned: OwnedBusiness): number {
   const b = business(owned.id);
   const neglected = state.day - owned.visited > BUSINESS_NEGLECT_DAYS;
   const r = rngFor(state.seed, 'biz', owned.id, state.day)();

@@ -7,7 +7,7 @@ import { byCodePoint } from '@/engine/ordering';
 
 const ALLOWED_MEMORY_SOURCES = new Set(['wish', 'place', 'goal', 'event']);
 
-export function archiveToWishlistSource(
+function archiveToWishlistSource(
   item: WishlistEvolutionArchiveItem,
 ): WishlistSource {
   return {

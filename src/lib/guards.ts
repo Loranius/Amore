@@ -5,13 +5,7 @@
 // рантаймі, замість сліпого `as`. Використовуються там, де дані
 // приходять «ззовні» (users.name, jsonb metadata, culinary-ai).
 // ============================================================
-import type {
-  UserName,
-  AppUser,
-  PlanMetadata,
-  CulinaryDish,
-  ShoppingCategory,
-} from '@/types';
+import type { UserName, AppUser, CulinaryDish, ShoppingCategory } from '@/types';
 import { SHOPPING_CATEGORIES } from '@/app/constants';
 
 /**
@@ -46,25 +40,6 @@ export function toAppUser(row: { id: number; name: string } | null | undefined):
   const name = asUserName(row.name);
   if (name === null) return null;
   return { id: row.id, name };
-}
-
-const PLAN_CATS: readonly string[] = ['date', 'dream', 'trip', 'goal', 'other'];
-const PLAN_STATUSES: readonly string[] = ['planned', 'active', 'done'];
-
-/**
- * Перевіряє форму jsonb events.metadata. Плани, бекфілені з тегів
- * `[cat:…][status:…]`, мають саме цю структуру; сирі події — null.
- */
-export function isPlanMetadata(v: unknown): v is PlanMetadata {
-  if (!v || typeof v !== 'object') return false;
-  const m = v as Record<string, unknown>;
-  return (
-    typeof m.cat === 'string' &&
-    PLAN_CATS.includes(m.cat) &&
-    typeof m.status === 'string' &&
-    PLAN_STATUSES.includes(m.status) &&
-    (m.done_at === null || typeof m.done_at === 'string')
-  );
 }
 
 /**

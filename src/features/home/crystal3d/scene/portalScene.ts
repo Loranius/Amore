@@ -291,7 +291,7 @@ export { PORTAL_EYE_ELEVATION_SIN } from './portalPalette';
 const EYE_ELEVATION_SIN = PORTAL_EYE_ELEVATION_SIN;
 
 /** Наскільки ближче за «вміщений» кадр стоїть камера (ADR-0210). */
-export const PORTAL_FRAME_CLOSENESS = 0.66;
+const PORTAL_FRAME_CLOSENESS = 0.66;
 
 /** Наскільки ціль опускається під кристал, у частках відстані. */
 /*

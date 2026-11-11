@@ -14,7 +14,7 @@ import { rngFor } from './rng';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
-export const MAX_FRIENDSHIP = 10;
+const MAX_FRIENDSHIP = 10;
 /** З цього рівня — подруга/друг: кава вдвох і бонус дружби. */
 export const FRIEND_LEVEL = 4;
 export const CLOSE_LEVEL = 7;
@@ -184,9 +184,9 @@ export function residentsIn(state: LifeState, city: CityId): Resident[] {
   return RESIDENTS.filter((r) => r.city === city && week >= r.minWeek);
 }
 
-export type FriendTier = 0 | 1 | 2;
+type FriendTier = 0 | 1 | 2;
 
-export function tierOf(level: number): FriendTier {
+function tierOf(level: number): FriendTier {
   return level >= FRIEND_LEVEL ? 2 : level > 0 ? 1 : 0;
 }
 

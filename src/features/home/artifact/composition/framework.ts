@@ -53,8 +53,8 @@ import { byCodePoint } from '@/engine/ordering';
 // Hierarchy Engine (Vol IV): рівно один фокус (king), далі support/family
 // (незалежні домінанти) → companion (супутники колоній) → micro (пил).
 // Мусить збігатися з CompositionTier у ../artifactTypes.ts.
-export type CompositionTier = 'king' | 'support' | 'family' | 'companion' | 'micro';
-export type CompositionRole = 'dominant' | 'satellite' | 'micro';
+type CompositionTier = 'king' | 'support' | 'family' | 'companion' | 'micro';
+type CompositionRole = 'dominant' | 'satellite' | 'micro';
 
 /** Генеричне тіло: звужений конус (frustum) із основою, віссю і розмірами. */
 export interface CompositionBody {
@@ -89,7 +89,7 @@ export interface ComposedBody extends CompositionBody {
   parentKey?: string;
 }
 
-export interface ArchetypeFeatures {
+interface ArchetypeFeatures {
   age: number;
   volume: number;
   energy: number;
@@ -98,7 +98,7 @@ export interface ArchetypeFeatures {
   rnd: number;
 }
 
-export interface CompanionSpec {
+interface CompanionSpec {
   suffix: string;
   count: number;
   lengthMul: number;
@@ -130,7 +130,7 @@ export interface SilhouettePreset {
   envelope: (alignment: number, horiz: number, y: number) => number;
 }
 
-export interface MicroLayerConfig {
+interface MicroLayerConfig {
   minParentVolume: number;
   maxPerParent: number;
   globalCap: number;

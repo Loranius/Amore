@@ -14,7 +14,7 @@
 // ============================================================
 import { hexToRgb } from './pixel';
 
-export type OutfitPart = 'top' | 'bottom' | 'accent';
+type OutfitPart = 'top' | 'bottom' | 'accent';
 export type OutfitColors = { [P in OutfitPart]?: string | undefined };
 
 /** Частини в порядку каналів маски: червоний, зелений, синій. */

@@ -20,7 +20,7 @@ import type { ClusterBranch, ClusterMaterial } from '../crystalCluster';
 import { lodSegments, type LodLevel } from './lod';
 
 /** Рядок профілю обертання: радіус на висоті y (локальний простір тіла). */
-export interface ProfileRow {
+interface ProfileRow {
   y: number;
   r: number;
 }

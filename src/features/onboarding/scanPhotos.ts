@@ -24,10 +24,10 @@ import type { DatedPhoto } from './photoImport';
  * 256 КБ із запасом покривають і APP1 у JPEG, і бокс `meta` з елементом
  * EXIF у HEIC: обидва стоять на початку файлу.
  */
-export const EXIF_PREFIX_BYTES = 256 * 1024;
+const EXIF_PREFIX_BYTES = 256 * 1024;
 
 /** Час зйомки з файлу, або `null`. Не кидає: битий кадр не валить імпорт. */
-export async function readTakenAt(file: Blob): Promise<string | null> {
+async function readTakenAt(file: Blob): Promise<string | null> {
   try {
     const head = await file.slice(0, EXIF_PREFIX_BYTES).arrayBuffer();
     const early = readExifTakenAt(head);

@@ -44,7 +44,7 @@ export interface CrystalDeltas {
 
 /** Нулі для стану «дані ще не прийшли». Експортується, бо той самий
  *  порожній знімок потрібен і заглушці кристала, поки вантажиться 3D. */
-export const EMPTY_DNA: CrystalDNA = {
+const EMPTY_DNA: CrystalDNA = {
   daysTogether: 0,
   photos: 0,
   places: 0,
@@ -59,7 +59,7 @@ export const EMPTY_DNA: CrystalDNA = {
   totalSaved: 0,
 };
 
-export const EMPTY_DELTAS: CrystalDeltas = {
+const EMPTY_DELTAS: CrystalDeltas = {
   wishesDoneThisMonth: 0,
   placesThisMonth: 0,
   moviesWatchedThisMonth: 0,
@@ -249,8 +249,7 @@ export interface CrystalWish {
 }
 
 /**
- * Виконані бажання ОБОХ партнерів (на відміну від useFulfilledWishes —
- * той власницький, для сторінки вішліста). «Бажання → нові маленькі
+ * Виконані бажання ОБОХ партнерів. «Бажання → нові маленькі
  * бічні кристали» (crystalCluster.ts): кожне виконане бажання — окремий
  * маленький супутній кристалик, вік якого рахується від fulfilled_at.
  */

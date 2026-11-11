@@ -21,7 +21,7 @@ import { boundsOverlap, breatheMargin, isInsideHost, type HostSolid } from './ho
 import { triangleInside, worldVertices } from './junctionTrim';
 import { byCodePoint, byNormalizedText } from '@/engine/ordering';
 
-export type ShellViolationKind =
+type ShellViolationKind =
   /** Тіло посилається на господаря, якого немає в опублікованій масі. */
   | 'orphan-host'
   /** Кришка основи повністю занурена в господаря, але лишилась в оболонці. */
@@ -275,13 +275,13 @@ export const UNDERSIDE_DIRECTIONS: THREE.Vector3[] = [
 ];
 
 /** Повний оберт навколо колонії — 16 горизонтальних напрямків (§8). */
-export const ORBIT_DIRECTIONS: THREE.Vector3[] = Array.from({ length: 16 }, (_, i) => {
+const ORBIT_DIRECTIONS: THREE.Vector3[] = Array.from({ length: 16 }, (_, i) => {
   const a = (i / 16) * Math.PI * 2;
   return new THREE.Vector3(Math.cos(a), 0, Math.sin(a));
 });
 
 /** Строго згори (§8). */
-export const TOP_DIRECTION = new THREE.Vector3(0, -1, 0);
+const TOP_DIRECTION = new THREE.Vector3(0, -1, 0);
 
 /** Похилі згори — між орбітою й видом згори лишалась би сліпа зона. */
 const UPPER_OBLIQUE: THREE.Vector3[] = [

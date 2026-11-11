@@ -54,9 +54,9 @@ import {
   type CrystalLifeState,
 } from '@/engine/life';
 
-export const ENGINE_VERSION = '1.0.0';
-export const SPECIES_RULES_VERSION = '1.0.0';
-export const COUPLE_TIME_ZONE = 'Europe/Kyiv';
+const ENGINE_VERSION = '1.0.0';
+const SPECIES_RULES_VERSION = '1.0.0';
+const COUPLE_TIME_ZONE = 'Europe/Kyiv';
 
 /**
  * Стеля опублікованих тіл.
@@ -64,7 +64,7 @@ export const COUPLE_TIME_ZONE = 'Europe/Kyiv';
  * Не оптимізація: рушій росту сам вирішує, скільки тіл існує, і без стелі
  * пара з піввіковою історією отримала б їх стільки, скільки років.
  */
-export const MAX_PUBLISHED_BODIES = 128;
+const MAX_PUBLISHED_BODIES = 128;
 
 export interface CrystalPipelineInput {
   coupleId: string;

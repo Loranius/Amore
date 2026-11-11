@@ -20,7 +20,7 @@
 // нового немає, тож і відгуку немає.
 // ============================================================
 
-export type CelebrationEffect = 'wave' | 'crown' | 'flush' | 'burst';
+type CelebrationEffect = 'wave' | 'crown' | 'flush' | 'burst';
 
 /** Вид події → ефект. Невідомий вид мовчить, а не вигадує відгук. */
 const EFFECT_OF: Readonly<Record<string, CelebrationEffect>> = {
@@ -40,7 +40,7 @@ export const CELEBRATION_DELAY_S = 1.2;
 /** Тривалість одного ефекту. */
 export const CELEBRATION_DURATION_S = 2.4;
 /** Наступний ефект починається, поки попередній ще згасає. */
-export const CELEBRATION_STEP_S = 1.1;
+const CELEBRATION_STEP_S = 1.1;
 
 export interface CelebrationBeat {
   effect: CelebrationEffect;

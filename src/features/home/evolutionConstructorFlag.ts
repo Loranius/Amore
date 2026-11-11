@@ -21,7 +21,7 @@
 // вмикається адресою.
 // ============================================================
 
-export const EVOLUTION_SANDBOX_QUERY_KEY = 'sandbox';
+const EVOLUTION_SANDBOX_QUERY_KEY = 'sandbox';
 
 /**
  * Конструктор доступний у розробці або на явний запит адресою

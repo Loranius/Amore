@@ -107,7 +107,7 @@ const SPOT = {
   bed: [16, 12],
 } as const;
 
-export const FAMILY_NAME: Record<FamilyId, string> = { mom: 'Мама', dad: 'Тато', vlad: 'Владік' };
+const FAMILY_NAME: Record<FamilyId, string> = { mom: 'Мама', dad: 'Тато', vlad: 'Владік' };
 
 /**
  * Розклад родини (з порту): у будні батьки на роботі, Владік у садочку; уночі

@@ -4,7 +4,7 @@
 // resolveHomeArtifact (homeArtifact.ts), обираючи артефакт. Прапорець лишався
 // перемикачем без другого положення.
 
-export const EVOLUTION_DIAGNOSTICS_QUERY_KEY = 'evolutionDiagnostics';
+const EVOLUTION_DIAGNOSTICS_QUERY_KEY = 'evolutionDiagnostics';
 
 /**
  * Build metrics and adapter diagnostics overlay. Off unless asked for: on the

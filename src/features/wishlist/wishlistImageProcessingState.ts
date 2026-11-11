@@ -6,7 +6,7 @@ import type { WishlistImageDisplayMode } from './wishlistImageModes';
 
 export const CURRENT_WISHLIST_IMAGE_PROCESSOR_VERSION = 1;
 
-export const DEFAULT_WISHLIST_IMAGE_LEASE_MS = 2 * 60 * 1000;
+const DEFAULT_WISHLIST_IMAGE_LEASE_MS = 2 * 60 * 1000;
 
 export type WishlistImageProcessingStatus =
   | 'idle'
@@ -15,7 +15,7 @@ export type WishlistImageProcessingStatus =
   | 'ready'
   | 'failed';
 
-export interface WishlistImageProcessingClaim {
+interface WishlistImageProcessingClaim {
   sessionId: string;
   leaseExpiresAt: string;
 }

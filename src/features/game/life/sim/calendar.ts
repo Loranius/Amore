@@ -15,11 +15,11 @@
 export type Season = 'autumn' | 'winter' | 'spring' | 'summer';
 export type Stage = 'sadok' | 'school' | 'uni' | 'adult';
 
-export const DAYS_PER_WEEK = 7;
+const DAYS_PER_WEEK = 7;
 /** Перший навчальний рік гри — садочок. */
-export const FIRST_YEAR = 2007;
-export const SCHOOL_GRADES = 11;
-export const UNI_COURSES = 4;
+const FIRST_YEAR = 2007;
+const SCHOOL_GRADES = 11;
+const UNI_COURSES = 4;
 export const UNI_FIRST_WEEK = 1 + SCHOOL_GRADES; // 12
 export const ADULT_FIRST_WEEK = UNI_FIRST_WEEK + UNI_COURSES; // 16
 /** Тиждень і день зустрічі з Дімою: середа 4-го курсу. */
@@ -75,7 +75,7 @@ export interface DayInfo {
   age: number;
 }
 
-export const BIRTH_YEAR = 2002;
+const BIRTH_YEAR = 2002;
 
 export function stageOfWeek(week: number): { stage: Stage; level: number } {
   if (week <= 0) return { stage: 'sadok', level: 0 };

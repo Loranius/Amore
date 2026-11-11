@@ -4,6 +4,5 @@
 // що реалізує інтерфейс Species; Growth Engine споживає лише
 // GrowthInstruction і не знає, що вирощує.
 // ============================================================
-export type { GrowthInstruction, Species } from './speciesTypes';
 export { crystalSpecies } from './crystalSpecies';
-export type { CrystalConstraints, CrystalInstruction, CrystalState } from './crystalSpecies';
+export type { CrystalConstraints } from './crystalSpecies';
